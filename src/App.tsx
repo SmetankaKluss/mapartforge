@@ -88,6 +88,20 @@ export default function App() {
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
 
+  // Ref with all current state needed for processing (avoids stale closures in reprocess)
+  const processRef = useRef({
+    sourceImage: null as HTMLImageElement | null,
+    dithering: 'floyd-steinberg' as DitheringMode,
+    mapGrid: { wide: 1, tall: 1 } as MapGrid,
+    intensity: 100,
+    compareMode: false,
+    compareLeft: 'floyd-steinberg' as DitheringMode,
+    compareRight: 'yliluoma2' as DitheringMode,
+    activePalette: null as unknown as ComputedPalette,
+    adjustments: DEFAULT_ADJUSTMENTS,
+    bnScale: 2,
+  });
+
   // ── Auto-save settings to localStorage ──────────────────────────────────
   useEffect(() => { saveSettings({ dithering }); }, [dithering]);
   useEffect(() => { saveSettings({ intensity }); }, [intensity]);
@@ -183,6 +197,9 @@ export default function App() {
   // Keep exportRef current each render so keyboard shortcuts access fresh state
   exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode };
 
+  // Keep processRef current each render so reprocess() always reads fresh state
+  processRef.current = { sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale };
+
   async function runProcess(
     img: HTMLImageElement,
     mode: DitheringMode,
@@ -201,6 +218,7 @@ export default function App() {
     setProcessingProgress(0);
     const w = gridPixelWidth(grid);
     const h = gridPixelHeight(grid);
+    console.log(`[mapart] runProcess — mode:${mode} intens:${intens} (→${(intens/100).toFixed(3)}) size:${w}x${h} palette:${palette.colors.length}`);
     try {
       if (compare) {
         const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
@@ -228,19 +246,20 @@ export default function App() {
     cmpRight?: DitheringMode; palette?: ComputedPalette; adj?: ImageAdjustments;
     bn?: number;
   } = {}) {
-    const img = overrides.img ?? sourceImage;
+    const s = processRef.current;
+    const img = overrides.img ?? s.sourceImage;
     if (!img) return;
     runProcess(
       img,
-      overrides.mode    ?? dithering,
-      overrides.grid    ?? mapGrid,
-      overrides.intens  ?? intensity,
-      overrides.compare ?? compareMode,
-      overrides.cmpLeft  ?? compareLeft,
-      overrides.cmpRight ?? compareRight,
-      overrides.palette  ?? activePalette,
-      overrides.adj      ?? adjustments,
-      overrides.bn      ?? bnScale,
+      overrides.mode    ?? s.dithering,
+      overrides.grid    ?? s.mapGrid,
+      overrides.intens  ?? s.intensity,
+      overrides.compare ?? s.compareMode,
+      overrides.cmpLeft  ?? s.compareLeft,
+      overrides.cmpRight ?? s.compareRight,
+      overrides.palette  ?? s.activePalette,
+      overrides.adj      ?? s.adjustments,
+      overrides.bn      ?? s.bnScale,
     );
   }
 
