@@ -89,19 +89,6 @@ export default function App() {
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
 
-  // Ref with all current state needed for processing (avoids stale closures in reprocess)
-  const processRef = useRef({
-    sourceImage: null as HTMLImageElement | null,
-    dithering: 'floyd-steinberg' as DitheringMode,
-    mapGrid: { wide: 1, tall: 1 } as MapGrid,
-    intensity: 100,
-    compareMode: false,
-    compareLeft: 'floyd-steinberg' as DitheringMode,
-    compareRight: 'yliluoma2' as DitheringMode,
-    activePalette: null as unknown as ComputedPalette,
-    adjustments: DEFAULT_ADJUSTMENTS,
-    bnScale: 2,
-  });
 
   // ── Auto-save settings to localStorage ──────────────────────────────────
   useEffect(() => { console.log('[effect-dithering]', dithering); saveSettings({ dithering }); }, [dithering]);
@@ -198,9 +185,6 @@ export default function App() {
   // Keep exportRef current each render so keyboard shortcuts access fresh state
   exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode };
 
-  // Keep processRef current each render so reprocess() always reads fresh state
-  processRef.current = { sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale };
-
   async function runProcess(
     img: HTMLImageElement,
     mode: DitheringMode,
@@ -215,6 +199,7 @@ export default function App() {
   ) {
     if (processingRef.current) return;
     processingRef.current = true;
+    console.log('[mapart]', mode, intens);
     setProcessing(true);
     setProcessingProgress(0);
     const w = gridPixelWidth(grid);
@@ -239,98 +224,65 @@ export default function App() {
     }
   }
 
-  function reprocess(overrides: {
-    img?: HTMLImageElement; mode?: DitheringMode; grid?: MapGrid;
-    intens?: number; compare?: boolean; cmpLeft?: DitheringMode;
-    cmpRight?: DitheringMode; palette?: ComputedPalette; adj?: ImageAdjustments;
-    bn?: number;
-  } = {}) {
-    const s = processRef.current;
-    const img = overrides.img ?? s.sourceImage;
-    if (!img) return;
-    console.log('[mapart]', overrides.mode ?? s.dithering, overrides.intens ?? s.intensity);
-    runProcess(
-      img,
-      overrides.mode    ?? s.dithering,
-      overrides.grid    ?? s.mapGrid,
-      overrides.intens  ?? s.intensity,
-      overrides.compare ?? s.compareMode,
-      overrides.cmpLeft  ?? s.compareLeft,
-      overrides.cmpRight ?? s.compareRight,
-      overrides.palette  ?? s.activePalette,
-      overrides.adj      ?? s.adjustments,
-      overrides.bn      ?? s.bnScale,
-    );
-  }
-
   const handleImageLoaded = useCallback((img: HTMLImageElement) => {
     setSourceImage(img);
     setShowOriginal(false);
     setUndoStack([]);
     setRedoStack([]);
-    reprocess({ img });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
-    reprocess({ mode });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
-    reprocess({ grid });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
+  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
 
   const handleIntensityCommit = useCallback((v: number) => {
     setIntensity(v);
-    reprocess({ intens: v });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
   }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleBnScaleChange = useCallback((v: number) => {
     setBnScale(v);
-    reprocess({ bn: v });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, v);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
 
   const handleCompareModeChange = useCallback((enabled: boolean) => {
     setCompareMode(enabled);
     setShowOriginal(false);
-    reprocess({ compare: enabled });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, adjustments, bnScale);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
     if (side === 'left') {
       setCompareLeft(mode);
-      reprocess({ cmpLeft: mode, compare: true });
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, adjustments, bnScale);
     } else {
       setCompareRight(mode);
-      reprocess({ cmpRight: mode, compare: true });
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, adjustments, bnScale);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleSelectionChange = useCallback((sel: BlockSelection) => {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
-    reprocess({ palette: newPalette });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, mapMode, bnScale]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
     const shades = mode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    reprocess({ palette: newPalette });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, adjustments, bnScale]);
 
   const handleAdjChange = useCallback((adj: ImageAdjustments) => {
@@ -339,9 +291,8 @@ export default function App() {
 
   const handleAdjCommit = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
-    reprocess({ adj });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale]);
 
   const handleRemoveBlock = useCallback((csId: number) => {
     pushToHistory();
@@ -349,8 +300,7 @@ export default function App() {
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
-    reprocess({ palette: newPalette });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
   }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, bnScale]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
@@ -398,14 +348,11 @@ export default function App() {
     setBlockSelection(DEFAULT_SELECTION);
     setAdjustments(DEFAULT_ADJUSTMENTS);
     setMapMode('2d');
-    // Reprocess if an image is loaded
-    reprocess({
-      mode: 'floyd-steinberg', intens: 100, bn: 2,
-      grid: { wide: 1, tall: 1 },
-      palette: buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [2])),
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (sourceImage) {
+      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [2]));
+      runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2);
+    }
+  }, [sourceImage, compareMode, compareLeft, compareRight]);
 
   // ── Load from ?share= URL param (runs once on mount) ──────────────────────
   // Using a ref to prevent double-execution in React StrictMode
