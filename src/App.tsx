@@ -218,7 +218,6 @@ export default function App() {
     setProcessingProgress(0);
     const w = gridPixelWidth(grid);
     const h = gridPixelHeight(grid);
-    console.log(`[mapart] runProcess — mode:${mode} intens:${intens} (→${(intens/100).toFixed(3)}) size:${w}x${h} palette:${palette.colors.length}`);
     try {
       if (compare) {
         const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
@@ -229,7 +228,6 @@ export default function App() {
           dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
           onProgress: setProcessingProgress,
         });
-        console.log('[mapart] imageData set, hasContent should now be true');
         setImageData(result.processed);
         setOriginalData(result.original);
       }

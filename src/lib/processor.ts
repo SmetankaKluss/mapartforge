@@ -44,14 +44,6 @@ export async function processImage(
     onProgress,
   } = options;
 
-  // Debug: verify palette is being received correctly
-  const isDefault = palette === DEFAULT_PALETTE;
-  console.log(
-    `[mapart] processImage — mode:${dithering} size:${width}x${height}` +
-    ` palette:${palette.colors.length} colors ${isDefault ? '(DEFAULT)' : '(custom)'}` +
-    ` first5: ${palette.colors.slice(0, 5).map(c => `rgb(${c.r},${c.g},${c.b})`).join(' ')}`,
-  );
-
   onProgress?.(5);
 
   const raw      = await scaleSource(source, width, height);
