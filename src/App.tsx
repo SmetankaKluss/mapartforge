@@ -103,7 +103,7 @@ export default function App() {
   });
 
   // ── Auto-save settings to localStorage ──────────────────────────────────
-  useEffect(() => { saveSettings({ dithering }); }, [dithering]);
+  useEffect(() => { console.log('[effect-dithering]', dithering); saveSettings({ dithering }); }, [dithering]);
   useEffect(() => { saveSettings({ intensity }); }, [intensity]);
   useEffect(() => { saveSettings({ mapGrid }); }, [mapGrid]);
   useEffect(() => { saveSettings({ blockSelection }); }, [blockSelection]);
@@ -247,6 +247,7 @@ export default function App() {
     const s = processRef.current;
     const img = overrides.img ?? s.sourceImage;
     if (!img) return;
+    console.log('[mapart]', overrides.mode ?? s.dithering, overrides.intens ?? s.intensity);
     runProcess(
       img,
       overrides.mode    ?? s.dithering,
