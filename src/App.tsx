@@ -1,0 +1,826 @@
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { ImageUpload } from './components/ImageUpload';
+import { PreviewCanvas } from './components/PreviewCanvas';
+import type { PaintTool, PaintBlock } from './components/PreviewCanvas';
+import { BlockPickerPopup } from './components/BlockPickerPopup';
+import { SPRITE_URL } from './components/BlockCanvas';
+import { CompareView } from './components/CompareView';
+import { MaterialsList } from './components/MaterialsList';
+import { Controls } from './components/Controls';
+import { Adjustments } from './components/Adjustments';
+import { PaletteEditor } from './components/PaletteEditor';
+import { ExportPanel } from './components/ExportPanel';
+import type { DitheringMode } from './lib/dithering';
+import { buildComputedPalette } from './lib/dithering';
+import type { ComputedPalette } from './lib/dithering';
+import { processImage, processCompare } from './lib/processor';
+import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
+import type { MapGrid } from './lib/types';
+import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
+import type { BlockSelection } from './lib/paletteBlocks';
+import { DEFAULT_ADJUSTMENTS } from './lib/adjustments';
+import type { ImageAdjustments } from './lib/adjustments';
+import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
+import { loadShare } from './lib/share';
+import { downloadPng } from './lib/exportPng';
+import { exportLitematic } from './lib/exportLitematic';
+import './App.css';
+
+const MAX_HISTORY = 20;
+
+interface HistoryEntry {
+  imageData: ImageData | null;
+  blockSelection: BlockSelection;
+}
+
+const DITHERING_LABELS: Record<DitheringMode, string> = {
+  'none':            'None',
+  'floyd-steinberg': 'Floyd–Steinberg',
+  'stucki':          'Stucki',
+  'jjn':             'JJN',
+  'atkinson':        'Atkinson',
+  'blue-noise':      'Blue Noise',
+  'yliluoma2':       'Yliluoma #2',
+};
+const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2'];
+
+export default function App() {
+  // ── Restore persisted settings on first render ────────────────────────
+  const saved = loadSettings();
+
+  const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
+  const [imageData, setImageData]       = useState<ImageData | null>(null);
+  const [originalData, setOriginalData] = useState<ImageData | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [showGrid, setShowGrid]         = useState(false);
+  const [zoom, setZoom]                 = useState(100);
+  const [compareMode, setCompareMode]   = useState(false);
+  const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
+  const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
+  const [compareData, setCompareData]   = useState<{ left: ImageData; right: ImageData } | null>(null);
+  const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
+  const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
+  const [dithering, setDithering]       = useState<DitheringMode>(saved.dithering ?? 'floyd-steinberg');
+  const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
+  const [bnScale, setBnScale]           = useState(saved.bnScale ?? 2);
+  const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
+  const [processing, setProcessing]     = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
+  const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
+  const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
+  const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
+  const [showBlockPicker, setShowBlockPicker] = useState(false);
+  const [shareBanner, setShareBanner] = useState(false);
+  const processingRef = useRef(false);
+  const previewSectionRef = useRef<HTMLElement>(null);
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+
+  // Always-current ref — updated each render so callbacks never see stale state
+  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection }>({
+    imageData: null, blockSelection: DEFAULT_SELECTION,
+  });
+  latestRef.current = { imageData, blockSelection };
+
+  // Ref with all current state needed for export shortcuts (avoids stale closures)
+  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
+
+  // ── Auto-save settings to localStorage ──────────────────────────────────
+  useEffect(() => { saveSettings({ dithering }); }, [dithering]);
+  useEffect(() => { saveSettings({ intensity }); }, [intensity]);
+  useEffect(() => { saveSettings({ mapGrid }); }, [mapGrid]);
+  useEffect(() => { saveSettings({ blockSelection }); }, [blockSelection]);
+  useEffect(() => { saveSettings({ adjustments }); }, [adjustments]);
+  useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
+  useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
+
+  // Push current state onto undo stack before a tracked action
+  const pushToHistory = useCallback(() => {
+    const { imageData: img, blockSelection: sel } = latestRef.current;
+    setUndoStack(prev => {
+      const next = [...prev, { imageData: img, blockSelection: sel }];
+      return next.length > MAX_HISTORY ? next.slice(1) : next;
+    });
+    setRedoStack([]);
+  // latestRef is a stable ref, setters are stable
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      const cur = latestRef.current;
+      setRedoStack(r => [...r, { imageData: cur.imageData, blockSelection: cur.blockSelection }]);
+      setImageData(entry.imageData);
+      setBlockSelection(entry.blockSelection);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      const cur = latestRef.current;
+      setUndoStack(u => {
+        const next = [...u, { imageData: cur.imageData, blockSelection: cur.blockSelection }];
+        return next.length > MAX_HISTORY ? next.slice(1) : next;
+      });
+      setImageData(entry.imageData);
+      setBlockSelection(entry.blockSelection);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  // Keyboard shortcuts for undo/redo + export — effect registered below,
+  // after handleExportPng/handleExportLitematic are declared.
+
+  // Keyboard shortcuts for paint tools (E / B / F / Escape)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (!imageData) return;
+      switch (e.code) {
+        case 'KeyE': setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper'); break;
+        case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
+        case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
+        case 'Escape': setActiveTool(null); break;
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [imageData]);
+
+  // Ctrl+scroll to zoom on the preview section
+  useEffect(() => {
+    const el = previewSectionRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const direction = e.deltaY > 0 ? -1 : 1;
+      setZoom(prev => Math.max(50, Math.min(800, prev + direction * 10)));
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  // previewSectionRef is stable; re-attach only if section mounts/unmounts
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const modeShades = mapMode === '2d' ? [2] : [0, 1, 2];
+
+  const activePalette = useMemo<ComputedPalette>(
+    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blockSelection, mapMode],
+  );
+
+  // Keep exportRef current each render so keyboard shortcuts access fresh state
+  exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode };
+
+  async function runProcess(
+    img: HTMLImageElement,
+    mode: DitheringMode,
+    grid: MapGrid,
+    intens: number,
+    compare: boolean,
+    cmpLeft: DitheringMode,
+    cmpRight: DitheringMode,
+    palette: ComputedPalette,
+    adj: ImageAdjustments,
+    bn: number,
+  ) {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setProcessing(true);
+    setProcessingProgress(0);
+    const w = gridPixelWidth(grid);
+    const h = gridPixelHeight(grid);
+    try {
+      if (compare) {
+        const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
+        setCompareData({ left: result.left, right: result.right });
+        setOriginalData(result.original);
+      } else {
+        const result = await processImage(img, {
+          dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
+          onProgress: setProcessingProgress,
+        });
+        setImageData(result.processed);
+        setOriginalData(result.original);
+      }
+    } finally {
+      processingRef.current = false;
+      setProcessing(false);
+      setProcessingProgress(0);
+    }
+  }
+
+  function reprocess(overrides: {
+    img?: HTMLImageElement; mode?: DitheringMode; grid?: MapGrid;
+    intens?: number; compare?: boolean; cmpLeft?: DitheringMode;
+    cmpRight?: DitheringMode; palette?: ComputedPalette; adj?: ImageAdjustments;
+    bn?: number;
+  } = {}) {
+    const img = overrides.img ?? sourceImage;
+    if (!img) return;
+    runProcess(
+      img,
+      overrides.mode    ?? dithering,
+      overrides.grid    ?? mapGrid,
+      overrides.intens  ?? intensity,
+      overrides.compare ?? compareMode,
+      overrides.cmpLeft  ?? compareLeft,
+      overrides.cmpRight ?? compareRight,
+      overrides.palette  ?? activePalette,
+      overrides.adj      ?? adjustments,
+      overrides.bn      ?? bnScale,
+    );
+  }
+
+  const handleImageLoaded = useCallback((img: HTMLImageElement) => {
+    setSourceImage(img);
+    setShowOriginal(false);
+    setUndoStack([]);
+    setRedoStack([]);
+    reprocess({ img });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleDitheringChange = useCallback((mode: DitheringMode) => {
+    setDithering(mode);
+    reprocess({ mode });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleMapGridChange = useCallback((grid: MapGrid) => {
+    setMapGrid(grid);
+    reprocess({ grid });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
+
+  const handleIntensityCommit = useCallback((v: number) => {
+    setIntensity(v);
+    reprocess({ intens: v });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+
+  const handleBnScaleChange = useCallback((v: number) => {
+    setBnScale(v);
+    reprocess({ bn: v });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleCompareModeChange = useCallback((enabled: boolean) => {
+    setCompareMode(enabled);
+    setShowOriginal(false);
+    reprocess({ compare: enabled });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
+    if (side === 'left') {
+      setCompareLeft(mode);
+      reprocess({ cmpLeft: mode, compare: true });
+    } else {
+      setCompareRight(mode);
+      reprocess({ cmpRight: mode, compare: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments]);
+
+  const handleSelectionChange = useCallback((sel: BlockSelection) => {
+    pushToHistory();
+    setBlockSelection(sel);
+    const shades = mapMode === '2d' ? [2] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
+    reprocess({ palette: newPalette });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, mapMode, bnScale]);
+
+  const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
+    setMapMode(mode);
+    const shades = mode === '2d' ? [2] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
+    reprocess({ palette: newPalette });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, adjustments, bnScale]);
+
+  const handleAdjChange = useCallback((adj: ImageAdjustments) => {
+    setAdjustments(adj);
+  }, []);
+
+  const handleAdjCommit = useCallback((adj: ImageAdjustments) => {
+    setAdjustments(adj);
+    reprocess({ adj });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette]);
+
+  const handleRemoveBlock = useCallback((csId: number) => {
+    pushToHistory();
+    const next: BlockSelection = { ...blockSelection, [csId]: [] };
+    setBlockSelection(next);
+    const shades = mapMode === '2d' ? [2] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
+    reprocess({ palette: newPalette });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, bnScale]);
+
+  const handleImageUpdate = useCallback((data: ImageData) => {
+    pushToHistory();
+    setImageData(data);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Export shortcuts (stable — uses exportRef for fresh state) ───────────
+  const handleExportPng = useCallback(() => {
+    const { imageData: img, dithering: d, mapGrid: g } = exportRef.current;
+    if (!img) return;
+    downloadPng(img, `MapartForge_${g.wide}x${g.tall}_${d}.png`);
+  }, []);
+
+  const handleExportLitematic = useCallback(() => {
+    const { imageData: img, activePalette: ap, blockSelection: sel, mapGrid: g, mapMode: mm } = exportRef.current;
+    if (!img) return;
+    const groups: Record<number, number[]> = {};
+    for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
+    exportLitematic(img, ap.colors, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
+  }, []);
+
+  // Keyboard shortcuts for undo/redo + export
+  // (declared here, after handleExportPng/handleExportLitematic, to avoid TDZ)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.ctrlKey) return;
+      if (!e.shiftKey && e.code === 'KeyZ') { e.preventDefault(); handleUndo(); return; }
+      if (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ')) { e.preventDefault(); handleRedo(); return; }
+      if (!e.shiftKey && e.code === 'KeyS') { e.preventDefault(); handleExportPng(); return; }
+      if (e.shiftKey && e.code === 'KeyS') { e.preventDefault(); handleExportLitematic(); return; }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [handleUndo, handleRedo, handleExportPng, handleExportLitematic]);
+
+  // ── Reset all settings to defaults ───────────────────────────────────────
+  const handleResetDefaults = useCallback(() => {
+    clearSettings();
+    setDithering('floyd-steinberg');
+    setIntensity(100);
+    setBnScale(2);
+    setMapGrid({ wide: 1, tall: 1 });
+    setBlockSelection(DEFAULT_SELECTION);
+    setAdjustments(DEFAULT_ADJUSTMENTS);
+    setMapMode('2d');
+    // Reprocess if an image is loaded
+    reprocess({
+      mode: 'floyd-steinberg', intens: 100, bn: 2,
+      grid: { wide: 1, tall: 1 },
+      palette: buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [2])),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Load from ?share= URL param (runs once on mount) ──────────────────────
+  // Using a ref to prevent double-execution in React StrictMode
+  const shareLoadedRef = useRef(false);
+  useEffect(() => {
+    if (shareLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    if (!shareId) return;
+    shareLoadedRef.current = true;
+
+    loadShare(shareId).then(result => {
+      if (!result) return;
+      const s = result.settings;
+      // Restore settings
+      if (s.dithering)       setDithering(s.dithering);
+      if (s.intensity != null)  setIntensity(s.intensity);
+      if (s.bnScale != null)    setBnScale(s.bnScale);
+      if (s.mapGrid)         setMapGrid(s.mapGrid);
+      if (s.blockSelection)  setBlockSelection(s.blockSelection);
+      if (s.adjustments)     setAdjustments(s.adjustments);
+      if (s.mapMode)         setMapMode(s.mapMode);
+
+      // Load source image from storage
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        setSourceImage(img);
+        setShareBanner(true);
+        setUndoStack([]);
+        setRedoStack([]);
+        const shades = (s.mapMode ?? '2d') === '2d' ? [2] : [0, 1, 2];
+        const palette = buildComputedPalette(
+          buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades),
+        );
+        runProcess(
+          img,
+          s.dithering       ?? 'floyd-steinberg',
+          s.mapGrid         ?? { wide: 1, tall: 1 },
+          s.intensity       ?? 100,
+          false,
+          'floyd-steinberg',
+          'yliluoma2',
+          palette,
+          s.adjustments     ?? DEFAULT_ADJUSTMENTS,
+          s.bnScale         ?? 2,
+        );
+      };
+      img.src = result.imageUrl;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const baseScale    = gridScale(mapGrid);
+  const cmpBaseScale = Math.max(1, Math.floor(baseScale / 2));
+  const zoomFactor   = zoom / 100;
+  const displayScale    = Math.max(1, Math.round(baseScale    * zoomFactor));
+  const cmpDisplayScale = Math.max(1, Math.round(cmpBaseScale * zoomFactor));
+  const pw = gridPixelWidth(mapGrid);
+  const ph = gridPixelHeight(mapGrid);
+
+  const hasContent = imageData !== null || compareData !== null;
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-inner">
+          <span className="logo-icon">🗺</span>
+          <h1 className="app-title">MapartForge</h1>
+          <span className="app-tagline">Minecraft map art generator</span>
+        </div>
+      </header>
+
+      {shareBanner && (
+        <div className="share-banner">
+          <span>🔗 Viewing shared map art</span>
+          <button className="share-banner-dismiss" onClick={() => setShareBanner(false)} title="Dismiss">✕</button>
+        </div>
+      )}
+
+      <main className="app-main">
+        <aside className="sidebar">
+          <ImageUpload onImageLoaded={handleImageLoaded} />
+          <Controls
+            dithering={dithering}
+            onDitheringChange={handleDitheringChange}
+            intensity={intensity}
+            onIntensityChange={handleIntensityChange}
+            onIntensityCommit={handleIntensityCommit}
+            bnScale={bnScale}
+            onBnScaleChange={handleBnScaleChange}
+            mapGrid={mapGrid}
+            onMapGridChange={handleMapGridChange}
+            processing={processing}
+          />
+          <Adjustments
+            adjustments={adjustments}
+            sourceImage={sourceImage}
+            onChange={handleAdjChange}
+            onCommit={handleAdjCommit}
+            disabled={processing}
+          />
+          <PaletteEditor
+            blockSelection={blockSelection}
+            onSelectionChange={handleSelectionChange}
+            paletteSize={activePalette.colors.length}
+            disabled={processing}
+          />
+          <ExportPanel
+            imageData={imageData}
+            compareData={compareData}
+            compareMode={compareMode}
+            dithering={dithering}
+            compareLeft={compareLeft}
+            compareRight={compareRight}
+            mapGrid={mapGrid}
+            mapMode={mapMode}
+            activePalette={activePalette}
+            blockSelection={blockSelection}
+            disabled={processing}
+            sourceImage={sourceImage}
+            intensity={intensity}
+            adjustments={adjustments}
+            bnScale={bnScale}
+          />
+          <MaterialsList
+            imageData={compareMode ? (compareData?.left ?? null) : imageData}
+            cp={activePalette}
+            blockSelection={blockSelection}
+          />
+          <div className="sidebar-footer">
+            <button
+              className="reset-defaults-btn"
+              onClick={handleResetDefaults}
+              disabled={processing}
+            >↺ Reset to defaults</button>
+          </div>
+        </aside>
+
+        <section className="preview-section" ref={previewSectionRef}>
+          <div className="preview-header">
+            <h2 className="preview-title">Preview</h2>
+            <div className="mode-toggle">
+              <button
+                className={`mode-btn ${mapMode === '2d' ? 'active' : ''}`}
+                onClick={() => handleMapModeChange('2d')}
+                disabled={processing}
+                title="2D flat — one shade per color, ~61 colors"
+              >2D flat</button>
+              <button
+                className={`mode-btn ${mapMode === '3d' ? 'active' : ''}`}
+                onClick={() => handleMapModeChange('3d')}
+                disabled={processing}
+                title="3D staircase — 3 shades per color, ~183 colors"
+              >3D staircase</button>
+            </div>
+            {hasContent && (
+              <span className="preview-meta">
+                {pw}×{ph} blocks
+                {!compareMode && ` · ${dithering}${dithering !== 'none' ? ` · ${intensity}%` : ''}`}
+              </span>
+            )}
+            {hasContent && (
+              <div className="preview-header-actions">
+                <div className="undo-redo-group">
+                  <button
+                    className="undo-redo-btn"
+                    onClick={handleUndo}
+                    disabled={undoStack.length === 0}
+                    title="Undo (Ctrl+Z)"
+                  >←</button>
+                  <button
+                    className="undo-redo-btn"
+                    onClick={handleRedo}
+                    disabled={redoStack.length === 0}
+                    title="Redo (Ctrl+Y)"
+                  >→</button>
+                  {(undoStack.length > 0 || redoStack.length > 0) && (
+                    <span className="undo-redo-counter">{undoStack.length}/{MAX_HISTORY}</span>
+                  )}
+                </div>
+
+                <div className="zoom-control">
+                  <input
+                    type="range" min={50} max={800} step={10} value={zoom}
+                    className="zoom-slider"
+                    onChange={e => setZoom(Number(e.target.value))}
+                    title="Zoom preview (Ctrl+scroll)"
+                  />
+                  <span className="zoom-label">{zoom}%</span>
+                  {([100, 200, 400, 800] as const).map(z => (
+                    <button
+                      key={z}
+                      className={`zoom-snap-btn${zoom === z ? ' active' : ''}`}
+                      onClick={() => setZoom(z)}
+                      title={`Snap to ${z}%`}
+                    >{z === 800 ? '8×' : z === 400 ? '4×' : z === 200 ? '2×' : '1×'}</button>
+                  ))}
+                </div>
+
+                <button
+                  className={`grid-toggle-btn ${showGrid ? 'active' : ''}`}
+                  onClick={() => setShowGrid(g => !g)}
+                  title="Toggle per-pixel grid lines"
+                >
+                  {showGrid ? 'Hide grid' : 'Show grid'}
+                </button>
+
+                {!compareMode && (
+                  <div className="ab-toggle">
+                    <button
+                      className={`ab-btn ${textureMode === 'pixel' ? 'active' : ''}`}
+                      onClick={() => setTextureMode('pixel')}
+                      title="Show processed pixels"
+                    >Pixel</button>
+                    <button
+                      className={`ab-btn ${textureMode === 'block' ? 'active' : ''}`}
+                      onClick={() => setTextureMode('block')}
+                      title="Show block textures — slow on large grids"
+                    >Blocks</button>
+                  </div>
+                )}
+
+                <div className="ab-toggle">
+                  {!compareMode && (
+                    <>
+                      <button className={`ab-btn ${!showOriginal ? 'active' : ''}`} onClick={() => setShowOriginal(false)}>
+                        Processed
+                      </button>
+                      <button className={`ab-btn ${showOriginal ? 'active' : ''}`} onClick={() => setShowOriginal(true)}>
+                        Original
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className={`ab-btn ${compareMode ? 'active' : ''}`}
+                    onClick={() => handleCompareModeChange(!compareMode)}
+                  >Compare</button>
+                </div>
+
+                {/* Shortcuts panel trigger */}
+                <div className="shortcuts-wrap">
+                  <button
+                    className={`shortcuts-btn${showShortcuts ? ' active' : ''}`}
+                    onClick={() => setShowShortcuts(v => !v)}
+                    title="Keyboard shortcuts"
+                  >⌨</button>
+                  {showShortcuts && (
+                    <div className="shortcuts-panel">
+                      <div className="shortcuts-panel-title">Keyboard Shortcuts</div>
+                      <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
+                      <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
+                      <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Download PNG</span></div>
+                      <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Download .litematic</span></div>
+                      <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom in/out</span></div>
+                      <div className="shortcuts-divider" />
+                      <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper tool</span></div>
+                      <div className="shortcut-row"><kbd>B</kbd><span>Brush tool</span></div>
+                      <div className="shortcut-row"><kbd>F</kbd><span>Fill bucket</span></div>
+                      <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect tool / close</span></div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {compareMode && hasContent && (
+            <div className="compare-selectors">
+              <div className="compare-selector">
+                <label className="compare-selector-label">Left</label>
+                <select
+                  className="compare-selector-select"
+                  value={compareLeft}
+                  onChange={e => handleCompareSideChange('left', e.target.value as DitheringMode)}
+                  disabled={processing}
+                >
+                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                </select>
+              </div>
+              <span className="compare-vs">vs</span>
+              <div className="compare-selector">
+                <label className="compare-selector-label">Right</label>
+                <select
+                  className="compare-selector-select"
+                  value={compareRight}
+                  onChange={e => handleCompareSideChange('right', e.target.value as DitheringMode)}
+                  disabled={processing}
+                >
+                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {!compareMode && imageData && (
+            <div className="paint-toolbar">
+              <div className="paint-tools">
+                <button
+                  className={`paint-tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
+                  onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
+                  title="Eyedropper — pick block (E)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
+                    <circle cx="2.5" cy="13.5" r="1.8"/>
+                  </svg>
+                </button>
+                <button
+                  className={`paint-tool-btn${activeTool === 'brush' ? ' active' : ''}`}
+                  onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
+                  title="Brush — paint block (B)"
+                  disabled={!paintBlock}
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
+                    <path d="M3 13.5c0-1 .5-1.5 1-1.5s1 .5 1 1.5S4.5 15.5 4 16c-.5-.5-1-1.5-1-2.5z" opacity=".7"/>
+                  </svg>
+                </button>
+                <button
+                  className={`paint-tool-btn${activeTool === 'fill' ? ' active' : ''}`}
+                  onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
+                  title="Fill bucket (F)"
+                  disabled={!paintBlock}
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
+                    <path d="M3 2h6l1 2H2L3 2z"/>
+                    <circle cx="13" cy="11" r="2.2"/>
+                    <path d="M13 6l.5 4.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="paint-divider" />
+
+              {/* Brush size — only shown when brush is active */}
+              {activeTool === 'brush' && (
+                <>
+                  <div className="brush-size-group">
+                    {([1, 2, 3] as const).map(s => (
+                      <button
+                        key={s}
+                        className={`brush-size-btn${brushSize === s ? ' active' : ''}`}
+                        onClick={() => setBrushSize(s)}
+                        title={`Brush size ${s}×${s}`}
+                      >{s}×{s}</button>
+                    ))}
+                  </div>
+                  <div className="paint-divider" />
+                </>
+              )}
+
+              <div className="paint-swatch-wrapper">
+                <div className="paint-active-swatch">
+                  {paintBlock ? (
+                    <>
+                      <div className="paint-swatch-icon-wrap">
+                        <span className="paint-swatch-icon" style={{
+                          backgroundImage: `url(${SPRITE_URL})`,
+                          backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px`,
+                        }} />
+                      </div>
+                      <span className="paint-swatch-name">{paintBlock.displayName}</span>
+                    </>
+                  ) : (
+                    <span className="paint-no-block">No block selected</span>
+                  )}
+                </div>
+                <button
+                  className="paint-choose-btn"
+                  onClick={() => setShowBlockPicker(p => !p)}
+                  title="Open block picker"
+                >Choose ▾</button>
+                {showBlockPicker && (
+                  <BlockPickerPopup
+                    blockSelection={blockSelection}
+                    current={paintBlock}
+                    onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
+                    onClose={() => setShowBlockPicker(false)}
+                  />
+                )}
+              </div>
+
+              <span className="paint-hint">E · B · F · Esc</span>
+            </div>
+          )}
+
+          <div className="preview-canvas-area">
+            {compareMode ? (
+              <CompareView
+                leftData={compareData?.left   ?? null}
+                rightData={compareData?.right ?? null}
+                leftLabel={DITHERING_LABELS[compareLeft]}
+                rightLabel={DITHERING_LABELS[compareRight]}
+                width={pw} height={ph} scale={cmpDisplayScale} showGrid={showGrid}
+              />
+            ) : (
+              <PreviewCanvas
+                mode={textureMode}
+                imageData={imageData} originalData={originalData}
+                showOriginal={showOriginal} showGrid={showGrid}
+                width={pw} height={ph} scale={displayScale}
+                cp={activePalette} blockSelection={blockSelection}
+                activeTool={activeTool}
+                paintBlock={paintBlock}
+                brushSize={brushSize}
+                onRemoveBlock={handleRemoveBlock}
+                onImageUpdate={handleImageUpdate}
+                onToolChange={setActiveTool}
+                onPaintBlockChange={setPaintBlock}
+              />
+            )}
+
+            {/* Processing progress overlay */}
+            {processing && (
+              <div className="processing-overlay">
+                <div className="processing-overlay-inner">
+                  <div className="processing-spinner" />
+                  <span className="processing-label">
+                    Processing… {DITHERING_LABELS[dithering]}
+                  </span>
+                  <span className="processing-pct">{processingProgress}%</span>
+                </div>
+                <div className="processing-bar-track">
+                  <div
+                    className="processing-bar-fill"
+                    style={{ width: `${processingProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
