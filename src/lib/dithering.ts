@@ -517,6 +517,10 @@ export async function applyDithering(
   bnScale: number = 2,
   onProgress?: ProgressFn,
 ): Promise<Uint8ClampedArray> {
+  if (cp.colors.length === 0) {
+    console.error('[mapart] applyDithering called with empty palette — falling back to DEFAULT_PALETTE');
+    cp = DEFAULT_PALETTE;
+  }
   const out = new Uint8ClampedArray(width * height * 4);
 
   // ── Nearest colour only ────────────────────────────────────────────────

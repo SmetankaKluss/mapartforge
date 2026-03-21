@@ -67,7 +67,8 @@ export async function loadShare(id: string): Promise<{
     .select('settings, image_path')
     .eq('id', id)
     .single();
-  if (error || !data) return null;
+  if (error) { console.error('[share] loadShare failed:', error); return null; }
+  if (!data) return null;
 
   const { data: urlData } = supabase.storage
     .from(BUCKET)
