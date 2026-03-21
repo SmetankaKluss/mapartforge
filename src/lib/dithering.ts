@@ -521,6 +521,7 @@ export async function applyDithering(
     console.error('[mapart] applyDithering called with empty palette — falling back to DEFAULT_PALETTE');
     cp = DEFAULT_PALETTE;
   }
+  console.log(`[mapart] applyDithering — mode:${mode} intensity:${intensity.toFixed(3)} palette:${cp.colors.length}`);
   const out = new Uint8ClampedArray(width * height * 4);
 
   // ── Nearest colour only ────────────────────────────────────────────────
