@@ -155,7 +155,7 @@ export function ExportPanel({
             disabled={base || busyPng}
             title={compareMode ? 'Download left and right panels as separate PNGs' : 'Download processed image as PNG'}
           >
-            {busyPng ? 'Saving…' : compareMode ? 'Download PNG (×2)' : 'Download PNG'}
+            {busyPng ? 'Saving…' : compareMode ? '↓ PNG ×2' : '↓ PNG'}
           </button>
 
           <button
@@ -164,29 +164,25 @@ export function ExportPanel({
             disabled={base || busyMapdat}
             title="Download Minecraft map.dat file(s) — one per 128×128 tile"
           >
-            {busyMapdat
-              ? 'Building…'
-              : mapCount > 1
-                ? `Download map.dat (${mapCount} files)`
-                : 'Download map.dat'}
+            {busyMapdat ? 'Building…' : mapCount > 1 ? `↓ MAP.DAT (${mapCount} files)` : '↓ MAP.DAT'}
           </button>
 
           <button
-            className={`export-btn ${mapMode === '3d' ? 'export-btn-secondary' : ''}`}
+            className={`export-btn${mapMode === '3d' ? ' export-btn-secondary' : ''}`}
             onClick={handleLitematicFlat}
             disabled={base || busyAnyLite}
             title="Single flat layer — standard survival-friendly 2D map art"
           >
-            {busyLiteFlat ? 'Building…' : 'Download .litematic (2D flat)'}
+            {busyLiteFlat ? 'Building…' : '↓ LITEMATIC 2D'}
           </button>
 
           <button
-            className={`export-btn ${mapMode === '2d' ? 'export-btn-secondary' : ''}`}
+            className={`export-btn${mapMode === '2d' ? ' export-btn-secondary' : ''}`}
             onClick={handleLitematicStaircase}
             disabled={base || busyAnyLite}
             title="Staircase structure — extra shading tones from height variation"
           >
-            {busyLiteStairs ? 'Building…' : 'Download .litematic (3D staircase)'}
+            {busyLiteStairs ? 'Building…' : '↓ LITEMATIC 3D'}
           </button>
 
           {isMultiMap && (
@@ -196,15 +192,13 @@ export function ExportPanel({
               disabled={base || busyAnyLite}
               title={`Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files, zipped`}
             >
-              {busyZip
-                ? 'Zipping…'
-                : `Download ZIP (${mapGrid.wide * mapGrid.tall} maps, split)`}
+              {busyZip ? 'Zipping…' : `↓ ZIP (${mapGrid.wide * mapGrid.tall} maps)`}
             </button>
           )}
         </div>
       )}
       {compareMode && hasContent && (
-        <p className="export-note">In compare mode, PNG exports both panels; map.dat/.litematic use the left panel.</p>
+        <p className="export-note">Compare mode: PNG exports both panels; other formats use the left panel.</p>
       )}
       {hasContent && (
         <div className="share-row">
@@ -214,7 +208,7 @@ export function ExportPanel({
             disabled={base || shareState === 'uploading' || !sourceImage}
             title="Upload and share a link to this map art with current settings"
           >
-            {shareState === 'uploading' ? 'Uploading…' : shareState === 'error' ? 'Upload failed' : '🔗 Share'}
+            {shareState === 'uploading' ? 'Uploading…' : shareState === 'error' ? 'Upload failed' : '⬡ SHARE'}
           </button>
         </div>
       )}

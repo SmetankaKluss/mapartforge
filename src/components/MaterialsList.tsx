@@ -68,8 +68,8 @@ function fmtStacks(n: number): string {
   const stacks = Math.floor(n / 64);
   const rem    = n % 64;
   if (stacks === 0) return `${rem}`;
-  if (rem === 0)    return `${stacks}× 64`;
-  return `${stacks}× 64 + ${rem}`;
+  if (rem === 0)    return `${stacks}×64`;
+  return `${stacks}×64+${rem}`;
 }
 
 function fmtShulkers(n: number): string {
@@ -78,10 +78,10 @@ function fmtShulkers(n: number): string {
   const stacks   = Math.floor(rem1 / 64);
   const rem2     = rem1 % 64;
   const parts: string[] = [];
-  if (shulkers > 0) parts.push(`${shulkers} shulker${shulkers > 1 ? 's' : ''}`);
-  if (stacks   > 0) parts.push(`${stacks}× 64`);
+  if (shulkers > 0) parts.push(`${shulkers}sh`);
+  if (stacks   > 0) parts.push(`${stacks}×64`);
   if (rem2     > 0) parts.push(`${rem2}`);
-  return parts.length ? parts.join(' + ') : '0';
+  return parts.length ? parts.join('+') : '0';
 }
 
 function buildCopyText(entries: MaterialEntry[], total: number): string {
@@ -129,55 +129,57 @@ export function MaterialsList({ imageData, cp, blockSelection }: Props) {
     <section className="sidebar-section">
       <div className="mat-header">
         <h3 className="section-title" style={{ margin: 0 }}>Materials</h3>
-        <button className="mat-copy-btn" onClick={handleCopy}>
-          {copied ? '✓ Copied!' : 'Copy list'}
-        </button>
       </div>
       <div className="mat-table-wrap">
         <table className="mat-table">
           <thead>
             <tr>
-              <th className="mat-th mat-col-block">Block</th>
-              <th className="mat-th mat-col-num">Total</th>
-              <th className="mat-th mat-col-stacks">Stacks</th>
-              <th className="mat-th mat-col-shulkers">Shulkers</th>
+              <th className="mat-th mat-col-block">BLOCK</th>
+              <th className="mat-th mat-col-num">TOTAL</th>
+              <th className="mat-th mat-col-stacks">STACKS</th>
+              <th className="mat-th mat-col-shulkers">SHULKERS</th>
             </tr>
           </thead>
           <tbody>
-            {materials.map(e => {
+            {materials.map((e, i) => {
               const row = COLOUR_ROWS[e.csId];
               return (
-              <tr key={`${e.csId}_${e.blockId}`} className="mat-row">
-                <td className="mat-col-block">
-                  <div className="mat-block-cell">
-                    <span className="mat-icon-wrap">
-                      <BlockIcon
-                        nbtName={e.nbtName}
-                        blockId={e.blockId}
-                        csId={e.csId}
-                        r={row?.r ?? 128} g={row?.g ?? 128} b={row?.b ?? 128}
-                        className="mat-icon"
-                      />
-                    </span>
-                    <span className="mat-name">{e.displayName}</span>
-                  </div>
-                </td>
-                <td className="mat-col-num">{fmtN(e.count)}</td>
-                <td className="mat-col-stacks">{fmtStacks(e.count)}</td>
-                <td className="mat-col-shulkers">{fmtShulkers(e.count)}</td>
-              </tr>
-            );
+                <tr key={`${e.csId}_${e.blockId}`} className={`mat-row${i % 2 === 0 ? ' mat-row-even' : ' mat-row-odd'}`}>
+                  <td className="mat-col-block">
+                    <div className="mat-block-cell">
+                      <span className="mat-icon-wrap">
+                        <BlockIcon
+                          nbtName={e.nbtName}
+                          blockId={e.blockId}
+                          csId={e.csId}
+                          r={row?.r ?? 128} g={row?.g ?? 128} b={row?.b ?? 128}
+                          className="mat-icon"
+                        />
+                      </span>
+                      <span className="mat-name">{e.displayName}</span>
+                    </div>
+                  </td>
+                  <td className="mat-col-num mat-num-cell">{fmtN(e.count)}</td>
+                  <td className="mat-col-stacks mat-num-cell">{fmtStacks(e.count)}</td>
+                  <td className="mat-col-shulkers mat-num-cell">{fmtShulkers(e.count)}</td>
+                </tr>
+              );
             })}
           </tbody>
           <tfoot>
             <tr className="mat-total-row">
-              <td className="mat-col-block mat-total-label">Total</td>
-              <td className="mat-col-num">{fmtN(total)}</td>
-              <td className="mat-col-stacks">{fmtStacks(total)}</td>
-              <td className="mat-col-shulkers">{fmtShulkers(total)}</td>
+              <td className="mat-col-block"><span className="mat-total-label">TOTAL</span></td>
+              <td className="mat-col-num mat-num-cell mat-total-num">{fmtN(total)}</td>
+              <td className="mat-col-stacks mat-num-cell mat-total-num">{fmtStacks(total)}</td>
+              <td className="mat-col-shulkers mat-num-cell mat-total-num">{fmtShulkers(total)}</td>
             </tr>
           </tfoot>
         </table>
+      </div>
+      <div className="mat-copy-row">
+        <button className="mat-copy-btn" onClick={handleCopy}>
+          {copied ? '✓ COPIED!' : '⎘ COPY LIST'}
+        </button>
       </div>
     </section>
   );
