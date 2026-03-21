@@ -7,8 +7,8 @@ import type { ImageAdjustments } from '../lib/adjustments';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip } from '../lib/exportLitematic';
-import { uploadShare } from '../lib/share';
-import { ShareModal } from './ShareModal';
+import { uploadPermalink } from '../lib/share';
+import { LinkModal } from './LinkModal';
 
 interface Props {
   imageData:   ImageData | null;
@@ -22,7 +22,7 @@ interface Props {
   activePalette:  ComputedPalette;
   blockSelection: BlockSelection;
   disabled:    boolean;
-  // Share
+  // Link export
   sourceImage: HTMLImageElement | null;
   intensity:   number;
   adjustments: ImageAdjustments;
@@ -49,20 +49,19 @@ export function ExportPanel({
   mapGrid, mapMode, activePalette, blockSelection, disabled,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
-  const [busyPng]                             = useState(false);
-  const [busyMapdat,      setBusyMapdat]      = useState(false);
-  const [busyLiteFlat,    setBusyLiteFlat]    = useState(false);
-  const [busyLiteStairs,  setBusyLiteStairs]  = useState(false);
-  const [busyZip,         setBusyZip]         = useState(false);
-  const [shareState,      setShareState]      = useState<'idle' | 'uploading' | 'error'>('idle');
-  const [shareUrl,        setShareUrl]        = useState<string | null>(null);
+  const [busyPng]                           = useState(false);
+  const [busyMapdat,     setBusyMapdat]     = useState(false);
+  const [busyLiteFlat,   setBusyLiteFlat]   = useState(false);
+  const [busyLiteStairs, setBusyLiteStairs] = useState(false);
+  const [busyZip,        setBusyZip]        = useState(false);
+  const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
+  const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
   const hasImage   = imageData !== null;
   const hasCmp     = compareData !== null;
   const hasContent = compareMode ? hasCmp : hasImage;
   const mapCount   = mapGrid.wide * mapGrid.tall;
 
-  // Which ImageData to use for export in normal mode
   const exportData = compareMode ? null : imageData;
 
   function handlePng() {
@@ -110,9 +109,9 @@ export function ExportPanel({
   async function handleZip() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
-    const structure   = mapMode === '3d' ? 'staircase' : 'flat';
+    const structure     = mapMode === '3d' ? 'staircase' : 'flat';
     const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
-    const zipFilename = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
+    const zipFilename   = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
     setBusyZip(true);
     try {
       await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename);
@@ -121,25 +120,25 @@ export function ExportPanel({
     }
   }
 
-  async function handleShare() {
-    const src     = compareMode ? compareData?.left ?? null : imageData;
+  async function handleGetLink() {
+    const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src || !sourceImage) return;
-    setShareState('uploading');
+    setLinkState('uploading');
     try {
-      const url = await uploadShare(sourceImage, src, {
+      const url = await uploadPermalink(sourceImage, src, {
         dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, bnScale,
       });
-      setShareUrl(url);
-      setShareState('idle');
+      setLinkUrl(url);
+      setLinkState('idle');
     } catch {
-      setShareState('error');
-      setTimeout(() => setShareState('idle'), 3000);
+      setLinkState('error');
+      setTimeout(() => setLinkState('idle'), 3000);
     }
   }
 
-  const base         = disabled || !hasContent;
-  const busyAnyLite  = busyLiteFlat || busyLiteStairs || busyZip;
-  const isMultiMap   = mapGrid.wide * mapGrid.tall > 1;
+  const base        = disabled || !hasContent;
+  const busyAnyLite = busyLiteFlat || busyLiteStairs || busyZip;
+  const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
 
   return (
     <section className="sidebar-section">
@@ -200,18 +199,18 @@ export function ExportPanel({
       {compareMode && hasContent && (
         <p className="export-note">Compare mode: PNG exports both panels; other formats use the left panel.</p>
       )}
-      <div className="share-row">
+      <div className="link-row">
         <button
-          className={`share-btn${shareState === 'error' ? ' share-btn-error' : ''}`}
-          onClick={handleShare}
-          disabled={base || shareState === 'uploading' || !sourceImage}
-          title={!hasContent ? 'Process an image first' : 'Upload and share a link to this map art with current settings'}
+          className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
+          onClick={handleGetLink}
+          disabled={base || linkState === 'uploading' || !sourceImage}
+          title={!hasContent ? 'Process an image first' : 'Generate a permalink to this map art with current settings'}
         >
-          {shareState === 'uploading' ? 'Uploading…' : shareState === 'error' ? 'Upload failed' : '⬡ SHARE'}
+          {linkState === 'uploading' ? 'Uploading…' : linkState === 'error' ? 'Upload failed' : '🔗 GET LINK'}
         </button>
       </div>
-      {shareUrl && (
-        <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />
+      {linkUrl && (
+        <LinkModal url={linkUrl} onClose={() => setLinkUrl(null)} />
       )}
     </section>
   );

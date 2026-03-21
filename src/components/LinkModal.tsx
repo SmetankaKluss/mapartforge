@@ -6,7 +6,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function ShareModal({ url, onClose }: Props) {
+export function LinkModal({ url, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +81,7 @@ export function ShareModal({ url, onClose }: Props) {
           letterSpacing: '0.08em',
           marginBottom: 12,
         }}>
-          LINK CREATED
+          LINK READY
         </div>
 
         {/* Subtitle */}

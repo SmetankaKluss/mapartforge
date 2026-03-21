@@ -154,8 +154,8 @@ input, select, textarea { outline: none; }
   z-index: 1;
 }
 
-/* ── Share Banner ──────────────────────────────────────────────────────── */
-.share-banner {
+/* ── View Banner ───────────────────────────────────────────────────────── */
+.view-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,7 +175,7 @@ input, select, textarea { outline: none; }
   to   { transform: translateY(0);     opacity: 1; }
 }
 
-.share-banner-dismiss {
+.view-banner-dismiss {
   background: none;
   border: none;
   color: var(--text-muted);
@@ -183,7 +183,7 @@ input, select, textarea { outline: none; }
   padding: 0 4px;
   transition: color 0.12s;
 }
-.share-banner-dismiss:hover { color: var(--accent); }
+.view-banner-dismiss:hover { color: var(--accent); }
 
 /* ── Three-panel body ──────────────────────────────────────────────────── */
 .app-body {
@@ -631,26 +631,12 @@ input, select, textarea { outline: none; }
 .export-btn-zip { border-color: rgba(87,255,110,0.4); color: var(--accent); }
 .export-note { font-size: 9px; color: var(--text-muted); padding: 0 8px 6px; font-style: italic; }
 
-/* Share button — gold */
-.share-row { padding: 0 8px 8px; }
-.share-btn { width: 100%; height: 36px; padding: 0 12px; background: var(--gold-dim); border: 1px solid rgba(255,215,0,0.4); color: var(--gold); font-family: var(--font-mono); font-size: 12px; display: flex; align-items: center; letter-spacing: 0.02em; transition: border-color 0.12s, box-shadow 0.12s, background 0.12s; }
-.share-btn:hover:not(:disabled) { border-color: var(--gold); background: rgba(255,215,0,0.16); box-shadow: 0 0 10px var(--gold-glow); }
-.share-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.share-btn-error { border-color: rgba(255,68,85,0.5); color: var(--red); background: rgba(255,68,85,0.08); }
-
-/* Share Modal */
-.share-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9998; }
-.share-modal-box { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); z-index: 9999; background: var(--bg-panel); border: 2px solid var(--accent); padding: 24px; min-width: 420px; box-shadow: 0 0 0 1px rgba(87,255,110,0.15), 0 0 32px rgba(87,255,110,0.2), 0 24px 64px rgba(0,0,0,0.9); }
-.share-modal-title { font-family: var(--font-pixel); font-size: 10px; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 14px; }
-.share-modal-desc { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5; }
-.share-url-row { margin-bottom: 14px; }
-.share-url-input { width: 100%; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; font-family: var(--font-mono); font-size: 11px; }
-.share-url-input:focus { outline: none; border-color: var(--accent); }
-.share-modal-actions { display: flex; gap: 8px; }
-.share-copy-btn { flex: 1; height: 34px; background: rgba(87,255,110,0.12); border: 1px solid rgba(87,255,110,0.5); color: var(--accent); font-family: var(--font-pixel); font-size: 8px; transition: box-shadow 0.12s, background 0.12s; }
-.share-copy-btn:hover { background: rgba(87,255,110,0.2); box-shadow: 0 0 10px rgba(87,255,110,0.3); }
-.share-modal-close { flex: 0 0 auto; height: 34px; padding: 0 16px; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; transition: border-color 0.12s, color 0.12s; }
-.share-modal-close:hover { border-color: var(--accent); color: var(--accent); }
+/* Get Link button — gold */
+.link-row { padding: 0 8px 8px; }
+.link-export-btn { width: 100%; height: 36px; padding: 0 12px; background: var(--gold-dim); border: 1px solid rgba(255,215,0,0.4); color: var(--gold); font-family: var(--font-mono); font-size: 12px; display: flex; align-items: center; letter-spacing: 0.02em; transition: border-color 0.12s, box-shadow 0.12s, background 0.12s; }
+.link-export-btn:hover:not(:disabled) { border-color: var(--gold); background: rgba(255,215,0,0.16); box-shadow: 0 0 10px var(--gold-glow); }
+.link-export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.link-export-btn-error { border-color: rgba(255,68,85,0.5); color: var(--red); background: rgba(255,68,85,0.08); }
 
 /* ── Materials List ────────────────────────────────────────────────────── */
 .mat-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }

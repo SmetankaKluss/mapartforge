@@ -73,7 +73,7 @@ export default function App() {
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
-  const [shareBanner, setShareBanner] = useState(false);
+  const [viewBanner, setViewBanner] = useState(false);
   const processingRef = useRef(false);
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
@@ -390,15 +390,15 @@ export default function App() {
 
   // ── Load from ?share= URL param (runs once on mount) ──────────────────────
   // Using a ref to prevent double-execution in React StrictMode
-  const shareLoadedRef = useRef(false);
+  const linkLoadedRef = useRef(false);
   useEffect(() => {
-    if (shareLoadedRef.current) return;
+    if (linkLoadedRef.current) return;
     const params = new URLSearchParams(window.location.search);
-    const shareId = params.get('share');
-    if (!shareId) return;
-    shareLoadedRef.current = true;
+    const linkId = params.get('share');
+    if (!linkId) return;
+    linkLoadedRef.current = true;
 
-    loadShare(shareId).then(result => {
+    loadShare(linkId).then(result => {
       if (!result) return;
       const s = result.settings;
       // Restore settings
@@ -415,7 +415,7 @@ export default function App() {
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         setSourceImage(img);
-        setShareBanner(true);
+        setViewBanner(true);
         setUndoStack([]);
         setRedoStack([]);
         const shades = (s.mapMode ?? '2d') === '2d' ? [2] : [0, 1, 2];
@@ -477,10 +477,10 @@ export default function App() {
         </div>
       </header>
 
-      {shareBanner && (
-        <div className="share-banner">
-          <span>█ VIEWING SHARED MAP ART</span>
-          <button className="share-banner-dismiss" onClick={() => setShareBanner(false)} title="Dismiss">✕</button>
+      {viewBanner && (
+        <div className="view-banner">
+          <span>█ LOADED FROM LINK</span>
+          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Dismiss">✕</button>
         </div>
       )}
 

@@ -28,7 +28,7 @@ function imageDataToBlob(data: ImageData): Promise<Blob> {
   );
 }
 
-export async function uploadShare(
+export async function uploadPermalink(
   sourceImage: HTMLImageElement,
   previewData: ImageData,
   settings: SavedSettings,
