@@ -200,18 +200,16 @@ export function ExportPanel({
       {compareMode && hasContent && (
         <p className="export-note">Compare mode: PNG exports both panels; other formats use the left panel.</p>
       )}
-      {hasContent && (
-        <div className="share-row">
-          <button
-            className={`share-btn${shareState === 'error' ? ' share-btn-error' : ''}`}
-            onClick={handleShare}
-            disabled={base || shareState === 'uploading' || !sourceImage}
-            title="Upload and share a link to this map art with current settings"
-          >
-            {shareState === 'uploading' ? 'Uploading…' : shareState === 'error' ? 'Upload failed' : '⬡ SHARE'}
-          </button>
-        </div>
-      )}
+      <div className="share-row">
+        <button
+          className={`share-btn${shareState === 'error' ? ' share-btn-error' : ''}`}
+          onClick={handleShare}
+          disabled={base || shareState === 'uploading' || !sourceImage}
+          title={!hasContent ? 'Process an image first' : 'Upload and share a link to this map art with current settings'}
+        >
+          {shareState === 'uploading' ? 'Uploading…' : shareState === 'error' ? 'Upload failed' : '⬡ SHARE'}
+        </button>
+      </div>
       {shareUrl && (
         <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />
       )}

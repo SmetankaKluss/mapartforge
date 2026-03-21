@@ -44,8 +44,8 @@ export async function uploadShare(
     supabase.storage.from(BUCKET).upload(`images/${id}.png`,   srcBlob,     { contentType: 'image/png' }),
     supabase.storage.from(BUCKET).upload(`previews/${id}.png`, previewBlob, { contentType: 'image/png' }),
   ]);
-  if (imgUpload.error)     throw imgUpload.error;
-  if (previewUpload.error) throw previewUpload.error;
+  if (imgUpload.error)     { console.error('[share] image upload failed:', imgUpload.error); throw imgUpload.error; }
+  if (previewUpload.error) { console.error('[share] preview upload failed:', previewUpload.error); throw previewUpload.error; }
 
   const { error: dbErr } = await supabase.from('shares').insert({
     id,
@@ -53,7 +53,7 @@ export async function uploadShare(
     image_path:   `images/${id}.png`,
     preview_path: `previews/${id}.png`,
   });
-  if (dbErr) throw dbErr;
+  if (dbErr) { console.error('[share] database insert failed:', dbErr); throw dbErr; }
 
   return `${SHARE_BASE}/?share=${id}`;
 }

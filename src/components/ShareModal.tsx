@@ -31,12 +31,12 @@ export function ShareModal({ url, onClose }: Props) {
   }
 
   return (
-    <div className="share-modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="share-modal">
-        <div className="share-modal-header">
-          <span className="share-modal-title">Share link created</span>
-          <button className="share-modal-close" onClick={onClose} title="Close">✕</button>
-        </div>
+    <>
+      {/* Backdrop */}
+      <div className="share-modal-backdrop" onClick={onClose} />
+      {/* Modal box */}
+      <div className="share-modal-box" role="dialog" aria-modal="true">
+        <div className="share-modal-title">LINK CREATED</div>
         <p className="share-modal-desc">
           Anyone with this link can view your map art with all current settings.
         </p>
@@ -48,11 +48,16 @@ export function ShareModal({ url, onClose }: Props) {
             readOnly
             onClick={() => inputRef.current?.select()}
           />
+        </div>
+        <div className="share-modal-actions">
           <button className="share-copy-btn" onClick={handleCopy}>
-            {copied ? '✓ Copied!' : 'Copy link'}
+            {copied ? '✓ COPIED!' : '⎘ COPY LINK'}
+          </button>
+          <button className="share-modal-close" onClick={onClose}>
+            ✕ CLOSE
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

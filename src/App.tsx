@@ -211,6 +211,7 @@ export default function App() {
           dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
           onProgress: setProcessingProgress,
         });
+        console.log('[mapart] imageData set, hasContent should now be true');
         setImageData(result.processed);
         setOriginalData(result.original);
       }
