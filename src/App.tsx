@@ -453,210 +453,273 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-inner">
-          <span className="logo-icon">🗺</span>
-          <h1 className="app-title">MapartForge</h1>
-          <span className="app-tagline">Minecraft map art generator</span>
+          <svg className="logo-svg" viewBox="0 0 24 24" width="28" height="28" fill="none" aria-hidden="true">
+            <rect x="14" y="2" width="2" height="2" fill="#57FF6E"/>
+            <rect x="16" y="2" width="2" height="2" fill="#57FF6E"/>
+            <rect x="18" y="2" width="2" height="2" fill="#57FF6E"/>
+            <rect x="18" y="4" width="2" height="2" fill="#57FF6E"/>
+            <rect x="16" y="4" width="2" height="2" fill="#57FF6E"/>
+            <rect x="14" y="4" width="2" height="2" fill="#FFD700"/>
+            <rect x="12" y="6" width="2" height="2" fill="#FFD700"/>
+            <rect x="10" y="8" width="2" height="2" fill="#FFD700"/>
+            <rect x="8"  y="10" width="2" height="2" fill="#FFD700"/>
+            <rect x="6"  y="12" width="2" height="2" fill="#FFD700"/>
+            <rect x="4"  y="14" width="2" height="2" fill="#FFD700"/>
+            <rect x="2"  y="16" width="2" height="2" fill="#FFD700"/>
+          </svg>
+          <div className="header-titles">
+            <h1 className="app-title">MAPARTFORGE</h1>
+            <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
+          </div>
+          <div className="header-spacer" />
+          <span className="header-ver">v1.0</span>
         </div>
       </header>
 
       {shareBanner && (
         <div className="share-banner">
-          <span>🔗 Viewing shared map art</span>
+          <span>█ VIEWING SHARED MAP ART</span>
           <button className="share-banner-dismiss" onClick={() => setShareBanner(false)} title="Dismiss">✕</button>
         </div>
       )}
 
-      <main className="app-main">
-        <aside className="sidebar">
-          <ImageUpload onImageLoaded={handleImageLoaded} />
-          <Controls
-            dithering={dithering}
-            onDitheringChange={handleDitheringChange}
-            intensity={intensity}
-            onIntensityChange={handleIntensityChange}
-            onIntensityCommit={handleIntensityCommit}
-            bnScale={bnScale}
-            onBnScaleChange={handleBnScaleChange}
-            mapGrid={mapGrid}
-            onMapGridChange={handleMapGridChange}
-            processing={processing}
-          />
-          <Adjustments
-            adjustments={adjustments}
-            sourceImage={sourceImage}
-            onChange={handleAdjChange}
-            onCommit={handleAdjCommit}
-            disabled={processing}
-          />
-          <PaletteEditor
-            blockSelection={blockSelection}
-            onSelectionChange={handleSelectionChange}
-            paletteSize={activePalette.colors.length}
-            disabled={processing}
-          />
-          <ExportPanel
-            imageData={imageData}
-            compareData={compareData}
-            compareMode={compareMode}
-            dithering={dithering}
-            compareLeft={compareLeft}
-            compareRight={compareRight}
-            mapGrid={mapGrid}
-            mapMode={mapMode}
-            activePalette={activePalette}
-            blockSelection={blockSelection}
-            disabled={processing}
-            sourceImage={sourceImage}
-            intensity={intensity}
-            adjustments={adjustments}
-            bnScale={bnScale}
-          />
-          <MaterialsList
-            imageData={compareMode ? (compareData?.left ?? null) : imageData}
-            cp={activePalette}
-            blockSelection={blockSelection}
-          />
-          <div className="sidebar-footer">
-            <button
-              className="reset-defaults-btn"
-              onClick={handleResetDefaults}
+      <div className="app-body">
+        {/* ── LEFT PANEL ── */}
+        <aside className="panel panel-left">
+          <div className="panel-scroll">
+            <ImageUpload onImageLoaded={handleImageLoaded} />
+            <Controls
+              dithering={dithering}
+              onDitheringChange={handleDitheringChange}
+              intensity={intensity}
+              onIntensityChange={handleIntensityChange}
+              onIntensityCommit={handleIntensityCommit}
+              bnScale={bnScale}
+              onBnScaleChange={handleBnScaleChange}
+              mapGrid={mapGrid}
+              onMapGridChange={handleMapGridChange}
+              processing={processing}
+            />
+            <Adjustments
+              adjustments={adjustments}
+              sourceImage={sourceImage}
+              onChange={handleAdjChange}
+              onCommit={handleAdjCommit}
               disabled={processing}
-            >↺ Reset to defaults</button>
+            />
+            <div className="panel-section">
+              <div className="section-header">&gt; MAP MODE</div>
+              <div className="mode-toggle">
+                <button
+                  className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
+                  onClick={() => handleMapModeChange('2d')}
+                  disabled={processing}
+                  title="2D flat — one shade per color, ~61 colors"
+                >2D FLAT</button>
+                <button
+                  className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
+                  onClick={() => handleMapModeChange('3d')}
+                  disabled={processing}
+                  title="3D staircase — 3 shades per color, ~183 colors"
+                >3D STAIR</button>
+              </div>
+            </div>
+          </div>
+          <div className="panel-footer">
+            <button className="reset-defaults-btn" onClick={handleResetDefaults} disabled={processing}>
+              ↺ RESET DEFAULTS
+            </button>
           </div>
         </aside>
 
-        <section className="preview-section" ref={previewSectionRef}>
-          <div className="preview-header">
-            <h2 className="preview-title">Preview</h2>
-            <div className="mode-toggle">
-              <button
-                className={`mode-btn ${mapMode === '2d' ? 'active' : ''}`}
-                onClick={() => handleMapModeChange('2d')}
-                disabled={processing}
-                title="2D flat — one shade per color, ~61 colors"
-              >2D flat</button>
-              <button
-                className={`mode-btn ${mapMode === '3d' ? 'active' : ''}`}
-                onClick={() => handleMapModeChange('3d')}
-                disabled={processing}
-                title="3D staircase — 3 shades per color, ~183 colors"
-              >3D staircase</button>
-            </div>
-            {hasContent && (
-              <span className="preview-meta">
-                {pw}×{ph} blocks
-                {!compareMode && ` · ${dithering}${dithering !== 'none' ? ` · ${intensity}%` : ''}`}
-              </span>
-            )}
-            {hasContent && (
-              <div className="preview-header-actions">
-                <div className="undo-redo-group">
+        {/* ── CENTER PANEL ── */}
+        <main className="panel panel-center" ref={previewSectionRef}>
+          <div className="toolbar">
+            {/* Paint tools — only when image is loaded and not in compare mode */}
+            {!compareMode && imageData && (
+              <>
+                <div className="toolbar-group">
                   <button
-                    className="undo-redo-btn"
-                    onClick={handleUndo}
-                    disabled={undoStack.length === 0}
-                    title="Undo (Ctrl+Z)"
-                  >←</button>
+                    className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
+                    onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
+                    title="Eyedropper (E)"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
+                      <circle cx="2.5" cy="13.5" r="1.8"/>
+                    </svg>
+                  </button>
                   <button
-                    className="undo-redo-btn"
-                    onClick={handleRedo}
-                    disabled={redoStack.length === 0}
-                    title="Redo (Ctrl+Y)"
-                  >→</button>
-                  {(undoStack.length > 0 || redoStack.length > 0) && (
-                    <span className="undo-redo-counter">{undoStack.length}/{MAX_HISTORY}</span>
-                  )}
+                    className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`}
+                    onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
+                    title="Brush (B)"
+                    disabled={!paintBlock}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
+                      <path d="M3 13.5c0-1 .5-1.5 1-1.5s1 .5 1 1.5S4.5 15.5 4 16c-.5-.5-1-1.5-1-2.5z" opacity=".7"/>
+                    </svg>
+                  </button>
+                  <button
+                    className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`}
+                    onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
+                    title="Fill (F)"
+                    disabled={!paintBlock}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
+                      <path d="M3 2h6l1 2H2L3 2z"/>
+                      <circle cx="13" cy="11" r="2.2"/>
+                      <path d="M13 6l.5 4.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+                    </svg>
+                  </button>
                 </div>
 
-                <div className="zoom-control">
-                  <input
-                    type="range" min={50} max={800} step={10} value={zoom}
-                    className="zoom-slider"
-                    onChange={e => setZoom(Number(e.target.value))}
-                    title="Zoom preview (Ctrl+scroll)"
-                  />
-                  <span className="zoom-label">{zoom}%</span>
-                  {([100, 200, 400, 800] as const).map(z => (
-                    <button
-                      key={z}
-                      className={`zoom-snap-btn${zoom === z ? ' active' : ''}`}
-                      onClick={() => setZoom(z)}
-                      title={`Snap to ${z}%`}
-                    >{z === 800 ? '8×' : z === 400 ? '4×' : z === 200 ? '2×' : '1×'}</button>
-                  ))}
-                </div>
-
-                <button
-                  className={`grid-toggle-btn ${showGrid ? 'active' : ''}`}
-                  onClick={() => setShowGrid(g => !g)}
-                  title="Toggle per-pixel grid lines"
-                >
-                  {showGrid ? 'Hide grid' : 'Show grid'}
-                </button>
-
-                {!compareMode && (
-                  <div className="ab-toggle">
-                    <button
-                      className={`ab-btn ${textureMode === 'pixel' ? 'active' : ''}`}
-                      onClick={() => setTextureMode('pixel')}
-                      title="Show processed pixels"
-                    >Pixel</button>
-                    <button
-                      className={`ab-btn ${textureMode === 'block' ? 'active' : ''}`}
-                      onClick={() => setTextureMode('block')}
-                      title="Show block textures — slow on large grids"
-                    >Blocks</button>
+                {activeTool === 'brush' && (
+                  <div className="toolbar-group">
+                    {([1, 2, 3] as const).map(s => (
+                      <button
+                        key={s}
+                        className={`tool-btn${brushSize === s ? ' active' : ''}`}
+                        onClick={() => setBrushSize(s)}
+                        title={`Brush ${s}×${s}`}
+                      >{s}×</button>
+                    ))}
                   </div>
                 )}
 
-                <div className="ab-toggle">
-                  {!compareMode && (
-                    <>
-                      <button className={`ab-btn ${!showOriginal ? 'active' : ''}`} onClick={() => setShowOriginal(false)}>
-                        Processed
-                      </button>
-                      <button className={`ab-btn ${showOriginal ? 'active' : ''}`} onClick={() => setShowOriginal(true)}>
-                        Original
-                      </button>
-                    </>
+                <div className="toolbar-group paint-swatch-wrapper">
+                  <div className="paint-active-swatch">
+                    {paintBlock ? (
+                      <>
+                        <span className="paint-swatch-icon" style={{
+                          backgroundImage: `url(${SPRITE_URL})`,
+                          backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px`,
+                        }} />
+                        <span className="paint-swatch-name">{paintBlock.displayName}</span>
+                      </>
+                    ) : (
+                      <span className="paint-no-block">no block</span>
+                    )}
+                  </div>
+                  <button className="tool-btn" onClick={() => setShowBlockPicker(p => !p)} title="Choose block">▾</button>
+                  {showBlockPicker && (
+                    <BlockPickerPopup
+                      blockSelection={blockSelection}
+                      current={paintBlock}
+                      onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
+                      onClose={() => setShowBlockPicker(false)}
+                    />
                   )}
-                  <button
-                    className={`ab-btn ${compareMode ? 'active' : ''}`}
-                    onClick={() => handleCompareModeChange(!compareMode)}
-                  >Compare</button>
                 </div>
 
-                {/* Shortcuts panel trigger */}
-                <div className="shortcuts-wrap">
-                  <button
-                    className={`shortcuts-btn${showShortcuts ? ' active' : ''}`}
-                    onClick={() => setShowShortcuts(v => !v)}
-                    title="Keyboard shortcuts"
-                  >⌨</button>
-                  {showShortcuts && (
-                    <div className="shortcuts-panel">
-                      <div className="shortcuts-panel-title">Keyboard Shortcuts</div>
-                      <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
-                      <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
-                      <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Download PNG</span></div>
-                      <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Download .litematic</span></div>
-                      <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom in/out</span></div>
-                      <div className="shortcuts-divider" />
-                      <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper tool</span></div>
-                      <div className="shortcut-row"><kbd>B</kbd><span>Brush tool</span></div>
-                      <div className="shortcut-row"><kbd>F</kbd><span>Fill bucket</span></div>
-                      <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect tool / close</span></div>
-                    </div>
-                  )}
-                </div>
+                <div className="toolbar-sep" />
+              </>
+            )}
+
+            {/* Undo / Redo */}
+            {hasContent && (
+              <div className="toolbar-group">
+                <button className="tool-btn" onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)">←</button>
+                <button className="tool-btn" onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Y)">→</button>
+                {(undoStack.length > 0 || redoStack.length > 0) && (
+                  <span className="toolbar-label">{undoStack.length}/{MAX_HISTORY}</span>
+                )}
               </div>
             )}
+
+            <div className="toolbar-spacer" />
+
+            {/* Zoom */}
+            {hasContent && (
+              <div className="toolbar-group">
+                <input
+                  type="range" min={50} max={800} step={10} value={zoom}
+                  className="zoom-slider"
+                  onChange={e => setZoom(Number(e.target.value))}
+                  title="Zoom (Ctrl+scroll)"
+                />
+                <span className="toolbar-label">{zoom}%</span>
+                {([100, 200, 400, 800] as const).map(z => (
+                  <button
+                    key={z}
+                    className={`tool-btn${zoom === z ? ' active' : ''}`}
+                    onClick={() => setZoom(z)}
+                    title={`${z}%`}
+                  >{z === 800 ? '8×' : z === 400 ? '4×' : z === 200 ? '2×' : '1×'}</button>
+                ))}
+              </div>
+            )}
+
+            {/* View toggles */}
+            {hasContent && (
+              <div className="toolbar-group">
+                <button
+                  className={`tool-btn${showGrid ? ' active' : ''}`}
+                  onClick={() => setShowGrid(g => !g)}
+                  title="Toggle grid"
+                >GRID</button>
+                {!compareMode && (
+                  <>
+                    <button
+                      className={`tool-btn${textureMode === 'pixel' ? ' active' : ''}`}
+                      onClick={() => setTextureMode('pixel')}
+                      title="Pixel view"
+                    >PIX</button>
+                    <button
+                      className={`tool-btn${textureMode === 'block' ? ' active' : ''}`}
+                      onClick={() => setTextureMode('block')}
+                      title="Block textures"
+                    >BLK</button>
+                    <button
+                      className={`tool-btn${!showOriginal ? ' active' : ''}`}
+                      onClick={() => setShowOriginal(false)}
+                      title="Processed view"
+                    >PROC</button>
+                    <button
+                      className={`tool-btn${showOriginal ? ' active' : ''}`}
+                      onClick={() => setShowOriginal(true)}
+                      title="Original image"
+                    >ORIG</button>
+                  </>
+                )}
+                <button
+                  className={`tool-btn${compareMode ? ' active' : ''}`}
+                  onClick={() => handleCompareModeChange(!compareMode)}
+                  title="Compare dithering modes"
+                >CMP</button>
+              </div>
+            )}
+
+            {/* Shortcuts */}
+            <div className="toolbar-group shortcuts-wrap">
+              <button
+                className={`tool-btn${showShortcuts ? ' active' : ''}`}
+                onClick={() => setShowShortcuts(v => !v)}
+                title="Keyboard shortcuts"
+              >⌨</button>
+              {showShortcuts && (
+                <div className="shortcuts-panel">
+                  <div className="shortcuts-panel-title">SHORTCUTS</div>
+                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>PNG</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>.litematic</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom</span></div>
+                  <div className="shortcuts-divider" />
+                  <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper</span></div>
+                  <div className="shortcut-row"><kbd>B</kbd><span>Brush</span></div>
+                  <div className="shortcut-row"><kbd>F</kbd><span>Fill</span></div>
+                  <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect</span></div>
+                </div>
+              )}
+            </div>
           </div>
 
           {compareMode && hasContent && (
             <div className="compare-selectors">
               <div className="compare-selector">
-                <label className="compare-selector-label">Left</label>
+                <label className="compare-selector-label">LEFT</label>
                 <select
                   className="compare-selector-select"
                   value={compareLeft}
@@ -666,9 +729,9 @@ export default function App() {
                   {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
                 </select>
               </div>
-              <span className="compare-vs">vs</span>
+              <span className="compare-vs">VS</span>
               <div className="compare-selector">
-                <label className="compare-selector-label">Right</label>
+                <label className="compare-selector-label">RIGHT</label>
                 <select
                   className="compare-selector-select"
                   value={compareRight}
@@ -681,100 +744,12 @@ export default function App() {
             </div>
           )}
 
-          {!compareMode && imageData && (
-            <div className="paint-toolbar">
-              <div className="paint-tools">
-                <button
-                  className={`paint-tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
-                  onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
-                  title="Eyedropper — pick block (E)"
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
-                    <circle cx="2.5" cy="13.5" r="1.8"/>
-                  </svg>
-                </button>
-                <button
-                  className={`paint-tool-btn${activeTool === 'brush' ? ' active' : ''}`}
-                  onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
-                  title="Brush — paint block (B)"
-                  disabled={!paintBlock}
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
-                    <path d="M3 13.5c0-1 .5-1.5 1-1.5s1 .5 1 1.5S4.5 15.5 4 16c-.5-.5-1-1.5-1-2.5z" opacity=".7"/>
-                  </svg>
-                </button>
-                <button
-                  className={`paint-tool-btn${activeTool === 'fill' ? ' active' : ''}`}
-                  onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
-                  title="Fill bucket (F)"
-                  disabled={!paintBlock}
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
-                    <path d="M3 2h6l1 2H2L3 2z"/>
-                    <circle cx="13" cy="11" r="2.2"/>
-                    <path d="M13 6l.5 4.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-                  </svg>
-                </button>
-              </div>
+          <div className="canvas-area">
+            <span className="corner corner-tl" />
+            <span className="corner corner-tr" />
+            <span className="corner corner-bl" />
+            <span className="corner corner-br" />
 
-              <div className="paint-divider" />
-
-              {/* Brush size — only shown when brush is active */}
-              {activeTool === 'brush' && (
-                <>
-                  <div className="brush-size-group">
-                    {([1, 2, 3] as const).map(s => (
-                      <button
-                        key={s}
-                        className={`brush-size-btn${brushSize === s ? ' active' : ''}`}
-                        onClick={() => setBrushSize(s)}
-                        title={`Brush size ${s}×${s}`}
-                      >{s}×{s}</button>
-                    ))}
-                  </div>
-                  <div className="paint-divider" />
-                </>
-              )}
-
-              <div className="paint-swatch-wrapper">
-                <div className="paint-active-swatch">
-                  {paintBlock ? (
-                    <>
-                      <div className="paint-swatch-icon-wrap">
-                        <span className="paint-swatch-icon" style={{
-                          backgroundImage: `url(${SPRITE_URL})`,
-                          backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px`,
-                        }} />
-                      </div>
-                      <span className="paint-swatch-name">{paintBlock.displayName}</span>
-                    </>
-                  ) : (
-                    <span className="paint-no-block">No block selected</span>
-                  )}
-                </div>
-                <button
-                  className="paint-choose-btn"
-                  onClick={() => setShowBlockPicker(p => !p)}
-                  title="Open block picker"
-                >Choose ▾</button>
-                {showBlockPicker && (
-                  <BlockPickerPopup
-                    blockSelection={blockSelection}
-                    current={paintBlock}
-                    onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
-                    onClose={() => setShowBlockPicker(false)}
-                  />
-                )}
-              </div>
-
-              <span className="paint-hint">E · B · F · Esc</span>
-            </div>
-          )}
-
-          <div className="preview-canvas-area">
             {compareMode ? (
               <CompareView
                 leftData={compareData?.left   ?? null}
@@ -800,27 +775,67 @@ export default function App() {
               />
             )}
 
-            {/* Processing progress overlay */}
             {processing && (
               <div className="processing-overlay">
                 <div className="processing-overlay-inner">
                   <div className="processing-spinner" />
-                  <span className="processing-label">
-                    Processing… {DITHERING_LABELS[dithering]}
-                  </span>
+                  <span className="processing-label">PROCESSING… {DITHERING_LABELS[dithering].toUpperCase()}</span>
                   <span className="processing-pct">{processingProgress}%</span>
                 </div>
                 <div className="processing-bar-track">
-                  <div
-                    className="processing-bar-fill"
-                    style={{ width: `${processingProgress}%` }}
-                  />
+                  <div className="processing-bar-fill" style={{ width: `${processingProgress}%` }} />
                 </div>
               </div>
             )}
           </div>
-        </section>
-      </main>
+        </main>
+
+        {/* ── RIGHT PANEL ── */}
+        <aside className="panel panel-right">
+          <div className="panel-scroll">
+            <PaletteEditor
+              blockSelection={blockSelection}
+              onSelectionChange={handleSelectionChange}
+              paletteSize={activePalette.colors.length}
+              disabled={processing}
+            />
+            <MaterialsList
+              imageData={compareMode ? (compareData?.left ?? null) : imageData}
+              cp={activePalette}
+              blockSelection={blockSelection}
+            />
+          </div>
+          <div className="panel-footer">
+            <ExportPanel
+              imageData={imageData}
+              compareData={compareData}
+              compareMode={compareMode}
+              dithering={dithering}
+              compareLeft={compareLeft}
+              compareRight={compareRight}
+              mapGrid={mapGrid}
+              mapMode={mapMode}
+              activePalette={activePalette}
+              blockSelection={blockSelection}
+              disabled={processing}
+              sourceImage={sourceImage}
+              intensity={intensity}
+              adjustments={adjustments}
+              bnScale={bnScale}
+            />
+          </div>
+        </aside>
+      </div>
+
+      {/* ── STATUS BAR ── */}
+      <div className="status-bar">
+        <span>█ {DITHERING_LABELS[dithering].toUpperCase()}</span>
+        <span>█ {mapGrid.wide}×{mapGrid.tall} MAPS</span>
+        <span>█ {activePalette.colors.length} COLORS</span>
+        <span>█ {mapMode.toUpperCase()}</span>
+        <span>█ {zoom}%</span>
+        {hasContent && <span>█ {pw}×{ph}px</span>}
+      </div>
     </div>
   );
 }
