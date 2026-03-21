@@ -104,7 +104,7 @@ export class NbtWriter {
 export async function gzipBytes(data: Uint8Array): Promise<Uint8Array> {
   const stream = new CompressionStream('gzip');
   const writer = stream.writable.getWriter();
-  writer.write(data);
+  writer.write(new Uint8Array(data));
   writer.close();
 
   const reader = stream.readable.getReader();

@@ -366,7 +366,7 @@ async function applyAtkinson(
 // edgeSensitivity (0–1): how aggressively to treat regions as "flat".
 //   0 = only hard edges dither  |  1 = almost everything dithers
 
-function applyEdgeOnly(
+export function applyEdgeOnly(
   data: Uint8ClampedArray, width: number, height: number,
   edgeSensitivity: number, cp: ComputedPalette,
 ): Uint8ClampedArray {
@@ -457,7 +457,7 @@ function applyEdgeOnly(
 // Colour boundaries: blue noise at 1× scale for sharp detail.
 // Fixed edge threshold tuned for moderate sensitivity.
 
-function applyBlueNoiseEdge(
+export function applyBlueNoiseEdge(
   data: Uint8ClampedArray, width: number, height: number,
   intensity: number, cp: ComputedPalette,
 ): Uint8ClampedArray {

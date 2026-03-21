@@ -64,7 +64,7 @@ export async function processImage(
   onProgress?.(100);
 
   return {
-    processed: new ImageData(processedData, width, height),
+    processed: new ImageData(new Uint8ClampedArray(processedData), width, height),
     original,
   };
 }
@@ -89,8 +89,8 @@ export async function processCompare(
   ]);
 
   return {
-    left:     new ImageData(leftData,  width, height),
-    right:    new ImageData(rightData, width, height),
+    left:     new ImageData(new Uint8ClampedArray(leftData),  width, height),
+    right:    new ImageData(new Uint8ClampedArray(rightData), width, height),
     original: new ImageData(new Uint8ClampedArray(raw), width, height),
   };
 }

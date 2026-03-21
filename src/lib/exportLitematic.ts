@@ -83,7 +83,7 @@ function packBlockStates(indices: Uint32Array, paletteSize: number): BigInt64Arr
 }
 
 function triggerDownload(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
   a.click();

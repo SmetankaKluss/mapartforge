@@ -3,6 +3,8 @@ import { MapCanvas } from './MapCanvas';
 import { BlockCanvas } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+
+const SPRITE_URL = 'https://raw.githubusercontent.com/rebane2001/mapartcraft/master/src/images/textures.png';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
 import { rgbToOklab, oklabDistance } from '../lib/oklab';

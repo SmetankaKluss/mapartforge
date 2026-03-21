@@ -49,7 +49,7 @@ export function ExportPanel({
   mapGrid, mapMode, activePalette, blockSelection, disabled,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
-  const [busyPng,         setBusyPng]         = useState(false);
+  const [busyPng]                             = useState(false);
   const [busyMapdat,      setBusyMapdat]      = useState(false);
   const [busyLiteFlat,    setBusyLiteFlat]    = useState(false);
   const [busyLiteStairs,  setBusyLiteStairs]  = useState(false);

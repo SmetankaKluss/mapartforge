@@ -347,11 +347,11 @@ export default function App() {
   }, []);
 
   const handleExportLitematic = useCallback(() => {
-    const { imageData: img, activePalette: ap, blockSelection: sel, mapGrid: g, mapMode: mm } = exportRef.current;
+    const { imageData: img, activePalette: ap, blockSelection: sel, mapMode: mm } = exportRef.current;
     if (!img) return;
     const groups: Record<number, number[]> = {};
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
-    exportLitematic(img, ap.colors, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
+    exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
   }, []);
 
   // Keyboard shortcuts for undo/redo + export

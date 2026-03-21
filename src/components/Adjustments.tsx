@@ -38,7 +38,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
     canvas.width  = THUMB_SIZE;
     canvas.height = THUMB_SIZE;
     canvas.getContext('2d')!.putImageData(
-      new ImageData(adjusted, THUMB_SIZE, THUMB_SIZE),
+      new ImageData(new Uint8ClampedArray(adjusted), THUMB_SIZE, THUMB_SIZE),
       0, 0,
     );
   }, [sourceImage, adjustments]);
