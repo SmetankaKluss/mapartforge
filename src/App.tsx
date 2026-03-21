@@ -535,10 +535,27 @@ export default function App() {
         {/* ── CENTER PANEL ── */}
         <main className="panel panel-center" ref={previewSectionRef}>
           <div className="toolbar">
-            {/* Paint tools — only when image is loaded and not in compare mode */}
+
+            {/* LEFT: undo/redo — always visible */}
+            <div className="toolbar-group">
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title="Undo (Ctrl+Z)">↩</button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title="Redo (Ctrl+Y)">↪</button>
+            </div>
+            <div className="toolbar-sep" />
+
+            {/* TOOLS: select / eyedropper / brush / fill — only when image loaded */}
             {!compareMode && imageData && (
               <>
                 <div className="toolbar-group">
+                  <button
+                    className={`tool-btn${activeTool === null ? ' active' : ''}`}
+                    onClick={() => setActiveTool(null)}
+                    title="Select / deselect tool (Esc)"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M2 2l4 11.5 2.3-4.3L13 14l1.5-1.5-4.7-4.7L14.5 5 2 2z"/>
+                    </svg>
+                  </button>
                   <button
                     className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
@@ -578,12 +595,7 @@ export default function App() {
                 {activeTool === 'brush' && (
                   <div className="toolbar-group">
                     {([1, 2, 3] as const).map(s => (
-                      <button
-                        key={s}
-                        className={`tool-btn${brushSize === s ? ' active' : ''}`}
-                        onClick={() => setBrushSize(s)}
-                        title={`Brush ${s}×${s}`}
-                      >{s}×</button>
+                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}×${s}`}>{s}×</button>
                     ))}
                   </div>
                 )}
@@ -592,10 +604,7 @@ export default function App() {
                   <div className="paint-active-swatch">
                     {paintBlock ? (
                       <>
-                        <span className="paint-swatch-icon" style={{
-                          backgroundImage: `url(${SPRITE_URL})`,
-                          backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px`,
-                        }} />
+                        <span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} />
                         <span className="paint-swatch-name">{paintBlock.displayName}</span>
                       </>
                     ) : (
@@ -612,92 +621,49 @@ export default function App() {
                     />
                   )}
                 </div>
-
                 <div className="toolbar-sep" />
               </>
             )}
 
-            {/* Undo / Redo */}
-            {hasContent && (
-              <div className="toolbar-group">
-                <button className="tool-btn" onClick={handleUndo} disabled={undoStack.length === 0} title="Undo (Ctrl+Z)">←</button>
-                <button className="tool-btn" onClick={handleRedo} disabled={redoStack.length === 0} title="Redo (Ctrl+Y)">→</button>
-                {(undoStack.length > 0 || redoStack.length > 0) && (
-                  <span className="toolbar-label">{undoStack.length}/{MAX_HISTORY}</span>
-                )}
-              </div>
-            )}
-
+            {/* SPACER */}
             <div className="toolbar-spacer" />
 
-            {/* Zoom */}
+            {/* ZOOM — only when content */}
             {hasContent && (
               <div className="toolbar-group">
-                <input
-                  type="range" min={50} max={800} step={10} value={zoom}
-                  className="zoom-slider"
-                  onChange={e => setZoom(Number(e.target.value))}
-                  title="Zoom (Ctrl+scroll)"
-                />
+                <input type="range" min={50} max={800} step={10} value={zoom} className="zoom-slider" onChange={e => setZoom(Number(e.target.value))} title="Zoom (Ctrl+scroll)" />
                 <span className="toolbar-label">{zoom}%</span>
-                {([100, 200, 400, 800] as const).map(z => (
-                  <button
-                    key={z}
-                    className={`tool-btn${zoom === z ? ' active' : ''}`}
-                    onClick={() => setZoom(z)}
-                    title={`${z}%`}
-                  >{z === 800 ? '8×' : z === 400 ? '4×' : z === 200 ? '2×' : '1×'}</button>
+                <div className="toolbar-sep" />
+                {([200, 400, 800] as const).map(z => (
+                  <button key={z} className={`tool-btn${zoom === z ? ' active' : ''}`} onClick={() => setZoom(z)} title={`${z}%`}>
+                    {z === 800 ? '8×' : z === 400 ? '4×' : '2×'}
+                  </button>
                 ))}
               </div>
             )}
 
-            {/* View toggles */}
+            {/* VIEW TOGGLES — only when content */}
             {hasContent && (
-              <div className="toolbar-group">
-                <button
-                  className={`tool-btn${showGrid ? ' active' : ''}`}
-                  onClick={() => setShowGrid(g => !g)}
-                  title="Toggle grid"
-                >GRID</button>
-                {!compareMode && (
-                  <>
-                    <button
-                      className={`tool-btn${textureMode === 'pixel' ? ' active' : ''}`}
-                      onClick={() => setTextureMode('pixel')}
-                      title="Pixel view"
-                    >PIX</button>
-                    <button
-                      className={`tool-btn${textureMode === 'block' ? ' active' : ''}`}
-                      onClick={() => setTextureMode('block')}
-                      title="Block textures"
-                    >BLK</button>
-                    <button
-                      className={`tool-btn${!showOriginal ? ' active' : ''}`}
-                      onClick={() => setShowOriginal(false)}
-                      title="Processed view"
-                    >PROC</button>
-                    <button
-                      className={`tool-btn${showOriginal ? ' active' : ''}`}
-                      onClick={() => setShowOriginal(true)}
-                      title="Original image"
-                    >ORIG</button>
-                  </>
-                )}
-                <button
-                  className={`tool-btn${compareMode ? ' active' : ''}`}
-                  onClick={() => handleCompareModeChange(!compareMode)}
-                  title="Compare dithering modes"
-                >CMP</button>
-              </div>
+              <>
+                <div className="toolbar-sep" />
+                <div className="toolbar-group">
+                  {!compareMode && (
+                    <>
+                      <button className={`tool-btn${!showOriginal ? ' active' : ''}`} onClick={() => setShowOriginal(false)} title="Processed">PROC</button>
+                      <button className={`tool-btn${showOriginal ? ' active' : ''}`} onClick={() => setShowOriginal(true)} title="Original">ORIG</button>
+                      <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">BLK</button>
+                    </>
+                  )}
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Compare">CMP</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Grid">GRID</button>
+                </div>
+              </>
             )}
 
-            {/* Shortcuts */}
+            {/* SHORTCUTS */}
+            <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button
-                className={`tool-btn${showShortcuts ? ' active' : ''}`}
-                onClick={() => setShowShortcuts(v => !v)}
-                title="Keyboard shortcuts"
-              >⌨</button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title="Keyboard shortcuts">⌨</button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
                   <div className="shortcuts-panel-title">SHORTCUTS</div>
