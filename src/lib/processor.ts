@@ -47,6 +47,8 @@ export async function processImage(
   onProgress?.(5);
 
   const raw      = await scaleSource(source, width, height);
+  const expected = width * height * 4;
+  console.log('[proc] scaled', width, 'x', height, 'data.length=', raw.length, 'expected=', expected, raw.length === expected ? 'OK' : 'MISMATCH');
   const original = new ImageData(new Uint8ClampedArray(raw), width, height);
 
   onProgress?.(10);

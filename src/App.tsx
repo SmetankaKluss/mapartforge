@@ -86,6 +86,9 @@ export default function App() {
   });
   latestRef.current = { imageData, blockSelection };
 
+  // Cancellation token — incremented each time runProcess starts; async result is discarded if token changed
+  const runTokenRef = useRef(0);
+
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
 
@@ -197,8 +200,14 @@ export default function App() {
     adj: ImageAdjustments,
     bn: number,
   ) {
-    if (processingRef.current) return;
+    if (processingRef.current) {
+      console.log('[mapart] blocked mode=', mode);
+      return;
+    }
     processingRef.current = true;
+    runTokenRef.current += 1;
+    const myToken = runTokenRef.current;
+    console.log('[mapart]', mode, intens, 'token=', myToken);
     setProcessing(true);
     setProcessingProgress(0);
     const w = gridPixelWidth(grid);
@@ -206,6 +215,7 @@ export default function App() {
     try {
       if (compare) {
         const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
+        if (runTokenRef.current !== myToken) { console.log('[mapart] stale result discarded mode=', mode); return; }
         setCompareData({ left: result.left, right: result.right });
         setOriginalData(result.original);
       } else {
@@ -213,13 +223,16 @@ export default function App() {
           dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
           onProgress: setProcessingProgress,
         });
+        if (runTokenRef.current !== myToken) { console.log('[mapart] stale result discarded mode=', mode); return; }
         setImageData(result.processed);
         setOriginalData(result.original);
       }
     } finally {
-      processingRef.current = false;
-      setProcessing(false);
-      setProcessingProgress(0);
+      if (runTokenRef.current === myToken) {
+        processingRef.current = false;
+        setProcessing(false);
+        setProcessingProgress(0);
+      }
     }
   }
 
