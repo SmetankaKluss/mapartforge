@@ -21,6 +21,7 @@ import type { BlockSelection } from './lib/paletteBlocks';
 import { DEFAULT_ADJUSTMENTS } from './lib/adjustments';
 import type { ImageAdjustments } from './lib/adjustments';
 import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
+import type { SavedSettings } from './lib/localStorage';
 import { loadShare } from './lib/share';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
@@ -45,8 +46,8 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
 const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2'];
 
 export default function App() {
-  // ── Restore persisted settings on first render ────────────────────────
-  const saved = loadSettings();
+  // ── Restore persisted settings — lazy init runs exactly once on mount ─
+  const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
 
   const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
   const [imageData, setImageData]       = useState<ImageData | null>(null);
