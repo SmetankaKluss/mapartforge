@@ -200,14 +200,10 @@ export default function App() {
     adj: ImageAdjustments,
     bn: number,
   ) {
-    if (processingRef.current) {
-      console.log('[mapart] blocked mode=', mode);
-      return;
-    }
+    if (processingRef.current) return;
     processingRef.current = true;
     runTokenRef.current += 1;
     const myToken = runTokenRef.current;
-    console.log('[mapart]', mode, intens, 'token=', myToken);
     setProcessing(true);
     setProcessingProgress(0);
     const w = gridPixelWidth(grid);
@@ -215,7 +211,7 @@ export default function App() {
     try {
       if (compare) {
         const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
-        if (runTokenRef.current !== myToken) { console.log('[mapart] stale result discarded mode=', mode); return; }
+        if (runTokenRef.current !== myToken) return;
         setCompareData({ left: result.left, right: result.right });
         setOriginalData(result.original);
       } else {
@@ -223,7 +219,7 @@ export default function App() {
           dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
           onProgress: setProcessingProgress,
         });
-        if (runTokenRef.current !== myToken) { console.log('[mapart] stale result discarded mode=', mode); return; }
+        if (runTokenRef.current !== myToken) return;
         setImageData(result.processed);
         setOriginalData(result.original);
       }
