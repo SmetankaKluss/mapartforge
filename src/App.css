@@ -740,6 +740,45 @@ input, select, textarea { outline: none; }
 .shortcut-row kbd { background: var(--bg-input); border: 1px solid var(--border); padding: 1px 5px; font-family: var(--font-mono); font-size: 9px; color: var(--text); }
 .shortcuts-divider { height: 1px; background: var(--border); margin: 6px 0; }
 
+/* ── Dithering Tooltip ─────────────────────────────────────────────────── */
+.dither-tooltip {
+  position: fixed;
+  z-index: 9999;
+  width: 230px;
+  background: #0d1117;
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(87,255,110,0.15), 0 8px 28px rgba(0,0,0,0.7);
+  padding: 10px 12px;
+  pointer-events: none;
+}
+.dither-tooltip-title {
+  font-family: var(--font-pixel);
+  font-size: 6px;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+.dither-tooltip-body {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text);
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.dither-tooltip-best {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+.dither-tooltip-best-label {
+  color: var(--accent);
+  font-size: 9px;
+}
+
 /* ── Global Scrollbars ─────────────────────────────────────────────────── */
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 *::-webkit-scrollbar { width: 4px; height: 4px; }

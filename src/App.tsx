@@ -144,7 +144,7 @@ export default function App() {
   // Keyboard shortcuts for undo/redo + export — effect registered below,
   // after handleExportPng/handleExportLitematic are declared.
 
-  // Keyboard shortcuts for paint tools (E / B / F / Escape)
+  // Keyboard shortcuts for paint tools (E / B / F / Escape) + view toggles (Z / O)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -155,11 +155,13 @@ export default function App() {
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'Escape': setActiveTool(null); break;
+        case 'KeyZ': setShowGrid(g => !g); break;
+        case 'KeyO': if (!compareMode) setShowOriginal(o => !o); break;
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [imageData]);
+  }, [imageData, compareMode]);
 
   // Ctrl+scroll to zoom on the preview section
   useEffect(() => {
@@ -331,6 +333,23 @@ export default function App() {
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
     exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
   }, []);
+
+  // Keyboard shortcuts: 1-7 select dithering, C toggles compare mode
+  // (declared here, after handleDitheringChange / handleCompareModeChange, to avoid TDZ)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.code.startsWith('Digit')) {
+        const idx = Number(e.key) - 1;
+        if (idx >= 0 && idx < ALL_MODES.length) { handleDitheringChange(ALL_MODES[idx]); return; }
+      }
+      if (!imageData) return;
+      if (e.code === 'KeyC') handleCompareModeChange(!compareMode);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [imageData, compareMode, handleDitheringChange, handleCompareModeChange]);
 
   // Keyboard shortcuts for undo/redo + export
   // (declared here, after handleExportPng/handleExportLitematic, to avoid TDZ)
@@ -644,14 +663,19 @@ export default function App() {
                   <div className="shortcuts-panel-title">SHORTCUTS</div>
                   <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>PNG</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>.litematic</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Export PNG</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Export .litematic</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom</span></div>
+                  <div className="shortcuts-divider" />
+                  <div className="shortcut-row"><kbd>Z</kbd><span>Toggle grid</span></div>
+                  <div className="shortcut-row"><kbd>O</kbd><span>Toggle orig/proc</span></div>
+                  <div className="shortcut-row"><kbd>C</kbd><span>Toggle compare</span></div>
+                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>Select dithering</span></div>
                   <div className="shortcuts-divider" />
                   <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper</span></div>
                   <div className="shortcut-row"><kbd>B</kbd><span>Brush</span></div>
                   <div className="shortcut-row"><kbd>F</kbd><span>Fill</span></div>
-                  <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect</span></div>
+                  <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect tool</span></div>
                 </div>
               )}
             </div>

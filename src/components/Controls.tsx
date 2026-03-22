@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { DitheringMode } from '../lib/dithering';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
 import type { MapGrid } from '../lib/types';
@@ -18,14 +18,84 @@ interface Props {
 
 const BN_SCALES = [1, 2] as const;
 
-const DITHERING_OPTIONS: { value: DitheringMode; label: string; desc: string }[] = [
-  { value: 'none',            label: 'None',            desc: 'Nearest OKLAB color only' },
-  { value: 'floyd-steinberg', label: 'Floyd–Steinberg', desc: 'Classic serpentine diffusion' },
-  { value: 'stucki',          label: 'Stucki',          desc: 'Smooth 12-neighbor diffusion' },
-  { value: 'jjn',             label: 'JJN',             desc: 'Jarvis-Judice-Ninke' },
-  { value: 'atkinson',        label: 'Atkinson',        desc: 'Apple HyperCard style' },
-  { value: 'blue-noise',      label: 'Blue Noise',      desc: 'Aperiodic ordered (IGN)' },
-  { value: 'yliluoma2',       label: 'Yliluoma #2',     desc: 'Pattern dithering for pixel art' },
+interface DitheringOption {
+  value: DitheringMode;
+  label: string;
+  desc: string;
+  tooltip: { fullName: string; description: string; bestFor: string };
+}
+
+const DITHERING_OPTIONS: DitheringOption[] = [
+  {
+    value: 'none',
+    label: 'None',
+    desc: 'Nearest OKLAB color only',
+    tooltip: {
+      fullName: 'No Dithering',
+      description: 'Maps each pixel directly to the nearest palette color using OKLAB perceptual distance. No error propagation.',
+      bestFor: 'Logos, pixel art, and images with few flat colors.',
+    },
+  },
+  {
+    value: 'floyd-steinberg',
+    label: 'Floyd–Steinberg',
+    desc: 'Classic serpentine diffusion',
+    tooltip: {
+      fullName: 'Floyd–Steinberg',
+      description: 'Distributes quantization error to 4 neighboring pixels in a serpentine scan. Classic and fast.',
+      bestFor: 'Photos and general-purpose use.',
+    },
+  },
+  {
+    value: 'stucki',
+    label: 'Stucki',
+    desc: 'Smooth 12-neighbor diffusion',
+    tooltip: {
+      fullName: 'Stucki',
+      description: 'Spreads error across 12 neighbors with a wider kernel. Produces smoother gradients than Floyd–Steinberg.',
+      bestFor: 'Smooth gradients and portraits.',
+    },
+  },
+  {
+    value: 'jjn',
+    label: 'JJN',
+    desc: 'Jarvis-Judice-Ninke',
+    tooltip: {
+      fullName: 'Jarvis–Judice–Ninke',
+      description: 'A 12-pixel kernel with different weight distribution for rounder, more diffuse error spread.',
+      bestFor: 'Detailed photos with fine textures.',
+    },
+  },
+  {
+    value: 'atkinson',
+    label: 'Atkinson',
+    desc: 'Apple HyperCard style',
+    tooltip: {
+      fullName: 'Atkinson',
+      description: 'Propagates only ¾ of the error, preserving bright highlights and producing a crisper look.',
+      bestFor: 'High-contrast images and illustrations.',
+    },
+  },
+  {
+    value: 'blue-noise',
+    label: 'Blue Noise',
+    desc: 'Aperiodic ordered (IGN)',
+    tooltip: {
+      fullName: 'Blue Noise (IGN)',
+      description: 'Ordered dithering using an interleaved gradient noise pattern. Avoids repetitive banding artifacts.',
+      bestFor: 'Artistic output and stylized map art.',
+    },
+  },
+  {
+    value: 'yliluoma2',
+    label: 'Yliluoma #2',
+    desc: 'Pattern dithering for pixel art',
+    tooltip: {
+      fullName: 'Yliluoma Algorithm #2',
+      description: 'Clusters pixels into palette-color patterns rather than diffusing error. Produces a crisp, painterly look.',
+      bestFor: 'Pixel art style and large multi-map grids.',
+    },
+  },
 ];
 
 const ERROR_DIFFUSION: DitheringMode[] = ['floyd-steinberg', 'stucki', 'jjn', 'atkinson'];
@@ -69,6 +139,24 @@ export function Controls({
   const showIntensity = dithering !== 'none';
   const blockW = mapGrid.wide * MAP_BLOCK_SIZE;
   const blockH = mapGrid.tall * MAP_BLOCK_SIZE;
+
+  // Dithering tooltip state
+  const [tooltipInfo, setTooltipInfo] = useState<{ mode: DitheringMode; top: number; left: number } | null>(null);
+  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  function handleOptionMouseEnter(e: React.MouseEvent<HTMLLabelElement>, value: DitheringMode) {
+    clearTimeout(tooltipTimer.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const top = Math.min(rect.top, window.innerHeight - 140);
+    tooltipTimer.current = setTimeout(() => {
+      setTooltipInfo({ mode: value, top, left: rect.right + 10 });
+    }, 400);
+  }
+
+  function handleOptionMouseLeave() {
+    clearTimeout(tooltipTimer.current);
+    setTooltipInfo(null);
+  }
 
   // Custom grid state
   const [showCustom, setShowCustom] = useState(false);
@@ -183,7 +271,12 @@ export function Controls({
         <h3 className="control-title">Dithering</h3>
         <div className="dither-options">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
-            <label key={value} className={`dither-option ${dithering === value ? 'active' : ''}`}>
+            <label
+              key={value}
+              className={`dither-option ${dithering === value ? 'active' : ''}`}
+              onMouseEnter={e => handleOptionMouseEnter(e, value)}
+              onMouseLeave={handleOptionMouseLeave}
+            >
               <input
                 type="radio"
                 name="dithering"
@@ -197,6 +290,17 @@ export function Controls({
             </label>
           ))}
         </div>
+        {tooltipInfo && (() => {
+          const opt = DITHERING_OPTIONS.find(o => o.value === tooltipInfo.mode);
+          if (!opt) return null;
+          return (
+            <div className="dither-tooltip" style={{ top: tooltipInfo.top, left: tooltipInfo.left }}>
+              <div className="dither-tooltip-title">{opt.tooltip.fullName}</div>
+              <div className="dither-tooltip-body">{opt.tooltip.description}</div>
+              <div className="dither-tooltip-best"><span className="dither-tooltip-best-label">Best for:</span> {opt.tooltip.bestFor}</div>
+            </div>
+          );
+        })()}
       </section>
 
       {/* ── Blue noise pattern scale ──────────────────────────── */}
