@@ -52,7 +52,7 @@ export default function App() {
   const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
   const [imageData, setImageData]       = useState<ImageData | null>(null);
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
-  const [showOriginal, setShowOriginal] = useState(false);
+  const [splitPos, setSplitPos] = useState(50);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
   const [compareMode, setCompareMode]   = useState(false);
@@ -156,7 +156,7 @@ export default function App() {
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'Escape': setActiveTool(null); break;
         case 'KeyZ': setShowGrid(g => !g); break;
-        case 'KeyO': if (!compareMode) setShowOriginal(o => !o); break;
+        case 'KeyO': if (!compareMode) setSplitPos(50); break;
       }
     }
     document.addEventListener('keydown', onKey);
@@ -236,7 +236,7 @@ export default function App() {
 
   const handleImageLoaded = useCallback((img: HTMLImageElement) => {
     setSourceImage(img);
-    setShowOriginal(false);
+    setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
@@ -266,7 +266,6 @@ export default function App() {
 
   const handleCompareModeChange = useCallback((enabled: boolean) => {
     setCompareMode(enabled);
-    setShowOriginal(false);
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, adjustments, bnScale);
   }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
@@ -643,8 +642,7 @@ export default function App() {
                 <div className="toolbar-group">
                   {!compareMode && (
                     <>
-                      <button className={`tool-btn${!showOriginal ? ' active' : ''}`} onClick={() => setShowOriginal(false)} title="Processed">PROC</button>
-                      <button className={`tool-btn${showOriginal ? ' active' : ''}`} onClick={() => setShowOriginal(true)} title="Original">ORIG</button>
+                      <button className="tool-btn" onClick={() => setSplitPos(50)} title="Reset split to center (⟺)">⟺</button>
                       <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">BLK</button>
                     </>
                   )}
@@ -668,7 +666,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom</span></div>
                   <div className="shortcuts-divider" />
                   <div className="shortcut-row"><kbd>Z</kbd><span>Toggle grid</span></div>
-                  <div className="shortcut-row"><kbd>O</kbd><span>Toggle orig/proc</span></div>
+                  <div className="shortcut-row"><kbd>O</kbd><span>Reset split to 50%</span></div>
                   <div className="shortcut-row"><kbd>C</kbd><span>Toggle compare</span></div>
                   <div className="shortcut-row"><kbd>1 – 7</kbd><span>Select dithering</span></div>
                   <div className="shortcuts-divider" />
@@ -727,7 +725,7 @@ export default function App() {
               <PreviewCanvas
                 mode={textureMode}
                 imageData={imageData} originalData={originalData}
-                showOriginal={showOriginal} showGrid={showGrid}
+                showOriginal={false} showGrid={showGrid}
                 width={pw} height={ph} scale={displayScale}
                 cp={activePalette} blockSelection={blockSelection}
                 activeTool={activeTool}
@@ -737,6 +735,8 @@ export default function App() {
                 onImageUpdate={handleImageUpdate}
                 onToolChange={setActiveTool}
                 onPaintBlockChange={setPaintBlock}
+                splitPos={imageData && originalData ? splitPos : undefined}
+                onSplitPosChange={setSplitPos}
               />
             )}
 

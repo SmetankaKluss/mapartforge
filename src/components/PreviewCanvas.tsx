@@ -64,6 +64,8 @@ interface Props {
   onImageUpdate: (data: ImageData) => void;
   onToolChange: (tool: PaintTool | null) => void;
   onPaintBlockChange: (block: PaintBlock) => void;
+  splitPos?: number;
+  onSplitPosChange?: (p: number) => void;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -195,6 +197,7 @@ export function PreviewCanvas({
   width, height, scale, cp, blockSelection,
   activeTool, paintBlock, brushSize,
   onRemoveBlock, onImageUpdate, onToolChange, onPaintBlockChange,
+  splitPos, onSplitPosChange,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -210,6 +213,13 @@ export function PreviewCanvas({
   const [paintVersion, setPaintVersion] = useState(0);
   const [brushCursor, setBrushCursor]   = useState<string>('cell');
 
+  // Split slider state
+  const isDraggingSplitRef   = useRef(false);
+  const splitContainerRef    = useRef<HTMLDivElement>(null);
+  const onSplitPosChangeRef  = useRef(onSplitPosChange);
+  const [labelsVisible, setLabelsVisible] = useState(true);
+  const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
@@ -218,12 +228,26 @@ export function PreviewCanvas({
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
   propsRef.current = { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize };
+  // Keep ref current each render so stable global handlers see latest callback
+  onSplitPosChangeRef.current = onSplitPosChange;
 
   const displayImageData = paintBufferRef.current ?? imageData;
 
   // ── Cleanup timers ──────────────────────────────────────────────────────────
 
-  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+  useEffect(() => () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    clearTimeout(labelTimerRef.current);
+  }, []);
+
+  // ── Show split labels on mount / when split activates ───────────────────────
+  useEffect(() => {
+    if (splitPos == null) return;
+    setLabelsVisible(true);
+    labelTimerRef.current = setTimeout(() => setLabelsVisible(false), 2000);
+    return () => clearTimeout(labelTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitPos != null]);
 
   // ── Close tooltip when a paint tool activates ───────────────────────────────
 
@@ -247,6 +271,13 @@ export function PreviewCanvas({
 
   useEffect(() => {
     function onGlobalMouseMove(e: MouseEvent) {
+      // Split drag takes priority
+      if (isDraggingSplitRef.current && splitContainerRef.current) {
+        const rect = splitContainerRef.current.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+        onSplitPosChangeRef.current?.(pos);
+        return;
+      }
       const { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize } = propsRef.current;
       if (!isDraggingRef.current || activeTool !== 'brush' || !paintBlock || !paintBufferRef.current) return;
       const canvas = canvasZoneRef.current?.querySelector('canvas');
@@ -271,6 +302,7 @@ export function PreviewCanvas({
     }
 
     function onGlobalMouseUp() {
+      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; return; }
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       if (paintBufferRef.current) {
@@ -362,7 +394,55 @@ export function PreviewCanvas({
 
   // ── Paint tool handlers ─────────────────────────────────────────────────────
 
+  // ── Split slider helpers ─────────────────────────────────────────────────────
+
+  function showSplitLabels() {
+    setLabelsVisible(true);
+    clearTimeout(labelTimerRef.current);
+    labelTimerRef.current = setTimeout(() => setLabelsVisible(false), 2000);
+  }
+
+  function handleDividerMouseDown(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    isDraggingSplitRef.current = true;
+    showSplitLabels();
+  }
+
+  function handleDividerTouchStart(e: React.TouchEvent) {
+    e.preventDefault(); e.stopPropagation();
+    isDraggingSplitRef.current = true;
+    showSplitLabels();
+    const touch = e.touches[0];
+    if (touch && splitContainerRef.current) {
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      onSplitPosChangeRef.current?.(Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100)));
+    }
+  }
+
+  function handleContainerTouchMove(e: React.TouchEvent) {
+    if (!isDraggingSplitRef.current || !splitContainerRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (touch) {
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      onSplitPosChangeRef.current?.(Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100)));
+    }
+  }
+
+  function handleContainerTouchEnd() { isDraggingSplitRef.current = false; }
+
+  function handleContainerMouseEnter() { if (splitPos != null) showSplitLabels(); }
+
   function handleZoneMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    // Alt+drag anywhere on canvas → move split divider
+    if (e.altKey && splitPos != null && splitContainerRef.current) {
+      e.preventDefault();
+      isDraggingSplitRef.current = true;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      onSplitPosChangeRef.current?.(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
+      showSplitLabels();
+      return;
+    }
     if (!activeTool || showOriginal) return;
     e.preventDefault(); // prevent text selection during drag
 
@@ -470,7 +550,7 @@ export function PreviewCanvas({
 
   // ── Canvas child ────────────────────────────────────────────────────────────
 
-  const inner = mode === 'block' ? (
+  const processedLayer = mode === 'block' ? (
     <BlockCanvas
       imageData={displayImageData} cp={cp} blockSelection={blockSelection}
       width={width} height={height} showGrid={showGrid} scale={scale}
@@ -482,6 +562,44 @@ export function PreviewCanvas({
       width={width} height={height} scale={scale}
     />
   );
+
+  const inner = splitPos != null ? (
+    <div
+      ref={splitContainerRef}
+      className="split-canvas-container"
+      onMouseEnter={handleContainerMouseEnter}
+      onTouchMove={handleContainerTouchMove}
+      onTouchEnd={handleContainerTouchEnd}
+    >
+      {/* Bottom: processed (always full width) */}
+      {processedLayer}
+      {/* Top: original clipped to left side of divider */}
+      {originalData && (
+        <div
+          className="split-original-layer"
+          style={{ clipPath: `inset(0 ${100 - splitPos}% 0 0)` }}
+        >
+          <MapCanvas
+            imageData={originalData} originalData={null}
+            showOriginal={false} showGrid={false}
+            width={width} height={height} scale={scale}
+          />
+        </div>
+      )}
+      {/* Divider line + handle */}
+      <div
+        className="split-divider"
+        style={{ left: `${splitPos}%` }}
+        onMouseDown={handleDividerMouseDown}
+        onTouchStart={handleDividerTouchStart}
+      >
+        <div className="split-handle">◀▶</div>
+      </div>
+      {/* Labels */}
+      <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>ORIGINAL</span>
+      <span className={`split-label split-label-right${labelsVisible ? ' visible' : ''}`}>PROCESSED</span>
+    </div>
+  ) : processedLayer;
 
   // paintVersion is used only to force re-renders when paint buffer mutates
   void paintVersion;
