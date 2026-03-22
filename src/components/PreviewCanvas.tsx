@@ -543,7 +543,11 @@ export function PreviewCanvas({
 
   const TOOLTIP_W = 220;
   const TOOLTIP_H = showRepaint ? 320 : 130;
-  const ttLeft = Math.min(mousePos.x + 12, window.innerWidth  - TOOLTIP_W - 8);
+  const RIGHT_PANEL_W = 260; // matches --panel-right CSS variable
+  const spaceOnRight = window.innerWidth - RIGHT_PANEL_W - (mousePos.x + 12);
+  const ttLeft = spaceOnRight >= TOOLTIP_W
+    ? mousePos.x + 12
+    : Math.max(8, mousePos.x - TOOLTIP_W - 12);
   const ttTop  = Math.min(mousePos.y + 12, window.innerHeight - TOOLTIP_H - 8);
 
   // ── Cursor style ────────────────────────────────────────────────────────────
