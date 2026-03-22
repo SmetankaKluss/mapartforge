@@ -541,7 +541,6 @@ input, select, textarea { outline: none; }
   position: relative;
   display: inline-block;
   overflow: hidden;
-  cursor: ew-resize;
   line-height: 0; /* prevent inline gap under canvases */
 }
 
