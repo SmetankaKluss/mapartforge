@@ -327,7 +327,7 @@ input, select, textarea { outline: none; }
 .dither-option {
   display: flex; align-items: baseline; padding: 6px 12px; cursor: pointer;
   transition: background 0.1s; border-left: 2px solid transparent; gap: 0; position: relative;
-  border-bottom: 1px solid rgba(87,255,110,0.1);
+  border-bottom: 1px solid rgba(87,255,110,0.1); overflow: hidden;
 }
 .dither-option:last-child { border-bottom: none; }
 .dither-option:hover { background: rgba(87, 255, 110, 0.06); }
@@ -335,9 +335,9 @@ input, select, textarea { outline: none; }
 .dither-option input[type="radio"] { display: none; }
 .dither-option::before { content: '  '; font-family: var(--font-mono); font-size: 10px; width: 14px; flex-shrink: 0; color: var(--accent); }
 .dither-option.active::before { content: '▶'; }
-.dither-label { font-family: var(--font-mono); font-size: 11px; color: #e0e0e0; min-width: 110px; }
+.dither-label { font-family: var(--font-mono); font-size: 11px; color: #e0e0e0; min-width: 100px; flex-shrink: 0; }
 .dither-option.active .dither-label { color: var(--accent); font-weight: 500; }
-.dither-desc { font-size: 9px; color: rgba(255,255,255,0.55); margin-left: 6px; }
+.dither-desc { font-size: 9px; color: rgba(255,255,255,0.55); margin-left: 6px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dither-option.active .dither-desc { color: rgba(87,255,110,0.75); }
 
 .bn-scale-options { display: flex; gap: 4px; padding: 6px 12px; }
@@ -442,7 +442,7 @@ input, select, textarea { outline: none; }
 }
 .tool-btn:hover:not(:disabled) { border-color: rgba(87,255,110,0.5); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .tool-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); animation: toolPulse 2s ease infinite; }
-.tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 @keyframes toolPulse {
   0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
   50%       { box-shadow: 0 0 12px rgba(87, 255, 110, 0.55); }
@@ -457,7 +457,7 @@ input, select, textarea { outline: none; }
 /* Undo/Redo */
 .undo-redo-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 14px; font-weight: bold; transition: border-color 0.12s, color 0.12s; }
 .undo-redo-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.undo-redo-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.undo-redo-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Zoom */
 .zoom-btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 16px; font-weight: bold; line-height: 1; transition: border-color 0.12s, color 0.12s; }
@@ -576,7 +576,7 @@ input, select, textarea { outline: none; }
 .pe-select { flex: 1; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 4px 6px; font-family: var(--font-mono); font-size: 10px; min-width: 0; appearance: none; }
 .pe-select:focus { border-color: var(--accent); }
 .pe-builtin-row { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.pe-builtin-btn { flex: 1; padding: 5px 4px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.02em; text-align: center; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
+.pe-builtin-btn { flex: 1; padding: 5px 4px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
 .pe-builtin-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 4px var(--accent-glow); }
 .pe-builtin-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .pe-rows { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
