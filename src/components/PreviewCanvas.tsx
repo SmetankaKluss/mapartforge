@@ -599,9 +599,14 @@ export function PreviewCanvas({
         className="split-divider"
         style={{ left: `${splitPos}%` }}
         onMouseDown={handleDividerMouseDown}
+        onClick={e => e.stopPropagation()}
         onTouchStart={handleDividerTouchStart}
       >
-        <div className="split-handle" onMouseDown={e => e.stopPropagation()}>◀▶</div>
+        <div
+          className="split-handle"
+          onMouseDown={handleDividerMouseDown}
+          onClick={e => e.stopPropagation()}
+        >◀▶</div>
       </div>
       {/* Labels */}
       <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>ORIGINAL</span>
