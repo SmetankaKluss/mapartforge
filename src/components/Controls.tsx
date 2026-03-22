@@ -368,7 +368,7 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">OKLAB dist below which pixels snap cleanly (no diffusion).</p>
+            <p className="intensity-hint">OKLAB dist for clean snap. Keep low (≤0.01) — higher values snap everything.</p>
           </div>
 
           {/* Max candidate dist */}
