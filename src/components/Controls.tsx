@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
@@ -171,6 +171,12 @@ export function Controls({
     clearTimeout(tooltipTimer.current);
     setTooltipInfo(null);
   }
+
+  // Local live state for KlussDither sliders — updated on every drag tick (display only).
+  // Commits to parent only on mouseUp/touchEnd to avoid racing with processingRef guard.
+  const [liveKluss, setLiveKluss] = useState<KlussParams>(klussParams);
+  // Sync when parent resets params (e.g. "Reset to defaults" button)
+  useEffect(() => { setLiveKluss(klussParams); }, [klussParams]);
 
   // Custom grid state
   const [showCustom, setShowCustom] = useState(false);
@@ -351,51 +357,51 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Clean threshold</span>
-              <span className="intensity-value">{klussParams.cleanThreshold.toFixed(2)}</span>
+              <span className="intensity-value">{liveKluss.cleanThreshold.toFixed(2)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
               min={0.01} max={0.30} step={0.01}
-              value={klussParams.cleanThreshold}
-              onChange={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number(e.target.value) })}
-              onMouseUp={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
+              value={liveKluss.cleanThreshold}
+              onChange={e => setLiveKluss(p => ({ ...p, cleanThreshold: Number(e.target.value) }))}
+              onMouseUp={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">OKLAB distance for clean snap (no dithering).</p>
+            <p className="intensity-hint">OKLAB dist below which pixels snap cleanly (no diffusion).</p>
           </div>
 
           {/* Max candidate dist */}
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Candidate range</span>
-              <span className="intensity-value">{klussParams.maxCandidateDist.toFixed(2)}</span>
+              <span className="intensity-value">{liveKluss.maxCandidateDist.toFixed(2)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
               min={0.05} max={0.80} step={0.01}
-              value={klussParams.maxCandidateDist}
-              onChange={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number(e.target.value) })}
-              onMouseUp={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
+              value={liveKluss.maxCandidateDist}
+              onChange={e => setLiveKluss(p => ({ ...p, maxCandidateDist: Number(e.target.value) }))}
+              onMouseUp={e => onKlussParamsChange({ ...liveKluss, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...liveKluss, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Max OKLAB distance for dither candidates.</p>
+            <p className="intensity-hint">Max OKLAB dist for dither candidates.</p>
           </div>
 
           {/* Error cap */}
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Error cap</span>
-              <span className="intensity-value">{klussParams.errorCap.toFixed(2)}</span>
+              <span className="intensity-value">{liveKluss.errorCap.toFixed(2)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
               min={0.01} max={0.50} step={0.01}
-              value={klussParams.errorCap}
-              onChange={e => onKlussParamsChange({ ...klussParams, errorCap: Number(e.target.value) })}
-              onMouseUp={e => onKlussParamsChange({ ...klussParams, errorCap: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={e => onKlussParamsChange({ ...klussParams, errorCap: Number((e.target as HTMLInputElement).value) })}
+              value={liveKluss.errorCap}
+              onChange={e => setLiveKluss(p => ({ ...p, errorCap: Number(e.target.value) }))}
+              onMouseUp={e => onKlussParamsChange({ ...liveKluss, errorCap: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...liveKluss, errorCap: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
             <p className="intensity-hint">Caps accumulated error per channel (× 255).</p>
@@ -405,18 +411,18 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Zone boundary</span>
-              <span className="intensity-value">{klussParams.zoneBoundaryThreshold.toFixed(2)}</span>
+              <span className="intensity-value">{liveKluss.zoneBoundaryThreshold.toFixed(2)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
-              min={0.02} max={0.40} step={0.01}
-              value={klussParams.zoneBoundaryThreshold}
-              onChange={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number(e.target.value) })}
-              onMouseUp={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
+              min={0.02} max={0.50} step={0.01}
+              value={liveKluss.zoneBoundaryThreshold}
+              onChange={e => setLiveKluss(p => ({ ...p, zoneBoundaryThreshold: Number(e.target.value) }))}
+              onMouseUp={e => onKlussParamsChange({ ...liveKluss, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...liveKluss, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Clears error buffer at colour zone edges.</p>
+            <p className="intensity-hint">Clears error buffer at hard colour zone edges.</p>
           </div>
 
           <button
@@ -457,6 +463,9 @@ export function Controls({
           )}
           {dithering === 'yliluoma2' && (
             <p className="intensity-hint">Pattern size (1–8 colors per cluster).</p>
+          )}
+          {dithering === 'kluss' && (
+            <p className="intensity-hint">Error diffusion strength (scales 0–75% dampening).</p>
           )}
         </section>
       )}

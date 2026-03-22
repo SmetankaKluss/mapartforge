@@ -27,10 +27,10 @@ export interface KlussParams {
 }
 
 export const DEFAULT_KLUSS_PARAMS: KlussParams = {
-  cleanThreshold:        0.08,
+  cleanThreshold:        0.04,  // snap only very close matches — lower = more dithering
   maxCandidateDist:      0.35,
-  errorCap:              0.15,
-  zoneBoundaryThreshold: 0.12,
+  errorCap:              0.20,
+  zoneBoundaryThreshold: 0.22,  // only clear at hard colour boundaries
 };
 
 // ── Computed-palette bundle ───────────────────────────────────────────────
