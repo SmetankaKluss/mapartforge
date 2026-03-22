@@ -248,6 +248,17 @@ input, select, textarea { outline: none; }
 .panel-scroll::-webkit-scrollbar { width: 4px; }
 .panel-scroll::-webkit-scrollbar-track { background: transparent; }
 .panel-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+.panel-scroll::after {
+  content: '';
+  display: block;
+  position: sticky;
+  bottom: 0;
+  height: 36px;
+  margin-top: -36px;
+  background: linear-gradient(to bottom, transparent, var(--bg-panel));
+  pointer-events: none;
+  z-index: 1;
+}
 
 /* ── Section Headers (> prefix style) ─────────────────────────────────── */
 .section-header,
