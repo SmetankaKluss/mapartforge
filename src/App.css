@@ -356,6 +356,13 @@ input, select, textarea { outline: none; }
 .bn-scale-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .bn-scale-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
+/* KlussDither param rows */
+.kluss-param { padding: 6px 12px 2px; }
+.kluss-param-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.kluss-param-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.kluss-reset-btn { display: block; margin: 8px 12px 2px; padding: 4px 10px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; cursor: pointer; transition: border-color 0.12s, color 0.12s; }
+.kluss-reset-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
 /* Intensity slider */
 .intensity-slider { width: calc(100% - 24px); margin: 4px 12px 0; height: 18px; -webkit-appearance: none; appearance: none; background: transparent; }
 .intensity-slider::-webkit-slider-runnable-track { height: 2px; background: var(--bg-input); border: 1px solid rgba(87,255,110,0.25); }

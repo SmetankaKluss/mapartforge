@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import type { DitheringMode } from '../lib/dithering';
+import type { DitheringMode, KlussParams } from '../lib/dithering';
+import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
 import type { MapGrid } from '../lib/types';
 
@@ -11,6 +12,8 @@ interface Props {
   onIntensityCommit: (v: number) => void;
   bnScale: number;
   onBnScaleChange: (v: number) => void;
+  klussParams: KlussParams;
+  onKlussParamsChange: (p: KlussParams) => void;
   mapGrid: MapGrid;
   onMapGridChange: (g: MapGrid) => void;
   processing: boolean;
@@ -96,6 +99,16 @@ const DITHERING_OPTIONS: DitheringOption[] = [
       bestFor: 'Pixel art style and large multi-map grids.',
     },
   },
+  {
+    value: 'kluss',
+    label: 'KlussDither',
+    desc: 'Smart threshold dithering for anime art',
+    tooltip: {
+      fullName: 'KlussDither',
+      description: 'Clean-zone detection snaps flat colour fills directly; Stucki error diffusion with dampening and error capping handles gradients. Zone boundaries are cleared to prevent bleed.',
+      bestFor: 'Anime art, illustrations, and images with large flat colour regions.',
+    },
+  },
 ];
 
 const ERROR_DIFFUSION: DitheringMode[] = ['floyd-steinberg', 'stucki', 'jjn', 'atkinson'];
@@ -133,6 +146,7 @@ export function Controls({
   dithering, onDitheringChange,
   intensity, onIntensityChange, onIntensityCommit,
   bnScale, onBnScaleChange,
+  klussParams, onKlussParamsChange,
   mapGrid, onMapGridChange,
   processing,
 }: Props) {
@@ -325,6 +339,91 @@ export function Controls({
               ? 'Fine grain — may show ribbing pattern.'
               : `${bnScale}×${bnScale} block areas share one noise threshold.`}
           </p>
+        </section>
+      )}
+
+      {/* ── KlussDither params ───────────────────────────────────── */}
+      {dithering === 'kluss' && (
+        <section className="control-group">
+          <h3 className="control-title">KlussDither settings</h3>
+
+          {/* Clean threshold */}
+          <div className="kluss-param">
+            <div className="kluss-param-header">
+              <span className="kluss-param-label">Clean threshold</span>
+              <span className="intensity-value">{klussParams.cleanThreshold.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" className="intensity-slider"
+              min={0.01} max={0.30} step={0.01}
+              value={klussParams.cleanThreshold}
+              onChange={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number(e.target.value) })}
+              onMouseUp={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...klussParams, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
+              disabled={processing}
+            />
+            <p className="intensity-hint">OKLAB distance for clean snap (no dithering).</p>
+          </div>
+
+          {/* Max candidate dist */}
+          <div className="kluss-param">
+            <div className="kluss-param-header">
+              <span className="kluss-param-label">Candidate range</span>
+              <span className="intensity-value">{klussParams.maxCandidateDist.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" className="intensity-slider"
+              min={0.05} max={0.80} step={0.01}
+              value={klussParams.maxCandidateDist}
+              onChange={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number(e.target.value) })}
+              onMouseUp={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...klussParams, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
+              disabled={processing}
+            />
+            <p className="intensity-hint">Max OKLAB distance for dither candidates.</p>
+          </div>
+
+          {/* Error cap */}
+          <div className="kluss-param">
+            <div className="kluss-param-header">
+              <span className="kluss-param-label">Error cap</span>
+              <span className="intensity-value">{klussParams.errorCap.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" className="intensity-slider"
+              min={0.01} max={0.50} step={0.01}
+              value={klussParams.errorCap}
+              onChange={e => onKlussParamsChange({ ...klussParams, errorCap: Number(e.target.value) })}
+              onMouseUp={e => onKlussParamsChange({ ...klussParams, errorCap: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...klussParams, errorCap: Number((e.target as HTMLInputElement).value) })}
+              disabled={processing}
+            />
+            <p className="intensity-hint">Caps accumulated error per channel (× 255).</p>
+          </div>
+
+          {/* Zone boundary threshold */}
+          <div className="kluss-param">
+            <div className="kluss-param-header">
+              <span className="kluss-param-label">Zone boundary</span>
+              <span className="intensity-value">{klussParams.zoneBoundaryThreshold.toFixed(2)}</span>
+            </div>
+            <input
+              type="range" className="intensity-slider"
+              min={0.02} max={0.40} step={0.01}
+              value={klussParams.zoneBoundaryThreshold}
+              onChange={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number(e.target.value) })}
+              onMouseUp={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...klussParams, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
+              disabled={processing}
+            />
+            <p className="intensity-hint">Clears error buffer at colour zone edges.</p>
+          </div>
+
+          <button
+            className="kluss-reset-btn"
+            onClick={() => onKlussParamsChange(DEFAULT_KLUSS_PARAMS)}
+            disabled={processing}
+          >Reset to defaults</button>
         </section>
       )}
 

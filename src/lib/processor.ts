@@ -1,17 +1,18 @@
-import { applyDithering, DEFAULT_PALETTE } from './dithering';
-import type { DitheringMode, ComputedPalette } from './dithering';
+import { applyDithering, DEFAULT_PALETTE, DEFAULT_KLUSS_PARAMS } from './dithering';
+import type { DitheringMode, ComputedPalette, KlussParams } from './dithering';
 import { applyAdjustments, DEFAULT_ADJUSTMENTS } from './adjustments';
 import type { ImageAdjustments } from './adjustments';
 
 export interface ProcessOptions {
-  dithering:   DitheringMode;
-  width:       number;
-  height:      number;
-  intensity:   number;
-  bnScale?:    number;
-  palette?:    ComputedPalette;
+  dithering:    DitheringMode;
+  width:        number;
+  height:       number;
+  intensity:    number;
+  bnScale?:     number;
+  palette?:     ComputedPalette;
   adjustments?: ImageAdjustments;
-  onProgress?: (pct: number) => void;
+  onProgress?:  (pct: number) => void;
+  klussParams?: KlussParams;
 }
 
 export interface ProcessResult {
@@ -42,6 +43,7 @@ export async function processImage(
     palette     = DEFAULT_PALETTE,
     adjustments = DEFAULT_ADJUSTMENTS,
     onProgress,
+    klussParams = DEFAULT_KLUSS_PARAMS,
   } = options;
 
   onProgress?.(5);
@@ -59,7 +61,7 @@ export async function processImage(
     ? (row: number, total: number) => onProgress(10 + Math.round((row / total) * 85))
     : undefined;
 
-  const processedData = await applyDithering(adjusted, width, height, dithering, intensity, palette, bnScale, rowProgress);
+  const processedData = await applyDithering(adjusted, width, height, dithering, intensity, palette, bnScale, rowProgress, klussParams);
 
   onProgress?.(100);
 

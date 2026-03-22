@@ -37,6 +37,7 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
   'atkinson':        'atkinson',
   'blue-noise':      'blue-noise',
   'yliluoma2':       'yliluoma2',
+  'kluss':           'kluss',
 };
 
 function makePngFilename(grid: MapGrid, dithering: DitheringMode): string {

@@ -10,8 +10,8 @@ import { Controls } from './components/Controls';
 import { Adjustments } from './components/Adjustments';
 import { PaletteEditor } from './components/PaletteEditor';
 import { ExportPanel } from './components/ExportPanel';
-import type { DitheringMode } from './lib/dithering';
-import { buildComputedPalette } from './lib/dithering';
+import type { DitheringMode, KlussParams } from './lib/dithering';
+import { buildComputedPalette, DEFAULT_KLUSS_PARAMS } from './lib/dithering';
 import type { ComputedPalette } from './lib/dithering';
 import { processImage, processCompare } from './lib/processor';
 import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
@@ -42,8 +42,9 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
   'atkinson':        'Atkinson',
   'blue-noise':      'Blue Noise',
   'yliluoma2':       'Yliluoma #2',
+  'kluss':           'KlussDither',
 };
-const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2'];
+const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
 
 export default function App() {
   // ── Restore persisted settings — lazy init runs exactly once on mount ─
@@ -64,6 +65,7 @@ export default function App() {
   const [dithering, setDithering]       = useState<DitheringMode>(saved.dithering ?? 'floyd-steinberg');
   const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
   const [bnScale, setBnScale]           = useState(saved.bnScale ?? 2);
+  const [klussParams, setKlussParams]   = useState<KlussParams>(DEFAULT_KLUSS_PARAMS);
   const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
   const [processing, setProcessing]     = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
@@ -201,6 +203,7 @@ export default function App() {
     palette: ComputedPalette,
     adj: ImageAdjustments,
     bn: number,
+    kp: KlussParams,
   ) {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -219,7 +222,7 @@ export default function App() {
       } else {
         const result = await processImage(img, {
           dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
-          onProgress: setProcessingProgress,
+          onProgress: setProcessingProgress, klussParams: kp,
         });
         if (runTokenRef.current !== myToken) return;
         setImageData(result.processed);
@@ -239,60 +242,65 @@ export default function App() {
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
-    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
-    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
-  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
-    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
-  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
 
   const handleIntensityCommit = useCallback((v: number) => {
     setIntensity(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale);
-  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleBnScaleChange = useCallback((v: number) => {
     setBnScale(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, v);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, v, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, klussParams]);
+
+  const handleKlussParamsChange = useCallback((kp: KlussParams) => {
+    setKlussParams(kp);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, kp);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
 
   const handleCompareModeChange = useCallback((enabled: boolean) => {
     setCompareMode(enabled);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, adjustments, bnScale);
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
     if (side === 'left') {
       setCompareLeft(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, adjustments, bnScale);
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, adjustments, bnScale, klussParams);
     } else {
       setCompareRight(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, adjustments, bnScale);
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, adjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleSelectionChange = useCallback((sel: BlockSelection) => {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, mapMode, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, mapMode, bnScale, klussParams]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
     const shades = mode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, adjustments, bnScale, klussParams]);
 
   const handleAdjChange = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
@@ -300,8 +308,8 @@ export default function App() {
 
   const handleAdjCommit = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
 
   const handleRemoveBlock = useCallback((csId: number) => {
     pushToHistory();
@@ -309,8 +317,8 @@ export default function App() {
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale);
-  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, bnScale, klussParams]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
     pushToHistory();
@@ -333,7 +341,7 @@ export default function App() {
     exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
   }, []);
 
-  // Keyboard shortcuts: 1-7 select dithering, C toggles compare mode
+  // Keyboard shortcuts: 1-8 select dithering, C toggles compare mode
   // (declared here, after handleDitheringChange / handleCompareModeChange, to avoid TDZ)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -376,7 +384,7 @@ export default function App() {
     setMapMode('2d');
     if (sourceImage) {
       const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [2]));
-      runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2);
+      runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
     }
   }, [sourceImage, compareMode, compareLeft, compareRight]);
 
@@ -425,6 +433,7 @@ export default function App() {
           palette,
           s.adjustments     ?? DEFAULT_ADJUSTMENTS,
           s.bnScale         ?? 2,
+          DEFAULT_KLUSS_PARAMS,
         );
       };
       img.src = result.imageUrl;
@@ -489,6 +498,8 @@ export default function App() {
               onIntensityCommit={handleIntensityCommit}
               bnScale={bnScale}
               onBnScaleChange={handleBnScaleChange}
+              klussParams={klussParams}
+              onKlussParamsChange={handleKlussParamsChange}
               mapGrid={mapGrid}
               onMapGridChange={handleMapGridChange}
               processing={processing}

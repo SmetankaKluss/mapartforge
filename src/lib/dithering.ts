@@ -10,7 +10,28 @@ export type DitheringMode =
   | 'jjn'
   | 'atkinson'
   | 'blue-noise'
-  | 'yliluoma2';
+  | 'yliluoma2'
+  | 'kluss';
+
+// ── KlussDither parameters ────────────────────────────────────────────────
+
+export interface KlussParams {
+  /** OKLAB distance below which a pixel is placed cleanly with no error propagation. */
+  cleanThreshold: number;
+  /** Only palette candidates within this OKLAB distance are considered for dithering. */
+  maxCandidateDist: number;
+  /** Accumulated error is capped at this fraction of 255 before colour lookup. */
+  errorCap: number;
+  /** OKLAB distance between adjacent source pixels that triggers an error-buffer reset in radius 2. */
+  zoneBoundaryThreshold: number;
+}
+
+export const DEFAULT_KLUSS_PARAMS: KlussParams = {
+  cleanThreshold:        0.08,
+  maxCandidateDist:      0.35,
+  errorCap:              0.15,
+  zoneBoundaryThreshold: 0.12,
+};
 
 // ── Computed-palette bundle ───────────────────────────────────────────────
 
@@ -500,12 +521,133 @@ export function applyBlueNoiseEdge(
   return out;
 }
 
+// ── KlussDither ───────────────────────────────────────────────────────────
+//
+// Designed for anime / illustration art.  Two key behaviours:
+//
+//  1. Clean zones: if the nearest palette colour is already close enough
+//     (OKLAB dist < cleanThreshold) the pixel is placed without any error
+//     propagation, preserving flat-colour fills.
+//
+//  2. Zone boundary clearing: when adjacent source pixels differ by more
+//     than zoneBoundaryThreshold the accumulated error buffers are wiped in
+//     a radius-2 window, preventing bleed across hard colour boundaries.
+//
+// In gradient/texture areas a Stucki kernel with 0.75 × intensity dampening
+// is used and accumulated error is capped at errorCap × 255 per channel.
+
+async function applyKlussDither(
+  data: Uint8ClampedArray, width: number, height: number,
+  intensity: number, cp: ComputedPalette, params: KlussParams,
+  onProgress?: ProgressFn,
+): Promise<Uint8ClampedArray> {
+  const { cleanThreshold, maxCandidateDist, errorCap, zoneBoundaryThreshold } = params;
+  const out   = new Uint8ClampedArray(width * height * 4);
+  const [r, g, b] = initBuffers(data, width * height);
+  const total = width * height;
+  const D     = 42; // Stucki kernel divisor
+  const damp  = 0.75 * intensity;
+  const capV  = errorCap * 255;
+
+  // Pre-compute OKLAB for every source pixel (zone boundary detection only)
+  const srcLabs = new Array<Lab>(total);
+  for (let i = 0; i < total; i++) {
+    srcLabs[i] = rgbToOklab(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+
+      // ── Zone boundary detection ─────────────────────────────────────────
+      let zoneBoundary = false;
+      if (x > 0 && oklabDistance(srcLabs[idx], srcLabs[idx - 1]) > zoneBoundaryThreshold) zoneBoundary = true;
+      if (!zoneBoundary && y > 0 && oklabDistance(srcLabs[idx], srcLabs[idx - width]) > zoneBoundaryThreshold) zoneBoundary = true;
+
+      if (zoneBoundary) {
+        // Reset error buffer in radius 2 to prevent cross-boundary bleed
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const ny = y + dy, nx = x + dx;
+            if (ny < 0 || ny >= height || nx < 0 || nx >= width) continue;
+            const ni = ny * width + nx;
+            r[ni] = data[ni * 4];
+            g[ni] = data[ni * 4 + 1];
+            b[ni] = data[ni * 4 + 2];
+          }
+        }
+      }
+
+      // Cap accumulated error before colour lookup
+      const cr  = Math.max(0, Math.min(255, r[idx]));
+      const cg  = Math.max(0, Math.min(255, g[idx]));
+      const cb_ = Math.max(0, Math.min(255, b[idx]));
+
+      // Find nearest palette colour in OKLAB
+      const pLab = rgbToOklab(cr, cg, cb_);
+      let minDist = Infinity, nearestIdx = 0;
+      for (let i = 0; i < cp.labs.length; i++) {
+        const d = oklabDistance(pLab, cp.labs[i]);
+        if (d < minDist) { minDist = d; nearestIdx = i; }
+      }
+
+      let color: PaletteColor;
+      if (minDist < cleanThreshold) {
+        // ── Clean zone: snap directly, no error ────────────────────────
+        color = cp.colors[nearestIdx];
+      } else {
+        // ── Dither zone: top-3 candidates within maxCandidateDist ──────
+        const candidates: { c: PaletteColor; d: number }[] = [];
+        for (let i = 0; i < cp.labs.length; i++) {
+          const d = oklabDistance(pLab, cp.labs[i]);
+          if (d <= maxCandidateDist) candidates.push({ c: cp.colors[i], d });
+        }
+        candidates.sort((a, b_) => a.d - b_.d);
+        color = candidates.length > 0 ? candidates[0].c : cp.colors[nearestIdx];
+
+        // Stucki kernel × damp; error capped per channel
+        const er = Math.max(-capV, Math.min(capV, cr  - color.r));
+        const eg = Math.max(-capV, Math.min(capV, cg  - color.g));
+        const eb = Math.max(-capV, Math.min(capV, cb_ - color.b));
+
+        const W  = width;
+        const sp = (di: number, f: number) =>
+          addErr(r, g, b, idx + di, total, er, eg, eb, (f / D) * damp, 1);
+
+        if (x + 1 < width) sp(+1, 8);
+        if (x + 2 < width) sp(+2, 4);
+        if (y + 1 < height) {
+          if (x - 2 >= 0)    sp(W - 2, 2);
+          if (x - 1 >= 0)    sp(W - 1, 4);
+                             sp(W,     8);
+          if (x + 1 < width) sp(W + 1, 4);
+          if (x + 2 < width) sp(W + 2, 2);
+        }
+        if (y + 2 < height) {
+          if (x - 2 >= 0)    sp(W * 2 - 2, 1);
+          if (x - 1 >= 0)    sp(W * 2 - 1, 2);
+                             sp(W * 2,     4);
+          if (x + 1 < width) sp(W * 2 + 1, 2);
+          if (x + 2 < width) sp(W * 2 + 2, 1);
+        }
+      }
+
+      out[idx * 4]     = color.r;
+      out[idx * 4 + 1] = color.g;
+      out[idx * 4 + 2] = color.b;
+      out[idx * 4 + 3] = 255;
+    }
+    if (onProgress) { onProgress(y, height); if ((y & (YIELD_ROWS - 1)) === YIELD_ROWS - 1) await yieldControl(); }
+  }
+  return out;
+}
+
 // ── Main entry point ──────────────────────────────────────────────────────
 
 /**
- * @param bnScale  Pattern scale for blue-noise modes (1 | 2 | 4 | 8).
- *                 Each noise threshold covers a bnScale×bnScale block area.
- *                 Higher = less ribbing, smoother transitions. Default 2.
+ * @param bnScale      Pattern scale for blue-noise modes (1 | 2 | 4 | 8).
+ * @param onProgress   Row-by-row progress callback.
+ * @param klussParams  Parameters for the KlussDither algorithm.
  */
 export async function applyDithering(
   data: Uint8ClampedArray,
@@ -516,6 +658,7 @@ export async function applyDithering(
   cp: ComputedPalette = DEFAULT_PALETTE,
   bnScale: number = 2,
   onProgress?: ProgressFn,
+  klussParams?: KlussParams,
 ): Promise<Uint8ClampedArray> {
   if (cp.colors.length === 0) {
     cp = DEFAULT_PALETTE;
@@ -577,6 +720,7 @@ export async function applyDithering(
   if (mode === 'stucki')           return applyStucki(data, width, height, intensity, cp, onProgress);
   if (mode === 'jjn')              return applyJJN(data, width, height, intensity, cp, onProgress);
   if (mode === 'atkinson')         return applyAtkinson(data, width, height, intensity, cp, onProgress);
+  if (mode === 'kluss')            return applyKlussDither(data, width, height, intensity, cp, klussParams ?? DEFAULT_KLUSS_PARAMS, onProgress);
 
   return out;
 }
