@@ -219,6 +219,7 @@ export function PreviewCanvas({
   const onSplitPosChangeRef  = useRef(onSplitPosChange);
   const [labelsVisible, setLabelsVisible] = useState(true);
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
 
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
@@ -302,7 +303,7 @@ export function PreviewCanvas({
     }
 
     function onGlobalMouseUp() {
-      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; return; }
+      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       if (paintBufferRef.current) {
@@ -405,12 +406,14 @@ export function PreviewCanvas({
   function handleDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
     isDraggingSplitRef.current = true;
+    setIsDraggingSplit(true);
     showSplitLabels();
   }
 
   function handleDividerTouchStart(e: React.TouchEvent) {
     e.preventDefault(); e.stopPropagation();
     isDraggingSplitRef.current = true;
+    setIsDraggingSplit(true);
     showSplitLabels();
     const touch = e.touches[0];
     if (touch && splitContainerRef.current) {
@@ -429,11 +432,13 @@ export function PreviewCanvas({
     }
   }
 
-  function handleContainerTouchEnd() { isDraggingSplitRef.current = false; }
+  function handleContainerTouchEnd() { isDraggingSplitRef.current = false; setIsDraggingSplit(false); }
 
   function handleContainerMouseEnter() { if (splitPos != null) showSplitLabels(); }
 
   function handleZoneMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    // If split drag is in progress (e.g. event bubbled through), ignore
+    if (isDraggingSplitRef.current) return;
     // Alt+drag anywhere on canvas → move split divider
     if (e.altKey && splitPos != null && splitContainerRef.current) {
       e.preventDefault();
@@ -504,6 +509,7 @@ export function PreviewCanvas({
   }
 
   function handleZoneClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (isDraggingSplitRef.current) return; // ignore click if split drag just ended
     if (activeTool) return; // paint tools handle clicks via mousedown
     const info = lookupAtEvent(e);
     if (info) {
@@ -572,12 +578,14 @@ export function PreviewCanvas({
       onTouchEnd={handleContainerTouchEnd}
     >
       {/* Bottom: processed (always full width) */}
-      {processedLayer}
+      <div style={isDraggingSplit ? { pointerEvents: 'none' } : undefined}>
+        {processedLayer}
+      </div>
       {/* Top: original clipped to left side of divider */}
       {originalData && (
         <div
           className="split-original-layer"
-          style={{ clipPath: `inset(0 ${100 - splitPos}% 0 0)` }}
+          style={{ clipPath: `inset(0 ${100 - splitPos}% 0 0)`, pointerEvents: 'none' }}
         >
           <MapCanvas
             imageData={originalData} originalData={null}
@@ -593,7 +601,7 @@ export function PreviewCanvas({
         onMouseDown={handleDividerMouseDown}
         onTouchStart={handleDividerTouchStart}
       >
-        <div className="split-handle">◀▶</div>
+        <div className="split-handle" onMouseDown={e => e.stopPropagation()}>◀▶</div>
       </div>
       {/* Labels */}
       <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>ORIGINAL</span>
