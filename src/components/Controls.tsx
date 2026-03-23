@@ -102,10 +102,10 @@ const DITHERING_OPTIONS: DitheringOption[] = [
   {
     value: 'kluss',
     label: 'KlussDither',
-    desc: 'Smart threshold dithering for anime art',
+    desc: 'IGN blend dithering for anime art',
     tooltip: {
       fullName: 'KlussDither',
-      description: 'Clean-zone detection snaps flat colour fills directly; Stucki error diffusion with dampening and error capping handles gradients. Zone boundaries are cleared to prevent bleed.',
+      description: 'Clean-zone detection snaps flat fills directly. Dither zones use IGN (blue noise) threshold selection between the two nearest palette colors, guaranteeing a visible dither pattern wherever two colors compete. Mild Stucki error diffusion smooths gradients on top.',
       bestFor: 'Anime art, illustrations, and images with large flat colour regions.',
     },
   },
@@ -357,54 +357,54 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Clean threshold</span>
-              <span className="intensity-value">{liveKluss.cleanThreshold.toFixed(2)}</span>
+              <span className="intensity-value">{liveKluss.cleanThreshold.toFixed(3)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
-              min={0.01} max={0.30} step={0.01}
+              min={0.001} max={0.05} step={0.001}
               value={liveKluss.cleanThreshold}
               onChange={e => setLiveKluss(p => ({ ...p, cleanThreshold: Number(e.target.value) }))}
               onMouseUp={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">OKLAB dist for clean snap. Keep low (≤0.01) — higher values snap everything.</p>
+            <p className="intensity-hint">Pixels closer than this OKLAB dist snap cleanly (no dither). ~0.015 = avg Minecraft palette dist.</p>
           </div>
 
-          {/* Max candidate dist */}
+          {/* Error strength */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Candidate range</span>
-              <span className="intensity-value">{liveKluss.maxCandidateDist.toFixed(2)}</span>
+              <span className="kluss-param-label">Error strength</span>
+              <span className="intensity-value">{liveKluss.maxCandidateDist.toFixed(1)}</span>
             </div>
             <input
               type="range" className="intensity-slider"
-              min={0.05} max={0.80} step={0.01}
+              min={0.10} max={3.00} step={0.10}
               value={liveKluss.maxCandidateDist}
               onChange={e => setLiveKluss(p => ({ ...p, maxCandidateDist: Number(e.target.value) }))}
               onMouseUp={e => onKlussParamsChange({ ...liveKluss, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Max OKLAB dist for dither candidates.</p>
+            <p className="intensity-hint">Stucki diffusion strength. 1.0 = standard; 3.0 = amplified dithering; 0.1 = very subtle.</p>
           </div>
 
           {/* Error cap */}
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Error cap</span>
-              <span className="intensity-value">{liveKluss.errorCap.toFixed(2)}</span>
+              <span className="intensity-value">{Math.max(1, Math.round(liveKluss.errorCap)) * 64} RGB</span>
             </div>
             <input
               type="range" className="intensity-slider"
-              min={0.01} max={0.50} step={0.01}
-              value={liveKluss.errorCap}
+              min={1} max={4} step={1}
+              value={Math.max(1, Math.round(liveKluss.errorCap))}
               onChange={e => setLiveKluss(p => ({ ...p, errorCap: Number(e.target.value) }))}
               onMouseUp={e => onKlussParamsChange({ ...liveKluss, errorCap: Number((e.target as HTMLInputElement).value) })}
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, errorCap: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Caps accumulated error per channel (× 255).</p>
+            <p className="intensity-hint">Max error spread per channel. Lower = softer transitions; 256 = uncapped (full Stucki).</p>
           </div>
 
           {/* Zone boundary threshold */}
@@ -422,7 +422,7 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Clears error buffer at hard colour zone edges.</p>
+            <p className="intensity-hint">Hard colour edges snap cleanly — prevents diffusion from bleeding across sharp zone boundaries.</p>
           </div>
 
           <button
@@ -465,7 +465,7 @@ export function Controls({
             <p className="intensity-hint">Pattern size (1–8 colors per cluster).</p>
           )}
           {dithering === 'kluss' && (
-            <p className="intensity-hint">Error diffusion strength (scales 0–75% dampening).</p>
+            <p className="intensity-hint">0% = no dithering (pure snap), 100% = full Stucki diffusion at the set error strength.</p>
           )}
         </section>
       )}
