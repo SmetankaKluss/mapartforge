@@ -63,7 +63,10 @@ export default function App() {
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
   const [splitPos, setSplitPos] = useState(50);
   const [showGrid, setShowGrid]         = useState(false);
-  const [zoom, setZoom]                 = useState(100);
+  const [zoom, setZoomState]            = useState(100);
+  const [panX, setPanXState]            = useState(0);
+  const [panY, setPanYState]            = useState(0);
+  const [isDragging, setIsDragging]     = useState(false);
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -90,6 +93,22 @@ export default function App() {
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const previewSectionRef = useRef<HTMLElement>(null);
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  // Always-current refs for zoom/pan — lets wheel/drag handlers avoid stale closures
+  const zoomRef = useRef(100);
+  const panXRef = useRef(0);
+  const panYRef = useRef(0);
+
+  // Synced setters — update both ref (immediate, for event handlers) and state (for render)
+  const setZoom  = useCallback((v: number | ((p: number) => number)) => {
+    setZoomState(prev => { const next = typeof v === 'function' ? v(prev) : v; zoomRef.current = next; return next; });
+  }, []);
+  const setPanX  = useCallback((v: number | ((p: number) => number)) => {
+    setPanXState(prev => { const next = typeof v === 'function' ? v(prev) : v; panXRef.current = next; return next; });
+  }, []);
+  const setPanY  = useCallback((v: number | ((p: number) => number)) => {
+    setPanYState(prev => { const next = typeof v === 'function' ? v(prev) : v; panYRef.current = next; return next; });
+  }, []);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
@@ -175,21 +194,86 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [imageData, compareMode]);
 
-  // Ctrl+scroll to zoom on the preview section
+  // Wheel to zoom (Photoshop-style: scroll zooms at cursor, Ctrl+scroll keeps old behavior)
   useEffect(() => {
     const el = previewSectionRef.current;
     if (!el) return;
     function onWheel(e: WheelEvent) {
-      if (!e.ctrlKey) return;
       e.preventDefault();
       const direction = e.deltaY > 0 ? -1 : 1;
-      setZoom(prev => sliderToZoom(Math.max(0, Math.min(100, zoomToSlider(prev) + direction * 5))));
+      const oldZoom = zoomRef.current;
+      const newSlider = Math.max(0, Math.min(100, zoomToSlider(oldZoom) + direction * 5));
+      const newZoom = sliderToZoom(newSlider);
+      if (newZoom === oldZoom) return;
+
+      if (e.ctrlKey) {
+        // Ctrl+scroll: centered zoom (no pan shift)
+        setZoom(newZoom);
+        return;
+      }
+
+      // Scroll: zoom at cursor position
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const zoomFactor = newZoom / oldZoom;
+      setPanX(panXRef.current + (mouseX - panXRef.current) * (1 - zoomFactor));
+      setPanY(panYRef.current + (mouseY - panYRef.current) * (1 - zoomFactor));
+      setZoom(newZoom);
     }
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  // previewSectionRef is stable; re-attach only if section mounts/unmounts
+  // refs are stable — no deps needed
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Drag-to-pan (middle mouse or space+drag) — uses refs, never needs re-registration
+  const isDraggingRef = useRef(false);
+  useEffect(() => {
+    const el = previewSectionRef.current;
+    if (!el) return;
+
+    function onMouseDown(e: MouseEvent) {
+      if (e.button === 1 || (e.button === 0 && (e as MouseEvent & { code: string }).code === 'Space')) {
+        e.preventDefault();
+        isDraggingRef.current = true;
+        setIsDragging(true);
+        panStartRef.current = { x: e.clientX, y: e.clientY, panX: panXRef.current, panY: panYRef.current };
+      }
+    }
+
+    function onMouseMove(e: MouseEvent) {
+      if (!isDraggingRef.current || !panStartRef.current) return;
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      setPanX(panStartRef.current.panX + dx);
+      setPanY(panStartRef.current.panY + dy);
+    }
+
+    function onMouseUp() {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        panStartRef.current = null;
+      }
+    }
+
+    el.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset pan & zoom when a new image is loaded
+  useEffect(() => {
+    setPanX(0);
+    setPanY(0);
+  }, [imageData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeShades = mapMode === '2d' ? [2] : [0, 1, 2];
 
@@ -727,6 +811,7 @@ export default function App() {
                   {!compareMode && (
                     <>
                       <button className="tool-btn" onClick={() => setSplitPos(50)} title="Reset split to center (⟺)">⟺</button>
+                      <button className="tool-btn" onClick={() => { setPanX(0); setPanY(0); setZoom(100); }} title="Reset view (fit)">⌖</button>
                       <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
                     </>
                   )}
@@ -751,7 +836,9 @@ export default function App() {
                   <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Export PNG</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Export .litematic</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom (centered)</span></div>
+                  <div className="shortcut-row"><kbd>Scroll</kbd><span>Zoom (at cursor)</span></div>
+                  <div className="shortcut-row"><kbd>Mid-click drag</kbd><span>Pan</span></div>
                   <div className="shortcuts-divider" />
                   <div className="shortcut-row"><kbd>Z</kbd><span>Toggle grid</span></div>
                   <div className="shortcut-row"><kbd>O</kbd><span>Reset split to 50%</span></div>
@@ -802,30 +889,46 @@ export default function App() {
             <span className="corner corner-br" />
 
             {compareMode ? (
-              <CompareView
-                leftData={compareData?.left   ?? null}
-                rightData={compareData?.right ?? null}
-                leftLabel={DITHERING_LABELS[compareLeft]}
-                rightLabel={DITHERING_LABELS[compareRight]}
-                width={pw} height={ph} scale={cmpDisplayScale} showGrid={showGrid}
-              />
+              <div
+                style={{
+                  transform: `translate(${panX}px, ${panY}px) scale(${zoom / 100})`,
+                  transformOrigin: '0 0',
+                  cursor: isDragging ? 'grabbing' : 'default',
+                }}
+              >
+                <CompareView
+                  leftData={compareData?.left   ?? null}
+                  rightData={compareData?.right ?? null}
+                  leftLabel={DITHERING_LABELS[compareLeft]}
+                  rightLabel={DITHERING_LABELS[compareRight]}
+                  width={pw} height={ph} scale={cmpDisplayScale / (zoom / 100)} showGrid={showGrid}
+                />
+              </div>
             ) : (
-              <PreviewCanvas
-                mode={textureMode}
-                imageData={imageData} originalData={originalData}
-                showOriginal={false} showGrid={showGrid}
-                width={pw} height={ph} scale={displayScale}
-                cp={activePalette} blockSelection={blockSelection}
-                activeTool={activeTool}
-                paintBlock={paintBlock}
-                brushSize={brushSize}
-                onRemoveBlock={handleRemoveBlock}
-                onImageUpdate={handleImageUpdate}
-                onToolChange={setActiveTool}
-                onPaintBlockChange={setPaintBlock}
-                splitPos={imageData && originalData ? splitPos : undefined}
-                onSplitPosChange={setSplitPos}
-              />
+              <div
+                style={{
+                  transform: `translate(${panX}px, ${panY}px) scale(${zoom / 100})`,
+                  transformOrigin: '0 0',
+                  cursor: isDragging ? 'grabbing' : 'default',
+                }}
+              >
+                <PreviewCanvas
+                  mode={textureMode}
+                  imageData={imageData} originalData={originalData}
+                  showOriginal={false} showGrid={showGrid}
+                  width={pw} height={ph} scale={displayScale / (zoom / 100)}
+                  cp={activePalette} blockSelection={blockSelection}
+                  activeTool={activeTool}
+                  paintBlock={paintBlock}
+                  brushSize={brushSize}
+                  onRemoveBlock={handleRemoveBlock}
+                  onImageUpdate={handleImageUpdate}
+                  onToolChange={setActiveTool}
+                  onPaintBlockChange={setPaintBlock}
+                  splitPos={imageData && originalData ? splitPos : undefined}
+                  onSplitPosChange={setSplitPos}
+                />
+              </div>
             )}
 
             {processing && (
