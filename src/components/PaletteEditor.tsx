@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
@@ -18,14 +18,24 @@ interface Props {
 }
 
 export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled }: Props) {
-  const [presetName,    setPresetName]    = useState('');
-  const [customPresets, setCustomPresets] = useState<Record<string, BlockSelection>>(loadStoredPresets);
-  const [selectedPreset, setSelectedPreset] = useState('');
+  const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
+  const [selectedPreset,  setSelectedPreset]  = useState('');
+  const [searchQuery,     setSearchQuery]     = useState('');
+  const [showSaveModal,   setShowSaveModal]   = useState(false);
+  const [modalName,       setModalName]       = useState('');
+  const modalInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the modal input whenever it opens
+  useEffect(() => {
+    if (showSaveModal) modalInputRef.current?.focus();
+  }, [showSaveModal]);
 
   const persistPresets = useCallback((p: Record<string, BlockSelection>) => {
     setCustomPresets(p);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
   }, []);
+
+  // ── Preset selector ──────────────────────────────────────────────────────
 
   function handlePresetSelect(name: string) {
     setSelectedPreset(name);
@@ -37,14 +47,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     }
   }
 
-  function handleSave() {
-    const name = presetName.trim();
-    if (!name || name in BUILTIN_PRESETS) return;
-    persistPresets({ ...customPresets, [name]: blockSelection });
-    setSelectedPreset(name);
-    setPresetName('');
-  }
-
   function handleDelete() {
     if (!selectedPreset || selectedPreset in BUILTIN_PRESETS) return;
     const next = { ...customPresets };
@@ -52,6 +54,29 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     persistPresets(next);
     setSelectedPreset('');
   }
+
+  // ── Save modal ───────────────────────────────────────────────────────────
+
+  function openSaveModal() {
+    setModalName('');
+    setShowSaveModal(true);
+  }
+
+  function confirmSave() {
+    const name = modalName.trim();
+    if (!name || name in BUILTIN_PRESETS) return;
+    persistPresets({ ...customPresets, [name]: blockSelection });
+    setSelectedPreset(name);
+    setModalName('');
+    setShowSaveModal(false);
+  }
+
+  function cancelSave() {
+    setShowSaveModal(false);
+    setModalName('');
+  }
+
+  // ── Block toggles ────────────────────────────────────────────────────────
 
   function toggleBlock(csId: number, blockId: number) {
     const cur = blockSelection[csId] ?? [];
@@ -68,20 +93,36 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     onSelectionChange({ ...blockSelection, [csId]: allOn ? [] : row.blocks.map(b => b.blockId) });
   }
 
-  const customNames = Object.keys(customPresets);
+  // ── Search filtering ─────────────────────────────────────────────────────
 
-  const blockCount = COLOUR_ROWS.reduce(
+  const q = searchQuery.trim().toLowerCase();
+  const filteredRows = q
+    ? COLOUR_ROWS.filter(row =>
+        row.colourName.toLowerCase().includes(q) ||
+        row.blocks.some(b =>
+          b.displayName.toLowerCase().includes(q) ||
+          b.nbtName.toLowerCase().includes(q),
+        ),
+      )
+    : COLOUR_ROWS;
+
+  // ── Derived counts ───────────────────────────────────────────────────────
+
+  const customNames = Object.keys(customPresets);
+  const blockCount  = COLOUR_ROWS.reduce(
     (sum, row) => sum + (blockSelection[row.csId]?.length ?? 0), 0,
   );
+  const modalNameInvalid = modalName.trim() in BUILTIN_PRESETS;
 
   return (
     <section className="sidebar-section">
+      {/* Section header */}
       <h3 className="section-title">
         Palette
         <span className="palette-count">{paletteSize} colors · {blockCount} blocks</span>
       </h3>
 
-      {/* Unified preset selector — built-in + custom */}
+      {/* ── Row 1: preset dropdown ── */}
       <div className="pe-preset-bar">
         <select
           className={`pe-preset-select${selectedPreset ? ' has-value' : ''}`}
@@ -111,73 +152,137 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         )}
       </div>
 
-      {/* Save current selection as custom preset */}
-      <div className="pe-bar">
-        <input
-          className="pe-name-input"
-          placeholder="Save as preset…"
-          value={presetName}
-          onChange={e => setPresetName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSave()}
-          disabled={disabled}
-        />
+      {/* ── Row 2: search + save ── */}
+      <div className="pe-search-bar">
+        <div className="pe-search-wrap">
+          <input
+            className="pe-search-input"
+            placeholder="Search blocks…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            spellCheck={false}
+          />
+          {searchQuery && (
+            <button
+              className="pe-search-clear"
+              onClick={() => setSearchQuery('')}
+              title="Clear search"
+              tabIndex={-1}
+            >×</button>
+          )}
+        </div>
         <button
-          className="pe-btn pe-btn-save"
-          onClick={handleSave}
-          disabled={disabled || !presetName.trim() || presetName.trim() in BUILTIN_PRESETS}
-          title="Save current selection as a preset"
+          className="pe-save-btn"
+          onClick={openSaveModal}
+          disabled={disabled}
+          title="Save current block selection as a preset"
         >Save</button>
       </div>
 
-      {/* Scrollable colour rows */}
+      {/* ── Scrollable colour rows ── */}
       <div className="pe-rows">
-        {COLOUR_ROWS.map(row => {
-          const activeIds = blockSelection[row.csId] ?? [];
-          const allOn = activeIds.length === row.blocks.length;
-          const rowOn = activeIds.length > 0;
+        {filteredRows.length === 0 ? (
+          <p className="pe-no-results">No blocks match "{searchQuery}"</p>
+        ) : (
+          filteredRows.map(row => {
+            const activeIds = blockSelection[row.csId] ?? [];
+            const allOn = activeIds.length === row.blocks.length;
+            const rowOn = activeIds.length > 0;
 
-          return (
-            <div key={row.csId} className={`pe-row${rowOn ? '' : ' row-off'}`}>
-              <div className="pe-row-header">
-                <div
-                  className="pe-swatch"
-                  style={{ background: `rgb(${row.r},${row.g},${row.b})` }}
-                  title={`#${[row.r, row.g, row.b].map(v => v.toString(16).padStart(2, '0')).join('')}`}
-                />
-                <span className="pe-row-name">{row.colourName}</span>
-                <button
-                  className="pe-row-toggle"
-                  onClick={() => !disabled && toggleRow(row.csId)}
-                  disabled={disabled}
-                  title={allOn ? 'Deselect all' : 'Select all'}
-                >{activeIds.length === 0 ? '○' : allOn ? '●' : '◑'}</button>
-              </div>
+            // When searching, filter blocks within the row too
+            const visibleBlocks = q
+              ? row.blocks.filter(b =>
+                  row.colourName.toLowerCase().includes(q) ||
+                  b.displayName.toLowerCase().includes(q) ||
+                  b.nbtName.toLowerCase().includes(q),
+                )
+              : row.blocks;
 
-              <div className="pe-block-grid">
-                {row.blocks.map(block => {
-                  const isOn = activeIds.includes(block.blockId);
-                  return (
-                    <div
-                      key={block.blockId}
-                      className={`pe-block${isOn ? ' on' : ' off'}`}
-                      onClick={() => !disabled && toggleBlock(row.csId, block.blockId)}
-                      title={`${block.displayName}\nminecraft:${block.nbtName}`}
-                    >
-                      <BlockIcon
-                        nbtName={block.nbtName}
-                        blockId={block.blockId}
-                        csId={row.csId}
-                        r={row.r} g={row.g} b={row.b}
-                        className="pe-block-icon"
-                      />
-                    </div>
-                  );
-                })}
+            return (
+              <div key={row.csId} className={`pe-row${rowOn ? '' : ' row-off'}`}>
+                <div className="pe-row-header">
+                  <div
+                    className="pe-swatch"
+                    style={{ background: `rgb(${row.r},${row.g},${row.b})` }}
+                    title={`#${[row.r, row.g, row.b].map(v => v.toString(16).padStart(2, '0')).join('')}`}
+                  />
+                  <span className="pe-row-name">{row.colourName}</span>
+                  <button
+                    className="pe-row-toggle"
+                    onClick={() => !disabled && toggleRow(row.csId)}
+                    disabled={disabled}
+                    title={allOn ? 'Deselect all' : 'Select all'}
+                  >{activeIds.length === 0 ? '○' : allOn ? '●' : '◑'}</button>
+                </div>
+
+                <div className="pe-block-grid">
+                  {visibleBlocks.map(block => {
+                    const isOn = activeIds.includes(block.blockId);
+                    return (
+                      <div
+                        key={block.blockId}
+                        className={`pe-block${isOn ? ' on' : ' off'}`}
+                        onClick={() => !disabled && toggleBlock(row.csId, block.blockId)}
+                        title={`${block.displayName}\nminecraft:${block.nbtName}`}
+                      >
+                        <BlockIcon
+                          nbtName={block.nbtName}
+                          blockId={block.blockId}
+                          csId={row.csId}
+                          r={row.r} g={row.g} b={row.b}
+                          className="pe-block-icon"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
+
+      {/* ── Save preset modal ── */}
+      {showSaveModal && (
+        <div
+          className="pe-modal-backdrop"
+          onClick={cancelSave}
+          onKeyDown={e => e.key === 'Escape' && cancelSave()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Save preset"
+        >
+          <div className="pe-modal" onClick={e => e.stopPropagation()}>
+            <div className="pe-modal-title">Save preset</div>
+            <input
+              ref={modalInputRef}
+              className={`pe-modal-input${modalNameInvalid ? ' invalid' : ''}`}
+              placeholder="Preset name…"
+              value={modalName}
+              onChange={e => setModalName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  confirmSave();
+                if (e.key === 'Escape') cancelSave();
+              }}
+              spellCheck={false}
+            />
+            {modalNameInvalid && (
+              <p className="pe-modal-error">Built-in preset names are reserved.</p>
+            )}
+            <div className="pe-modal-actions">
+              <button
+                className="pe-modal-btn pe-modal-btn-save"
+                onClick={confirmSave}
+                disabled={!modalName.trim() || modalNameInvalid}
+              >SAVE</button>
+              <button
+                className="pe-modal-btn pe-modal-btn-cancel"
+                onClick={cancelSave}
+              >CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
