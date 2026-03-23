@@ -90,7 +90,7 @@ function buildCopyText(entries: MaterialEntry[], total: number): string {
   const header = pad('Block', COL[0]) + pad('Total', COL[1]) + pad('Stacks', COL[2]) + 'Shulkers';
   const divider = '─'.repeat(COL[0] + COL[1] + COL[2] + 26);
   const lines = [
-    'Materials List – MapartForge',
+    'Materials List – KlussForge',
     '═'.repeat(divider.length),
     header,
     divider,
