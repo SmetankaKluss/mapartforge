@@ -26,6 +26,7 @@ import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
+import { CropModal } from './components/CropModal';
 import { Analytics } from '@vercel/analytics/react';
 import { createTour, shouldAutoStart } from './lib/tour';
 import 'driver.js/dist/driver.css';
@@ -86,12 +87,11 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
-  const [resetZoomPending,     setResetZoomPending]     = useState(false);
-  const [resetSplitPending,    setResetSplitPending]    = useState(false);
   const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
-  const resetZoomTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resetSplitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  // Always holds the originally-uploaded image so crop modal can re-crop from source
+  const uploadedImageRef = useRef<HTMLImageElement | null>(null);
   const workerRef     = useRef<Worker | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCancel, setShowCancel] = useState(false);
@@ -285,11 +285,21 @@ export default function App() {
   }
 
   const handleImageLoaded = useCallback((img: HTMLImageElement) => {
+    uploadedImageRef.current = img;   // save original for crop modal
     setSourceImage(img);
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+
+  const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
+    setShowCropModal(false);
+    setSourceImage(croppedImg);
+    setSplitPos(50);
+    setUndoStack([]);
+    setRedoStack([]);
+    runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
   }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
@@ -516,16 +526,15 @@ export default function App() {
   }, []);
 
   const baseScale    = gridScale(mapGrid);
-  const cmpBaseScale = Math.max(1, Math.floor(baseScale / 2));
   const zoomFactor   = zoom / 100;
-  const displayScale    = Math.max(1, Math.round(baseScale    * zoomFactor));
-  const cmpDisplayScale = Math.max(1, Math.round(cmpBaseScale * zoomFactor));
+  const displayScale = Math.max(1, Math.round(baseScale * zoomFactor));
   const pw = gridPixelWidth(mapGrid);
   const ph = gridPixelHeight(mapGrid);
 
   const hasContent = imageData !== null || compareData !== null;
 
   return (
+    <>
     <div className="app">
       <header className="app-header">
         <div className="header-inner">
@@ -559,6 +568,17 @@ export default function App() {
         <aside className="panel panel-left">
           <div className="panel-scroll">
             <ImageUpload onImageLoaded={handleImageLoaded} />
+            {uploadedImageRef.current && (
+              <div className="crop-section">
+                <button
+                  className="crop-tool-btn"
+                  onClick={() => setShowCropModal(true)}
+                  disabled={processing}
+                  title={`Crop source image to ${pw}×${ph} map grid ratio`}
+                >✂ Crop to ratio</button>
+                <span className="crop-ratio-hint">{mapGrid.wide}:{mapGrid.tall}</span>
+              </div>
+            )}
             <Controls
               dithering={dithering}
               onDitheringChange={handleDitheringChange}
@@ -729,38 +749,18 @@ export default function App() {
               <>
                 <div className="toolbar-sep" />
                 <div className="toolbar-group">
+                  <button
+                    className="tool-btn tool-btn-zoom-reset"
+                    title="Reset zoom to 100%"
+                    onClick={() => setZoom(100)}
+                  >⌖</button>
+                  <button
+                    className="tool-btn"
+                    title="Reset split to center"
+                    onClick={() => setSplitPos(50)}
+                  >⟺</button>
                   {!compareMode && (
-                    <>
-                      <button
-                        className={`tool-btn reset-confirm-btn${resetZoomPending ? ' pending' : ''}`}
-                        title={resetZoomPending ? 'Click again to confirm' : 'Reset zoom to 100%'}
-                        onClick={() => {
-                          if (!resetZoomPending) {
-                            setResetZoomPending(true);
-                            resetZoomTimerRef.current = setTimeout(() => setResetZoomPending(false), 2000);
-                          } else {
-                            if (resetZoomTimerRef.current) clearTimeout(resetZoomTimerRef.current);
-                            setResetZoomPending(false);
-                            setZoom(100);
-                          }
-                        }}
-                      >{resetZoomPending ? 'Sure?' : '⌖'}</button>
-                      <button
-                        className={`tool-btn reset-confirm-btn${resetSplitPending ? ' pending' : ''}`}
-                        title={resetSplitPending ? 'Click again to confirm' : 'Reset split to center (⟺)'}
-                        onClick={() => {
-                          if (!resetSplitPending) {
-                            setResetSplitPending(true);
-                            resetSplitTimerRef.current = setTimeout(() => setResetSplitPending(false), 2000);
-                          } else {
-                            if (resetSplitTimerRef.current) clearTimeout(resetSplitTimerRef.current);
-                            setResetSplitPending(false);
-                            setSplitPos(50);
-                          }
-                        }}
-                      >{resetSplitPending ? 'Sure?' : '⟺'}</button>
-                      <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
-                    </>
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
                   )}
                   <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Compare">Compare</button>
                   <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Grid">Grid</button>
@@ -783,9 +783,6 @@ export default function App() {
                   <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Export PNG</span></div>
                   <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Export .litematic</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Scroll</kbd><span>Zoom (centered)</span></div>
-                  <div className="shortcut-row"><kbd>Scroll</kbd><span>Zoom (at cursor)</span></div>
-                  <div className="shortcut-row"><kbd>Mid-click drag</kbd><span>Pan</span></div>
                   <div className="shortcuts-divider" />
                   <div className="shortcut-row"><kbd>Z</kbd><span>Toggle grid</span></div>
                   <div className="shortcut-row"><kbd>O</kbd><span>Reset split to 50%</span></div>
@@ -841,7 +838,8 @@ export default function App() {
                 rightData={compareData?.right ?? null}
                 leftLabel={DITHERING_LABELS[compareLeft]}
                 rightLabel={DITHERING_LABELS[compareRight]}
-                width={pw} height={ph} scale={cmpDisplayScale} showGrid={showGrid}
+                width={pw} height={ph} scale={displayScale} showGrid={showGrid}
+                splitPos={splitPos} onSplitPosChange={setSplitPos}
               />
             ) : (
               <div>
@@ -960,5 +958,16 @@ export default function App() {
         </a>
       </div>
     </div>
+
+    {/* ── Crop modal ── */}
+    {showCropModal && uploadedImageRef.current && (
+      <CropModal
+        sourceImage={uploadedImageRef.current}
+        targetW={pw} targetH={ph}
+        onApply={handleCropApply}
+        onCancel={() => setShowCropModal(false)}
+      />
+    )}
+    </>
   );
 }
