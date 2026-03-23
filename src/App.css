@@ -710,18 +710,27 @@ input, select, textarea { outline: none; }
   transition: color 0.1s;
 }
 .pe-search-clear:hover { color: var(--text); }
-.pe-save-btn {
-  padding: 0 10px; height: 100%;
+.pe-save-btn,
+.pe-clear-btn {
+  padding: 0 16px;
+  align-self: stretch;         /* match the search-wrap height exactly */
   background: var(--bg-input);
   border: 1px solid var(--border);
   color: var(--text-muted);
   font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.05em;
   white-space: nowrap; flex-shrink: 0;
   transition: border-color 0.12s, color 0.12s, box-shadow 0.12s;
-  display: flex; align-items: center;
+  display: flex; align-items: center; justify-content: center;
 }
-.pe-save-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
-.pe-save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pe-save-btn:hover:not(:disabled)  { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+.pe-save-btn:disabled              { opacity: 0.4; cursor: not-allowed; }
+.pe-clear-btn:hover:not(:disabled) { border-color: rgba(255,68,68,0.7); color: #ff4444; box-shadow: 0 0 6px rgba(255,68,68,0.3); }
+.pe-clear-btn:disabled             { opacity: 0.4; cursor: not-allowed; }
+.pe-clear-btn.pending              { border-color: rgba(255,68,68,0.7); color: #ff4444; animation: clearPulse 0.6s ease infinite alternate; }
+@keyframes clearPulse {
+  from { box-shadow: 0 0 4px rgba(255,68,68,0.2); }
+  to   { box-shadow: 0 0 10px rgba(255,68,68,0.55); }
+}
 
 /* no-results message */
 .pe-no-results { padding: 16px 12px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); font-style: italic; text-align: center; }

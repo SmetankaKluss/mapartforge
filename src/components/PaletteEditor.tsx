@@ -23,6 +23,8 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   const [searchQuery,     setSearchQuery]     = useState('');
   const [showSaveModal,   setShowSaveModal]   = useState(false);
   const [modalName,       setModalName]       = useState('');
+  const [clearPending,    setClearPending]    = useState(false);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modalInputRef = useRef<HTMLInputElement>(null);
 
   // Focus the modal input whenever it opens
@@ -53,6 +55,22 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     delete next[selectedPreset];
     persistPresets(next);
     setSelectedPreset('');
+  }
+
+  // ── Clear all ────────────────────────────────────────────────────────────
+
+  function handleClear() {
+    if (!clearPending) {
+      // First click: arm the confirmation, auto-cancel after 2 s
+      setClearPending(true);
+      clearTimerRef.current = setTimeout(() => setClearPending(false), 2000);
+    } else {
+      // Second click within window: deselect every block
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      setClearPending(false);
+      const empty = Object.fromEntries(COLOUR_ROWS.map(r => [r.csId, []]));
+      onSelectionChange(empty);
+    }
   }
 
   // ── Save modal ───────────────────────────────────────────────────────────
@@ -177,6 +195,12 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           disabled={disabled}
           title="Save current block selection as a preset"
         >Save</button>
+        <button
+          className={`pe-clear-btn${clearPending ? ' pending' : ''}`}
+          onClick={handleClear}
+          disabled={disabled}
+          title={clearPending ? 'Click again to confirm' : 'Deselect all blocks'}
+        >{clearPending ? 'Sure?' : 'Clear'}</button>
       </div>
 
       {/* ── Scrollable colour rows ── */}
