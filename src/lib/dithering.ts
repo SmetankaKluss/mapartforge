@@ -18,27 +18,22 @@ export type DitheringMode =
 export interface KlussParams {
   /** OKLAB distance below which a pixel is placed cleanly with no error propagation. */
   cleanThreshold: number;
-  /** Only palette candidates within this OKLAB distance are considered for dithering. */
+  /** Error diffusion strength multiplier. 1.0 = standard Stucki; 3.0 = amplified; 0.1 = subtle. */
   maxCandidateDist: number;
-  /** Accumulated error is capped at this fraction of 255 before colour lookup. */
+  /** Accumulated error cap in ×64 RGB units. 1=64, 2=128, 3=192, 4=uncapped. */
   errorCap: number;
-  /** OKLAB distance between adjacent source pixels that triggers an error-buffer reset in radius 2. */
+  /** OKLAB distance to any of the 8 neighbours that triggers a clean snap (no error propagation). */
   zoneBoundaryThreshold: number;
+  /** Blue-noise jitter amplitude (RGB units) added to quantisation input in dither zone. 0 = off. */
+  jitter: number;
 }
 
 export const DEFAULT_KLUSS_PARAMS: KlussParams = {
-  // Minecraft's ~200-colour palette has an average nearest-colour OKLAB
-  // distance of ~0.015.  cleanThreshold should sit at or just below that
-  // value so flat-colour fills snap cleanly while transition pixels dither.
   cleanThreshold:        0.01,
-  // Error diffusion strength multiplier (field name kept for backwards-compat).
-  // 1.0 = standard Stucki strength; 3.0 = 3× amplified; 0.1 = very subtle.
   maxCandidateDist:      1.00,
-  // Error cap in ×64 RGB units (field name kept for backwards-compat).
-  // 1 = 64 RGB cap; 2 = 128; 3 = 192; 4 = 256 (effectively uncapped).
-  // Lower values reduce how much error accumulates at harsh transitions.
   errorCap:              4,
   zoneBoundaryThreshold: 0.08,
+  jitter:                0,
 };
 
 // ── Computed-palette bundle ───────────────────────────────────────────────
@@ -564,62 +559,75 @@ async function applyKlussDither(
   intensity: number, cp: ComputedPalette, params: KlussParams,
   onProgress?: ProgressFn,
 ): Promise<Uint8ClampedArray> {
-  const { cleanThreshold, maxCandidateDist, errorCap, zoneBoundaryThreshold } = params;
+  const { cleanThreshold, maxCandidateDist, errorCap, zoneBoundaryThreshold, jitter } = params;
   const out   = new Uint8ClampedArray(width * height * 4);
   const total = width * height;
 
-  // Error diffusion strength: maxCandidateDist * intensity scales Stucki kernel.
   const strength = Math.max(0, maxCandidateDist * intensity);
+  const capVal   = errorCap * 64;
 
-  // Per-channel error cap in RGB units (errorCap × 64).
-  const capVal = errorCap * 64;
-
-  // Pre-compute OKLAB for every source pixel.
-  // Also compute each source pixel's nearest-palette OKLAB distance for
-  // clean-zone detection — this is always based on original source colour,
-  // not the accumulated error buffer, so flat fills stay clean.
+  // Pre-compute OKLAB + nearest-palette distance for every source pixel.
   const srcLabs        = new Array<Lab>(total);
   const srcNearestDist = new Float32Array(total);
   for (let i = 0; i < total; i++) {
     const lab = rgbToOklab(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
     srcLabs[i] = lab;
-    let sd1 = Infinity;
+    let sd = Infinity;
     for (let j = 0; j < cp.labs.length; j++) {
       const d = oklabDistance(lab, cp.labs[j]);
-      if (d < sd1) sd1 = d;
+      if (d < sd) sd = d;
     }
-    srcNearestDist[i] = sd1;
+    srcNearestDist[i] = sd;
   }
 
-  // Working buffers for Stucki error diffusion (copy of source).
   const [rBuf, gBuf, bBuf] = initBuffers(data, total);
 
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+    // ── Serpentine scan: alternate direction each row ──────────────────────
+    const ltr = (y & 1) === 0;
+    const x0  = ltr ? 0 : width - 1;
+    const x1  = ltr ? width : -1;
+    const dx  = ltr ? 1 : -1;
+
+    for (let x = x0; x !== x1; x += dx) {
       const idx = y * width + x;
+      const lab = srcLabs[idx];
+      const t   = zoneBoundaryThreshold;
 
-      // Zone boundary: source colour differs sharply from left/top neighbour.
-      // These pixels snap to nearest with no error propagated, keeping hard
-      // colour zone edges (e.g. outlines in anime art) perfectly crisp.
+      // ── 8-neighbour boundary check ─────────────────────────────────────
       const crossesBoundary =
-        (x > 0 && oklabDistance(srcLabs[idx], srcLabs[idx - 1]) > zoneBoundaryThreshold) ||
-        (y > 0 && oklabDistance(srcLabs[idx], srcLabs[idx - width]) > zoneBoundaryThreshold);
+        (x > 0             &&              oklabDistance(lab, srcLabs[idx - 1])             > t) ||
+        (x < width - 1     &&              oklabDistance(lab, srcLabs[idx + 1])             > t) ||
+        (y > 0             &&              oklabDistance(lab, srcLabs[idx - width])          > t) ||
+        (y < height - 1    &&              oklabDistance(lab, srcLabs[idx + width])          > t) ||
+        (x > 0         && y > 0         && oklabDistance(lab, srcLabs[idx - width - 1])     > t) ||
+        (x < width - 1 && y > 0         && oklabDistance(lab, srcLabs[idx - width + 1])     > t) ||
+        (x > 0         && y < height - 1 && oklabDistance(lab, srcLabs[idx + width - 1])    > t) ||
+        (x < width - 1 && y < height - 1 && oklabDistance(lab, srcLabs[idx + width + 1])    > t);
 
-      // Nearest palette colour from the current (error-accumulated) buffer.
-      const { color } = findClosestColor(rBuf[idx], gBuf[idx], bBuf[idx], cp);
+      // ── Blue-noise jitter: perturb quantisation input only ─────────────
+      // Applied in dither zone only; does NOT affect error computation,
+      // so it adds organic variation without amplifying accumulated error.
+      let qr = rBuf[idx], qg = gBuf[idx], qb = bBuf[idx];
+      if (jitter > 0 && !crossesBoundary && srcNearestDist[idx] >= cleanThreshold) {
+        const jAmp = (ign(x, y) - 0.5) * jitter;
+        qr += jAmp; qg += jAmp; qb += jAmp;
+      }
+
+      const { color } = findClosestColor(qr, qg, qb, cp);
 
       out[idx * 4]     = color.r;
       out[idx * 4 + 1] = color.g;
       out[idx * 4 + 2] = color.b;
       out[idx * 4 + 3] = 255;
 
-      // Clean zone, boundary, or zero intensity → no error propagation.
       if (crossesBoundary || srcNearestDist[idx] < cleanThreshold || intensity <= 0) {
         continue;
       }
 
-      // Dither zone: compute quantisation error from the buffer value,
-      // apply per-channel cap, then spread with Stucki kernel.
+      // ── Stucki error diffusion ─────────────────────────────────────────
+      // Error is computed from the un-jittered buffer so jitter doesn't
+      // compound through the diffusion chain.
       let er = clamp(rBuf[idx]) - color.r;
       let eg = clamp(gBuf[idx]) - color.g;
       let eb = clamp(bBuf[idx]) - color.b;
@@ -635,8 +643,15 @@ async function applyKlussDither(
       const sp = (di: number, f: number) =>
         addErr(rBuf, gBuf, bBuf, idx + di, total, er, eg, eb, f / D, strength);
 
-      if (x + 1 < width) sp(+1, 8);
-      if (x + 2 < width) sp(+2, 4);
+      // Same row: mirror kernel direction for rtl rows
+      if (ltr) {
+        if (x + 1 < width) sp(+1, 8);
+        if (x + 2 < width) sp(+2, 4);
+      } else {
+        if (x - 1 >= 0) sp(-1, 8);
+        if (x - 2 >= 0) sp(-2, 4);
+      }
+      // Rows +1 and +2: kernel is symmetric — no mirroring needed
       if (y + 1 < height) {
         if (x - 2 >= 0)    sp(W - 2, 2);
         if (x - 1 >= 0)    sp(W - 1, 4);

@@ -432,6 +432,26 @@ export function Controls({
             <p className="intensity-hint">Hard colour edges snap cleanly — prevents diffusion from bleeding across sharp zone boundaries.</p>
           </div>
 
+          {/* Jitter */}
+          <div className="kluss-param">
+            <div className="kluss-param-header">
+              <span className="kluss-param-label">Jitter</span>
+              <NumInput value={liveKluss.jitter} min={0} max={24} step={1} decimals={0}
+                onCommit={v => { const p = { ...liveKluss, jitter: v }; setLiveKluss(p); onKlussParamsChange(p); }}
+                disabled={processing} />
+            </div>
+            <input
+              type="range" className="intensity-slider"
+              min={0} max={24} step={1}
+              value={liveKluss.jitter}
+              onChange={e => setLiveKluss(p => ({ ...p, jitter: Number(e.target.value) }))}
+              onMouseUp={e => onKlussParamsChange({ ...liveKluss, jitter: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={e => onKlussParamsChange({ ...liveKluss, jitter: Number((e.target as HTMLInputElement).value) })}
+              disabled={processing}
+            />
+            <p className="intensity-hint">Blue-noise perturbation in dither zone. 0 = off; ~8 = subtle; ~20 = heavy. Breaks up Stucki structure.</p>
+          </div>
+
           <button
             className="kluss-reset-btn"
             onClick={() => onKlussParamsChange(DEFAULT_KLUSS_PARAMS)}
