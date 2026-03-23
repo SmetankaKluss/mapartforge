@@ -1012,3 +1012,220 @@ input, select, textarea { outline: none; }
   font-size: 10px;
 }
 .status-tg:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — Tablet (768–1099px) & Mobile (< 768px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Hidden by default — shown only at relevant breakpoints */
+.tablet-right-toggle,
+.tablet-right-sep,
+.tablet-drawer-backdrop,
+.mobile-tab-bar { display: none; }
+
+/* ── Tablet: 768px – 1099px ─────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1099px) {
+  :root {
+    --panel-left: 240px;
+  }
+
+  /* Show tablet drawer toggle */
+  .tablet-right-toggle { display: flex; }
+  .tablet-right-sep    { display: block; }
+
+  /* Right panel → slides up from bottom as a drawer */
+  .panel-right {
+    animation: none;
+    position: fixed;
+    bottom: var(--status-h);
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-height: 65vh;
+    z-index: 200;
+    transform: translateY(100vh);
+    transition: transform 0.3s ease;
+    border-left: none;
+    border-top: 2px solid var(--accent);
+    box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.7), 0 0 16px var(--accent-glow);
+  }
+  .panel-right.drawer-open { transform: translateY(0); }
+
+  /* Backdrop closes drawer */
+  .tablet-drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 199;
+  }
+
+  /* Drawer drag handle hint */
+  .panel-right::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 3px;
+    background: var(--border);
+    margin: 8px auto 0;
+    flex-shrink: 0;
+  }
+}
+
+/* ── Mobile: < 768px ────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  :root {
+    --header-h:  44px;
+    --toolbar-h: 44px;
+    --status-h:  24px;
+    --tab-bar-h: 56px;
+  }
+
+  html, body, #root { overflow: hidden; }
+
+  .app { height: 100dvh; }
+
+  /* Header: hide tagline and version to save space */
+  .app-tagline { display: none; }
+  .header-ver  { display: none; }
+
+  /* Body: vertical stack */
+  .app-body {
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Reorder flex children: canvas first, tabs below, tab bar last */
+  .panel-center   { order: 1; width: 100%; flex-shrink: 0; min-width: 0; }
+  .panel-left     { order: 2; }
+  .panel-right    { order: 2; }
+  .mobile-tab-bar { order: 3; }
+
+  /* Canvas: capped height */
+  .canvas-area {
+    height: 40vh;
+    flex: none;
+    overflow: auto;
+  }
+
+  /* Toolbar: horizontal scroll, no overflow clip */
+  .toolbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+
+  /* Paint tools: hidden on mobile */
+  .toolbar-paint-tools { display: none; }
+
+  /* Tablet toggle: never shown on mobile */
+  .tablet-right-toggle,
+  .tablet-right-sep { display: none !important; }
+
+  /* Left panel: hidden by default, shown as Settings tab */
+  .panel-left {
+    display: none;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    animation: none;
+  }
+  .app-body[data-tab="settings"] .panel-left { display: flex; }
+
+  /* Right panel: hidden by default, shown as Palette/Export tab */
+  .panel-right {
+    display: none;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    animation: none;
+  }
+  .app-body[data-tab="palette"] .panel-right,
+  .app-body[data-tab="export"]  .panel-right { display: flex; }
+
+  /* Within right panel: show only the active section */
+  .app-body[data-tab="export"]  .mobile-palette-content { display: none; }
+  .app-body[data-tab="palette"] .mobile-export-content  { display: none; }
+  .mobile-palette-content,
+  .mobile-export-content { width: 100%; }
+
+  /* Mobile tab bar */
+  .mobile-tab-bar {
+    display: flex;
+    height: var(--tab-bar-h);
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+  }
+
+  .mobile-tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-top: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.03em;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+    padding: 6px 4px;
+    cursor: pointer;
+  }
+  .mobile-tab-btn:hover { color: var(--text); }
+  .mobile-tab-btn.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-top-color: var(--accent);
+  }
+  .mobile-tab-icon  { font-size: 18px; line-height: 1; }
+  .mobile-tab-label { font-size: 9px; }
+
+  /* Status bar: hide credit/tg link on mobile */
+  .status-credit,
+  .status-tg,
+  .status-spacer { display: none; }
+  .status-bar { gap: 8px; padding: 0 8px; font-size: 9px; }
+
+  /* Increase all tap targets to ≥ 44px */
+  .tool-btn    { min-width: 44px; height: 44px; }
+  .grid-btn    { min-width: 44px; min-height: 44px; }
+  .mode-btn,
+  .map-mode-btn { min-height: 44px; font-size: 7px; }
+  .dither-option { padding: 10px 12px; min-height: 44px; }
+  .dither-option:last-child { border-bottom: 1px solid rgba(87,255,110,0.1); }
+
+  /* Slightly larger fonts for readability */
+  .dither-label { font-size: 12px; }
+  .dither-desc  { font-size: 10px; }
+  .upload-label { font-size: 12px; }
+
+  /* Compact upload zone in Settings tab */
+  .upload-zone { padding: 10px 12px; margin: 6px; }
+  .upload-icon { font-size: 16px; margin-bottom: 3px; }
+  .upload-sub  { font-size: 9px; }
+
+  /* Block picker: full screen on mobile */
+  .block-picker-popup {
+    width: calc(100vw - 24px);
+    max-height: 70vh;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Panel-right's drawer-handle pseudo not needed on mobile */
+  .panel-right::before { display: none; }
+
+  /* Processing bar width adjustment */
+  .processing-bar-track { width: min(260px, 80vw); }
+}

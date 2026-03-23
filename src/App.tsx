@@ -83,6 +83,8 @@ export default function App() {
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
+  const [tabletRightOpen, setTabletRightOpen] = useState(false);
 
   // Always-current ref — updated each render so callbacks never see stale state
   const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection }>({
@@ -497,7 +499,7 @@ export default function App() {
         </div>
       )}
 
-      <div className="app-body">
+      <div className="app-body" data-tab={mobileTab}>
         {/* ── LEFT PANEL ── */}
         <aside className="panel panel-left">
           <div className="panel-scroll">
@@ -561,7 +563,7 @@ export default function App() {
 
             {/* TOOLS: select / eyedropper / brush / fill — only when image loaded */}
             {!compareMode && imageData && (
-              <>
+              <div className="toolbar-paint-tools">
                 <div className="toolbar-group">
                   <button
                     className={`tool-btn${activeTool === null ? ' active' : ''}`}
@@ -638,7 +640,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="toolbar-sep" />
-              </>
+              </div>
             )}
 
             {/* SPACER */}
@@ -668,6 +670,10 @@ export default function App() {
                 </div>
               </>
             )}
+
+            {/* TABLET DRAWER TOGGLE */}
+            <div className="toolbar-sep tablet-right-sep" />
+            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title="Palette & Export">📦</button>
 
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
@@ -773,21 +779,26 @@ export default function App() {
         </main>
 
         {/* ── RIGHT PANEL ── */}
-        <aside className="panel panel-right">
+        {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
+        <aside className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}`}>
           <div className="panel-scroll">
-            <PaletteEditor
-              blockSelection={blockSelection}
-              onSelectionChange={handleSelectionChange}
-              paletteSize={activePalette.colors.length}
-              disabled={processing}
-            />
-            <MaterialsList
-              imageData={compareMode ? (compareData?.left ?? null) : imageData}
-              cp={activePalette}
-              blockSelection={blockSelection}
-            />
+            <div className="mobile-palette-content">
+              <PaletteEditor
+                blockSelection={blockSelection}
+                onSelectionChange={handleSelectionChange}
+                paletteSize={activePalette.colors.length}
+                disabled={processing}
+              />
+            </div>
+            <div className="mobile-export-content">
+              <MaterialsList
+                imageData={compareMode ? (compareData?.left ?? null) : imageData}
+                cp={activePalette}
+                blockSelection={blockSelection}
+              />
+            </div>
           </div>
-          <div className="panel-footer">
+          <div className="panel-footer mobile-export-content">
             <ExportPanel
               imageData={imageData}
               compareData={compareData}
@@ -807,6 +818,22 @@ export default function App() {
             />
           </div>
         </aside>
+
+        {/* ── MOBILE TAB BAR ── */}
+        <div className="mobile-tab-bar">
+          <button className={`mobile-tab-btn${mobileTab === 'settings' ? ' active' : ''}`} onClick={() => setMobileTab('settings')}>
+            <span className="mobile-tab-icon">⚙</span>
+            <span className="mobile-tab-label">Settings</span>
+          </button>
+          <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
+            <span className="mobile-tab-icon">🎨</span>
+            <span className="mobile-tab-label">Palette</span>
+          </button>
+          <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
+            <span className="mobile-tab-icon">📦</span>
+            <span className="mobile-tab-label">Export</span>
+          </button>
+        </div>
       </div>
 
       {/* ── STATUS BAR ── */}
