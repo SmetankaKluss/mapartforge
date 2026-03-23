@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
@@ -16,6 +16,48 @@ interface Props {
   scale: number;
 }
 
+// ── Sprite cell bounds analysis ───────────────────────────────────────────
+// Scans each 32×32 sprite cell to find the first and last non-transparent
+// pixel rows.  Used to scale carpet / thin-texture blocks so they fill the
+// full block area rather than rendering as a narrow horizontal strip.
+
+interface CellBounds { y: number; h: number }
+
+function analyzeSpriteCells(sprite: HTMLImageElement): Map<string, CellBounds> {
+  const CELL = 32;
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = sprite.naturalWidth;
+  offscreen.height = sprite.naturalHeight;
+  const ctx = offscreen.getContext('2d')!;
+  ctx.drawImage(sprite, 0, 0);
+  const { data } = ctx.getImageData(0, 0, sprite.naturalWidth, sprite.naturalHeight);
+  const cols = Math.floor(sprite.naturalWidth  / CELL);
+  const rows = Math.floor(sprite.naturalHeight / CELL);
+  const map  = new Map<string, CellBounds>();
+
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < rows; row++) {
+      let first = CELL, last = -1;
+      outer: for (let py = 0; py < CELL; py++) {
+        for (let px = 0; px < CELL; px++) {
+          const alpha = data[((row * CELL + py) * sprite.naturalWidth + (col * CELL + px)) * 4 + 3];
+          if (alpha > 16) {
+            if (py < first) first = py;
+            last = py;
+            if (py < first) continue outer; // keep scanning downward
+          }
+        }
+      }
+      if (last >= first) {
+        map.set(`${col}_${row}`, { y: row * CELL + first, h: last - first + 1 });
+      }
+    }
+  }
+  return map;
+}
+
+// ── Colour → palette entry lookup ─────────────────────────────────────────
+
 function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { csId: number; blockId: number }> {
   const map = new Map<number, { csId: number; blockId: number }>();
   for (const c of cp.colors) {
@@ -31,19 +73,28 @@ function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { cs
 }
 
 export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [sprite, setSprite] = useState<HTMLImageElement | null>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const [sprite,      setSprite]      = useState<HTMLImageElement | null>(null);
+  const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
   const [spriteReady, setSpriteReady] = useState(false);
-  const [rendering, setRendering] = useState(false);
+  const [rendering,   setRendering]   = useState(false);
 
   const isLarge = width * height > 128 * 128;
+
+  // Analyze the sprite cell bounds once on load so that thin textures
+  // (e.g. carpets) are scaled to fill the full block area.
+  const onSpriteLoad = useCallback((img: HTMLImageElement) => {
+    setSprite(img);
+    setSpriteBounds(analyzeSpriteCells(img));
+    setSpriteReady(true);
+  }, []);
 
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => { setSprite(img); setSpriteReady(true); };
+    img.onload = () => onSpriteLoad(img);
     img.src = SPRITE_URL;
-  }, []);
+  }, [onSpriteLoad]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -66,7 +117,12 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
           const r = imageData.data[i], g = imageData.data[i + 1], b = imageData.data[i + 2];
           const entry = lookup.get((r << 16) | (g << 8) | b);
           if (entry) {
-            ctx.drawImage(sprite, entry.blockId * 32, entry.csId * 32, 32, 32,
+            // Use analyzed bounds so thin textures (carpets etc.) scale to
+            // fill the full block area instead of rendering as a slim strip.
+            const bounds = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
+            const srcY = bounds ? bounds.y      : entry.csId * 32;
+            const srcH = bounds ? bounds.h      : 32;
+            ctx.drawImage(sprite, entry.blockId * 32, srcY, 32, srcH,
               x * scale, y * scale, scale, scale);
           } else {
             ctx.fillStyle = `rgb(${r},${g},${b})`;
@@ -96,7 +152,7 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [imageData, sprite, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
+  }, [imageData, sprite, spriteBounds, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
 
   if (!imageData) {
     return (

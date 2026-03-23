@@ -408,9 +408,10 @@ input, select, textarea { outline: none; }
 
 /* ── Panel Footer ──────────────────────────────────────────────────────── */
 .panel-footer { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-panel); }
-.reset-defaults-btn { width: 100%; padding: 8px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.06em; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
+.reset-defaults-btn { width: 100%; padding: 8px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 7px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; gap: 7px; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
 .reset-defaults-btn:hover:not(:disabled) { border-color: rgba(255,215,0,0.5); color: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
 .reset-defaults-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.reset-icon { font-size: 18px; line-height: 1; }
 
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 .toolbar {
@@ -450,10 +451,10 @@ input, select, textarea { outline: none; }
 
 /* Tool buttons — auto-width, min 28px square for icon buttons */
 .tool-btn {
-  min-width: 28px; height: 28px; padding: 0 6px;
+  min-width: 28px; height: 28px; padding: 0 8px;
   display: flex; align-items: center; justify-content: center;
   background: transparent; border: 1px solid transparent; color: var(--text-muted);
-  font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.03em;
+  font-family: var(--font-pixel); font-size: 8px; letter-spacing: 0.03em;
   white-space: nowrap;
   transition: border-color 0.12s, color 0.12s, box-shadow 0.12s, background 0.12s;
   flex-shrink: 0;
@@ -664,10 +665,31 @@ input, select, textarea { outline: none; }
 .pe-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .pe-select { flex: 1; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); padding: 4px 6px; font-family: var(--font-mono); font-size: 10px; min-width: 0; appearance: none; }
 .pe-select:focus { border-color: var(--accent); }
-.pe-builtin-row { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.pe-builtin-btn { flex: 1; padding: 5px 4px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
-.pe-builtin-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 4px var(--accent-glow); }
-.pe-builtin-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+/* Unified preset dropdown */
+.pe-preset-bar { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.pe-preset-select {
+  flex: 1; min-width: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 28px 6px 8px;
+  font-family: var(--font-mono); font-size: 10px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%2357FF6E' opacity='.6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.pe-preset-select:focus { outline: none; border-color: var(--accent); }
+.pe-preset-select.has-value {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+.pe-preset-select:disabled { opacity: 0.4; cursor: not-allowed; }
+.pe-preset-select option { background: #13132a; color: var(--text); }
+.pe-preset-select optgroup { color: var(--text-muted); font-style: normal; }
 .pe-rows { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .pe-row { border-bottom: 1px solid rgba(87,255,110,0.07); transition: background 0.1s; }
 .pe-row:hover { background: rgba(87,255,110,0.025); }

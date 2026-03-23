@@ -512,7 +512,7 @@ export default function App() {
               disabled={processing}
             />
             <div className="panel-section">
-              <div className="section-header">&gt; MAP MODE</div>
+              <div className="section-header">Map mode</div>
               <div className="mode-toggle">
                 <button
                   className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
@@ -531,7 +531,7 @@ export default function App() {
           </div>
           <div className="panel-footer">
             <button className="reset-defaults-btn" onClick={handleResetDefaults} disabled={processing}>
-              ↺ RESET DEFAULTS
+              <span className="reset-icon">↺</span> Reset defaults
             </button>
           </div>
         </aside>
@@ -556,7 +556,7 @@ export default function App() {
                     onClick={() => setActiveTool(null)}
                     title="Select / deselect tool (Esc)"
                   >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 2l4 11.5 2.3-4.3L13 14l1.5-1.5-4.7-4.7L14.5 5 2 2z"/>
                     </svg>
                   </button>
@@ -565,7 +565,7 @@ export default function App() {
                     onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
                     title="Eyedropper (E)"
                   >
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
                       <circle cx="2.5" cy="13.5" r="1.8"/>
                     </svg>
@@ -576,7 +576,7 @@ export default function App() {
                     title="Brush (B)"
                     disabled={!paintBlock}
                   >
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
                       <path d="M3 13.5c0-1 .5-1.5 1-1.5s1 .5 1 1.5S4.5 15.5 4 16c-.5-.5-1-1.5-1-2.5z" opacity=".7"/>
                     </svg>
@@ -587,7 +587,7 @@ export default function App() {
                     title="Fill (F)"
                     disabled={!paintBlock}
                   >
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
                       <path d="M3 2h6l1 2H2L3 2z"/>
                       <circle cx="13" cy="11" r="2.2"/>
@@ -637,12 +637,6 @@ export default function App() {
               <div className="toolbar-group">
                 <input type="range" min={50} max={800} step={10} value={zoom} className="zoom-slider" onChange={e => setZoom(Number(e.target.value))} title="Zoom (Ctrl+scroll)" />
                 <span className="toolbar-label">{zoom}%</span>
-                <div className="toolbar-sep" />
-                {([200, 400, 800] as const).map(z => (
-                  <button key={z} className={`tool-btn${zoom === z ? ' active' : ''}`} onClick={() => setZoom(z)} title={`${z}%`}>
-                    {z === 800 ? '8×' : z === 400 ? '4×' : '2×'}
-                  </button>
-                ))}
               </div>
             )}
 
@@ -654,11 +648,11 @@ export default function App() {
                   {!compareMode && (
                     <>
                       <button className="tool-btn" onClick={() => setSplitPos(50)} title="Reset split to center (⟺)">⟺</button>
-                      <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">BLK</button>
+                      <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
                     </>
                   )}
-                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Compare">CMP</button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Grid">GRID</button>
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Compare">Compare</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Grid">Grid</button>
                 </div>
               </>
             )}

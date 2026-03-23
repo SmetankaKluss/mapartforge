@@ -2806,19 +2806,7 @@ function dyeOnly(filterFn: (b: PaletteBlock) => boolean): BlockSelection {
 }
 
 export const BUILTIN_PRESETS: Readonly<Record<string, BlockSelection>> = {
-  'All Blocks': ALL,
-  'Extended': Object.fromEntries(
-    COLOUR_ROWS.map(row => [
-      row.csId,
-      DYE_CS_IDS.includes(row.csId)
-        // wool + carpet + concrete (blockIds 0,1,3)
-        ? row.blocks.filter(b => [0, 1, 3].includes(b.blockId)).map(b => b.blockId)
-        // a few structural colours: Stone (9), Oak (11), Sand (1)
-        : [9, 11, 1].includes(row.csId)
-          ? row.blocks.slice(0, 2).map(b => b.blockId)
-          : [],
-    ]),
-  ),
+  'All Blocks':  ALL,
   'Carpet Only': dyeOnly(b => b.nbtName.endsWith('_carpet')),
 };
 

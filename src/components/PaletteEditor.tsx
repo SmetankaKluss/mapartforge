@@ -20,32 +20,37 @@ interface Props {
 export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled }: Props) {
   const [presetName,    setPresetName]    = useState('');
   const [customPresets, setCustomPresets] = useState<Record<string, BlockSelection>>(loadStoredPresets);
-  const [loadTarget,    setLoadTarget]    = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('');
 
   const persistPresets = useCallback((p: Record<string, BlockSelection>) => {
     setCustomPresets(p);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
   }, []);
 
+  function handlePresetSelect(name: string) {
+    setSelectedPreset(name);
+    if (!name) return;
+    if (name in BUILTIN_PRESETS) {
+      onSelectionChange(BUILTIN_PRESETS[name]);
+    } else if (name in customPresets) {
+      onSelectionChange(customPresets[name]);
+    }
+  }
+
   function handleSave() {
     const name = presetName.trim();
     if (!name || name in BUILTIN_PRESETS) return;
     persistPresets({ ...customPresets, [name]: blockSelection });
-    setLoadTarget(name);
+    setSelectedPreset(name);
     setPresetName('');
   }
 
-  function handleLoad() {
-    const sel = customPresets[loadTarget];
-    if (sel) onSelectionChange(sel);
-  }
-
   function handleDelete() {
-    if (!loadTarget || loadTarget in BUILTIN_PRESETS) return;
+    if (!selectedPreset || selectedPreset in BUILTIN_PRESETS) return;
     const next = { ...customPresets };
-    delete next[loadTarget];
+    delete next[selectedPreset];
     persistPresets(next);
-    setLoadTarget('');
+    setSelectedPreset('');
   }
 
   function toggleBlock(csId: number, blockId: number) {
@@ -76,11 +81,41 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         <span className="palette-count">{paletteSize} colors · {blockCount} blocks</span>
       </h3>
 
-      {/* Save custom preset */}
+      {/* Unified preset selector — built-in + custom */}
+      <div className="pe-preset-bar">
+        <select
+          className={`pe-preset-select${selectedPreset ? ' has-value' : ''}`}
+          value={selectedPreset}
+          onChange={e => handlePresetSelect(e.target.value)}
+          disabled={disabled}
+        >
+          <option value="">— select preset —</option>
+          <optgroup label="Built-in">
+            {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </optgroup>
+          {customNames.length > 0 && (
+            <optgroup label="Custom">
+              {customNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </optgroup>
+          )}
+        </select>
+        {selectedPreset && !(selectedPreset in BUILTIN_PRESETS) && (
+          <button
+            className="pe-btn pe-btn-delete"
+            onClick={handleDelete}
+            disabled={disabled}
+            title="Delete preset"
+          >✕</button>
+        )}
+      </div>
+
+      {/* Save current selection as custom preset */}
       <div className="pe-bar">
         <input
           className="pe-name-input"
-          placeholder="Preset name…"
+          placeholder="Save as preset…"
           value={presetName}
           onChange={e => setPresetName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSave()}
@@ -92,39 +127,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           disabled={disabled || !presetName.trim() || presetName.trim() in BUILTIN_PRESETS}
           title="Save current selection as a preset"
         >Save</button>
-      </div>
-
-      {/* Load / delete custom preset */}
-      {customNames.length > 0 && (
-        <div className="pe-bar">
-          <select
-            className="pe-select"
-            value={loadTarget}
-            onChange={e => setLoadTarget(e.target.value)}
-            disabled={disabled}
-          >
-            <option value="">— load preset —</option>
-            {customNames.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <button className="pe-btn pe-btn-load" onClick={handleLoad} disabled={disabled || !loadTarget}>
-            Load
-          </button>
-          <button className="pe-btn pe-btn-delete" onClick={handleDelete} disabled={disabled || !loadTarget} title="Delete preset">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Built-in presets */}
-      <div className="pe-builtin-row">
-        {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
-          <button
-            key={name}
-            className="pe-builtin-btn"
-            onClick={() => onSelectionChange(BUILTIN_PRESETS[name])}
-            disabled={disabled}
-          >{name}</button>
-        ))}
       </div>
 
       {/* Scrollable colour rows */}
