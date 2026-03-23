@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { SavedSettings } from './localStorage';
 
-const SHARE_BASE = 'https://mapartforge.vercel.app';
+const SHARE_BASE = 'https://klussforge.vercel.app';
 const BUCKET = 'mapartforge';
 
 function generateId(): string {

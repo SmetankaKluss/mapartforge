@@ -3,7 +3,7 @@ import type { BlockSelection } from './paletteBlocks';
 import { COLOUR_ROWS } from './paletteBlocks';
 
 export const PALETTE_PARAM = 'palette';
-const SHARE_BASE = 'https://mapartforge.vercel.app';
+const SHARE_BASE = 'https://klussforge.vercel.app';
 
 /**
  * Encode a BlockSelection into a URL-safe compressed string.
