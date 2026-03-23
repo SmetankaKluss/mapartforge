@@ -25,7 +25,7 @@
   --font-pixel:   'Press Start 2P', monospace;
   --font-mono:    'JetBrains Mono', 'Consolas', monospace;
   --panel-left:   280px;
-  --panel-right:  260px;
+  --panel-right:  320px;
   --toolbar-h:    42px;
   --header-h:     48px;
   --status-h:     28px;
@@ -807,16 +807,16 @@ input, select, textarea { outline: none; }
 .pe-row { border-bottom: 1px solid rgba(87,255,110,0.07); transition: background 0.1s; }
 .pe-row:hover { background: rgba(87,255,110,0.025); }
 .pe-row-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; }
-.pe-swatch { width: 12px; height: 12px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+.pe-swatch { width: 16px; height: 16px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
 .pe-name { flex: 1; font-size: 9px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pe-toggle { background: none; border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; padding: 1px 4px; transition: border-color 0.1s, color 0.1s; }
 .pe-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .pe-block-grid { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px 8px 6px; }
-.pe-block { width: 24px; height: 24px; border: 1px solid transparent; overflow: hidden; cursor: pointer; transition: border-color 0.1s; position: relative; }
+.pe-block { width: 28px; height: 28px; border: 1px solid transparent; overflow: hidden; cursor: pointer; transition: border-color 0.1s; position: relative; }
 .pe-block.on  { border-color: var(--gold); }
 .pe-block.off { filter: grayscale(70%) brightness(0.55); }
 .pe-block:hover { border-color: var(--accent); }
-.pe-block-icon { display: block; width: 32px; height: 32px; background-image: url('https://raw.githubusercontent.com/rebane2001/mapartcraft/master/src/images/textures.png'); background-repeat: no-repeat; image-rendering: pixelated; transform: scale(0.75); transform-origin: 0 0; }
+.pe-block-icon { display: block; width: 32px; height: 32px; background-image: url('https://raw.githubusercontent.com/rebane2001/mapartcraft/master/src/images/textures.png'); background-repeat: no-repeat; image-rendering: pixelated; transform: scale(0.875); transform-origin: 0 0; }
 
 /* ── Block Icon States ─────────────────────────────────────────────────── */
 .block-icon-loading { background: linear-gradient(90deg, var(--bg-input) 25%, rgba(87,255,110,0.07) 50%, var(--bg-input) 75%); background-size: 200% 100%; animation: shimmer 1.4s ease infinite; }
