@@ -23,6 +23,7 @@ import type { ImageAdjustments } from './lib/adjustments';
 import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
 import type { SavedSettings } from './lib/localStorage';
 import { loadShare } from './lib/share';
+import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import './App.css';
@@ -76,7 +77,8 @@ export default function App() {
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
-  const [viewBanner, setViewBanner] = useState(false);
+  const [viewBanner,    setViewBanner]    = useState(false);
+  const [paletteBanner, setPaletteBanner] = useState(false);
   const processingRef = useRef(false);
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
@@ -388,6 +390,22 @@ export default function App() {
     }
   }, [sourceImage, compareMode, compareLeft, compareRight]);
 
+  // ── Load from ?palette= URL param (runs once on mount) ───────────────────
+  // Must run before the ?share= check so the ref guard doesn't block it.
+  useEffect(() => {
+    const params   = new URLSearchParams(window.location.search);
+    const shareId  = params.get('share');
+    const paletteQ = params.get(PALETTE_PARAM);
+    // ?share= takes priority — don't apply a palette-only link on top of a
+    // full image share, because the image share will restore its own palette.
+    if (shareId || !paletteQ) return;
+    const sel = decodePalette(paletteQ);
+    if (!sel) return;
+    setBlockSelection(sel);
+    setPaletteBanner(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Load from ?share= URL param (runs once on mount) ──────────────────────
   // Using a ref to prevent double-execution in React StrictMode
   const linkLoadedRef = useRef(false);
@@ -482,6 +500,13 @@ export default function App() {
         <div className="view-banner">
           <span>█ LOADED FROM LINK</span>
           <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Dismiss">✕</button>
+        </div>
+      )}
+
+      {paletteBanner && (
+        <div className="view-banner palette-banner">
+          <span>⬡ PALETTE LOADED FROM LINK</span>
+          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title="Dismiss">✕</button>
         </div>
       )}
 

@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
+import { buildPaletteUrl } from '../lib/paletteShare';
+import { PaletteShareModal } from './PaletteShareModal';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
@@ -24,6 +26,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   const [showSaveModal,   setShowSaveModal]   = useState(false);
   const [modalName,       setModalName]       = useState('');
   const [clearPending,    setClearPending]    = useState(false);
+  const [paletteUrl,      setPaletteUrl]      = useState<string | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modalInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,6 +206,16 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         >{clearPending ? 'Sure?' : 'Clear'}</button>
       </div>
 
+      {/* ── Row 3: share palette ── */}
+      <div className="pe-share-bar">
+        <button
+          className="pe-share-btn"
+          onClick={() => setPaletteUrl(buildPaletteUrl(blockSelection))}
+          disabled={disabled}
+          title="Generate a shareable link for the current block selection"
+        >⬡ Share palette</button>
+      </div>
+
       {/* ── Scrollable colour rows ── */}
       <div className="pe-rows">
         {filteredRows.length === 0 ? (
@@ -265,6 +278,11 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           })
         )}
       </div>
+
+      {/* ── Palette share modal ── */}
+      {paletteUrl && (
+        <PaletteShareModal url={paletteUrl} onClose={() => setPaletteUrl(null)} />
+      )}
 
       {/* ── Save preset modal ── */}
       {showSaveModal && (

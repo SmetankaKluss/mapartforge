@@ -735,6 +735,27 @@ input, select, textarea { outline: none; }
 /* no-results message */
 .pe-no-results { padding: 16px 12px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); font-style: italic; text-align: center; }
 
+/* ── Share palette bar ── */
+.pe-share-bar { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.pe-share-btn {
+  width: 100%;
+  padding: 7px 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.06em;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: border-color 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.pe-share-btn:hover:not(:disabled) {
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.pe-share-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Palette-from-link banner variant ── */
+.palette-banner { background: rgba(87,255,110,0.07); border-color: rgba(87,255,110,0.35); }
+
 /* ── Save preset modal ── */
 .pe-modal-backdrop {
   position: fixed; inset: 0; z-index: 1000;
