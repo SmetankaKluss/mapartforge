@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { NumInput } from './NumInput';
 import { applyAdjustments } from '../lib/adjustments';
 import type { ImageAdjustments } from '../lib/adjustments';
 
@@ -87,9 +88,12 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
           <div key={key} className="adj-slider-row">
             <div className="adj-slider-header">
               <span className="adj-slider-label">{label}</span>
-              <span className={`adj-slider-value ${adjustments[key] !== 0 ? 'nonzero' : ''}`}>
-                {adjustments[key] > 0 ? '+' : ''}{adjustments[key]}
-              </span>
+              <NumInput
+                value={adjustments[key]}
+                min={-100} max={100} step={1}
+                onCommit={v => commit(key, v)}
+                disabled={disabled}
+              />
             </div>
             <input
               type="range"

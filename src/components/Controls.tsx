@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { NumInput } from './NumInput';
 import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
@@ -357,7 +358,9 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Clean threshold</span>
-              <span className="intensity-value">{liveKluss.cleanThreshold.toFixed(3)}</span>
+              <NumInput value={liveKluss.cleanThreshold} min={0.001} max={0.05} step={0.001} decimals={3}
+                onCommit={v => { const p = { ...liveKluss, cleanThreshold: v }; setLiveKluss(p); onKlussParamsChange(p); }}
+                disabled={processing} />
             </div>
             <input
               type="range" className="intensity-slider"
@@ -375,7 +378,9 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Error strength</span>
-              <span className="intensity-value">{liveKluss.maxCandidateDist.toFixed(1)}</span>
+              <NumInput value={liveKluss.maxCandidateDist} min={0.10} max={3.00} step={0.10} decimals={1}
+                onCommit={v => { const p = { ...liveKluss, maxCandidateDist: v }; setLiveKluss(p); onKlussParamsChange(p); }}
+                disabled={processing} />
             </div>
             <input
               type="range" className="intensity-slider"
@@ -411,7 +416,9 @@ export function Controls({
           <div className="kluss-param">
             <div className="kluss-param-header">
               <span className="kluss-param-label">Zone boundary</span>
-              <span className="intensity-value">{liveKluss.zoneBoundaryThreshold.toFixed(2)}</span>
+              <NumInput value={liveKluss.zoneBoundaryThreshold} min={0.02} max={0.50} step={0.01} decimals={2}
+                onCommit={v => { const p = { ...liveKluss, zoneBoundaryThreshold: v }; setLiveKluss(p); onKlussParamsChange(p); }}
+                disabled={processing} />
             </div>
             <input
               type="range" className="intensity-slider"
@@ -438,7 +445,10 @@ export function Controls({
         <section className="control-group">
           <h3 className="control-title">
             Intensity
-            <span className="intensity-value">{intensity}%</span>
+            <span className="slider-value-wrap">
+              <NumInput value={intensity} min={0} max={100} step={1} onCommit={v => { onIntensityChange(v); onIntensityCommit(v); }} disabled={processing} />
+              <span className="num-input-unit">%</span>
+            </span>
           </h3>
           <input
             type="range"

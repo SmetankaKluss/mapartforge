@@ -25,7 +25,12 @@ import { loadShare } from './lib/share';
 import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
+import { NumInput } from './components/NumInput';
 import './App.css';
+
+// Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
+function sliderToZoom(s: number): number { return Math.round(50 * Math.pow(16, s / 100)); }
+function zoomToSlider(z: number): number { return Math.round(Math.log(z / 50) / Math.log(16) * 100); }
 
 const MAX_HISTORY = 20;
 
@@ -175,7 +180,7 @@ export default function App() {
       if (!e.ctrlKey) return;
       e.preventDefault();
       const direction = e.deltaY > 0 ? -1 : 1;
-      setZoom(prev => Math.max(50, Math.min(800, prev + direction * 10)));
+      setZoom(prev => sliderToZoom(Math.max(0, Math.min(100, zoomToSlider(prev) + direction * 5))));
     }
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -693,8 +698,9 @@ export default function App() {
             {/* ZOOM — only when content */}
             {hasContent && (
               <div className="toolbar-group">
-                <input type="range" min={50} max={800} step={10} value={zoom} className="zoom-slider" onChange={e => setZoom(Number(e.target.value))} title="Zoom (Ctrl+scroll)" />
-                <span className="toolbar-label">{zoom}%</span>
+                <input type="range" min={0} max={100} step={1} value={zoomToSlider(zoom)} className="zoom-slider" onChange={e => setZoom(sliderToZoom(Number(e.target.value)))} title="Zoom (Ctrl+scroll)" />
+                <NumInput value={zoom} min={50} max={800} step={1} onCommit={setZoom} />
+                <span className="toolbar-label-unit">%</span>
               </div>
             )}
 

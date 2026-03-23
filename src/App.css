@@ -441,6 +441,36 @@ input, select, textarea { outline: none; }
   font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
   padding: 0 4px; white-space: nowrap;
 }
+.toolbar-label-unit {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+  padding-right: 2px; white-space: nowrap;
+}
+
+/* ── Numeric input (beside sliders) ───────────────────────────────────── */
+.num-input {
+  width: 46px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: right;
+  padding: 1px 4px;
+  cursor: text;
+  flex-shrink: 0;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.num-input::-webkit-inner-spin-button,
+.num-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-glow); }
+.num-input:disabled { opacity: 0.4; cursor: not-allowed; }
+.num-input-unit {
+  font-family: var(--font-mono); font-size: 9px; color: var(--text-muted);
+}
+.slider-value-wrap {
+  display: flex; align-items: center; gap: 2px; margin-left: auto;
+}
 .zoom-slider {
   width: 80px; height: 18px; -webkit-appearance: none; appearance: none;
   background: transparent; cursor: pointer; flex-shrink: 0;
