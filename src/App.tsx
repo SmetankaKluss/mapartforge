@@ -26,6 +26,7 @@ import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
+import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
 // Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
@@ -888,6 +889,8 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      <Analytics />
 
       {/* ── STATUS BAR ── */}
       <div className="status-bar">
