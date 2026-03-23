@@ -27,6 +27,8 @@ import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { Analytics } from '@vercel/analytics/react';
+import { createTour, shouldAutoStart } from './lib/tour';
+import 'driver.js/dist/driver.css';
 import './App.css';
 
 // Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
@@ -511,6 +513,17 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Onboarding tour ───────────────────────────────────────────────────────
+  const startTour = useCallback(() => { createTour().drive(); }, []);
+  useEffect(() => {
+    if (shouldAutoStart()) {
+      // Slight delay so the DOM is fully painted
+      const t = setTimeout(() => createTour().drive(), 600);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const baseScale    = gridScale(mapGrid);
   const cmpBaseScale = Math.max(1, Math.floor(baseScale / 2));
   const zoomFactor   = zoom / 100;
@@ -531,6 +544,7 @@ export default function App() {
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
           </div>
           <div className="header-spacer" />
+          <button className="tour-btn" onClick={startTour} title="Start guided tour">? GUIDE</button>
           <span className="header-ver">v1.0</span>
         </div>
       </header>

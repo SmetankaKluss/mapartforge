@@ -122,6 +122,8 @@ input, select, textarea { outline: none; }
 .header-titles { display: flex; flex-direction: column; gap: 2px; }
 .header-spacer { flex: 1; }
 .header-ver { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); }
+.tour-btn { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); background: none; border: 1px solid var(--accent); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
+.tour-btn:hover { background: var(--accent-dim); }
 
 .app-logo {
   display: flex;
@@ -1262,3 +1264,90 @@ input, select, textarea { outline: none; }
   /* Processing bar width adjustment */
   .processing-bar-track { width: min(260px, 80vw); }
 }
+
+/* ── Driver.js tour — pixel-art theme overrides ───────────────────────── */
+
+/* Overlay */
+#driver-page-overlay { background: rgba(8, 8, 20, 0.82) !important; }
+
+/* Stage highlight */
+.driver-active-element { outline: none !important; }
+.driver-stage { border: 2px solid #57FF6E !important; box-shadow: 0 0 0 4px rgba(87,255,110,0.18), 0 0 18px rgba(87,255,110,0.25) !important; background: transparent !important; }
+
+/* Popover container */
+.driver-popover {
+  background: #0f0f1a !important;
+  border: 1px solid #57FF6E !important;
+  box-shadow: 0 0 24px rgba(87,255,110,0.2) !important;
+  padding: 18px 20px 14px !important;
+  max-width: 320px !important;
+  min-width: 260px !important;
+}
+.driver-popover * { border-radius: 0 !important; }
+
+/* Arrow */
+.driver-popover-arrow { border-color: #57FF6E !important; }
+.driver-popover-arrow-side-left  { border-right-color:  #57FF6E !important; }
+.driver-popover-arrow-side-right { border-left-color:   #57FF6E !important; }
+.driver-popover-arrow-side-top   { border-bottom-color: #57FF6E !important; }
+.driver-popover-arrow-side-bottom{ border-top-color:    #57FF6E !important; }
+
+/* Title */
+.driver-popover-title {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 8px !important;
+  color: #57FF6E !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 10px !important;
+  line-height: 1.6 !important;
+}
+
+/* Description */
+.driver-popover-description {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 11px !important;
+  color: #d8d8f0 !important;
+  line-height: 1.7 !important;
+  margin-bottom: 14px !important;
+}
+
+/* Footer row */
+.driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border-top: 1px solid rgba(87,255,110,0.18) !important;
+  padding-top: 10px !important;
+  margin-top: 0 !important;
+}
+
+/* Progress text */
+.driver-popover-progress-text {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 9px !important;
+  color: rgba(255,255,255,0.4) !important;
+  margin-right: auto !important;
+}
+
+/* Navigation buttons shared */
+.driver-popover-prev-btn,
+.driver-popover-next-btn,
+.driver-popover-close-btn {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 7px !important;
+  padding: 5px 10px !important;
+  background: none !important;
+  border: 1px solid rgba(87,255,110,0.5) !important;
+  color: #57FF6E !important;
+  cursor: pointer !important;
+  letter-spacing: 0.05em !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+.driver-popover-prev-btn { color: rgba(255,255,255,0.55) !important; border-color: rgba(255,255,255,0.2) !important; }
+.driver-popover-next-btn { border-color: #57FF6E !important; background: rgba(87,255,110,0.1) !important; }
+.driver-popover-close-btn { position: absolute !important; top: 10px !important; right: 10px !important; border: none !important; color: rgba(255,255,255,0.35) !important; font-size: 9px !important; padding: 2px 6px !important; }
+.driver-popover-prev-btn:hover { background: rgba(255,255,255,0.06) !important; }
+.driver-popover-next-btn:hover { background: rgba(87,255,110,0.2) !important; }
+.driver-popover-close-btn:hover { color: #fff !important; }
