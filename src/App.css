@@ -624,6 +624,8 @@ input, select, textarea { outline: none; }
 .processing-pct { font-family: var(--font-pixel); font-size: 9px; color: var(--gold); min-width: 36px; text-align: right; }
 .processing-bar-track { width: 260px; height: 8px; background: var(--bg-input); border: 1px solid var(--border); overflow: hidden; }
 .processing-bar-fill { height: 100%; background: var(--accent); transition: width 0.12s linear; box-shadow: 0 0 8px var(--accent-glow); }
+.processing-cancel-btn { font-family: var(--font-pixel); font-size: 7px; color: var(--fg-dim); background: none; border: 1px solid var(--border); padding: 3px 8px; cursor: pointer; letter-spacing: 0.08em; }
+.processing-cancel-btn:hover { border-color: #ff4444; color: #ff4444; }
 
 /* ── Block Picker ──────────────────────────────────────────────────────── */
 .block-picker-popup {

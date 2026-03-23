@@ -13,7 +13,6 @@ import { ExportPanel } from './components/ExportPanel';
 import type { DitheringMode, KlussParams } from './lib/dithering';
 import { buildComputedPalette, DEFAULT_KLUSS_PARAMS } from './lib/dithering';
 import type { ComputedPalette } from './lib/dithering';
-import { processImage, processCompare } from './lib/processor';
 import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
 import type { MapGrid } from './lib/types';
 import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
@@ -79,7 +78,9 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
-  const processingRef = useRef(false);
+  const workerRef     = useRef<Worker | null>(null);
+  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCancel, setShowCancel] = useState(false);
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
@@ -91,9 +92,6 @@ export default function App() {
     imageData: null, blockSelection: DEFAULT_SELECTION,
   });
   latestRef.current = { imageData, blockSelection };
-
-  // Cancellation token — incremented each time runProcess starts; async result is discarded if token changed
-  const runTokenRef = useRef(0);
 
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
@@ -196,7 +194,16 @@ export default function App() {
   // Keep exportRef current each render so keyboard shortcuts access fresh state
   exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode };
 
-  async function runProcess(
+  function handleCancelProcessing() {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+    setShowCancel(false);
+    setProcessing(false);
+    setProcessingProgress(0);
+  }
+
+  function runProcess(
     img: HTMLImageElement,
     mode: DitheringMode,
     grid: MapGrid,
@@ -209,36 +216,73 @@ export default function App() {
     bn: number,
     kp: KlussParams,
   ) {
-    if (processingRef.current) return;
-    processingRef.current = true;
-    runTokenRef.current += 1;
-    const myToken = runTokenRef.current;
+    // Terminate any running worker and clear pending cancel timer
+    workerRef.current?.terminate();
+    if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+
     setProcessing(true);
     setProcessingProgress(0);
+    setShowCancel(false);
+
     const w = gridPixelWidth(grid);
     const h = gridPixelHeight(grid);
-    try {
-      if (compare) {
-        const result = await processCompare(img, w, h, intens / 100, cmpLeft, cmpRight, palette, adj, bn);
-        if (runTokenRef.current !== myToken) return;
-        setCompareData({ left: result.left, right: result.right });
-        setOriginalData(result.original);
-      } else {
-        const result = await processImage(img, {
-          dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj,
-          onProgress: setProcessingProgress, klussParams: kp,
-        });
-        if (runTokenRef.current !== myToken) return;
-        setImageData(result.processed);
-        setOriginalData(result.original);
-      }
-    } finally {
-      if (runTokenRef.current === myToken) {
-        processingRef.current = false;
-        setProcessing(false);
-        setProcessingProgress(0);
-      }
+
+    // Show cancel button after 500 ms
+    cancelTimerRef.current = setTimeout(() => setShowCancel(true), 500);
+
+    const worker = new Worker(
+      new URL('./workers/processor.worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    workerRef.current = worker;
+
+    function done() {
+      if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+      setShowCancel(false);
+      setProcessing(false);
+      setProcessingProgress(0);
+      if (workerRef.current === worker) workerRef.current = null;
     }
+
+    worker.onmessage = (e: MessageEvent) => {
+      const msg = e.data;
+      if (msg.type === 'progress') {
+        setProcessingProgress(msg.pct as number);
+      } else if (msg.type === 'result') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
+        setImageData(mk(msg.processedData));
+        setOriginalData(mk(msg.originalData));
+        done();
+      } else if (msg.type === 'compare_result') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
+        setCompareData({ left: mk(msg.leftData), right: mk(msg.rightData) });
+        setOriginalData(mk(msg.originalData));
+        done();
+      } else if (msg.type === 'error') {
+        console.error('Processor worker error:', msg.message);
+        done();
+      }
+    };
+    worker.onerror = () => done();
+
+    // Create transferable bitmap, then dispatch to worker
+    createImageBitmap(img).then(bitmap => {
+      // If a newer runProcess call superseded this one, discard
+      if (workerRef.current !== worker) { bitmap.close(); return; }
+      if (compare) {
+        worker.postMessage(
+          { type: 'compare', bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn },
+          [bitmap],
+        );
+      } else {
+        worker.postMessage(
+          { type: 'process', bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp } },
+          [bitmap],
+        );
+      }
+    }).catch(() => done());
   }
 
   const handleImageLoaded = useCallback((img: HTMLImageElement) => {
@@ -769,6 +813,9 @@ export default function App() {
                   <div className="processing-spinner" />
                   <span className="processing-label">PROCESSING… {DITHERING_LABELS[dithering].toUpperCase()}</span>
                   <span className="processing-pct">{processingProgress}%</span>
+                  {showCancel && (
+                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ CANCEL</button>
+                  )}
                 </div>
                 <div className="processing-bar-track">
                   <div className="processing-bar-fill" style={{ width: `${processingProgress}%` }} />
