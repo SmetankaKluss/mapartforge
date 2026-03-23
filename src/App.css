@@ -304,6 +304,7 @@ input, select, textarea { outline: none; }
 .upload-icon { font-size: 22px; margin-bottom: 8px; }
 .upload-label { font-family: var(--font-mono); font-size: 11px; color: var(--text); margin-bottom: 4px; }
 .upload-sub   { font-size: 10px; color: var(--text-muted); }
+.upload-hint  { font-size: 9px; color: var(--accent); font-family: var(--font-mono); margin-top: 4px; opacity: 0.8; }
 
 /* ── Controls Component ────────────────────────────────────────────────── */
 .controls { display: flex; flex-direction: column; }
@@ -495,6 +496,13 @@ input, select, textarea { outline: none; }
 .tool-btn:hover:not(:disabled) { border-color: rgba(87,255,110,0.5); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .tool-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); animation: toolPulse 2s ease infinite; }
 .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Reset buttons — red confirm pattern (same as palette clear) */
+.reset-confirm-btn:hover:not(:disabled) { border-color: rgba(255,68,68,0.7) !important; color: #ff4444 !important; box-shadow: 0 0 6px rgba(255,68,68,0.3) !important; }
+.reset-confirm-btn.pending              { border-color: rgba(255,68,68,0.7) !important; color: #ff4444 !important; animation: resetPulse 0.6s ease infinite alternate; }
+@keyframes resetPulse {
+  from { box-shadow: 0 0 4px rgba(255,68,68,0.2); }
+  to   { box-shadow: 0 0 10px rgba(255,68,68,0.55); }
+}
 @keyframes toolPulse {
   0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
   50%       { box-shadow: 0 0 12px rgba(87, 255, 110, 0.55); }
@@ -1249,6 +1257,7 @@ input, select, textarea { outline: none; }
   .upload-zone { padding: 10px 12px; margin: 6px; }
   .upload-icon { font-size: 16px; margin-bottom: 3px; }
   .upload-sub  { font-size: 9px; }
+  .upload-hint  { font-size: 8px; margin-top: 3px; }
 
   /* Block picker: full screen on mobile */
   .block-picker-popup {

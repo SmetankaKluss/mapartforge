@@ -63,10 +63,7 @@ export default function App() {
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
   const [splitPos, setSplitPos] = useState(50);
   const [showGrid, setShowGrid]         = useState(false);
-  const [zoom, setZoomState]            = useState(100);
-  const [panX, setPanXState]            = useState(0);
-  const [panY, setPanYState]            = useState(0);
-  const [isDragging, setIsDragging]     = useState(false);
+  const [zoom, setZoom]                 = useState(100);
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -89,26 +86,14 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
+  const [resetZoomPending,  setResetZoomPending]  = useState(false);
+  const [resetSplitPending, setResetSplitPending] = useState(false);
+  const resetZoomTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetSplitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workerRef     = useRef<Worker | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const previewSectionRef = useRef<HTMLElement>(null);
-  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  // Always-current refs for zoom/pan — lets wheel/drag handlers avoid stale closures
-  const zoomRef = useRef(100);
-  const panXRef = useRef(0);
-  const panYRef = useRef(0);
-
-  // Synced setters — update both ref (immediate, for event handlers) and state (for render)
-  const setZoom  = useCallback((v: number | ((p: number) => number)) => {
-    setZoomState(prev => { const next = typeof v === 'function' ? v(prev) : v; zoomRef.current = next; return next; });
-  }, []);
-  const setPanX  = useCallback((v: number | ((p: number) => number)) => {
-    setPanXState(prev => { const next = typeof v === 'function' ? v(prev) : v; panXRef.current = next; return next; });
-  }, []);
-  const setPanY  = useCallback((v: number | ((p: number) => number)) => {
-    setPanYState(prev => { const next = typeof v === 'function' ? v(prev) : v; panYRef.current = next; return next; });
-  }, []);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
@@ -194,86 +179,6 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, [imageData, compareMode]);
 
-  // Wheel to zoom (Photoshop-style: scroll zooms at cursor, Ctrl+scroll keeps old behavior)
-  useEffect(() => {
-    const el = previewSectionRef.current;
-    if (!el) return;
-    function onWheel(e: WheelEvent) {
-      e.preventDefault();
-      const direction = e.deltaY > 0 ? -1 : 1;
-      const oldZoom = zoomRef.current;
-      const newSlider = Math.max(0, Math.min(100, zoomToSlider(oldZoom) + direction * 5));
-      const newZoom = sliderToZoom(newSlider);
-      if (newZoom === oldZoom) return;
-
-      if (e.ctrlKey) {
-        // Ctrl+scroll: centered zoom (no pan shift)
-        setZoom(newZoom);
-        return;
-      }
-
-      // Scroll: zoom at cursor position
-      const rect = (el as HTMLElement).getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const zoomFactor = newZoom / oldZoom;
-      setPanX(panXRef.current + (mouseX - panXRef.current) * (1 - zoomFactor));
-      setPanY(panYRef.current + (mouseY - panYRef.current) * (1 - zoomFactor));
-      setZoom(newZoom);
-    }
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  // refs are stable — no deps needed
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Drag-to-pan (middle mouse or space+drag) — uses refs, never needs re-registration
-  const isDraggingRef = useRef(false);
-  useEffect(() => {
-    const el = previewSectionRef.current;
-    if (!el) return;
-
-    function onMouseDown(e: MouseEvent) {
-      if (e.button === 1 || (e.button === 0 && (e as MouseEvent & { code: string }).code === 'Space')) {
-        e.preventDefault();
-        isDraggingRef.current = true;
-        setIsDragging(true);
-        panStartRef.current = { x: e.clientX, y: e.clientY, panX: panXRef.current, panY: panYRef.current };
-      }
-    }
-
-    function onMouseMove(e: MouseEvent) {
-      if (!isDraggingRef.current || !panStartRef.current) return;
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
-      setPanX(panStartRef.current.panX + dx);
-      setPanY(panStartRef.current.panY + dy);
-    }
-
-    function onMouseUp() {
-      if (isDraggingRef.current) {
-        isDraggingRef.current = false;
-        setIsDragging(false);
-        panStartRef.current = null;
-      }
-    }
-
-    el.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    return () => {
-      el.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Reset pan & zoom when a new image is loaded
-  useEffect(() => {
-    setPanX(0);
-    setPanY(0);
-  }, [imageData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeShades = mapMode === '2d' ? [2] : [0, 1, 2];
 
@@ -810,8 +715,34 @@ export default function App() {
                 <div className="toolbar-group">
                   {!compareMode && (
                     <>
-                      <button className="tool-btn" onClick={() => setSplitPos(50)} title="Reset split to center (⟺)">⟺</button>
-                      <button className="tool-btn" onClick={() => { setPanX(0); setPanY(0); setZoom(100); }} title="Reset view (fit)">⌖</button>
+                      <button
+                        className={`tool-btn reset-confirm-btn${resetZoomPending ? ' pending' : ''}`}
+                        title={resetZoomPending ? 'Click again to confirm' : 'Reset zoom to 100%'}
+                        onClick={() => {
+                          if (!resetZoomPending) {
+                            setResetZoomPending(true);
+                            resetZoomTimerRef.current = setTimeout(() => setResetZoomPending(false), 2000);
+                          } else {
+                            if (resetZoomTimerRef.current) clearTimeout(resetZoomTimerRef.current);
+                            setResetZoomPending(false);
+                            setZoom(100);
+                          }
+                        }}
+                      >{resetZoomPending ? 'Sure?' : '⌖'}</button>
+                      <button
+                        className={`tool-btn reset-confirm-btn${resetSplitPending ? ' pending' : ''}`}
+                        title={resetSplitPending ? 'Click again to confirm' : 'Reset split to center (⟺)'}
+                        onClick={() => {
+                          if (!resetSplitPending) {
+                            setResetSplitPending(true);
+                            resetSplitTimerRef.current = setTimeout(() => setResetSplitPending(false), 2000);
+                          } else {
+                            if (resetSplitTimerRef.current) clearTimeout(resetSplitTimerRef.current);
+                            setResetSplitPending(false);
+                            setSplitPos(50);
+                          }
+                        }}
+                      >{resetSplitPending ? 'Sure?' : '⟺'}</button>
                       <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
                     </>
                   )}
@@ -889,13 +820,7 @@ export default function App() {
             <span className="corner corner-br" />
 
             {compareMode ? (
-              <div
-                style={{
-                  transform: `translate(${panX}px, ${panY}px) scale(${zoom / 100})`,
-                  transformOrigin: '0 0',
-                  cursor: isDragging ? 'grabbing' : 'default',
-                }}
-              >
+              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: '0 0' }}>
                 <CompareView
                   leftData={compareData?.left   ?? null}
                   rightData={compareData?.right ?? null}
@@ -905,13 +830,7 @@ export default function App() {
                 />
               </div>
             ) : (
-              <div
-                style={{
-                  transform: `translate(${panX}px, ${panY}px) scale(${zoom / 100})`,
-                  transformOrigin: '0 0',
-                  cursor: isDragging ? 'grabbing' : 'default',
-                }}
-              >
+              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: '0 0' }}>
                 <PreviewCanvas
                   mode={textureMode}
                   imageData={imageData} originalData={originalData}
