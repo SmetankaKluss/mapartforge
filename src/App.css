@@ -412,8 +412,9 @@ input, select, textarea { outline: none; }
 /* ── Panel Footer ──────────────────────────────────────────────────────── */
 .panel-footer { padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-panel); }
 .reset-defaults-btn { width: 100%; padding: 8px; background: none; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 7px; letter-spacing: 0.06em; display: flex; align-items: center; justify-content: center; gap: 7px; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
-.reset-defaults-btn:hover:not(:disabled) { border-color: rgba(255,215,0,0.5); color: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
+.reset-defaults-btn:hover:not(:disabled) { border-color: rgba(255,68,68,0.7); color: #ff4444; box-shadow: 0 0 6px rgba(255,68,68,0.3); }
 .reset-defaults-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.reset-defaults-btn.pending { border-color: rgba(255,68,68,0.7); color: #ff4444; animation: resetPulse 0.6s ease infinite alternate; }
 .reset-icon { font-size: 18px; line-height: 1; }
 
 /* ── Toolbar ───────────────────────────────────────────────────────────── */

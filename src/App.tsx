@@ -86,10 +86,12 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
-  const [resetZoomPending,  setResetZoomPending]  = useState(false);
-  const [resetSplitPending, setResetSplitPending] = useState(false);
-  const resetZoomTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resetSplitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [resetZoomPending,     setResetZoomPending]     = useState(false);
+  const [resetSplitPending,    setResetSplitPending]    = useState(false);
+  const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
+  const resetZoomTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetSplitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workerRef     = useRef<Worker | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCancel, setShowCancel] = useState(false);
@@ -597,8 +599,22 @@ export default function App() {
             </div>
           </div>
           <div className="panel-footer">
-            <button className="reset-defaults-btn" onClick={handleResetDefaults} disabled={processing}>
-              <span className="reset-icon">↺</span> Reset defaults
+            <button
+              className={`reset-defaults-btn${resetDefaultsPending ? ' pending' : ''}`}
+              disabled={processing}
+              title={resetDefaultsPending ? 'Click again to confirm reset' : 'Reset all settings to defaults'}
+              onClick={() => {
+                if (!resetDefaultsPending) {
+                  setResetDefaultsPending(true);
+                  resetDefaultsTimerRef.current = setTimeout(() => setResetDefaultsPending(false), 2000);
+                } else {
+                  if (resetDefaultsTimerRef.current) clearTimeout(resetDefaultsTimerRef.current);
+                  setResetDefaultsPending(false);
+                  handleResetDefaults();
+                }
+              }}
+            >
+              <span className="reset-icon">↺</span> {resetDefaultsPending ? 'Sure?' : 'Reset defaults'}
             </button>
           </div>
         </aside>
@@ -820,22 +836,20 @@ export default function App() {
             <span className="corner corner-br" />
 
             {compareMode ? (
-              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: '0 0' }}>
-                <CompareView
-                  leftData={compareData?.left   ?? null}
-                  rightData={compareData?.right ?? null}
-                  leftLabel={DITHERING_LABELS[compareLeft]}
-                  rightLabel={DITHERING_LABELS[compareRight]}
-                  width={pw} height={ph} scale={cmpDisplayScale / (zoom / 100)} showGrid={showGrid}
-                />
-              </div>
+              <CompareView
+                leftData={compareData?.left   ?? null}
+                rightData={compareData?.right ?? null}
+                leftLabel={DITHERING_LABELS[compareLeft]}
+                rightLabel={DITHERING_LABELS[compareRight]}
+                width={pw} height={ph} scale={cmpDisplayScale} showGrid={showGrid}
+              />
             ) : (
-              <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: '0 0' }}>
+              <div>
                 <PreviewCanvas
                   mode={textureMode}
                   imageData={imageData} originalData={originalData}
                   showOriginal={false} showGrid={showGrid}
-                  width={pw} height={ph} scale={displayScale / (zoom / 100)}
+                  width={pw} height={ph} scale={displayScale}
                   cp={activePalette} blockSelection={blockSelection}
                   activeTool={activeTool}
                   paintBlock={paintBlock}
