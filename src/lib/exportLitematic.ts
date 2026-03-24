@@ -5,6 +5,17 @@ import type { BlockSelection } from './paletteBlocks';
 import { getPreferredBlockNbt, isMandatorySupport } from './paletteBlocks';
 import type { MapGrid } from './types';
 
+/**
+ * Blocks that require specific block-state Properties in the palette entry
+ * to be placed correctly in-game (e.g. glow_lichen must declare which face
+ * it attaches to — otherwise Minecraft treats it as a blank/floating block).
+ */
+const BLOCK_FACE_PROPS: Record<string, Record<string, string>> = {
+  'minecraft:glow_lichen': {
+    down: 'true', east: 'false', north: 'false', south: 'false', up: 'false', west: 'false',
+  },
+};
+
 export type SupportMode =
   | 1  // 1 block under floating-only blocks (sand, gravel, lichens…)
   | 2  // 1 block under every art block
@@ -143,13 +154,18 @@ async function buildLitematicBytes(
     minY  = Math.min(sc.minY, 1);
     sizeY = Math.max(1, sc.maxY - minY + 1);
   } else {
-    sizeY = 1;
+    // Flat mode: if any block needs mandatory support (e.g. glow_lichen) and
+    // a support block is selected, add a support layer at y=0 and shift art to y=1.
+    const needsSupport = supportBlockNbt && supportBlockNbt !== 'air' &&
+      pixelBaseId.some(bid => isMandatorySupport(bid, groups));
+    sizeY = needsSupport ? 2 : 1;
   }
 
   // ── 2. Block palette ──────────────────────────────────────────────────
   const blockPalette: string[] = ['minecraft:air'];
   const blockToIdx   = new Map<string, number>([['minecraft:air', 0]]);
   const pixelBlock   = new Array<number>(width * height);
+  const pixelBaseId  = new Int32Array(width * height);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
@@ -164,7 +180,8 @@ async function buildLitematicBytes(
         blockToIdx.set(blockId, idx);
         blockPalette.push(blockId);
       }
-      pixelBlock[z * sizeX + x] = idx;
+      pixelBlock[z * sizeX + x]  = idx;
+      pixelBaseId[z * sizeX + x] = entry?.baseId ?? 0;
     }
   }
 
@@ -197,11 +214,30 @@ async function buildLitematicBytes(
       }
     }
   } else {
+    const artY = sizeY - 1; // 0 normally, 1 when support layer added below
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        const vi = 0 * exportSizeZ * sizeX + z * sizeX + x;
+        const vi = artY * exportSizeZ * sizeX + z * sizeX + x;
         indices[vi] = pixelBlock[pi];
+      }
+    }
+    // Support layer (y=0) under floating blocks in flat mode
+    if (sizeY === 2 && supportBlockNbt && supportBlockNbt !== 'air') {
+      const supId = `minecraft:${supportBlockNbt}`;
+      let supIdx = blockToIdx.get(supId);
+      if (supIdx === undefined) {
+        supIdx = blockPalette.length;
+        blockPalette.push(supId);
+        blockToIdx.set(supId, supIdx);
+      }
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          const pi = z * sizeX + x;
+          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+          const vi = 0 * exportSizeZ * sizeX + z * sizeX + x;
+          indices[vi] = supIdx;
+        }
       }
     }
   }
@@ -275,6 +311,12 @@ async function buildLitematicBytes(
         w.tagListStart('BlockStatePalette', 10, blockPalette.length);
         for (const id of blockPalette) {
           w.tagString('Name', id);
+          const props = BLOCK_FACE_PROPS[id];
+          if (props) {
+            w.tagCompoundStart('Properties');
+            for (const [k, v] of Object.entries(props)) w.tagString(k, v);
+            w.tagCompoundEnd();
+          }
           w.tagCompoundEnd();
         }
 
