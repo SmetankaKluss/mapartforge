@@ -7,6 +7,7 @@ import type { ImageAdjustments } from '../lib/adjustments';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip } from '../lib/exportLitematic';
+import type { SupportMode } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
 import { LinkModal } from './LinkModal';
 
@@ -22,12 +23,15 @@ interface Props {
   activePalette:  ComputedPalette;
   blockSelection: BlockSelection;
   disabled:    boolean;
+  supportBlock: string;
+  supportMode:  SupportMode;
   // Link export
   sourceImage: HTMLImageElement | null;
   intensity:   number;
   adjustments: ImageAdjustments;
   bnScale:     number;
 }
+
 
 const DITHERING_LABELS: Record<DitheringMode, string> = {
   'none':            'none',
@@ -48,13 +52,13 @@ export function ExportPanel({
   imageData, compareData, compareMode,
   dithering, compareLeft, compareRight,
   mapGrid, mapMode, activePalette, blockSelection, disabled,
+  supportBlock, supportMode,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
-  const [busyPng]                           = useState(false);
-  const [busyMapdat,     setBusyMapdat]     = useState(false);
-  const [busyLiteFlat,   setBusyLiteFlat]   = useState(false);
-  const [busyLiteStairs, setBusyLiteStairs] = useState(false);
-  const [busyZip,        setBusyZip]        = useState(false);
+  const [busyPng]                         = useState(false);
+  const [busyMapdat,   setBusyMapdat]     = useState(false);
+  const [busyLiteFlat, setBusyLiteFlat]   = useState(false);
+  const [busyZip,      setBusyZip]        = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
@@ -85,25 +89,17 @@ export function ExportPanel({
     }
   }
 
-  async function handleLitematicFlat() {
+  async function handleLitematic() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    const structure = mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLiteFlat(true);
     try {
-      await exportLitematic(src, activePalette, blockSelection, 'MapartForge', 'flat');
+      await exportLitematic(src, activePalette, blockSelection, 'MapartForge', structure,
+        structure === 'staircase' ? supportBlock : undefined,
+        supportMode);
     } finally {
       setBusyLiteFlat(false);
-    }
-  }
-
-  async function handleLitematicStaircase() {
-    const src = compareMode ? compareData?.left ?? null : imageData;
-    if (!src) return;
-    setBusyLiteStairs(true);
-    try {
-      await exportLitematic(src, activePalette, blockSelection, 'MapartForge', 'staircase');
-    } finally {
-      setBusyLiteStairs(false);
     }
   }
 
@@ -115,7 +111,9 @@ export function ExportPanel({
     const zipFilename   = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
     setBusyZip(true);
     try {
-      await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename);
+      await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename,
+        structure === 'staircase' ? supportBlock : undefined,
+        supportMode);
     } finally {
       setBusyZip(false);
     }
@@ -138,7 +136,7 @@ export function ExportPanel({
   }
 
   const base        = disabled || !hasContent;
-  const busyAnyLite = busyLiteFlat || busyLiteStairs || busyZip;
+  const busyAnyLite = busyLiteFlat || busyZip;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
 
   return (
@@ -168,21 +166,12 @@ export function ExportPanel({
           </button>
 
           <button
-            className={`export-btn${mapMode === '3d' ? ' export-btn-secondary' : ''}`}
-            onClick={handleLitematicFlat}
+            className="export-btn"
+            onClick={handleLitematic}
             disabled={base || busyAnyLite}
-            title="Single flat layer — standard survival-friendly 2D map art"
+            title={mapMode === '3d' ? 'Staircase structure — extra shading tones from height variation' : 'Single flat layer — standard survival-friendly 2D map art'}
           >
-            {busyLiteFlat ? 'Building…' : '↓ LITEMATIC 2D'}
-          </button>
-
-          <button
-            className={`export-btn${mapMode === '2d' ? ' export-btn-secondary' : ''}`}
-            onClick={handleLitematicStaircase}
-            disabled={base || busyAnyLite}
-            title="Staircase structure — extra shading tones from height variation"
-          >
-            {busyLiteStairs ? 'Building…' : '↓ LITEMATIC 3D'}
+            {busyLiteFlat ? 'Building…' : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
           </button>
 
           {isMultiMap && (

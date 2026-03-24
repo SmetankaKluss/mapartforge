@@ -2,8 +2,13 @@ import JSZip from 'jszip';
 import { NbtWriter, gzipBytes } from './nbt';
 import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
-import { getPreferredBlockNbt } from './paletteBlocks';
+import { getPreferredBlockNbt, isMandatorySupport } from './paletteBlocks';
 import type { MapGrid } from './types';
+
+export type SupportMode =
+  | 1  // 1 block under floating-only blocks (sand, gravel, lichens…)
+  | 2  // 1 block under every art block
+  | 3; // 2 blocks under every art block
 
 interface ColorEntry { baseId: number; shade: number }
 
@@ -110,11 +115,13 @@ function extractTile(src: ImageData, col: number, row: number): ImageData {
 
 /** Core builder: returns gzipped .litematic bytes for one tile. */
 async function buildLitematicBytes(
-  imageData: ImageData,
-  cp:        ComputedPalette,
-  groups:    BlockSelection,
-  name:      string,
-  structure: 'flat' | 'staircase',
+  imageData:        ImageData,
+  cp:               ComputedPalette,
+  groups:           BlockSelection,
+  name:             string,
+  structure:        'flat' | 'staircase',
+  supportBlockNbt?: string,
+  supportMode:      SupportMode = 2,
 ): Promise<Uint8Array> {
   const { data, width, height } = imageData;
   const lookup = buildLookup(cp);
@@ -199,6 +206,35 @@ async function buildLitematicBytes(
     }
   }
 
+  // ── 3b. Support blocks (staircase only) ──────────────────────────────
+  if (structure === 'staircase' && supportBlockNbt && supportBlockNbt !== 'air') {
+    const supId = `minecraft:${supportBlockNbt}`;
+    let supIdx = blockToIdx.get(supId);
+    if (supIdx === undefined) {
+      supIdx = blockPalette.length;
+      blockPalette.push(supId);
+      blockToIdx.set(supId, supIdx);
+    }
+    const depth = supportMode === 3 ? 2 : 1;
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const pi = z * sizeX + x;
+        const i  = (z * width + x) * 4;
+        const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+        const entry = lookup.get(key);
+        // Mode 1: only blocks that can't float (supportBlockMandatory)
+        if (supportMode === 1 && !isMandatorySupport(entry?.baseId ?? 0, groups)) continue;
+        const pixelY = yGrid![pi] - minY;
+        for (let d = 1; d <= depth; d++) {
+          const sy = pixelY - d;
+          if (sy < 0) continue;
+          const vi = sy * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+          if (indices[vi] === 0) indices[vi] = supIdx;
+        }
+      }
+    }
+  }
+
   // ── 4. Pack block states ──────────────────────────────────────────────
   const packedStates = packBlockStates(indices, blockPalette.length);
 
@@ -259,14 +295,16 @@ async function buildLitematicBytes(
 
 /** Download a single .litematic file for the full canvas. */
 export async function exportLitematic(
-  imageData: ImageData,
-  cp:        ComputedPalette,
-  groups:    BlockSelection,
-  name:      string = 'MapartForge',
-  structure: 'flat' | 'staircase' = 'flat',
+  imageData:        ImageData,
+  cp:               ComputedPalette,
+  groups:           BlockSelection,
+  name:             string = 'MapartForge',
+  structure:        'flat' | 'staircase' = 'flat',
+  supportBlockNbt?: string,
+  supportMode:      SupportMode = 2,
 ): Promise<void> {
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
-  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure);
+  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, supportMode);
   triggerDownload(bytes, `${name}${suffix}.litematic`);
 }
 
@@ -276,12 +314,14 @@ export async function exportLitematic(
  * in Z-order (left→right, top→bottom).
  */
 export async function exportLitematicZip(
-  imageData:   ImageData,
-  cp:          ComputedPalette,
-  groups:      BlockSelection,
-  mapGrid:     MapGrid,
-  structure:   'flat' | 'staircase',
-  zipFilename: string,
+  imageData:        ImageData,
+  cp:               ComputedPalette,
+  groups:           BlockSelection,
+  mapGrid:          MapGrid,
+  structure:        'flat' | 'staircase',
+  zipFilename:      string,
+  supportBlockNbt?: string,
+  supportMode:      SupportMode = 2,
 ): Promise<void> {
   const zip = new JSZip();
   let idx = 1;
@@ -290,7 +330,7 @@ export async function exportLitematicZip(
     for (let col = 0; col < mapGrid.wide; col++) {
       const tile  = extractTile(imageData, col, row);
       const name  = `mapart_${idx}`;
-      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure);
+      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, supportMode);
       zip.file(`${name}.litematic`, bytes);
       idx++;
     }

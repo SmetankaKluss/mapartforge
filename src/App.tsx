@@ -36,6 +36,27 @@ import './App.css';
 function sliderToZoom(s: number): number { return Math.round(50 * Math.pow(16, s / 100)); }
 function zoomToSlider(z: number): number { return Math.round(Math.log(z / 50) / Math.log(16) * 100); }
 
+// Support blocks for 3D staircase (nbt name → sprite coords + label)
+const SUPPORT_BLOCKS_PALETTE = [
+  { nbt: 'stone',        csId: 9,  blockId: 4,  label: 'Stone' },
+  { nbt: 'cobblestone',  csId: 9,  blockId: 0,  label: 'Cobble' },
+  { nbt: 'deepslate',    csId: 58, blockId: 0,  label: 'Deepslate' },
+  { nbt: 'smooth_stone', csId: 9,  blockId: 18, label: 'Smooth' },
+  { nbt: 'granite',      csId: 8,  blockId: 7,  label: 'Granite' },
+  { nbt: 'diorite',      csId: 12, blockId: 1,  label: 'Diorite' },
+  { nbt: 'andesite',     csId: 9,  blockId: 9,  label: 'Andesite' },
+  { nbt: 'dirt',         csId: 8,  blockId: 3,  label: 'Dirt' },
+  { nbt: 'oak_planks',   csId: 11, blockId: 1,  label: 'Oak' },
+  { nbt: 'netherrack',   csId: 34, blockId: 0,  label: 'Nether' },
+  { nbt: 'blackstone',   csId: 28, blockId: 9,  label: 'Blackstone' },
+] as const;
+
+const SUPPORT_MODE_TITLES: Record<1 | 2 | 3, string> = {
+  1: 'Under floating blocks only (sand, gravel, lichens…)',
+  2: 'One block under every art block',
+  3: 'Two blocks under every art block',
+};
+
 const MAX_HISTORY = 20;
 
 interface HistoryEntry {
@@ -87,6 +108,8 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
+  const [supportBlock,  setSupportBlock]  = useState('stone');
+  const [supportMode,   setSupportMode]   = useState<1 | 2 | 3>(2);
   const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
   const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCropModal, setShowCropModal] = useState(false);
@@ -910,6 +933,53 @@ export default function App() {
                 paletteSize={activePalette.colors.length}
                 disabled={processing}
               />
+              {mapMode === '3d' && (
+                <div className="support-block-section">
+                  <div className="support-block-section-title">Support block (3D)</div>
+                  <div className="support-block-grid">
+                    {SUPPORT_BLOCKS_PALETTE.map(b => (
+                      <button
+                        key={b.nbt}
+                        className={`support-block-item${supportBlock === b.nbt ? ' active' : ''}`}
+                        onClick={() => setSupportBlock(b.nbt)}
+                        title={b.label}
+                      >
+                        <span
+                          className="support-block-sprite"
+                          style={{
+                            backgroundImage: `url(${SPRITE_URL})`,
+                            backgroundPosition: `-${b.blockId * 32}px -${b.csId * 32}px`,
+                          }}
+                        />
+                        <span className="support-block-item-label">{b.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="support-block-bottom-row">
+                    <button
+                      className={`support-block-item support-block-none${supportBlock === 'air' ? ' active' : ''}`}
+                      onClick={() => setSupportBlock('air')}
+                      title="No support blocks"
+                    >
+                      <span className="support-block-no-icon">∅</span>
+                      <span className="support-block-item-label">None</span>
+                    </button>
+                    {supportBlock !== 'air' && (
+                      <div className="support-mode-group">
+                        <span className="support-mode-label">Depth</span>
+                        {([1, 2, 3] as const).map(m => (
+                          <button
+                            key={m}
+                            className={`support-mode-btn${supportMode === m ? ' active' : ''}`}
+                            onClick={() => setSupportMode(m)}
+                            title={SUPPORT_MODE_TITLES[m]}
+                          >{m}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mobile-export-content">
               <MaterialsList
@@ -933,6 +1003,8 @@ export default function App() {
               activePalette={activePalette}
               blockSelection={blockSelection}
               disabled={processing}
+              supportBlock={supportBlock}
+              supportMode={supportMode}
               sourceImage={sourceImage}
               intensity={intensity}
               adjustments={adjustments}

@@ -2785,6 +2785,15 @@ export function getPreferredBlockNbt(baseId: number, sel: BlockSelection): strin
   return block?.nbtName ?? 'stone';
 }
 
+/** Returns true if the selected block for this baseId requires a support block underneath. */
+export function isMandatorySupport(baseId: number, sel: BlockSelection): boolean {
+  const row = COLOUR_ROWS.find(r => r.baseId === baseId);
+  if (!row) return false;
+  const activeIds = sel[row.csId] ?? [];
+  const block = row.blocks.find(b => activeIds.includes(b.blockId)) ?? row.blocks[0];
+  return block?.supportBlockMandatory ?? false;
+}
+
 // ── Built-in presets ─────────────────────────────────────────────────────
 
 const ALL: BlockSelection = Object.fromEntries(
