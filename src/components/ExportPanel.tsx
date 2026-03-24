@@ -140,7 +140,7 @@ export function ExportPanel({
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
 
   return (
-    <section className="sidebar-section">
+    <section className="sidebar-section" id="tour-export">
       <h3 className="section-title">Export</h3>
       {!hasContent && (
         <p className="export-empty">Process an image to enable export.</p>
