@@ -59,7 +59,7 @@ function clamp(v: number): number {
 function findClosestColor(
   r: number, g: number, b: number,
   cp: ComputedPalette,
-): { color: PaletteColor; index: number } {
+): { color: PaletteColor; index: number; dist: number } {
   const lab = rgbToOklab(clamp(r), clamp(g), clamp(b));
   let minDist = Infinity;
   let bestIndex = 0;
@@ -67,7 +67,7 @@ function findClosestColor(
     const d = oklabDistance(lab, cp.labs[i]);
     if (d < minDist) { minDist = d; bestIndex = i; }
   }
-  return { color: cp.colors[bestIndex], index: bestIndex };
+  return { color: cp.colors[bestIndex], index: bestIndex, dist: minDist };
 }
 
 // ── Error-diffusion helpers ───────────────────────────────────────────────
@@ -624,44 +624,47 @@ async function applyKlussDither(
       const lab = srcLabs[idx];
       const t   = zoneBoundaryThreshold;
 
-      // ── 8-neighbour boundary check ─────────────────────────────────────
-      const crossesBoundary =
-        (x > 0             &&              oklabDistance(lab, srcLabs[idx - 1])             > t) ||
-        (x < width - 1     &&              oklabDistance(lab, srcLabs[idx + 1])             > t) ||
-        (y > 0             &&              oklabDistance(lab, srcLabs[idx - width])          > t) ||
-        (y < height - 1    &&              oklabDistance(lab, srcLabs[idx + width])          > t) ||
-        (x > 0         && y > 0         && oklabDistance(lab, srcLabs[idx - width - 1])     > t) ||
-        (x < width - 1 && y > 0         && oklabDistance(lab, srcLabs[idx - width + 1])     > t) ||
-        (x > 0         && y < height - 1 && oklabDistance(lab, srcLabs[idx + width - 1])    > t) ||
-        (x < width - 1 && y < height - 1 && oklabDistance(lab, srcLabs[idx + width + 1])    > t);
+      // ── 8-neighbour boundary: compute max OKLAB distance to any neighbour ─
+      let maxND = 0;
+      if (x > 0)             { const d = oklabDistance(lab, srcLabs[idx - 1]);             if (d > maxND) maxND = d; }
+      if (x < width - 1)     { const d = oklabDistance(lab, srcLabs[idx + 1]);             if (d > maxND) maxND = d; }
+      if (y > 0)             { const d = oklabDistance(lab, srcLabs[idx - width]);          if (d > maxND) maxND = d; }
+      if (y < height - 1)    { const d = oklabDistance(lab, srcLabs[idx + width]);          if (d > maxND) maxND = d; }
+      if (x > 0         && y > 0         ) { const d = oklabDistance(lab, srcLabs[idx - width - 1]);  if (d > maxND) maxND = d; }
+      if (x < width - 1 && y > 0         ) { const d = oklabDistance(lab, srcLabs[idx - width + 1]);  if (d > maxND) maxND = d; }
+      if (x > 0         && y < height - 1 ) { const d = oklabDistance(lab, srcLabs[idx + width - 1]); if (d > maxND) maxND = d; }
+      if (x < width - 1 && y < height - 1 ) { const d = oklabDistance(lab, srcLabs[idx + width + 1]); if (d > maxND) maxND = d; }
 
       // ── Convert linear buffer → sRGB for palette lookup ───────────────
-      // Jitter is applied in sRGB space (consistent perceptual amplitude
-      // regardless of luminance). Error is still kept in linear space.
+      // Per-channel jitter uses decorrelated IGN phases so R/G/B are
+      // perturbed independently — prevents the monochromatic gray shift
+      // that a single shared amplitude produces at high jitter values.
       let qrS = linToSRGBByte(rBuf[idx]);
       let qgS = linToSRGBByte(gBuf[idx]);
       let qbS = linToSRGBByte(bBuf[idx]);
-      if (jitter > 0 && !crossesBoundary && srcNearestDist[idx] >= cleanThreshold) {
-        const jAmp = (ign(x, y) - 0.5) * jitter;
-        qrS = Math.max(0, Math.min(255, Math.round(qrS + jAmp)));
-        qgS = Math.max(0, Math.min(255, Math.round(qgS + jAmp)));
-        qbS = Math.max(0, Math.min(255, Math.round(qbS + jAmp)));
+      if (jitter > 0 && maxND < t && srcNearestDist[idx] >= cleanThreshold) {
+        qrS = Math.max(0, Math.min(255, Math.round(qrS + (ign(x,       y      ) - 0.5) * jitter)));
+        qgS = Math.max(0, Math.min(255, Math.round(qgS + (ign(x + 197, y + 103) - 0.5) * jitter)));
+        qbS = Math.max(0, Math.min(255, Math.round(qbS + (ign(x + 439, y + 251) - 0.5) * jitter)));
       }
 
-      const { color } = findClosestColor(qrS, qgS, qbS, cp);
+      const { color, dist: bufDist } = findClosestColor(qrS, qgS, qbS, cp);
 
       out[idx * 4]     = color.r;
       out[idx * 4 + 1] = color.g;
       out[idx * 4 + 2] = color.b;
       out[idx * 4 + 3] = 255;
 
-      if (crossesBoundary || srcNearestDist[idx] < cleanThreshold || intensity <= 0) {
+      // Skip diffusion if: hard boundary | source snaps cleanly |
+      // buffer has already converged to a palette colour | zero intensity.
+      // Buffer-based snap catches pixels where accumulated error has drifted
+      // the working value close enough to a palette entry to snap cleanly.
+      const shouldSnap = srcNearestDist[idx] < cleanThreshold || bufDist < cleanThreshold;
+      if (maxND >= t || shouldSnap || intensity <= 0) {
         continue;
       }
 
       // ── Stucki error diffusion (linear space) ─────────────────────────
-      // Buffer is in linear [0, 255]; palette color is converted to linear
-      // via SRGB_LIN so both sides of the subtraction match.
       let er = Math.max(0, Math.min(255, rBuf[idx])) - SRGB_LIN[color.r];
       let eg = Math.max(0, Math.min(255, gBuf[idx])) - SRGB_LIN[color.g];
       let eb = Math.max(0, Math.min(255, bBuf[idx])) - SRGB_LIN[color.b];
@@ -672,10 +675,19 @@ async function applyKlussDither(
         eb = Math.max(-capVal, Math.min(capVal, eb));
       }
 
+      // ── Soft boundary fade ─────────────────────────────────────────────
+      // Instead of a hard on/off cutoff, quadratically reduce diffusion
+      // strength as the pixel approaches the zone boundary threshold.
+      // Flat areas (maxND ≈ 0) get full strength; pixels just inside the
+      // boundary (maxND → t) fade smoothly to nearly zero — eliminates
+      // the halo / staircase artifact that the hard cut used to leave.
+      const bFade    = maxND / t;                         // 0 = flat, <1 = near edge
+      const localStr = strength * (1 - bFade * bFade);   // quadratic fade
+
       const W  = width;
       const D  = 42;
       const sp = (di: number, f: number) =>
-        addErr(rBuf, gBuf, bBuf, idx + di, total, er, eg, eb, f / D, strength);
+        addErr(rBuf, gBuf, bBuf, idx + di, total, er, eg, eb, f / D, localStr);
 
       // Same row: mirror kernel direction for rtl rows
       if (ltr) {
