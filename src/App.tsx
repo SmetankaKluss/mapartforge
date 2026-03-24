@@ -897,6 +897,7 @@ export default function App() {
                 imageData={compareMode ? (compareData?.left ?? null) : imageData}
                 cp={activePalette}
                 blockSelection={blockSelection}
+                mapGrid={mapGrid}
               />
             </div>
           </div>

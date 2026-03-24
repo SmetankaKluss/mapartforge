@@ -909,7 +909,24 @@ input, select, textarea { outline: none; }
 .link-export-btn-error { border-color: rgba(255,68,85,0.5); color: var(--red); background: rgba(255,68,85,0.08); }
 
 /* ── Materials List ────────────────────────────────────────────────────── */
-.mat-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.mat-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.mat-mode-toggle {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
+  cursor: pointer; user-select: none;
+}
+.mat-mode-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 12px; height: 12px; cursor: pointer;
+}
+.mat-mode-toggle:hover span { color: var(--text); }
+.mat-mode-hint {
+  font-size: 9px; color: var(--text-muted);
+  margin: 4px 0; padding: 4px 6px;
+  background: rgba(var(--accent-rgb, 0,255,170), 0.06);
+  border-left: 2px solid var(--accent);
+  line-height: 1.4;
+}
 .mat-table-wrap {
   max-height: 400px; overflow-y: auto;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
