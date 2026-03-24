@@ -67,6 +67,9 @@ input, select, textarea { outline: none; }
   font-size: 12px;
   line-height: 1.5;
   overflow: hidden;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Header ────────────────────────────────────────────────────────────── */
@@ -405,6 +408,17 @@ input, select, textarea { outline: none; }
 .mode-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .mode-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 6px var(--accent-glow); }
 .mode-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Adjustments toggle button ──────────────────────────────────────────── */
+.adj-toggle-btn {
+  width: 20px; height: 20px; flex-shrink: 0;
+  background: var(--bg-input); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 10px;
+  cursor: pointer; transition: border-color 0.12s, color 0.12s, background 0.12s;
+  display: flex; align-items: center; justify-content: center;
+}
+.adj-toggle-btn:hover:not(:disabled) { border-color: rgba(255,215,0,0.5); color: var(--gold); }
+.adj-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
 .map-mode-btn { flex: 1; padding: 7px 4px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.04em; text-align: center; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
 .map-mode-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .map-mode-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 6px var(--accent-glow); }

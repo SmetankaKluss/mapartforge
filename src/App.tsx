@@ -104,6 +104,7 @@ export default function App() {
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
+  const [showAdjustments, setShowAdjustments] = useState(true);
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
@@ -563,9 +564,9 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-inner">
-          <img src="/logo.png" height="32" style={{ width: 'auto' }} alt="KlussForge" />
+          <img src="/logo.png" height="32" style={{ width: 'auto' }} alt="MapKluss" />
           <div className="header-titles">
-            <h1 className="app-title">KLUSSFORGE</h1>
+            <h1 className="app-title">MAPKLUSS</h1>
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
           </div>
           <div className="header-spacer" />
@@ -619,15 +620,25 @@ export default function App() {
               onMapGridChange={handleMapGridChange}
               processing={processing}
             />
-            <Adjustments
-              adjustments={adjustments}
-              sourceImage={sourceImage}
-              onChange={handleAdjChange}
-              onCommit={handleAdjCommit}
-              disabled={processing}
-            />
+            {showAdjustments && (
+              <Adjustments
+                adjustments={adjustments}
+                sourceImage={sourceImage}
+                onChange={handleAdjChange}
+                onCommit={handleAdjCommit}
+                disabled={processing}
+              />
+            )}
             <div className="panel-section">
-              <div className="section-header">Map mode</div>
+              <div className="section-header">
+                Map mode
+                <button
+                  className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
+                  onClick={() => setShowAdjustments(v => !v)}
+                  disabled={processing}
+                  title={showAdjustments ? 'Hide adjustments' : 'Show adjustments'}
+                >☀</button>
+              </div>
               <div className="mode-toggle">
                 <button
                   className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}

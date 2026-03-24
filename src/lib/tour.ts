@@ -1,7 +1,7 @@
 import { driver } from 'driver.js';
 import { flushSync } from 'react-dom';
 
-const TOUR_KEY = 'klussforge_tour_done';
+const TOUR_KEY = 'mapkluss_tour_done';
 
 const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 
