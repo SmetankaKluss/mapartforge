@@ -115,6 +115,28 @@ function ign(x: number, y: number): number {
   return ((52.9829189 * ((0.06711056 * (x & 0xffff) + 0.00583715 * (y & 0xffff)) % 1.0)) % 1.0);
 }
 
+// ── sRGB ↔ linear light (gamma-correct error diffusion) ───────────────────
+
+/**
+ * Precomputed sRGB byte (0–255) → linear [0, 255] scale.
+ * Using the proper IEC 61966-2-1 piecewise sRGB transfer function.
+ * Built once at module load; ~1 KB of floats.
+ */
+const SRGB_LIN = (() => {
+  const t = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const c = i / 255;
+    t[i] = (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4) * 255;
+  }
+  return t;
+})();
+
+/** Linear [0, 255] → clamped sRGB byte (rounds to nearest). */
+function linToSRGBByte(v: number): number {
+  const c = Math.max(0, Math.min(1, v / 255));
+  return Math.round((c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055) * 255);
+}
+
 // ── Yliluoma #2: constrained greedy pattern dithering ────────────────────
 
 const BAYER4 = [
@@ -581,6 +603,14 @@ async function applyKlussDither(
   }
 
   const [rBuf, gBuf, bBuf] = initBuffers(data, total);
+  // Convert working buffers to linear light so error is diffused in a
+  // perceptually correct space (sRGB is ~gamma 2.2; diffusing in it
+  // over-weights dark tones and under-weights light ones).
+  for (let i = 0; i < total; i++) {
+    rBuf[i] = SRGB_LIN[rBuf[i] | 0];
+    gBuf[i] = SRGB_LIN[gBuf[i] | 0];
+    bBuf[i] = SRGB_LIN[bBuf[i] | 0];
+  }
 
   for (let y = 0; y < height; y++) {
     // ── Serpentine scan: alternate direction each row ──────────────────────
@@ -605,16 +635,20 @@ async function applyKlussDither(
         (x > 0         && y < height - 1 && oklabDistance(lab, srcLabs[idx + width - 1])    > t) ||
         (x < width - 1 && y < height - 1 && oklabDistance(lab, srcLabs[idx + width + 1])    > t);
 
-      // ── Blue-noise jitter: perturb quantisation input only ─────────────
-      // Applied in dither zone only; does NOT affect error computation,
-      // so it adds organic variation without amplifying accumulated error.
-      let qr = rBuf[idx], qg = gBuf[idx], qb = bBuf[idx];
+      // ── Convert linear buffer → sRGB for palette lookup ───────────────
+      // Jitter is applied in sRGB space (consistent perceptual amplitude
+      // regardless of luminance). Error is still kept in linear space.
+      let qrS = linToSRGBByte(rBuf[idx]);
+      let qgS = linToSRGBByte(gBuf[idx]);
+      let qbS = linToSRGBByte(bBuf[idx]);
       if (jitter > 0 && !crossesBoundary && srcNearestDist[idx] >= cleanThreshold) {
         const jAmp = (ign(x, y) - 0.5) * jitter;
-        qr += jAmp; qg += jAmp; qb += jAmp;
+        qrS = Math.max(0, Math.min(255, Math.round(qrS + jAmp)));
+        qgS = Math.max(0, Math.min(255, Math.round(qgS + jAmp)));
+        qbS = Math.max(0, Math.min(255, Math.round(qbS + jAmp)));
       }
 
-      const { color } = findClosestColor(qr, qg, qb, cp);
+      const { color } = findClosestColor(qrS, qgS, qbS, cp);
 
       out[idx * 4]     = color.r;
       out[idx * 4 + 1] = color.g;
@@ -625,12 +659,12 @@ async function applyKlussDither(
         continue;
       }
 
-      // ── Stucki error diffusion ─────────────────────────────────────────
-      // Error is computed from the un-jittered buffer so jitter doesn't
-      // compound through the diffusion chain.
-      let er = clamp(rBuf[idx]) - color.r;
-      let eg = clamp(gBuf[idx]) - color.g;
-      let eb = clamp(bBuf[idx]) - color.b;
+      // ── Stucki error diffusion (linear space) ─────────────────────────
+      // Buffer is in linear [0, 255]; palette color is converted to linear
+      // via SRGB_LIN so both sides of the subtraction match.
+      let er = Math.max(0, Math.min(255, rBuf[idx])) - SRGB_LIN[color.r];
+      let eg = Math.max(0, Math.min(255, gBuf[idx])) - SRGB_LIN[color.g];
+      let eb = Math.max(0, Math.min(255, bBuf[idx])) - SRGB_LIN[color.b];
 
       if (capVal < 256) {
         er = Math.max(-capVal, Math.min(capVal, er));
