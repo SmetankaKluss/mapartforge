@@ -210,6 +210,9 @@ export default function App() {
 
   const modeShades = mapMode === '2d' ? [2] : [0, 1, 2];
 
+  // When adjustments are disabled, use zero adjustments for processing
+  const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
+
   const activePalette = useMemo<ComputedPalette>(
     () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,8 +319,8 @@ export default function App() {
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
-    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
     setShowCropModal(false);
@@ -325,65 +328,65 @@ export default function App() {
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
-    runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
-    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
-    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
 
   const handleIntensityCommit = useCallback((v: number) => {
     setIntensity(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleBnScaleChange = useCallback((v: number) => {
     setBnScale(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, v, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, v, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, klussParams]);
 
   const handleKlussParamsChange = useCallback((kp: KlussParams) => {
     setKlussParams(kp);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale, kp);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adjustments, bnScale]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, kp);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale]);
 
   const handleCompareModeChange = useCallback((enabled: boolean) => {
     setCompareMode(enabled);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
     if (side === 'left') {
       setCompareLeft(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, adjustments, bnScale, klussParams);
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
     } else {
       setCompareRight(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, adjustments, bnScale, klussParams);
+      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, adjustments, bnScale, klussParams]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleSelectionChange = useCallback((sel: BlockSelection) => {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, mapMode, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
     const shades = mode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
 
   const handleAdjChange = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
@@ -394,14 +397,25 @@ export default function App() {
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
 
+  const handleToggleAdjustments = useCallback(() => {
+    setShowAdjustments(prev => {
+      const next = !prev;
+      if (sourceImage) {
+        const adj = next ? adjustments : DEFAULT_ADJUSTMENTS;
+        runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+      }
+      return next;
+    });
+  }, [adjustments, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
+
   const handleRemoveBlock = useCallback((csId: number) => {
     pushToHistory();
     const next: BlockSelection = { ...blockSelection, [csId]: [] };
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [2] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, adjustments, bnScale, klussParams);
-  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, adjustments, bnScale, klussParams]);
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
     pushToHistory();
@@ -620,24 +634,18 @@ export default function App() {
               onMapGridChange={handleMapGridChange}
               processing={processing}
             />
-            {showAdjustments && (
-              <Adjustments
-                adjustments={adjustments}
-                sourceImage={sourceImage}
-                onChange={handleAdjChange}
-                onCommit={handleAdjCommit}
-                disabled={processing}
-              />
-            )}
+            <Adjustments
+              adjustments={adjustments}
+              sourceImage={sourceImage}
+              onChange={handleAdjChange}
+              onCommit={handleAdjCommit}
+              disabled={processing || !showAdjustments}
+              showAdjustments={showAdjustments}
+              onToggleAdjustments={handleToggleAdjustments}
+            />
             <div className="panel-section">
               <div className="section-header">
                 Map mode
-                <button
-                  className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
-                  onClick={() => setShowAdjustments(v => !v)}
-                  disabled={processing}
-                  title={showAdjustments ? 'Hide adjustments' : 'Show adjustments'}
-                >☀</button>
               </div>
               <div className="mode-toggle">
                 <button

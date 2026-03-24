@@ -67,8 +67,6 @@ input, select, textarea { outline: none; }
   font-size: 12px;
   line-height: 1.5;
   overflow: hidden;
-  max-width: 1600px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -387,13 +385,31 @@ input, select, textarea { outline: none; }
 @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
 
 /* ── Adjustments ───────────────────────────────────────────────────────── */
-.adj-reset-btn { font-family: var(--font-pixel); font-size: 6px; color: var(--text-muted); background: none; border: 1px solid var(--border); padding: 3px 6px; transition: color 0.12s, border-color 0.12s; }
+.adj-reset-btn { font-family: var(--font-pixel); font-size: 6px; color: var(--text-muted); background: none; border: 1px solid var(--border); padding: 3px 6px; margin-right: 6px; transition: color 0.12s, border-color 0.12s; }
 .adj-reset-btn:hover { color: var(--gold); border-color: rgba(255,215,0,0.5); box-shadow: 0 0 4px var(--gold-glow); }
 .adj-thumb-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .adj-thumb { image-rendering: pixelated; border: 1px solid var(--border); flex-shrink: 0; }
 .adj-thumb-label { font-size: 9px; color: var(--text-muted); }
 .adj-sliders { padding: 4px 0 8px; }
 .adj-slider-row { padding: 4px 12px; }
+
+/* Adjustments sleep mode (disabled but visible) */
+.control-group.adj-disabled {
+  opacity: 0.4; pointer-events: none;
+}
+.control-group.adj-disabled .control-title {
+  color: var(--text-dim);
+}
+.control-group.adj-disabled .adj-slider-label {
+  color: var(--text-dim);
+}
+.control-group.adj-disabled .adj-toggle-btn {
+  border-color: var(--text-dim) !important;
+  color: var(--text-dim) !important;
+  background: var(--bg-input) !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
 .adj-slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
 .adj-slider-label { font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .adj-slider-value { font-size: 9px; color: var(--text-muted); }
@@ -412,13 +428,13 @@ input, select, textarea { outline: none; }
 /* ── Adjustments toggle button ──────────────────────────────────────────── */
 .adj-toggle-btn {
   width: 20px; height: 20px; flex-shrink: 0;
-  background: var(--bg-input); border: 1px solid var(--border);
-  color: var(--text-muted); font-size: 10px;
+  background: var(--bg-input); border: 1px solid var(--text-dim);
+  color: var(--text-dim); font-size: 10px;
   cursor: pointer; transition: border-color 0.12s, color 0.12s, background 0.12s;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; margin-right: 4px;
 }
-.adj-toggle-btn:hover:not(:disabled) { border-color: rgba(255,215,0,0.5); color: var(--gold); }
-.adj-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.adj-toggle-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.adj-toggle-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(255,215,0,0.2); }
 .map-mode-btn { flex: 1; padding: 7px 4px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-pixel); font-size: 6px; letter-spacing: 0.04em; text-align: center; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s; }
 .map-mode-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .map-mode-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 6px var(--accent-glow); }
