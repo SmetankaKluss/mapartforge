@@ -4,7 +4,6 @@ import { BlockCanvas } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 
-const SPRITE_URL = 'https://raw.githubusercontent.com/rebane2001/mapartcraft/master/src/images/textures.png';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
 import { rgbToOklab, oklabDistance } from '../lib/oklab';
@@ -211,7 +210,6 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
   const [paintVersion, setPaintVersion] = useState(0);
-  const [brushCursor, setBrushCursor]   = useState<string>('cell');
 
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
@@ -279,7 +277,7 @@ export function PreviewCanvas({
         onSplitPosChangeRef.current?.(pos);
         return;
       }
-      const { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize } = propsRef.current;
+      const { activeTool, paintBlock, scale, width, height, cp, brushSize } = propsRef.current;
       if (!isDraggingRef.current || activeTool !== 'brush' || !paintBlock || !paintBufferRef.current) return;
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (!canvas) return;
@@ -321,28 +319,6 @@ export function PreviewCanvas({
     };
   }, []); // stable — uses only refs
 
-  // ── Brush cursor generation ─────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (activeTool !== 'brush' || !paintBlock) { setBrushCursor('cell'); return; }
-    let active = true;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (!active) return;
-      try {
-        const c = document.createElement('canvas');
-        c.width = 16; c.height = 16;
-        const ctx = c.getContext('2d')!;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, paintBlock.blockId * 32, paintBlock.csId * 32, 32, 32, 0, 0, 16, 16);
-        setBrushCursor(`url(${c.toDataURL()}) 8 8, cell`);
-      } catch { setBrushCursor('cell'); }
-    };
-    img.onerror = () => { if (active) setBrushCursor('cell'); };
-    img.src = SPRITE_URL;
-    return () => { active = false; };
-  }, [activeTool, paintBlock?.csId, paintBlock?.blockId]);
 
   // ── Repaint list memo ───────────────────────────────────────────────────────
 

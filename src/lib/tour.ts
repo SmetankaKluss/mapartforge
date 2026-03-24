@@ -7,16 +7,6 @@ const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 
 type Tab = 'settings' | 'palette' | 'export';
 
-// Tab required before each step becomes visible on mobile
-const STEP_TABS: (Tab | null)[] = [
-  'settings',  // 0: START HERE      → .upload-zone
-  'settings',  // 1: MAP GRID        → .grid-options
-  'settings',  // 2: DITHERING       → .dither-options
-  'palette',   // 3: BLOCK PALETTE   → .panel-right
-  'settings',  // 4: BEFORE / AFTER  → .canvas-area
-  'export',    // 5: EXPORT          → .panel-footer.mobile-export-content
-  'export',    // 6: SHARE LINK      → .link-export-btn
-];
 
 export function createTour(switchTab?: (tab: Tab) => void) {
   const switchSync = (tab: Tab) => {

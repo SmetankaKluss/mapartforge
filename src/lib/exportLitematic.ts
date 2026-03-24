@@ -154,11 +154,7 @@ async function buildLitematicBytes(
     minY  = Math.min(sc.minY, 1);
     sizeY = Math.max(1, sc.maxY - minY + 1);
   } else {
-    // Flat mode: if any block needs mandatory support (e.g. glow_lichen) and
-    // a support block is selected, add a support layer at y=0 and shift art to y=1.
-    const needsSupport = supportBlockNbt && supportBlockNbt !== 'air' &&
-      pixelBaseId.some(bid => isMandatorySupport(bid, groups));
-    sizeY = needsSupport ? 2 : 1;
+    sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
   }
 
   // ── 2. Block palette ──────────────────────────────────────────────────
@@ -182,6 +178,13 @@ async function buildLitematicBytes(
       }
       pixelBlock[z * sizeX + x]  = idx;
       pixelBaseId[z * sizeX + x] = entry?.baseId ?? 0;
+    }
+  }
+
+  // ── 2b. Flat mode: expand to 2 layers when mandatory-support blocks present ─
+  if (structure === 'flat' && supportBlockNbt && supportBlockNbt !== 'air') {
+    if (pixelBaseId.some(bid => isMandatorySupport(bid, groups))) {
+      sizeY = 2;
     }
   }
 
