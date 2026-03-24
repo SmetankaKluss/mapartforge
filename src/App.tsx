@@ -954,18 +954,17 @@ export default function App() {
                         <span className="support-block-item-label">{b.label}</span>
                       </button>
                     ))}
-                  </div>
-                  <div className="support-block-bottom-row">
-                    <button
-                      className={`support-block-item support-block-none${supportBlock === 'air' ? ' active' : ''}`}
-                      onClick={() => setSupportBlock('air')}
-                      title="No support blocks"
-                    >
-                      <span className="support-block-no-icon">∅</span>
-                      <span className="support-block-item-label">None</span>
-                    </button>
-                    {supportBlock !== 'air' && (
-                      <div className="support-mode-group">
+                    {/* None + Depth — spans 4 cells together */}
+                    <div className="support-none-depth">
+                      <button
+                        className={`support-block-item support-none-btn${supportBlock === 'air' ? ' active' : ''}`}
+                        onClick={() => setSupportBlock('air')}
+                        title="No support blocks"
+                      >
+                        <span className="support-block-no-icon">∅</span>
+                        <span className="support-block-item-label">None</span>
+                      </button>
+                      <div className={`support-depth-group${supportBlock === 'air' ? ' disabled' : ''}`}>
                         <span className="support-mode-label">Depth</span>
                         {([1, 2, 3] as const).map(m => (
                           <button
@@ -973,10 +972,11 @@ export default function App() {
                             className={`support-mode-btn${supportMode === m ? ' active' : ''}`}
                             onClick={() => setSupportMode(m)}
                             title={SUPPORT_MODE_TITLES[m]}
+                            disabled={supportBlock === 'air'}
                           >{m}</button>
                         ))}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               )}
