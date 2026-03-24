@@ -144,14 +144,12 @@ async function buildLitematicBytes(
   let sizeY: number;
   let yGrid: Int32Array | null = null;
   let minY  = 0;
-  // exportSizeZ includes a framing row north of the map art in staircase mode
-  const exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
+  const exportSizeZ = sizeZ;
 
   if (structure === 'staircase') {
     const sc = computeStaircase(data, width, height, lookup);
     yGrid = sc.yGrid;
-    // allMinY accounts for the framing block at y=1 (north reference)
-    minY  = Math.min(sc.minY, 1);
+    minY  = sc.minY;
     sizeY = Math.max(1, sc.maxY - minY + 1);
   } else {
     sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
@@ -166,6 +164,12 @@ async function buildLitematicBytes(
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
       const i = (z * width + x) * 4;
+      // Transparent pixel → air (index 0), no block placed
+      if (data[i + 3] < 128) {
+        pixelBlock[z * sizeX + x]  = 0; // minecraft:air
+        pixelBaseId[z * sizeX + x] = -1;
+        continue;
+      }
       const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
       const entry   = lookup.get(key);
       const nbt     = entry ? getPreferredBlockNbt(entry.baseId, groups) : 'stone';
@@ -188,31 +192,16 @@ async function buildLitematicBytes(
     }
   }
 
-  // Add barrier to palette for staircase framing row
-  let barrierIdx = 0;
-  if (structure === 'staircase') {
-    barrierIdx = blockPalette.length;
-    blockPalette.push('minecraft:barrier');
-    blockToIdx.set('minecraft:barrier', barrierIdx);
-  }
-
   // ── 3. Fill volume (Y×exportSizeZ×X, y outer) ────────────────────────
   const volume  = sizeX * sizeY * exportSizeZ;
   const indices = new Uint32Array(volume);
 
   if (structure === 'staircase') {
-    // Framing row at z=0: barrier blocks at y = 1 - minY (normalized)
-    const framingY = 1 - minY;
-    for (let x = 0; x < sizeX; x++) {
-      const vi = framingY * exportSizeZ * sizeX + 0 * sizeX + x;
-      indices[vi] = barrierIdx;
-    }
-    // Map art at z=1..sizeZ (shifted by 1 from framing row)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
         const y  = yGrid![pi] - minY;
-        const vi = y * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+        const vi = y * exportSizeZ * sizeX + z * sizeX + x;
         indices[vi] = pixelBlock[pi];
       }
     }
@@ -237,6 +226,7 @@ async function buildLitematicBytes(
       for (let z = 0; z < sizeZ; z++) {
         for (let x = 0; x < sizeX; x++) {
           const pi = z * sizeX + x;
+          if (pixelBaseId[pi] < 0) continue; // transparent pixel
           if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
           const vi = 0 * exportSizeZ * sizeX + z * sizeX + x;
           indices[vi] = supIdx;
@@ -267,7 +257,7 @@ async function buildLitematicBytes(
         for (let d = 1; d <= depth; d++) {
           const sy = pixelY - d;
           if (sy < 0) continue;
-          const vi = sy * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+          const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
           if (indices[vi] === 0) indices[vi] = supIdx;
         }
       }

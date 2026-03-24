@@ -116,6 +116,13 @@ export default function App() {
   const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
   const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCropModal, setShowCropModal] = useState(false);
+  const [sourceHasAlpha, setSourceHasAlpha] = useState(false);
+  const [bgMode, setBgMode] = useState<'color' | 'transparent'>('color');
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const bgModeRef  = useRef<'color' | 'transparent'>('color');
+  const bgColorRef = useRef('#ffffff');
+  bgModeRef.current  = bgMode;
+  bgColorRef.current = bgColor;
   // Always holds the originally-uploaded image so crop modal can re-crop from source
   const uploadedImageRef = useRef<HTMLImageElement | null>(null);
   const workerRef     = useRef<Worker | null>(null);
@@ -306,7 +313,7 @@ export default function App() {
         );
       } else {
         worker.postMessage(
-          { type: 'process', bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp } },
+          { type: 'process', bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp, bgMode: bgModeRef.current, bgColor: bgColorRef.current } },
           [bitmap],
         );
       }
@@ -315,6 +322,17 @@ export default function App() {
 
   const handleImageLoaded = useCallback((img: HTMLImageElement) => {
     uploadedImageRef.current = img;   // save original for crop modal
+    // Detect transparency by sampling pixels at reduced scale
+    const tc = document.createElement('canvas');
+    tc.width  = Math.min(img.naturalWidth,  64);
+    tc.height = Math.min(img.naturalHeight, 64);
+    const tctx = tc.getContext('2d')!;
+    tctx.drawImage(img, 0, 0, tc.width, tc.height);
+    const td = tctx.getImageData(0, 0, tc.width, tc.height).data;
+    let hasAlpha = false;
+    for (let i = 3; i < td.length; i += 4) { if (td[i] < 255) { hasAlpha = true; break; } }
+    setSourceHasAlpha(hasAlpha);
+    if (!hasAlpha) { setBgMode('color'); bgModeRef.current = 'color'; }
     setSourceImage(img);
     setSplitPos(50);
     setUndoStack([]);
@@ -407,6 +425,12 @@ export default function App() {
       return next;
     });
   }, [adjustments, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
+
+  // Reprocess when background mode or color changes
+  useEffect(() => {
+    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgMode, bgColor]);
 
   const handleRemoveBlock = useCallback((csId: number) => {
     pushToHistory();
@@ -609,6 +633,32 @@ export default function App() {
         <aside className="panel panel-left">
           <div className="panel-scroll">
             <ImageUpload onImageLoaded={handleImageLoaded} />
+            {sourceHasAlpha && (
+              <div className="alpha-controls">
+                <span className="alpha-label">Transparency</span>
+                <div className="alpha-mode-btns">
+                  <button
+                    className={`alpha-mode-btn${bgMode === 'color' ? ' active' : ''}`}
+                    onClick={() => setBgMode('color')}
+                    title="Fill transparent areas with a background color"
+                  >Fill BG</button>
+                  <button
+                    className={`alpha-mode-btn${bgMode === 'transparent' ? ' active' : ''}`}
+                    onClick={() => setBgMode('transparent')}
+                    title="Keep transparent areas empty (air blocks in export)"
+                  >Transparent</button>
+                  {bgMode === 'color' && (
+                    <input
+                      type="color"
+                      className="alpha-color-picker"
+                      value={bgColor}
+                      onChange={e => setBgColor(e.target.value)}
+                      title="Background fill color"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
             {uploadedImageRef.current && (
               <div className="crop-section">
                 <button

@@ -225,6 +225,7 @@ async function applyFloydSteinberg(
 
     for (let x = x0; x !== x1; x += dx) {
       const idx = y * width + x;
+      if (data[idx * 4 + 3] < 128) { continue; }
       const { color } = findClosestColor(r[idx], g[idx], b[idx], cp);
 
       out[idx * 4]     = color.r;
@@ -269,6 +270,7 @@ async function applyStucki(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
+      if (data[idx * 4 + 3] < 128) { continue; }
       const { color } = findClosestColor(r[idx], g[idx], b[idx], cp);
 
       out[idx * 4]     = color.r;
@@ -326,6 +328,7 @@ async function applyJJN(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
+      if (data[idx * 4 + 3] < 128) { continue; }
       const { color } = findClosestColor(r[idx], g[idx], b[idx], cp);
 
       out[idx * 4]     = color.r;
@@ -376,6 +379,7 @@ async function applyAtkinson(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const idx = y * width + x;
+      if (data[idx * 4 + 3] < 128) { continue; }
       const { color } = findClosestColor(r[idx], g[idx], b[idx], cp);
 
       out[idx * 4]     = color.r;
@@ -621,6 +625,7 @@ async function applyKlussDither(
 
     for (let x = x0; x !== x1; x += dx) {
       const idx = y * width + x;
+      if (data[idx * 4 + 3] < 128) { continue; }
       const lab = srcLabs[idx];
       const t   = zoneBoundaryThreshold;
 
@@ -746,6 +751,7 @@ export async function applyDithering(
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
+        if (data[i * 4 + 3] < 128) { out[i * 4 + 3] = 0; continue; }
         const { color } = findClosestColor(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], cp);
         out[i * 4] = color.r; out[i * 4 + 1] = color.g;
         out[i * 4 + 2] = color.b; out[i * 4 + 3] = 255;
@@ -762,6 +768,7 @@ export async function applyDithering(
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
+        if (data[i * 4 + 3] < 128) { out[i * 4 + 3] = 0; continue; }
         const offset = (ign(Math.floor(x / s), Math.floor(y / s)) - 0.5) * scale;
         const { color } = findClosestColor(
           data[i * 4] + offset, data[i * 4 + 1] + offset, data[i * 4 + 2] + offset, cp,
@@ -780,6 +787,7 @@ export async function applyDithering(
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
+        if (data[i * 4 + 3] < 128) { out[i * 4 + 3] = 0; continue; }
         const mix   = buildYliluomaMix(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], maxK, cp);
         const bayer = BAYER4[(y % 4) * 4 + (x % 4)];
         const color = mix[Math.floor(bayer * mix.length / 16)];

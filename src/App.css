@@ -630,7 +630,16 @@ input, select, textarea { outline: none; }
 /* Corner brackets around canvas */
 .canvas-brackets { position: relative; display: inline-block; }
 .corner { display: none; }
-.map-canvas { display: block; image-rendering: pixelated; }
+.map-canvas {
+  display: block;
+  image-rendering: pixelated;
+  background-color: #888;
+  background-image:
+    linear-gradient(45deg, #555 25%, transparent 25%, transparent 75%, #555 75%),
+    linear-gradient(45deg, #555 25%, transparent 25%, transparent 75%, #555 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
 
 /* ── Split Slider ──────────────────────────────────────────────────────────── */
 .split-canvas-container {
@@ -1089,6 +1098,16 @@ input, select, textarea { outline: none; }
 .repaint-picker { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 4px; }
 .repaint-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; cursor: pointer; font-size: 9px; color: var(--text); pointer-events: auto; border-left: 2px solid transparent; transition: background 0.1s; }
 .repaint-item:hover { background: rgba(87,255,110,0.07); border-left-color: var(--accent); }
+
+/* ── Alpha / Transparency Controls ────────────────────────────────────── */
+.alpha-controls { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.alpha-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.06em; white-space: nowrap; }
+.alpha-mode-btns { display: flex; align-items: center; gap: 4px; flex: 1; }
+.alpha-mode-btn { padding: 3px 8px; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 9px; cursor: pointer; transition: border-color 0.12s, color 0.12s; letter-spacing: 0.04em; white-space: nowrap; }
+.alpha-mode-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.alpha-mode-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(96,200,240,0.1); }
+.alpha-color-picker { width: 26px; height: 22px; padding: 1px; border: 1px solid var(--border); background: transparent; cursor: pointer; border-radius: 2px; }
+.alpha-color-picker:hover { border-color: var(--cyan); }
 
 /* ── Crop Tool Button (left panel) ────────────────────────────────────── */
 .crop-section { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); }

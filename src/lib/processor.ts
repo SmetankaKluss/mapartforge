@@ -13,6 +13,8 @@ export interface ProcessOptions {
   adjustments?: ImageAdjustments;
   onProgress?:  (pct: number) => void;
   klussParams?: KlussParams;
+  bgMode?:      'color' | 'transparent';
+  bgColor?:     string;
 }
 
 export interface ProcessResult {
@@ -24,11 +26,17 @@ async function scaleSource(
   source: HTMLImageElement | ImageBitmap,
   width: number,
   height: number,
+  bgMode: 'color' | 'transparent' = 'color',
+  bgColor: string = '#ffffff',
 ): Promise<Uint8ClampedArray> {
   const offscreen = new OffscreenCanvas(width, height);
   const ctx = offscreen.getContext('2d')!;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+  if (bgMode === 'color') {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, width, height);
+  }
   ctx.drawImage(source, 0, 0, width, height);
   return ctx.getImageData(0, 0, width, height).data;
 }
@@ -44,11 +52,13 @@ export async function processImage(
     adjustments = DEFAULT_ADJUSTMENTS,
     onProgress,
     klussParams = DEFAULT_KLUSS_PARAMS,
+    bgMode      = 'color',
+    bgColor     = '#ffffff',
   } = options;
 
   onProgress?.(5);
 
-  const raw      = await scaleSource(source, width, height);
+  const raw      = await scaleSource(source, width, height, bgMode, bgColor);
   const original = new ImageData(new Uint8ClampedArray(raw), width, height);
 
   onProgress?.(10);
