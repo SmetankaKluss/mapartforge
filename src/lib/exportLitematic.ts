@@ -126,12 +126,15 @@ async function buildLitematicBytes(
   let sizeY: number;
   let yGrid: Int32Array | null = null;
   let minY  = 0;
+  // exportSizeZ includes a framing row north of the map art in staircase mode
+  const exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
 
   if (structure === 'staircase') {
     const sc = computeStaircase(data, width, height, lookup);
     yGrid = sc.yGrid;
-    minY  = sc.minY;
-    sizeY = Math.max(1, sc.maxY - sc.minY + 1);
+    // allMinY accounts for the framing block at y=1 (north reference)
+    minY  = Math.min(sc.minY, 1);
+    sizeY = Math.max(1, sc.maxY - minY + 1);
   } else {
     sizeY = 1;
   }
@@ -158,16 +161,41 @@ async function buildLitematicBytes(
     }
   }
 
-  // ── 3. Fill volume (Y×Z×X, y outer) ──────────────────────────────────
-  const volume  = sizeX * sizeY * sizeZ;
+  // Add barrier to palette for staircase framing row
+  let barrierIdx = 0;
+  if (structure === 'staircase') {
+    barrierIdx = blockPalette.length;
+    blockPalette.push('minecraft:barrier');
+    blockToIdx.set('minecraft:barrier', barrierIdx);
+  }
+
+  // ── 3. Fill volume (Y×exportSizeZ×X, y outer) ────────────────────────
+  const volume  = sizeX * sizeY * exportSizeZ;
   const indices = new Uint32Array(volume);
 
-  for (let z = 0; z < sizeZ; z++) {
+  if (structure === 'staircase') {
+    // Framing row at z=0: barrier blocks at y = 1 - minY (normalized)
+    const framingY = 1 - minY;
     for (let x = 0; x < sizeX; x++) {
-      const pi = z * sizeX + x;
-      const y  = structure === 'staircase' ? yGrid![pi] - minY : 0;
-      const vi = y * sizeZ * sizeX + z * sizeX + x;
-      indices[vi] = pixelBlock[pi];
+      const vi = framingY * exportSizeZ * sizeX + 0 * sizeX + x;
+      indices[vi] = barrierIdx;
+    }
+    // Map art at z=1..sizeZ (shifted by 1 from framing row)
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const pi = z * sizeX + x;
+        const y  = yGrid![pi] - minY;
+        const vi = y * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+        indices[vi] = pixelBlock[pi];
+      }
+    }
+  } else {
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const pi = z * sizeX + x;
+        const vi = 0 * exportSizeZ * sizeX + z * sizeX + x;
+        indices[vi] = pixelBlock[pi];
+      }
     }
   }
 
@@ -191,7 +219,7 @@ async function buildLitematicBytes(
       w.tagCompoundStart('EnclosingSize');
         w.tagInt('x', sizeX);
         w.tagInt('y', sizeY);
-        w.tagInt('z', sizeZ);
+        w.tagInt('z', exportSizeZ);
       w.tagCompoundEnd();
       w.tagInt('RegionCount', 1);
       w.tagIntList('TileContainerEntityCount', [0]);
@@ -205,7 +233,7 @@ async function buildLitematicBytes(
         w.tagCompoundEnd();
 
         w.tagCompoundStart('Size');
-          w.tagInt('x', sizeX); w.tagInt('y', sizeY); w.tagInt('z', sizeZ);
+          w.tagInt('x', sizeX); w.tagInt('y', sizeY); w.tagInt('z', exportSizeZ);
         w.tagCompoundEnd();
 
         w.tagListStart('BlockStatePalette', 10, blockPalette.length);

@@ -559,6 +559,18 @@ input, select, textarea { outline: none; }
 .paint-choose-btn { padding: 0 7px; height: 26px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; transition: border-color 0.12s, color 0.12s; }
 .paint-choose-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Shade selector (3D mode brush/fill) */
+.shade-selector { gap: 3px; }
+.shade-btn {
+  width: 20px; height: 20px; padding: 0; border-radius: 2px;
+  background: var(--shade-color, #888);
+  border: 2px solid transparent;
+  cursor: pointer; flex-shrink: 0;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.shade-btn:hover { border-color: rgba(255,255,255,0.6); box-shadow: 0 0 5px rgba(255,255,255,0.3); }
+.shade-btn.active { border-color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+
 /* ── Compare Selectors ─────────────────────────────────────────────────── */
 .compare-selectors { display: flex; align-items: center; gap: 10px; padding: 5px 12px; background: var(--bg-panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .compare-selector { display: flex; align-items: center; gap: 6px; }
@@ -988,8 +1000,10 @@ input, select, textarea { outline: none; }
 .status-gold   { color: var(--gold);   margin-right: 4px; }
 
 /* ── Hover Tooltip ─────────────────────────────────────────────────────── */
-.hover-tooltip { position: fixed; z-index: 300; background: var(--bg-panel); border: 1px solid var(--border); padding: 8px 10px; min-width: 180px; max-width: 240px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.7), 0 0 8px var(--accent-glow); font-family: var(--font-mono); }
+.hover-tooltip { position: fixed; z-index: 300; background: var(--bg-panel); border: 1px solid var(--border); padding: 8px 10px; min-width: 180px; max-width: 240px; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.7), 0 0 8px var(--accent-glow); font-family: var(--font-mono); overflow: visible; }
 .hover-tooltip-pinned { pointer-events: auto; border-color: var(--gold); box-shadow: 0 4px 16px rgba(0,0,0,0.7), 0 0 8px var(--gold-glow); }
+.hover-tooltip-close { position: absolute; top: 4px; right: 5px; background: none; border: none; color: var(--text-muted); font-size: 11px; line-height: 1; padding: 1px 3px; cursor: pointer; pointer-events: auto; transition: color 0.1s; }
+.hover-tooltip-close:hover { color: var(--text); }
 .hover-tooltip-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 4px; }
 .hover-tooltip-sub { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
 .hover-tooltip-coord { font-size: 9px; color: var(--text-dim); }

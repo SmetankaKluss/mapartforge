@@ -47,6 +47,7 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose }:
       csId: row.csId,
       blockId: block.blockId,
       baseId: row.baseId,
+      shade: 1,
       displayName: block.displayName,
       colourName: row.colourName,
     } satisfies PaintBlock];

@@ -1,8 +1,29 @@
 import { driver } from 'driver.js';
+import { flushSync } from 'react-dom';
 
 const TOUR_KEY = 'klussforge_tour_done';
 
-export function createTour() {
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
+type Tab = 'settings' | 'palette' | 'export';
+
+// Tab required before each step becomes visible on mobile
+const STEP_TABS: (Tab | null)[] = [
+  'settings',  // 0: START HERE      → .upload-zone
+  'settings',  // 1: MAP GRID        → .grid-options
+  'settings',  // 2: DITHERING       → .dither-options
+  'palette',   // 3: BLOCK PALETTE   → .panel-right
+  'settings',  // 4: BEFORE / AFTER  → .canvas-area
+  'export',    // 5: EXPORT          → .panel-footer.mobile-export-content
+  'export',    // 6: SHARE LINK      → .link-export-btn
+];
+
+export function createTour(switchTab?: (tab: Tab) => void) {
+  const switchSync = (tab: Tab) => {
+    if (!isMobile() || !switchTab) return;
+    flushSync(() => switchTab(tab));
+  };
+
   const d = driver({
     animate: true,
     smoothScroll: true,
@@ -25,36 +46,40 @@ export function createTour() {
         popover: {
           title: 'START HERE',
           description: 'Drop any image or click to browse. PNG, JPG, WebP — any size works.',
-          side: 'right',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('settings'),
       },
       {
         element: '.grid-options',
         popover: {
           title: 'MAP GRID',
           description: 'Choose how many Minecraft maps your art will span. 1×1 = one map (128×128 blocks), 2×3 = six maps.',
-          side: 'right',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('settings'),
       },
       {
         element: '.dither-options',
         popover: {
           title: 'DITHERING',
           description: 'Select a mixing algorithm. KlussDither is our custom algorithm — best for anime and illustrations.',
-          side: 'right',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('settings'),
       },
       {
         element: '.panel-right',
         popover: {
           title: 'BLOCK PALETTE',
           description: 'Choose which blocks to use. More blocks = better color accuracy.',
-          side: 'left',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('palette'),
       },
       {
         element: '.canvas-area',
@@ -64,24 +89,27 @@ export function createTour() {
           side: 'bottom',
           align: 'center',
         },
+        onHighlightStarted: () => switchSync('settings'),
       },
       {
         element: '.panel-footer.mobile-export-content',
         popover: {
           title: 'EXPORT',
           description: 'Download as .litematic for Litematica mod, or map.dat to use directly in game.',
-          side: 'left',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('export'),
       },
       {
         element: '.link-export-btn',
         popover: {
           title: 'SHARE LINK',
           description: 'Share your settings with other builders via link.',
-          side: 'left',
-          align: 'start',
+          side: 'bottom',
+          align: 'center',
         },
+        onHighlightStarted: () => switchSync('export'),
       },
     ],
   });

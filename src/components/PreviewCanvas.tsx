@@ -17,6 +17,8 @@ export interface PaintBlock {
   csId: number;
   blockId: number;
   baseId: number;
+  /** Map shade (0=dark/down, 1=flat, 2=bright/up). Used by brush in 3D mode. */
+  shade: number;
   displayName: string;
   colourName: string;
 }
@@ -127,13 +129,11 @@ function getTargetColor(shade: number, targetBaseId: number, cp: ComputedPalette
 
 function paintPixelInBuffer(
   buf: ImageData, px: number, py: number,
-  targetBaseId: number, cp: ComputedPalette,
-  colorLookup: Map<number, { shade: number }>,
+  targetBaseId: number, targetShade: number,
+  cp: ComputedPalette,
 ): void {
   const i = (py * buf.width + px) * 4;
-  const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
-  const shade = colorLookup.get(key)?.shade ?? 2;
-  const tc = getTargetColor(shade, targetBaseId, cp);
+  const tc = getTargetColor(targetShade, targetBaseId, cp);
   if (!tc) return;
   buf.data[i] = tc.r; buf.data[i + 1] = tc.g; buf.data[i + 2] = tc.b;
 }
@@ -296,7 +296,7 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, cp, colorLookup);
+          paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
       setPaintVersion(v => v + 1);
@@ -454,7 +454,7 @@ export function PreviewCanvas({
     if (activeTool === 'eyedropper') {
       const info = lookupAtEvent(e);
       if (info) {
-        onPaintBlockChange({ csId: info.csId, blockId: info.blockId, baseId: info.baseId, displayName: info.displayName, colourName: info.colourName });
+        onPaintBlockChange({ csId: info.csId, blockId: info.blockId, baseId: info.baseId, shade: info.shade, displayName: info.displayName, colourName: info.colourName });
         onToolChange('brush'); // auto-switch to brush after picking
       }
       return;
@@ -477,7 +477,7 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock.baseId, cp, colorLookup);
+          paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
       setPaintVersion(v => v + 1);
@@ -500,10 +500,10 @@ export function PreviewCanvas({
     // Other tools active: no tooltip
     if (activeTool) return;
 
-    cancelHide();
     if (isPinned) return;
     const info = lookupAtEvent(e);
-    if (!info) return;
+    if (!info) { scheduleHide(); return; }
+    cancelHide();
     setMousePos({ x: e.clientX, y: e.clientY });
     setHoverInfo(info);
   }
@@ -552,11 +552,9 @@ export function PreviewCanvas({
 
   // ── Cursor style ────────────────────────────────────────────────────────────
 
-  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill'
+  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush'
     ? 'crosshair'
-    : activeTool === 'brush'
-      ? brushCursor
-      : undefined;
+    : undefined;
 
   // ── Canvas child ────────────────────────────────────────────────────────────
 
@@ -641,7 +639,9 @@ export function PreviewCanvas({
           onMouseLeave={handleTooltipLeave}
           onClick={e => e.stopPropagation()}
         >
-          {isPinned && <span className="hover-tooltip-pin-icon">📌</span>}
+          {isPinned && (
+            <button className="hover-tooltip-close" onClick={closeTooltip} title="Close">✕</button>
+          )}
           <div className="hover-tooltip-block">
             <div className="hover-tooltip-icon-wrap">
               {(() => {

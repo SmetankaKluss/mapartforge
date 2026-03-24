@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import type { DragEvent, ChangeEvent } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import type { DragEvent, ChangeEvent, ClipboardEvent } from 'react';
 
 interface Props {
   onImageLoaded: (img: HTMLImageElement) => void;
@@ -33,6 +33,54 @@ export function ImageUpload({ onImageLoaded }: Props) {
     e.target.value = '';
   }
 
+  // Обработка вставки из буфера обмена (Ctrl+V)
+  function onPaste(e: ClipboardEvent<HTMLDivElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          loadFile(file);
+          return;
+        }
+      }
+    }
+  }
+
+  // Регистрируем глобальный обработчик paste для всего документа
+  useEffect(() => {
+    function handleGlobalPaste(e: Event) {
+      // Проверяем, что фокус не в input/textarea/select
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
+      const clipboardEvent = e as unknown as ClipboardEvent;
+      const items = clipboardEvent.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            loadFile(file);
+            return;
+          }
+        }
+      }
+    }
+
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div
       className={`upload-zone ${dragging ? 'drag-over' : ''}`}
@@ -40,10 +88,14 @@ export function ImageUpload({ onImageLoaded }: Props) {
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
+      onPaste={onPaste}
+      tabIndex={0}
+      title="Press Ctrl+V to paste an image from clipboard"
     >
       <div className="upload-icon">⛏</div>
       <p className="upload-label">Drop an image here</p>
       <p className="upload-sub">or click to browse</p>
+      <p className="upload-hint">Ctrl+V to paste from clipboard</p>
       <input
         ref={inputRef}
         type="file"

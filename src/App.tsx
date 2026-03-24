@@ -515,11 +515,11 @@ export default function App() {
   }, []);
 
   // ── Onboarding tour ───────────────────────────────────────────────────────
-  const startTour = useCallback(() => { createTour().drive(); }, []);
+  const startTour = useCallback(() => { createTour(setMobileTab).drive(); }, []);
   useEffect(() => {
     if (shouldAutoStart()) {
       // Slight delay so the DOM is fully painted
-      const t = setTimeout(() => createTour().drive(), 600);
+      const t = setTimeout(() => createTour(setMobileTab).drive(), 600);
       return () => clearTimeout(t);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -704,6 +704,25 @@ export default function App() {
                     {([1, 2, 3] as const).map(s => (
                       <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}×${s}`}>{s}×</button>
                     ))}
+                  </div>
+                )}
+
+                {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && (
+                  <div className="toolbar-group shade-selector">
+                    {([0, 1, 2] as const).map(sh => {
+                      const shadeLabel = ['▼ Dark', '■ Mid', '▲ Bright'];
+                      const sc = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === sh);
+                      const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
+                      return (
+                        <button
+                          key={sh}
+                          className={`shade-btn${paintBlock.shade === sh ? ' active' : ''}`}
+                          style={{ '--shade-color': bg } as React.CSSProperties}
+                          title={shadeLabel[sh]}
+                          onClick={() => setPaintBlock(pb => pb ? { ...pb, shade: sh } : pb)}
+                        />
+                      );
+                    })}
                   </div>
                 )}
 
@@ -929,11 +948,11 @@ export default function App() {
             <span className="mobile-tab-label">Settings</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
-            <span className="mobile-tab-icon">🎨</span>
+            <span className="mobile-tab-icon">▦</span>
             <span className="mobile-tab-label">Palette</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
-            <span className="mobile-tab-icon">📦</span>
+            <span className="mobile-tab-icon">⬇</span>
             <span className="mobile-tab-label">Export</span>
           </button>
         </div>
