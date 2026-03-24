@@ -89,26 +89,11 @@ export function createTour(switchTab?: (tab: Tab) => void) {
         onHighlightStarted: () => switchSync('settings'),
       },
 
-      // ── 5. Intensity ──────────────────────────────────────────────────────
-      {
-        element: '.control-group:has(.intensity-slider)',
-        popover: {
-          title: '5. INTENSITY',
-          description:
-            'Controls how strongly the dithering algorithm spreads color error. ' +
-            '<b>Low</b> = cleaner, smoother look. <b>High</b> = more color-accurate but noisier. ' +
-            'Try around 70–85% as a starting point.',
-          side: 'bottom',
-          align: 'center',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-
-      // ── 6. Adjustments ────────────────────────────────────────────────────
+      // ── 5. Adjustments ────────────────────────────────────────────────────
       {
         element: '.adj-sliders',
         popover: {
-          title: '6. IMAGE ADJUSTMENTS',
+          title: '5. IMAGE ADJUSTMENTS',
           description:
             'Tweak the source image before it\'s converted. ' +
             'Bumping <b>contrast</b> and slightly increasing <b>saturation</b> often improves results significantly — ' +
@@ -119,11 +104,11 @@ export function createTour(switchTab?: (tab: Tab) => void) {
         onHighlightStarted: () => switchSync('settings'),
       },
 
-      // ── 7. Canvas / preview ───────────────────────────────────────────────
+      // ── 6. Canvas / preview ───────────────────────────────────────────────
       {
         element: '.canvas-area',
         popover: {
-          title: '7. PREVIEW',
+          title: '6. PREVIEW',
           description:
             'The processed map art appears here after the image is loaded. ' +
             '<b>Drag the split slider</b> left/right to compare the original with the result. ' +
@@ -139,7 +124,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '.toolbar',
         popover: {
-          title: '8. TOOLBAR',
+          title: '7. TOOLBAR',
           description:
             '<b>↩↪</b> Undo / Redo (Ctrl+Z / Ctrl+Y). ' +
             'After processing, paint tools appear: <b>cursor</b> (inspect), <b>eyedropper</b> (E — pick block), ' +
@@ -155,7 +140,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '.panel-right',
         popover: {
-          title: '9. BLOCK PALETTE',
+          title: '8. BLOCK PALETTE',
           description:
             'Enable or disable individual block color rows. <b>More blocks = more colors available = better quality.</b> ' +
             'Click the dot next to a color to toggle it; click a block icon to pick which variant to use. ' +
@@ -170,7 +155,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '.support-block-section',
         popover: {
-          title: '10. SUPPORT BLOCKS (3D)',
+          title: '9. SUPPORT BLOCKS (3D)',
           description:
             'In 3D staircase mode some blocks (sand, gravel, lichen…) can\'t float in mid-air. ' +
             'Choose a solid block to place underneath them automatically in the exported schematic. ' +
@@ -185,7 +170,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '.mat-header',
         popover: {
-          title: '11. MATERIALS LIST',
+          title: '10. MATERIALS LIST',
           description:
             'Shows every block type used in your map art with exact counts in <b>stacks</b> (64) and <b>shulker boxes</b> (1728). ' +
             'Toggle <b>Max/map</b> to see the maximum needed for a single 128×128 tile — useful for knowing what to bring per session.',
@@ -199,7 +184,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '#tour-export',
         popover: {
-          title: '12. EXPORT',
+          title: '11. EXPORT',
           description:
             '<b>↓ PNG</b> — download the processed image as a picture. ' +
             '<b>↓ MAP.DAT</b> — ready-to-use Minecraft map files; place in your saves folder. ' +
@@ -215,7 +200,7 @@ export function createTour(switchTab?: (tab: Tab) => void) {
       {
         element: '.link-export-btn',
         popover: {
-          title: '13. SHARE LINK',
+          title: '12. SHARE LINK',
           description:
             'Generates a <b>permanent link</b> that encodes your image and all current settings (grid, dithering, palette, adjustments). ' +
             'Share it with other builders or bookmark it to continue your project later — no account needed.',
