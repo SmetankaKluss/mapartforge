@@ -287,7 +287,7 @@ async function buildLitematicBytes(
 
     w.tagCompoundStart('Metadata');
       w.tagString('Name', name);
-      w.tagString('Author', 'KlussForge');
+      w.tagString('Author', 'MapKluss');
       w.tagString('Description', '');
       w.tagLong('TimeCreated', now);
       w.tagLong('TimeModified', now);

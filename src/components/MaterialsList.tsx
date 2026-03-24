@@ -127,7 +127,7 @@ function buildCopyText(entries: MaterialEntry[], total: number, maxPerMap: boole
   const header  = pad('Block', COL[0]) + pad(colHdr, COL[1]) + pad('Stacks', COL[2]) + 'Shulkers';
   const divider = '─'.repeat(COL[0] + COL[1] + COL[2] + 26);
   const lines = [
-    `Materials List – KlussForge (${mode})`,
+    `Materials List – MapKluss (${mode})`,
     '═'.repeat(divider.length),
     header,
     divider,

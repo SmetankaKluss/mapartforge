@@ -7,11 +7,11 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
 
   const sections: Record<WikiSection, { title: string; content: React.ReactNode }> = {
     overview: {
-      title: 'What is KlussForge?',
+      title: 'What is MapKluss?',
       content: (
         <div>
           <p>
-            <b>KlussForge</b> is a free, browser-based Minecraft map art generator. It converts any image into a schematic or map.dat file that you can build in Minecraft using the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a> or vanilla survival mode.
+            <b>MapKluss</b> is a free, browser-based Minecraft map art generator. It converts any image into a schematic or map.dat file that you can build in Minecraft using the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a> or vanilla survival mode.
           </p>
           <h4>Key features:</h4>
           <ul>
@@ -22,7 +22,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
             <li><b>Materials list</b> — exact block counts in stacks and shulker boxes</li>
             <li><b>Shareable links</b> — permalink your settings and image without an account</li>
           </ul>
-          <p>No signup required. No ads. No limits.</p>
+          <p>No signup required. No limits.</p>
         </div>
       ),
     },
@@ -198,7 +198,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
 
           <h4>Support blocks in 3D mode</h4>
           <p>
-            Some blocks (sand, gravel, glow lichen, etc.) can't float in mid-air. Choose a support block (e.g., stone, deepslate) and KlussForge will place it underneath:
+            Some blocks (sand, gravel, glow lichen, etc.) can't float in mid-air. Choose a support block (e.g., stone, deepslate) and MapKluss will place it underneath:
           </p>
           <ul>
             <li><b>Mode 1:</b> Under floating blocks only (sand, gravel, lichen…)</li>
@@ -451,7 +451,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           <h4>Blocks are floating (3D mode)</h4>
           <ul>
             <li>Select a support block in the Palette panel</li>
-            <li>KlussForge will automatically place support blocks underneath floating blocks</li>
+            <li>MapKluss will automatically place support blocks underneath floating blocks</li>
             <li>If still floating: Check that the support block isn't also floating (e.g., if you disabled all stone variants)</li>
           </ul>
 
@@ -519,7 +519,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     <div className="wiki-modal-overlay" onClick={onClose}>
       <div className="wiki-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="wiki-header">
-          <h2>KlussForge Wiki</h2>
+          <h2>MapKluss Wiki</h2>
           <button className="wiki-close-btn" onClick={onClose} title="Close">✕</button>
         </div>
 
