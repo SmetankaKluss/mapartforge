@@ -27,6 +27,7 @@ import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
+import { WikiModal } from './components/WikiModal';
 import { Analytics } from '@vercel/analytics/react';
 import { createTour, shouldAutoStart } from './lib/tour';
 import 'driver.js/dist/driver.css';
@@ -102,6 +103,7 @@ export default function App() {
   const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showWiki, setShowWiki] = useState(false);
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
@@ -568,6 +570,7 @@ export default function App() {
           </div>
           <div className="header-spacer" />
           <button className="tour-btn" onClick={startTour} title="Start guided tour">? GUIDE</button>
+          <button className="wiki-btn" onClick={() => setShowWiki(true)} title="Read full documentation">📖 WIKI</button>
           <span className="header-ver">v1.0</span>
         </div>
       </header>
@@ -1060,6 +1063,9 @@ export default function App() {
         onCancel={() => setShowCropModal(false)}
       />
     )}
+
+    {/* ── Wiki modal ── */}
+    {showWiki && <WikiModal onClose={() => setShowWiki(false)} />}
     </>
   );
 }
