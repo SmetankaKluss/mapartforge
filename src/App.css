@@ -736,6 +736,10 @@ input, select, textarea { outline: none; }
 .block-picker-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.06em; }
 .block-picker-close { background: none; border: none; color: var(--text-muted); font-size: 14px; padding: 0 2px; line-height: 1; }
 .block-picker-close:hover { color: var(--accent); }
+.block-picker-shade-row { display: flex; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.block-picker-shade-btn { flex: 1; padding: 4px 0; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 9px; cursor: pointer; transition: border-color 0.12s, color 0.12s; letter-spacing: 0.02em; }
+.block-picker-shade-btn:hover { border-color: var(--accent); color: var(--accent); }
+.block-picker-shade-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(87,255,110,0.08); }
 .block-picker-search-wrap { flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .block-picker-search { padding: 7px 10px; background: var(--bg-input); border: none; color: var(--text); font-family: var(--font-mono); font-size: 11px; width: 100%; }
 .block-picker-search::placeholder { color: var(--text-muted); }

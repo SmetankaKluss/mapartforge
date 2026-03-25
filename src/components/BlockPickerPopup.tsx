@@ -9,10 +9,14 @@ interface Props {
   current: PaintBlock | null;
   onSelect: (block: PaintBlock) => void;
   onClose: () => void;
+  mapMode?: '2d' | '3d';
 }
 
-export function BlockPickerPopup({ blockSelection, current, onSelect, onClose }: Props) {
+const SHADE_LABELS: Record<0 | 1 | 2, string> = { 0: '▼ Dark', 1: '■ Mid', 2: '▲ Bright' };
+
+export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, mapMode }: Props) {
   const [search, setSearch] = useState('');
+  const [shade, setShade] = useState<0 | 1 | 2>((current?.shade as 0 | 1 | 2) ?? 1);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -47,7 +51,7 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose }:
       csId: row.csId,
       blockId: block.blockId,
       baseId: row.baseId,
-      shade: 1,
+      shade,
       displayName: block.displayName,
       colourName: row.colourName,
     } satisfies PaintBlock];
@@ -59,6 +63,18 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose }:
         <span className="block-picker-title">Choose block</span>
         <button className="block-picker-close" onClick={onClose}>✕</button>
       </div>
+      {mapMode === '3d' && (
+        <div className="block-picker-shade-row">
+          {([0, 1, 2] as const).map(sh => (
+            <button
+              key={sh}
+              className={`block-picker-shade-btn${shade === sh ? ' active' : ''}`}
+              onClick={() => setShade(sh)}
+              title={SHADE_LABELS[sh]}
+            >{SHADE_LABELS[sh]}</button>
+          ))}
+        </div>
+      )}
       <div className="block-picker-search-wrap">
         <input
           className="block-picker-search"

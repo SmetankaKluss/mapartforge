@@ -839,6 +839,7 @@ export default function App() {
                       current={paintBlock}
                       onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
                       onClose={() => setShowBlockPicker(false)}
+                      mapMode={mapMode}
                     />
                   )}
                 </div>
