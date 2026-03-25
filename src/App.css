@@ -122,11 +122,14 @@ input, select, textarea { outline: none; }
 .logo-svg { flex-shrink: 0; display: block; }
 .header-titles { display: flex; flex-direction: column; gap: 2px; }
 .header-spacer { flex: 1; }
-.header-ver { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); }
 .tour-btn { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); background: none; border: 1px solid var(--accent); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
 .tour-btn:hover { background: var(--accent-dim); }
 .wiki-btn { font-family: var(--font-pixel); font-size: 7px; color: var(--cyan); background: none; border: 1px solid var(--cyan); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
 .wiki-btn:hover { background: rgba(96,200,240,0.12); }
+.support-btn { font-family: var(--font-pixel); font-size: 7px; color: #ff6b9d; background: none; border: 1px solid #ff6b9d; padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; text-decoration: none; display: inline-block; }
+.support-btn:hover { background: rgba(255, 107, 157, 0.12); color: #ff6b9d; }
+.header-ver { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); text-decoration: none; display: inline-block; }
+.header-ver:hover { color: var(--accent); border-color: var(--accent); }
 
 .app-logo {
   display: flex;

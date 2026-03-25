@@ -610,7 +610,8 @@ export default function App() {
           <div className="header-spacer" />
           <button className="tour-btn" onClick={startTour} title="Start guided tour">? GUIDE</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title="Read full documentation">📖 WIKI</button>
-          <span className="header-ver">v1.0</span>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title="Support development on Boosty">❤ SUPPORT</a>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title="Support development">v1.0</a>
         </div>
       </header>
 
