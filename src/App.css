@@ -1100,6 +1100,13 @@ input, select, textarea { outline: none; }
 .hover-btn-repaint { background: none; border: 1px solid rgba(96,200,240,0.35); color: var(--cyan); padding: 3px 6px; font-size: 9px; pointer-events: auto; margin-top: 3px; transition: border-color 0.1s; }
 .hover-btn-repaint:hover { border-color: var(--cyan); }
 .repaint-picker { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 4px; }
+.repaint-picker-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 4px; font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); }
+.repaint-back-btn { background: none; border: none; color: var(--text-muted); font-size: 11px; padding: 0 2px; cursor: pointer; line-height: 1; }
+.repaint-back-btn:hover { color: var(--accent); }
+.repaint-picker-list { max-height: 220px; overflow-y: auto; }
+.repaint-shade-row { display: flex; gap: 4px; padding: 6px 4px 4px; }
+.repaint-shade-btn { flex: 1; padding: 6px 2px; border: 1px solid var(--border); background: linear-gradient(to bottom, var(--shade-color, #888) 0%, var(--shade-color, #888) 40%, transparent 100%); color: var(--text); font-family: var(--font-mono); font-size: 8px; cursor: pointer; transition: border-color 0.12s; letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.repaint-shade-btn:hover { border-color: var(--accent); }
 .repaint-item { display: flex; align-items: center; gap: 6px; padding: 3px 4px; cursor: pointer; font-size: 9px; color: var(--text); pointer-events: auto; border-left: 2px solid transparent; transition: background 0.1s; }
 .repaint-item:hover { background: rgba(87,255,110,0.07); border-left-color: var(--accent); }
 

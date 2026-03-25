@@ -164,7 +164,10 @@ function floodFill(
   }
 }
 
-function repaintPixels(src: ImageData, srcBaseId: number, targetBaseId: number, cp: ComputedPalette): ImageData {
+function repaintPixels(
+  src: ImageData, srcBaseId: number, targetBaseId: number,
+  cp: ComputedPalette, fixedShade?: number,
+): ImageData {
   const shadeToTarget = new Map<number, { r: number; g: number; b: number }>();
   for (const c of cp.colors) {
     if (c.baseId === targetBaseId) shadeToTarget.set(c.shade, { r: c.r, g: c.g, b: c.b });
@@ -178,9 +181,10 @@ function repaintPixels(src: ImageData, srcBaseId: number, targetBaseId: number, 
   const { data } = newData;
   for (let i = 0, n = src.width * src.height; i < n; i++) {
     const key = (data[i * 4] << 16) | (data[i * 4 + 1] << 8) | data[i * 4 + 2];
-    const shade = srcKeyToShade.get(key);
-    if (shade === undefined) continue;
-    const tc = shadeToTarget.get(shade) ?? shadeToTarget.get(2) ?? [...shadeToTarget.values()][0];
+    const srcShade = srcKeyToShade.get(key);
+    if (srcShade === undefined) continue;
+    const targetShade = fixedShade !== undefined ? fixedShade : srcShade;
+    const tc = shadeToTarget.get(targetShade) ?? shadeToTarget.get(2) ?? [...shadeToTarget.values()][0];
     if (!tc) continue;
     data[i * 4] = tc.r; data[i * 4 + 1] = tc.g; data[i * 4 + 2] = tc.b;
   }
@@ -201,8 +205,10 @@ export function PreviewCanvas({
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
   const [mousePos, setMousePos]       = useState({ x: 0, y: 0 });
-  const [showRepaint, setShowRepaint] = useState(false);
-  const [isPinned, setIsPinned]       = useState(false);
+  const [showRepaint, setShowRepaint]       = useState(false);
+  const [repaintTarget, setRepaintTarget]   = useState<RepaintEntry | null>(null);
+  const [isPinned, setIsPinned]             = useState(false);
+  const is3D = useMemo(() => cp.colors.some(c => c.shade !== 2), [cp]);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Paint state
@@ -251,7 +257,7 @@ export function PreviewCanvas({
   // ── Close tooltip when a paint tool activates ───────────────────────────────
 
   useEffect(() => {
-    if (activeTool) { setIsPinned(false); setHoverInfo(null); setShowRepaint(false); }
+    if (activeTool) { setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); }
   }, [activeTool]);
 
   // ── Escape key ──────────────────────────────────────────────────────────────
@@ -259,7 +265,7 @@ export function PreviewCanvas({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        setIsPinned(false); setHoverInfo(null); setShowRepaint(false);
+        setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
       }
     }
     document.addEventListener('keydown', onKey);
@@ -332,7 +338,7 @@ export function PreviewCanvas({
   function scheduleHide() {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      setHoverInfo(null); setShowRepaint(false); setIsPinned(false);
+      setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); setIsPinned(false);
     }, HIDE_DELAY);
   }
 
@@ -341,7 +347,7 @@ export function PreviewCanvas({
   }
 
   function closeTooltip() {
-    cancelHide(); setIsPinned(false); setHoverInfo(null); setShowRepaint(false);
+    cancelHide(); setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
   }
 
   // ── Pixel coordinate helpers ────────────────────────────────────────────────
@@ -492,10 +498,10 @@ export function PreviewCanvas({
       setIsPinned(true);
       setHoverInfo(info);
       setMousePos({ x: e.clientX, y: e.clientY });
-      setShowRepaint(false);
+      setShowRepaint(false); setRepaintTarget(null);
       cancelHide();
     } else {
-      setIsPinned(false); setHoverInfo(null); setShowRepaint(false);
+      setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
     }
   }
 
@@ -509,16 +515,28 @@ export function PreviewCanvas({
     closeTooltip();
   }
 
-  function handleRepaintClick(entry: RepaintEntry) {
+  function handleRepaintItemClick(entry: RepaintEntry) {
     if (!hoverInfo || !imageData) return;
-    onImageUpdate(repaintPixels(imageData, hoverInfo.baseId, entry.baseId, cp));
+    if (is3D) {
+      // Show shade picker for this block
+      setRepaintTarget(entry);
+    } else {
+      // 2D mode — only one shade, apply immediately
+      onImageUpdate(repaintPixels(imageData, hoverInfo.baseId, entry.baseId, cp));
+      closeTooltip();
+    }
+  }
+
+  function handleRepaintShade(shade: 0 | 1 | 2) {
+    if (!hoverInfo || !imageData || !repaintTarget) return;
+    onImageUpdate(repaintPixels(imageData, hoverInfo.baseId, repaintTarget.baseId, cp, shade));
     closeTooltip();
   }
 
   // ── Tooltip positioning ─────────────────────────────────────────────────────
 
   const TOOLTIP_W = 220;
-  const TOOLTIP_H = showRepaint ? 320 : 130;
+  const TOOLTIP_H = repaintTarget ? 160 : showRepaint ? 320 : 130;
   const RIGHT_PANEL_W = 260; // matches --panel-right CSS variable
   const spaceOnRight = window.innerWidth - RIGHT_PANEL_W - (mousePos.x + 12);
   const ttLeft = spaceOnRight >= TOOLTIP_W
@@ -646,18 +664,18 @@ export function PreviewCanvas({
             </div>
           )}
 
-          {showRepaint && (
+          {showRepaint && !repaintTarget && (
             <div className="repaint-picker">
               <div className="repaint-picker-header">
                 <span>Pick replacement</span>
-                <button className="repaint-back-btn" onClick={() => setShowRepaint(false)}>✕</button>
+                <button className="repaint-back-btn" onClick={() => { setShowRepaint(false); setRepaintTarget(null); }}>✕</button>
               </div>
               <div className="repaint-picker-list">
                 {repaintEntries.map(e => (
                   <button
                     key={`${e.csId}_${e.blockId}`}
                     className={`repaint-item${e.csId === hoverInfo.csId ? ' repaint-item-current' : ''}`}
-                    onClick={() => handleRepaintClick(e)}
+                    onClick={() => handleRepaintItemClick(e)}
                     disabled={e.csId === hoverInfo.csId}
                   >
                     <div className="repaint-item-icon-wrap">
@@ -677,6 +695,31 @@ export function PreviewCanvas({
                     <span className="repaint-item-name">{e.displayName}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {repaintTarget && (
+            <div className="repaint-picker">
+              <div className="repaint-picker-header">
+                <span>{repaintTarget.displayName}</span>
+                <button className="repaint-back-btn" onClick={() => setRepaintTarget(null)}>◀</button>
+              </div>
+              <div className="repaint-shade-row">
+                {([0, 1, 2] as const).map(sh => {
+                  const shLabel = ['▼ Dark', '■ Mid', '▲ Bright'] as const;
+                  const sc = cp.colors.find(c => c.baseId === repaintTarget.baseId && c.shade === sh);
+                  const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
+                  return (
+                    <button
+                      key={sh}
+                      className="repaint-shade-btn"
+                      style={{ '--shade-color': bg } as React.CSSProperties}
+                      onClick={() => handleRepaintShade(sh)}
+                      title={shLabel[sh]}
+                    >{shLabel[sh]}</button>
+                  );
+                })}
               </div>
             </div>
           )}
