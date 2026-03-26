@@ -324,31 +324,16 @@ async function buildLitematicBytes(
       blockToIdx.set(supId, supIdx);
     }
 
-    if (staircaseMode === 'optimized') {
-      // Optimized: full support pillar from y=0 to pixelY-1 for every column
-      for (let z = 0; z < sizeZ; z++) {
-        for (let x = 0; x < sizeX; x++) {
-          const pi = z * sizeX + x;
-          if (pixelBlock[pi] === 0) continue; // transparent pixel
-          const pixelY = yGrid![pi];
-          for (let sy = 0; sy < pixelY; sy++) {
-            const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
-            if (indices[vi] === 0) indices[vi] = supIdx;
-          }
-        }
-      }
-    } else {
-      // Classic: thin snake — only support gravity-affected blocks (sand, gravel, etc.)
-      for (let z = 0; z < sizeZ; z++) {
-        for (let x = 0; x < sizeX; x++) {
-          const pi = z * sizeX + x;
-          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
-          const pixelY = yGrid![pi];
-          const sy = pixelY - 1;
-          if (sy < 0) continue;
-          const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
-          if (indices[vi] === 0) indices[vi] = supIdx;
-        }
+    // Both modes: only place 1 support block under gravity-affected blocks (sand, gravel, etc.)
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const pi = z * sizeX + x;
+        if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+        const pixelY = yGrid![pi];
+        const sy = pixelY - 1;
+        if (sy < 0) continue;
+        const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
+        if (indices[vi] === 0) indices[vi] = supIdx;
       }
     }
   }
