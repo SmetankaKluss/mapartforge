@@ -2797,7 +2797,7 @@ export function isMandatorySupport(baseId: number, sel: BlockSelection): boolean
 // ── Built-in presets ─────────────────────────────────────────────────────
 
 const ALL: BlockSelection = Object.fromEntries(
-  COLOUR_ROWS.map(row => [row.csId, row.blocks.map(b => b.blockId)]),
+  COLOUR_ROWS.map(row => [row.csId, row.blocks.slice(0, 1).map(b => b.blockId)]),
 );
 
 // Dye-colour row csIds (White Wool → Black Wool = csIds 13–28)

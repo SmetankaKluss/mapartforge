@@ -16,6 +16,17 @@ const BLOCK_FACE_PROPS: Record<string, Record<string, string>> = {
   },
 };
 
+/** Blocks that need axis=x to lie on their side (show bark/side texture on top). */
+const LOG_AXIS_X = new Set([
+  'minecraft:oak_log', 'minecraft:birch_log', 'minecraft:spruce_log',
+  'minecraft:jungle_log', 'minecraft:acacia_log', 'minecraft:dark_oak_log',
+  'minecraft:mangrove_log', 'minecraft:cherry_log', 'minecraft:cherry_wood',
+  'minecraft:stripped_cherry_log', 'minecraft:stripped_cherry_wood',
+  'minecraft:crimson_stem', 'minecraft:warped_stem',
+  'minecraft:stripped_crimson_stem', 'minecraft:stripped_warped_stem',
+  'minecraft:bamboo_block',
+]);
+
 export type SupportMode =
   | 1  // 1 block under floating-only blocks (sand, gravel, lichens…)
   | 2  // 1 block under every art block
@@ -297,15 +308,9 @@ async function buildLitematicBytes(
         blockPalette.push(noobId);
       }
       for (let x = 0; x < sizeX; x++) {
-        const firstArtY = yGrid![0 * sizeX + x];
-        const i = (0 * width + x) * 4;
-        const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-        const firstShade = lookup.get(key)?.shade ?? 1;
-        // Noobline is the virtual north neighbor of the first art row:
-        // shade 0 (dark):   noobline is higher → firstArtY + 1
-        // shade 1 (normal): same height         → firstArtY
-        // shade 2 (bright): noobline is lower   → firstArtY - 1
-        const nooblineY = Math.max(0, firstArtY + (firstShade === 0 ? 1 : firstShade === 2 ? -1 : 0));
+        // Noobline block is placed at the same Y as the first art block,
+        // directly to its north (z=0), strictly adjacent — not above or below.
+        const nooblineY = yGrid![0 * sizeX + x];
         const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
         indices[vi] = noobIdx;
       }
@@ -423,10 +428,12 @@ async function buildLitematicBytes(
         w.tagListStart('BlockStatePalette', 10, blockPalette.length);
         for (const id of blockPalette) {
           w.tagString('Name', id);
-          const props = BLOCK_FACE_PROPS[id];
-          if (props) {
+          const faceProps = BLOCK_FACE_PROPS[id];
+          const needsAxis = LOG_AXIS_X.has(id);
+          if (faceProps || needsAxis) {
             w.tagCompoundStart('Properties');
-            for (const [k, v] of Object.entries(props)) w.tagString(k, v);
+            if (faceProps) for (const [k, v] of Object.entries(faceProps)) w.tagString(k, v);
+            if (needsAxis) w.tagString('axis', 'x');
             w.tagCompoundEnd();
           }
           w.tagCompoundEnd();
