@@ -132,7 +132,6 @@ async function buildLitematicBytes(
   name:             string,
   structure:        'flat' | 'staircase',
   supportBlockNbt?: string,
-  supportMode:      SupportMode = 2,
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<Uint8Array> {
   const { data, width, height } = imageData;
@@ -353,7 +352,7 @@ export async function exportLitematic(
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
-  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, supportMode, staircaseMode);
+  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, staircaseMode);
   triggerDownload(bytes, `${name}${suffix}.litematic`);
 }
 
@@ -380,7 +379,7 @@ export async function exportLitematicZip(
     for (let col = 0; col < mapGrid.wide; col++) {
       const tile  = extractTile(imageData, col, row);
       const name  = `mapart_${idx}`;
-      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, supportMode, staircaseMode);
+      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, staircaseMode);
       zip.file(`${name}.litematic`, bytes);
       idx++;
     }
