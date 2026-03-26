@@ -33,45 +33,123 @@ function buildLookup(cp: ComputedPalette): Map<number, ColorEntry> {
 }
 
 /**
- * Compute staircase Y-levels for every pixel column.
- *
- * Minecraft map shading (north = z-1):
- *   shade 0 (mult 180, dark)   → north is HIGHER  → current = prevY - 1
- *   shade 1 (mult 220, medium) → same height       → current = prevY
- *   shade 2 (mult 255, bright) → north is LOWER    → current = prevY + 1
- *   shade 3 (water, very dark) → approximated as shade 1
+ * Compute raw heights for a single X-column based on shade deltas.
+ * shade 0 (dark)  → y-1, shade 1 (normal) → y, shade 2 (bright) → y+1
  */
-function computeStaircase(
+function columnRawHeights(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  lookup: Map<number, ColorEntry>,
+  x: number,
+): number[] {
+  const col = new Array<number>(height);
+  let y = 0;
+  for (let z = 0; z < height; z++) {
+    const i = (z * width + x) * 4;
+    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    const shade = lookup.get(key)?.shade ?? 2;
+    y = shade === 0 ? y - 1 : shade === 2 ? y + 1 : y;
+    col[z] = y;
+  }
+  return col;
+}
+
+/**
+ * Classic 3D: each X-column is an independent "sausage".
+ * Per-column normalisation — shift so column min = 0.
+ * Each column touches y=0 at its own lowest point, independent of neighbours.
+ */
+function computeStaircaseClassic(
   data: Uint8ClampedArray,
   width: number,
   height: number,
   lookup: Map<number, ColorEntry>,
 ): { yGrid: Int32Array; minY: number; maxY: number } {
   const yGrid = new Int32Array(width * height);
-  const prevY = new Int32Array(width).fill(1);
-
-  for (let z = 0; z < height; z++) {
-    for (let x = 0; x < width; x++) {
-      const i   = (z * width + x) * 4;
-      const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-      const shade = lookup.get(key)?.shade ?? 2;
-
-      const y = shade === 0 ? prevY[x] - 1
-              : shade === 2 ? prevY[x] + 1
-              : prevY[x];
-
-      yGrid[z * width + x] = y;
-      prevY[x] = y;
+  let maxY = 0;
+  for (let x = 0; x < width; x++) {
+    const col = columnRawHeights(data, width, height, lookup, x);
+    const colMin = Math.min(...col);
+    for (let z = 0; z < height; z++) {
+      const v = col[z] - colMin;
+      yGrid[z * width + x] = v;
+      if (v > maxY) maxY = v;
     }
   }
+  return { yGrid, minY: 0, maxY };
+}
 
-  let minY = Infinity, maxY = -Infinity;
-  for (const v of yGrid) {
-    if (v < minY) minY = v;
-    if (v > maxY) maxY = v;
+/**
+ * Valley/Optimized 3D: pulls descending valleys down to y=0 creating break-points.
+ * Ported from mapartcraft's valley algorithm (rebane2001/mapartcraft).
+ * Each ascending segment ("plateau") is pulled down as far as its adjacent valleys allow.
+ */
+function applyValleyAlgorithm(col: number[]): void {
+  const n = col.length;
+  const plateaus: { startIndex: number; endIndex: number }[] = [{ startIndex: 0, endIndex: 0 }];
+  let ascending = false;
+  let plateauStart = 0;
+  let prevH = col[0];
+
+  for (let i = 0; i < n; i++) {
+    const h = col[i];
+    if (ascending && h < prevH) {
+      ascending = false;
+      plateaus.push({ startIndex: plateauStart, endIndex: i });
+    } else if (h > prevH) {
+      ascending = true;
+      plateauStart = i;
+    }
+    prevH = h;
   }
-  if (!isFinite(minY)) { minY = 0; maxY = 0; }
-  return { yGrid, minY, maxY };
+  plateaus.push({ startIndex: n, endIndex: n });
+
+  const sidePull: [number, number] = [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER];
+  while (plateaus.length > 1) {
+    // Find minimum of valley region between plateaus[0] and plateaus[1]
+    let valleyMin = Number.MAX_SAFE_INTEGER;
+    for (let i = plateaus[0].endIndex; i < plateaus[1].startIndex; i++) {
+      if (col[i] < valleyMin) valleyMin = col[i];
+    }
+    if (valleyMin === Number.MAX_SAFE_INTEGER) valleyMin = 0;
+
+    // Pull valley down so its minimum = 0
+    for (let i = plateaus[0].endIndex; i < plateaus[1].startIndex; i++) {
+      col[i] -= valleyMin;
+    }
+
+    sidePull[1] = valleyMin;
+    const platPull = Math.min(sidePull[0], sidePull[1]);
+    if (platPull < Number.MAX_SAFE_INTEGER) {
+      for (let i = plateaus[0].startIndex; i < plateaus[0].endIndex; i++) {
+        col[i] -= platPull;
+      }
+    }
+
+    plateaus.shift();
+    sidePull[0] = sidePull[1];
+  }
+}
+
+function computeStaircaseOptimized(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  lookup: Map<number, ColorEntry>,
+): { yGrid: Int32Array; minY: number; maxY: number } {
+  const yGrid = new Int32Array(width * height);
+  let maxY = 0;
+  for (let x = 0; x < width; x++) {
+    const col = columnRawHeights(data, width, height, lookup, x);
+    applyValleyAlgorithm(col);
+    for (let z = 0; z < height; z++) {
+      const v = col[z];
+      yGrid[z * width + x] = v;
+      if (v > maxY) maxY = v;
+    }
+  }
+  return { yGrid, minY: 0, maxY };
 }
 
 /**
@@ -143,15 +221,14 @@ async function buildLitematicBytes(
   // ── 1. Determine Y dimensions ─────────────────────────────────────────
   let sizeY: number;
   let yGrid: Int32Array | null = null;
-  let minY  = 0;
   const exportSizeZ = sizeZ;
 
   if (structure === 'staircase') {
-    // Both classic and optimized use the same height computation
-    const sc = computeStaircase(data, width, height, lookup);
+    const sc = staircaseMode === 'optimized'
+      ? computeStaircaseOptimized(data, width, height, lookup)
+      : computeStaircaseClassic(data, width, height, lookup);
     yGrid = sc.yGrid;
-    minY  = sc.minY;
-    sizeY = Math.max(1, sc.maxY - minY + 1);
+    sizeY = Math.max(1, sc.maxY + 1);
   } else {
     sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
   }
@@ -202,7 +279,7 @@ async function buildLitematicBytes(
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        const y  = yGrid![pi] - minY;
+        const y  = yGrid![pi];
         const vi = y * exportSizeZ * sizeX + z * sizeX + x;
         indices[vi] = pixelBlock[pi];
       }
@@ -253,7 +330,7 @@ async function buildLitematicBytes(
         for (let x = 0; x < sizeX; x++) {
           const pi = z * sizeX + x;
           if (pixelBlock[pi] === 0) continue; // transparent pixel
-          const pixelY = yGrid![pi] - minY;
+          const pixelY = yGrid![pi];
           for (let sy = 0; sy < pixelY; sy++) {
             const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
             if (indices[vi] === 0) indices[vi] = supIdx;
@@ -266,7 +343,7 @@ async function buildLitematicBytes(
         for (let x = 0; x < sizeX; x++) {
           const pi = z * sizeX + x;
           if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
-          const pixelY = yGrid![pi] - minY;
+          const pixelY = yGrid![pi];
           const sy = pixelY - 1;
           if (sy < 0) continue;
           const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
