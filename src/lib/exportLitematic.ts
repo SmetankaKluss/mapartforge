@@ -148,16 +148,11 @@ async function buildLitematicBytes(
   const exportSizeZ = sizeZ;
 
   if (structure === 'staircase') {
-    if (staircaseMode === 'classic') {
-      const sc = computeStaircase(data, width, height, lookup);
-      yGrid = sc.yGrid;
-      minY  = sc.minY;
-      sizeY = Math.max(1, sc.maxY - minY + 1);
-    } else {
-      // Optimized: all shades at height 0
-      sizeY = 1;
-      yGrid = null; // Will be handled in volume filling
-    }
+    // Both classic and optimized use the same height computation
+    const sc = computeStaircase(data, width, height, lookup);
+    yGrid = sc.yGrid;
+    minY  = sc.minY;
+    sizeY = Math.max(1, sc.maxY - minY + 1);
   } else {
     sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
   }
@@ -204,24 +199,13 @@ async function buildLitematicBytes(
   const indices = new Uint32Array(volume);
 
   if (structure === 'staircase') {
-    if (yGrid !== null) {
-      // Classic mode: use computed y heights
-      for (let z = 0; z < sizeZ; z++) {
-        for (let x = 0; x < sizeX; x++) {
-          const pi = z * sizeX + x;
-          const y  = yGrid[pi] - minY;
-          const vi = y * exportSizeZ * sizeX + z * sizeX + x;
-          indices[vi] = pixelBlock[pi];
-        }
-      }
-    } else {
-      // Optimized mode: all at height 0
-      for (let z = 0; z < sizeZ; z++) {
-        for (let x = 0; x < sizeX; x++) {
-          const pi = z * sizeX + x;
-          const vi = z * sizeX + x; // y = 0, so vi = 0 * exportSizeZ * sizeX + z * sizeX + x
-          indices[vi] = pixelBlock[pi];
-        }
+    // Both classic and optimized: place pixel blocks at computed heights
+    for (let z = 0; z < sizeZ; z++) {
+      for (let x = 0; x < sizeX; x++) {
+        const pi = z * sizeX + x;
+        const y  = yGrid![pi] - minY;
+        const vi = y * exportSizeZ * sizeX + z * sizeX + x;
+        indices[vi] = pixelBlock[pi];
       }
     }
   } else {
@@ -263,18 +247,28 @@ async function buildLitematicBytes(
       blockPalette.push(supId);
       blockToIdx.set(supId, supIdx);
     }
-    const depth = supportMode === 3 ? 2 : 1;
-    for (let z = 0; z < sizeZ; z++) {
-      for (let x = 0; x < sizeX; x++) {
-        const pi = z * sizeX + x;
-        const i  = (z * width + x) * 4;
-        const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-        const entry = lookup.get(key);
-        // Mode 1: only blocks that can't float (supportBlockMandatory)
-        if (supportMode === 1 && !isMandatorySupport(entry?.baseId ?? 0, groups)) continue;
-        const pixelY = yGrid![pi] - minY;
-        for (let d = 1; d <= depth; d++) {
-          const sy = pixelY - d;
+
+    if (staircaseMode === 'optimized') {
+      // Optimized: full support pillar from y=0 to pixelY-1 for every column
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          const pi = z * sizeX + x;
+          if (pixelBlock[pi] === 0) continue; // transparent pixel
+          const pixelY = yGrid![pi] - minY;
+          for (let sy = 0; sy < pixelY; sy++) {
+            const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
+            if (indices[vi] === 0) indices[vi] = supIdx;
+          }
+        }
+      }
+    } else {
+      // Classic: thin snake — only support gravity-affected blocks (sand, gravel, etc.)
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          const pi = z * sizeX + x;
+          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+          const pixelY = yGrid![pi] - minY;
+          const sy = pixelY - 1;
           if (sy < 0) continue;
           const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
           if (indices[vi] === 0) indices[vi] = supIdx;
