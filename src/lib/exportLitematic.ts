@@ -348,7 +348,7 @@ export async function exportLitematic(
   name:             string = 'MapartForge',
   structure:        'flat' | 'staircase' = 'flat',
   supportBlockNbt?: string,
-  supportMode:      SupportMode = 2,
+  _supportMode:     SupportMode = 2,
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
@@ -369,7 +369,7 @@ export async function exportLitematicZip(
   structure:        'flat' | 'staircase',
   zipFilename:      string,
   supportBlockNbt?: string,
-  supportMode:      SupportMode = 2,
+  _supportMode:     SupportMode = 2,
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const zip = new JSZip();
