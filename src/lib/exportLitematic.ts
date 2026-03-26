@@ -211,6 +211,7 @@ async function buildLitematicBytes(
   structure:        'flat' | 'staircase',
   supportBlockNbt?: string,
   staircaseMode:    'classic' | 'optimized' = 'classic',
+  supportMode:      SupportMode = 1,
 ): Promise<Uint8Array> {
   const { data, width, height } = imageData;
   const lookup = buildLookup(cp);
@@ -221,14 +222,15 @@ async function buildLitematicBytes(
   // ── 1. Determine Y dimensions ─────────────────────────────────────────
   let sizeY: number;
   let yGrid: Int32Array | null = null;
-  const exportSizeZ = sizeZ;
+  // Staircase: add 1 extra Z row at z=0 for the noobline (north shading reference)
+  const exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
 
   if (structure === 'staircase') {
     const sc = staircaseMode === 'optimized'
       ? computeStaircaseOptimized(data, width, height, lookup)
       : computeStaircaseClassic(data, width, height, lookup);
     yGrid = sc.yGrid;
-    sizeY = Math.max(1, sc.maxY + 1);
+    sizeY = Math.max(1, sc.maxY + 2); // +1 for max, +1 headroom for noobline if needed
   } else {
     sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
   }
@@ -275,13 +277,37 @@ async function buildLitematicBytes(
   const indices = new Uint32Array(volume);
 
   if (structure === 'staircase') {
-    // Both classic and optimized: place pixel blocks at computed heights
+    // Art blocks placed at z+1 (z=0 is reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
         const y  = yGrid![pi];
-        const vi = y * exportSizeZ * sizeX + z * sizeX + x;
+        const vi = y * exportSizeZ * sizeX + (z + 1) * sizeX + x;
         indices[vi] = pixelBlock[pi];
+      }
+    }
+
+    // ── Noobline: 1 cobblestone per column at z=0 (north shading reference) ──
+    {
+      const noobId = 'minecraft:cobblestone';
+      let noobIdx = blockToIdx.get(noobId);
+      if (noobIdx === undefined) {
+        noobIdx = blockPalette.length;
+        blockToIdx.set(noobId, noobIdx);
+        blockPalette.push(noobId);
+      }
+      for (let x = 0; x < sizeX; x++) {
+        const firstArtY = yGrid![0 * sizeX + x];
+        const i = (0 * width + x) * 4;
+        const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+        const firstShade = lookup.get(key)?.shade ?? 1;
+        // Noobline is the virtual north neighbor of the first art row:
+        // shade 0 (dark):   noobline is higher → firstArtY + 1
+        // shade 1 (normal): same height         → firstArtY
+        // shade 2 (bright): noobline is lower   → firstArtY - 1
+        const nooblineY = Math.max(0, firstArtY + (firstShade === 0 ? 1 : firstShade === 2 ? -1 : 0));
+        const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+        indices[vi] = noobIdx;
       }
     }
   } else {
@@ -324,16 +350,35 @@ async function buildLitematicBytes(
       blockToIdx.set(supId, supIdx);
     }
 
-    // Both modes: only place 1 support block under gravity-affected blocks (sand, gravel, etc.)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+        if (pixelBlock[pi] === 0) continue; // transparent pixel
         const pixelY = yGrid![pi];
-        const sy = pixelY - 1;
-        if (sy < 0) continue;
-        const vi = sy * exportSizeZ * sizeX + z * sizeX + x;
-        if (indices[vi] === 0) indices[vi] = supIdx;
+        const artZ   = z + 1; // art shifted by 1 due to noobline
+
+        if (supportMode === 1) {
+          // Mode 1: 1 block under gravity-affected blocks only
+          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+          const sy = pixelY - 1;
+          if (sy < 0) continue;
+          const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
+          if (indices[vi] === 0) indices[vi] = supIdx;
+        } else if (supportMode === 2) {
+          // Mode 2: 1 block under every art block
+          const sy = pixelY - 1;
+          if (sy < 0) continue;
+          const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
+          if (indices[vi] === 0) indices[vi] = supIdx;
+        } else if (supportMode === 3) {
+          // Mode 3: 2 blocks under every art block
+          for (let k = 1; k <= 2; k++) {
+            const sy = pixelY - k;
+            if (sy < 0) break;
+            const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
+            if (indices[vi] === 0) indices[vi] = supIdx;
+          }
+        }
       }
     }
   }
@@ -410,11 +455,11 @@ export async function exportLitematic(
   name:             string = 'MapartForge',
   structure:        'flat' | 'staircase' = 'flat',
   supportBlockNbt?: string,
-  _supportMode:     SupportMode = 2,
+  supportMode:      SupportMode = 1,
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
-  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, staircaseMode);
+  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, staircaseMode, supportMode);
   triggerDownload(bytes, `${name}${suffix}.litematic`);
 }
 
@@ -431,7 +476,7 @@ export async function exportLitematicZip(
   structure:        'flat' | 'staircase',
   zipFilename:      string,
   supportBlockNbt?: string,
-  _supportMode:     SupportMode = 2,
+  supportMode:      SupportMode = 1,
   staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const zip = new JSZip();
@@ -441,7 +486,7 @@ export async function exportLitematicZip(
     for (let col = 0; col < mapGrid.wide; col++) {
       const tile  = extractTile(imageData, col, row);
       const name  = `mapart_${idx}`;
-      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, staircaseMode);
+      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, staircaseMode, supportMode);
       zip.file(`${name}.litematic`, bytes);
       idx++;
     }
