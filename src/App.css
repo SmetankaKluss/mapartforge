@@ -284,10 +284,24 @@ input, select, textarea { outline: none; }
   gap: 6px;
   line-height: 1;
 }
-.section-header::before,
-.control-title::before {
-  content: '>';
+.section-arrow {
+  font-size: 9px;
+  cursor: pointer;
   flex-shrink: 0;
+  transition: transform 0.15s ease;
+  user-select: none;
+  line-height: 1;
+}
+.section-arrow.collapsed {
+  transform: rotate(-90deg);
+}
+.control-group-content {
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.15s ease;
+}
+.control-group-content.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
 }
 
 /* ── Upload Zone ───────────────────────────────────────────────────────── */
@@ -534,6 +548,8 @@ input, select, textarea { outline: none; }
 .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Zoom reset button — larger icon */
 .tool-btn-zoom-reset { font-size: 16px; }
+/* Block picker arrow — bigger */
+.block-picker-arrow { font-size: 28px; min-width: 22px; }
 /* Reset buttons — red confirm pattern (same as palette clear) */
 .reset-confirm-btn:hover:not(:disabled) { border-color: rgba(255,68,68,0.7) !important; color: #ff4444 !important; box-shadow: 0 0 6px rgba(255,68,68,0.3) !important; }
 .reset-confirm-btn.pending              { border-color: rgba(255,68,68,0.7) !important; color: #ff4444 !important; animation: resetPulse 0.6s ease infinite alternate; }
@@ -940,7 +956,7 @@ input, select, textarea { outline: none; }
 
 /* ── Export Panel ──────────────────────────────────────────────────────── */
 .sidebar-section { display: flex; flex-direction: column; }
-.section-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.08em; padding: 10px 12px 7px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+.section-title { font-family: var(--font-pixel); font-size: 9px; color: var(--accent); letter-spacing: 0.08em; padding: 10px 12px 8px; background: rgba(87,255,110,0.04); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
 .section-title::before { content: '>'; }
 .export-empty { font-size: 9px; color: var(--text-muted); padding: 8px 12px; font-style: italic; }
 .export-buttons { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
@@ -956,9 +972,17 @@ input, select, textarea { outline: none; }
 }
 .export-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Panel Divider ──────────────────────────────────────────────────────────── */
+.panel-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--border) 10%, var(--border) 90%, transparent 100%);
+  margin: 8px 0;
+}
+
 /* ── Support Block Selector (3D mode, palette panel) ──────────────────── */
-.support-block-section { padding: 8px 10px 10px; border-top: 1px solid var(--border); }
-.support-block-section-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 6px; }
+.support-block-section { padding: 10px 10px 12px; background: rgba(87,255,110,0.04); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.support-block-section-title { font-family: var(--font-pixel); font-size: 9px; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 8px; }
 .support-block-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .support-block-item {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -1012,6 +1036,7 @@ input, select, textarea { outline: none; }
 .link-export-btn-error { border-color: rgba(255,68,85,0.5); color: var(--red); background: rgba(255,68,85,0.08); }
 
 /* ── Materials List ────────────────────────────────────────────────────── */
+.sidebar-section .mat-header { border-top: 1px solid var(--border); }
 .mat-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 .mat-mode-toggle {
   display: flex; align-items: center; gap: 5px;

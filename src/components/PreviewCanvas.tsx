@@ -215,6 +215,8 @@ export function PreviewCanvas({
   const paintBufferRef   = useRef<ImageData | null>(null);
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
+  const paintRenderScheduledRef = useRef(false);
+  const paintRenderFrameRef = useRef<number | null>(null);
   const [paintVersion, setPaintVersion] = useState(0);
 
   // Split slider state
@@ -275,6 +277,15 @@ export function PreviewCanvas({
   // ── Global mousemove + mouseup for brush drag ───────────────────────────────
 
   useEffect(() => {
+    function scheduleRender() {
+      if (paintRenderScheduledRef.current) return;
+      paintRenderScheduledRef.current = true;
+      paintRenderFrameRef.current = requestAnimationFrame(() => {
+        paintRenderScheduledRef.current = false;
+        setPaintVersion(v => v + 1);
+      });
+    }
+
     function onGlobalMouseMove(e: MouseEvent) {
       // Split drag takes priority
       if (isDraggingSplitRef.current && splitContainerRef.current) {
@@ -303,13 +314,15 @@ export function PreviewCanvas({
           paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
-      setPaintVersion(v => v + 1);
+      scheduleRender();
     }
 
     function onGlobalMouseUp() {
       if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
+      if (paintRenderFrameRef.current !== null) { cancelAnimationFrame(paintRenderFrameRef.current); }
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+      paintRenderScheduledRef.current = false;
       if (paintBufferRef.current) {
         onImageUpdateRef.current(paintBufferRef.current);
         paintBufferRef.current = null;
@@ -322,6 +335,7 @@ export function PreviewCanvas({
     return () => {
       window.removeEventListener('mousemove', onGlobalMouseMove);
       window.removeEventListener('mouseup',   onGlobalMouseUp);
+      if (paintRenderFrameRef.current !== null) cancelAnimationFrame(paintRenderFrameRef.current);
     };
   }, []); // stable — uses only refs
 
@@ -462,7 +476,13 @@ export function PreviewCanvas({
           paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
-      setPaintVersion(v => v + 1);
+      // Batch render like mousemove does — don't render immediately on mousedown
+      if (paintRenderFrameRef.current !== null) cancelAnimationFrame(paintRenderFrameRef.current);
+      paintRenderFrameRef.current = requestAnimationFrame(() => {
+        paintRenderScheduledRef.current = false;
+        setPaintVersion(v => v + 1);
+      });
+      paintRenderScheduledRef.current = true;
     } else if (activeTool === 'fill') {
       const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
       const i = (pos.py * buf.width + pos.px) * 4;
