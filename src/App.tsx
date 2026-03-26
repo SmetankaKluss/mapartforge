@@ -28,7 +28,6 @@ import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { WikiModal } from './components/WikiModal';
-import { Analytics } from '@vercel/analytics/react';
 import { createTour, shouldAutoStart } from './lib/tour';
 import 'driver.js/dist/driver.css';
 import './App.css';
@@ -92,6 +91,7 @@ export default function App() {
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
   const [compareData, setCompareData]   = useState<{ left: ImageData; right: ImageData } | null>(null);
   const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
+  const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'classic');
   const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
   const [dithering, setDithering]       = useState<DitheringMode>(saved.dithering ?? 'floyd-steinberg');
   const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
@@ -105,6 +105,7 @@ export default function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
   const [showAdjustments, setShowAdjustments] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
@@ -141,7 +142,7 @@ export default function App() {
   latestRef.current = { imageData, blockSelection };
 
   // Ref with all current state needed for export shortcuts (avoids stale closures)
-  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode });
+  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode });
 
 
   // ── Auto-save settings to localStorage ──────────────────────────────────
@@ -151,6 +152,7 @@ export default function App() {
   useEffect(() => { saveSettings({ blockSelection }); }, [blockSelection]);
   useEffect(() => { saveSettings({ adjustments }); }, [adjustments]);
   useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
+  useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
 
   // Push current state onto undo stack before a tracked action
@@ -227,7 +229,7 @@ export default function App() {
   );
 
   // Keep exportRef current each render so keyboard shortcuts access fresh state
-  exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode };
+  exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode };
 
   function handleCancelProcessing() {
     workerRef.current?.terminate();
@@ -415,6 +417,10 @@ export default function App() {
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
 
+  const handleToggleSection = useCallback((key: string) => {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
   const handleToggleAdjustments = useCallback(() => {
     setShowAdjustments(prev => {
       const next = !prev;
@@ -455,11 +461,11 @@ export default function App() {
   }, []);
 
   const handleExportLitematic = useCallback(() => {
-    const { imageData: img, activePalette: ap, blockSelection: sel, mapMode: mm } = exportRef.current;
+    const { imageData: img, activePalette: ap, blockSelection: sel, mapMode: mm, staircaseMode: sm } = exportRef.current;
     if (!img) return;
     const groups: Record<number, number[]> = {};
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
-    exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat');
+    exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat', undefined, undefined, sm);
   }, []);
 
   // Keyboard shortcuts: 1-8 select dithering, C toggles compare mode
@@ -683,8 +689,15 @@ export default function App() {
               onKlussParamsChange={handleKlussParamsChange}
               mapGrid={mapGrid}
               onMapGridChange={handleMapGridChange}
+              mapMode={mapMode}
+              onMapModeChange={handleMapModeChange}
+              staircaseMode={staircaseMode}
+              onStaircaseModeChange={setStaircaseMode}
               processing={processing}
+              collapsedSections={collapsedSections}
+              onToggleSection={handleToggleSection}
             />
+            <div className="panel-section">
             <Adjustments
               adjustments={adjustments}
               sourceImage={sourceImage}
@@ -693,25 +706,9 @@ export default function App() {
               disabled={processing || !showAdjustments}
               showAdjustments={showAdjustments}
               onToggleAdjustments={handleToggleAdjustments}
+              collapsed={!!collapsedSections['adjustments']}
+              onToggle={() => handleToggleSection('adjustments')}
             />
-            <div className="panel-section">
-              <div className="section-header">
-                Map mode
-              </div>
-              <div className="mode-toggle">
-                <button
-                  className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
-                  onClick={() => handleMapModeChange('2d')}
-                  disabled={processing}
-                  title="2D flat — one shade per color, ~61 colors"
-                >2D FLAT</button>
-                <button
-                  className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
-                  onClick={() => handleMapModeChange('3d')}
-                  disabled={processing}
-                  title="3D staircase — 3 shades per color, ~183 colors"
-                >3D STAIR</button>
-              </div>
             </div>
           </div>
           <div className="panel-footer">
@@ -798,7 +795,7 @@ export default function App() {
                 {activeTool === 'brush' && (
                   <div className="toolbar-group">
                     {([1, 2, 3] as const).map(s => (
-                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}×${s}`}>{s}×</button>
+                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}px`}>{s}px</button>
                     ))}
                   </div>
                 )}
@@ -833,7 +830,7 @@ export default function App() {
                       <span className="paint-no-block">no block</span>
                     )}
                   </div>
-                  <button className="tool-btn" onClick={() => setShowBlockPicker(p => !p)} title="Choose block">▾</button>
+                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title="Choose block">▾</button>
                   {showBlockPicker && (
                     <BlockPickerPopup
                       blockSelection={blockSelection}
@@ -1007,6 +1004,7 @@ export default function App() {
                 paletteSize={activePalette.colors.length}
                 disabled={processing}
               />
+              <div className="panel-divider"></div>
               {mapMode === '3d' && (
                 <div className="support-block-section">
                   <div className="support-block-section-title">Support block (3D)</div>
@@ -1040,7 +1038,7 @@ export default function App() {
                       </button>
                       <div className={`support-depth-group${supportBlock === 'air' ? ' disabled' : ''}`}>
                         <span className="support-mode-label">Depth</span>
-                        {([1, 2, 3] as const).map(m => (
+                        {([1, 2] as const).map(m => (
                           <button
                             key={m}
                             className={`support-mode-btn${supportMode === m ? ' active' : ''}`}
@@ -1074,6 +1072,7 @@ export default function App() {
               compareRight={compareRight}
               mapGrid={mapGrid}
               mapMode={mapMode}
+              staircaseMode={staircaseMode}
               activePalette={activePalette}
               blockSelection={blockSelection}
               disabled={processing}
@@ -1103,8 +1102,6 @@ export default function App() {
           </button>
         </div>
       </div>
-
-      <Analytics />
 
       {/* ── STATUS BAR ── */}
       <div className="status-bar">
