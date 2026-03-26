@@ -13,6 +13,8 @@ interface Props {
   disabled:     boolean;
   showAdjustments: boolean;
   onToggleAdjustments: () => void;
+  collapsed: boolean;
+  onToggle: () => void;
 }
 
 const SLIDERS: { key: keyof ImageAdjustments; label: string }[] = [
@@ -21,7 +23,7 @@ const SLIDERS: { key: keyof ImageAdjustments; label: string }[] = [
   { key: 'saturation', label: 'Saturation' },
 ];
 
-export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disabled, showAdjustments, onToggleAdjustments }: Props) {
+export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disabled, showAdjustments, onToggleAdjustments, collapsed, onToggle }: Props) {
   const thumbRef = useRef<HTMLCanvasElement>(null);
 
   // Redraw thumbnail whenever source image or adjustments change
@@ -68,6 +70,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
   return (
     <section className={`control-group${disabled ? ' adj-disabled' : ''}`}>
       <h3 className="control-title">
+        <span className={`section-arrow${collapsed ? ' collapsed' : ''}`} onClick={onToggle}>▼</span>
         <button
           className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
           onClick={onToggleAdjustments}
@@ -80,6 +83,8 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
         )}
         <span style={{ flex: 1, textAlign: 'right' }}>Adjustments</span>
       </h3>
+
+      <div className={`control-group-content${collapsed ? ' collapsed' : ''}`}>
 
       {/* Thumbnail */}
       {sourceImage && (
@@ -116,6 +121,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
             />
           </div>
         ))}
+      </div>
       </div>
     </section>
   );

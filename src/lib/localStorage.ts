@@ -11,6 +11,7 @@ export interface SavedSettings {
   blockSelection: BlockSelection;
   adjustments: ImageAdjustments;
   mapMode: '2d' | '3d';
+  staircaseMode: 'classic' | 'optimized';
   bnScale: number;
 }
 

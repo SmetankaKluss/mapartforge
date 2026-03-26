@@ -133,6 +133,7 @@ async function buildLitematicBytes(
   structure:        'flat' | 'staircase',
   supportBlockNbt?: string,
   supportMode:      SupportMode = 2,
+  staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<Uint8Array> {
   const { data, width, height } = imageData;
   const lookup = buildLookup(cp);
@@ -147,10 +148,16 @@ async function buildLitematicBytes(
   const exportSizeZ = sizeZ;
 
   if (structure === 'staircase') {
-    const sc = computeStaircase(data, width, height, lookup);
-    yGrid = sc.yGrid;
-    minY  = sc.minY;
-    sizeY = Math.max(1, sc.maxY - minY + 1);
+    if (staircaseMode === 'classic') {
+      const sc = computeStaircase(data, width, height, lookup);
+      yGrid = sc.yGrid;
+      minY  = sc.minY;
+      sizeY = Math.max(1, sc.maxY - minY + 1);
+    } else {
+      // Optimized: all shades at height 0
+      sizeY = 1;
+      yGrid = null; // Will be handled in volume filling
+    }
   } else {
     sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
   }
@@ -197,12 +204,24 @@ async function buildLitematicBytes(
   const indices = new Uint32Array(volume);
 
   if (structure === 'staircase') {
-    for (let z = 0; z < sizeZ; z++) {
-      for (let x = 0; x < sizeX; x++) {
-        const pi = z * sizeX + x;
-        const y  = yGrid![pi] - minY;
-        const vi = y * exportSizeZ * sizeX + z * sizeX + x;
-        indices[vi] = pixelBlock[pi];
+    if (yGrid !== null) {
+      // Classic mode: use computed y heights
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          const pi = z * sizeX + x;
+          const y  = yGrid[pi] - minY;
+          const vi = y * exportSizeZ * sizeX + z * sizeX + x;
+          indices[vi] = pixelBlock[pi];
+        }
+      }
+    } else {
+      // Optimized mode: all at height 0
+      for (let z = 0; z < sizeZ; z++) {
+        for (let x = 0; x < sizeX; x++) {
+          const pi = z * sizeX + x;
+          const vi = z * sizeX + x; // y = 0, so vi = 0 * exportSizeZ * sizeX + z * sizeX + x
+          indices[vi] = pixelBlock[pi];
+        }
       }
     }
   } else {
@@ -337,9 +356,10 @@ export async function exportLitematic(
   structure:        'flat' | 'staircase' = 'flat',
   supportBlockNbt?: string,
   supportMode:      SupportMode = 2,
+  staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
-  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, supportMode);
+  const bytes  = await buildLitematicBytes(imageData, cp, groups, name, structure, supportBlockNbt, supportMode, staircaseMode);
   triggerDownload(bytes, `${name}${suffix}.litematic`);
 }
 
@@ -357,6 +377,7 @@ export async function exportLitematicZip(
   zipFilename:      string,
   supportBlockNbt?: string,
   supportMode:      SupportMode = 2,
+  staircaseMode:    'classic' | 'optimized' = 'classic',
 ): Promise<void> {
   const zip = new JSZip();
   let idx = 1;
@@ -365,7 +386,7 @@ export async function exportLitematicZip(
     for (let col = 0; col < mapGrid.wide; col++) {
       const tile  = extractTile(imageData, col, row);
       const name  = `mapart_${idx}`;
-      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, supportMode);
+      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, supportMode, staircaseMode);
       zip.file(`${name}.litematic`, bytes);
       idx++;
     }

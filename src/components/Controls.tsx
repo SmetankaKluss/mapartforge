@@ -17,7 +17,13 @@ interface Props {
   onKlussParamsChange: (p: KlussParams) => void;
   mapGrid: MapGrid;
   onMapGridChange: (g: MapGrid) => void;
+  mapMode: '2d' | '3d';
+  onMapModeChange: (mode: '2d' | '3d') => void;
+  staircaseMode: 'classic' | 'optimized';
+  onStaircaseModeChange: (mode: 'classic' | 'optimized') => void;
   processing: boolean;
+  collapsedSections: Record<string, boolean>;
+  onToggleSection: (key: string) => void;
 }
 
 const BN_SCALES = [1, 2] as const;
@@ -149,7 +155,10 @@ export function Controls({
   bnScale, onBnScaleChange,
   klussParams, onKlussParamsChange,
   mapGrid, onMapGridChange,
+  mapMode, onMapModeChange,
+  staircaseMode, onStaircaseModeChange,
   processing,
+  collapsedSections, onToggleSection,
 }: Props) {
   const showIntensity = dithering !== 'none';
   const blockW = mapGrid.wide * MAP_BLOCK_SIZE;
@@ -203,7 +212,11 @@ export function Controls({
 
       {/* ── Map grid selector ─────────────────────────────────── */}
       <section className="control-group">
-        <h3 className="control-title">Map grid</h3>
+        <h3 className="control-title">
+          <span className={`section-arrow${collapsedSections['map-grid'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-grid')}>▼</span>
+          Map grid
+        </h3>
+        <div className={`control-group-content${collapsedSections['map-grid'] ? ' collapsed' : ''}`}>
         <div className="grid-options">
           {MAP_GRID_OPTIONS.map((g) => {
             const active = !customIsActive && g.wide === mapGrid.wide && g.tall === mapGrid.tall;
@@ -285,11 +298,58 @@ export function Controls({
         <p className="grid-info">
           {mapGrid.wide}×{mapGrid.tall} maps — <strong>{blockW}×{blockH}</strong> blocks
         </p>
+        </div>
+      </section>
+
+      {/* ── Map mode (2D/3D) ──────────────────────────────────── */}
+      <section className="control-group">
+        <h3 className="control-title">
+          <span className={`section-arrow${collapsedSections['map-mode'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-mode')}>▼</span>
+          Map mode
+        </h3>
+        <div className={`control-group-content${collapsedSections['map-mode'] ? ' collapsed' : ''}`}>
+          <div className="mode-toggle">
+            <button
+              className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
+              onClick={() => onMapModeChange('2d')}
+              disabled={processing}
+              title="2D flat — one shade per color, ~61 colors"
+            >2D FLAT</button>
+            <button
+              className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
+              onClick={() => onMapModeChange('3d')}
+              disabled={processing}
+              title="3D staircase —3 shades per color, ~183 colors"
+            >3D STAIR</button>
+          </div>
+          {mapMode === '3d' && (
+            <div className="mode-toggle" style={{ marginTop: '6px' }}>
+              <button
+                className={`mode-btn${staircaseMode === 'classic' ? ' active' : ''}`}
+                onClick={() => onStaircaseModeChange('classic')}
+                disabled={processing}
+                title="Classic: each shade on different height"
+                style={{ fontSize: '10px' }}
+              >Classic</button>
+              <button
+                className={`mode-btn${staircaseMode === 'optimized' ? ' active' : ''}`}
+                onClick={() => onStaircaseModeChange('optimized')}
+                disabled={processing}
+                title="Optimized: all shades at height 0, texture only"
+                style={{ fontSize: '10px' }}
+              >Optimized</button>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ── Dithering ─────────────────────────────────────────── */}
       <section className="control-group">
-        <h3 className="control-title">Dithering</h3>
+        <h3 className="control-title">
+          <span className={`section-arrow${collapsedSections['dithering'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('dithering')}>▼</span>
+          Dithering
+        </h3>
+        <div className={`control-group-content${collapsedSections['dithering'] ? ' collapsed' : ''}`}>
         <div className="dither-options">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
             <label
@@ -322,12 +382,17 @@ export function Controls({
             </div>
           );
         })()}
+        </div>
       </section>
 
       {/* ── Blue noise pattern scale ──────────────────────────── */}
       {dithering === 'blue-noise' && (
         <section className="control-group">
-          <h3 className="control-title">Pattern scale</h3>
+          <h3 className="control-title">
+            <span className={`section-arrow${collapsedSections['pattern-scale'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('pattern-scale')}>▼</span>
+            Pattern scale
+          </h3>
+          <div className={`control-group-content${collapsedSections['pattern-scale'] ? ' collapsed' : ''}`}>
           <div className="bn-scale-options">
             {BN_SCALES.map(s => (
               <button
@@ -346,13 +411,18 @@ export function Controls({
               ? 'Fine grain — may show ribbing pattern.'
               : `${bnScale}×${bnScale} block areas share one noise threshold.`}
           </p>
+          </div>
         </section>
       )}
 
       {/* ── KlussDither params ───────────────────────────────────── */}
       {dithering === 'kluss' && (
         <section className="control-group">
-          <h3 className="control-title">KlussDither settings</h3>
+          <h3 className="control-title">
+            <span className={`section-arrow${collapsedSections['klussettings'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('klussettings')}>▼</span>
+            KlussDither settings
+          </h3>
+          <div className={`control-group-content${collapsedSections['klussettings'] ? ' collapsed' : ''}`}>
 
           {/* Clean threshold */}
           <div className="kluss-param">
@@ -457,6 +527,7 @@ export function Controls({
             onClick={() => onKlussParamsChange(DEFAULT_KLUSS_PARAMS)}
             disabled={processing}
           >Reset to defaults</button>
+          </div>
         </section>
       )}
 
@@ -464,12 +535,14 @@ export function Controls({
       {showIntensity && (
         <section className="control-group">
           <h3 className="control-title">
+            <span className={`section-arrow${collapsedSections['intensity'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('intensity')}>▼</span>
             Intensity
             <span className="slider-value-wrap">
               <NumInput value={intensity} min={0} max={100} step={1} onCommit={v => { onIntensityChange(v); onIntensityCommit(v); }} disabled={processing} />
               <span className="num-input-unit">%</span>
             </span>
           </h3>
+          <div className={`control-group-content${collapsedSections['intensity'] ? ' collapsed' : ''}`}>
           <input
             type="range"
             min={0}
@@ -497,6 +570,7 @@ export function Controls({
           {dithering === 'kluss' && (
             <p className="intensity-hint">0% = no dithering (pure snap), 100% = full Stucki diffusion at the set error strength.</p>
           )}
+          </div>
         </section>
       )}
 

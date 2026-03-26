@@ -100,18 +100,20 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   // ── Block toggles ────────────────────────────────────────────────────────
 
   function toggleBlock(csId: number, blockId: number) {
+    // Radio-select: only one block per color group
     const cur = blockSelection[csId] ?? [];
-    const next = cur.includes(blockId)
-      ? cur.filter(id => id !== blockId)
-      : [...cur, blockId].sort((a, b) => a - b);
+    const isSelected = cur.includes(blockId);
+    const next = isSelected ? cur : [blockId];
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
 
   function toggleRow(csId: number) {
     const row = COLOUR_ROWS[csId];
     const cur = blockSelection[csId] ?? [];
-    const allOn = cur.length === row.blocks.length;
-    onSelectionChange({ ...blockSelection, [csId]: allOn ? [] : row.blocks.map(b => b.blockId) });
+    const hasSelection = cur.length > 0;
+    // Toggle: if any block selected, deselect all; otherwise select first block
+    const next = hasSelection ? [] : [row.blocks[0]?.blockId ?? 0];
+    onSelectionChange({ ...blockSelection, [csId]: next });
   }
 
   // ── Search filtering ─────────────────────────────────────────────────────

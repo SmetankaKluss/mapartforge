@@ -20,6 +20,7 @@ interface Props {
   compareRight: DitheringMode;
   mapGrid:     MapGrid;
   mapMode:     '2d' | '3d';
+  staircaseMode: 'classic' | 'optimized';
   activePalette:  ComputedPalette;
   blockSelection: BlockSelection;
   disabled:    boolean;
@@ -51,7 +52,7 @@ function makePngFilename(grid: MapGrid, dithering: DitheringMode): string {
 export function ExportPanel({
   imageData, compareData, compareMode,
   dithering, compareLeft, compareRight,
-  mapGrid, mapMode, activePalette, blockSelection, disabled,
+  mapGrid, mapMode, staircaseMode, activePalette, blockSelection, disabled,
   supportBlock, supportMode,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
@@ -97,7 +98,7 @@ export function ExportPanel({
     try {
       await exportLitematic(src, activePalette, blockSelection, 'MapartForge', structure,
         structure === 'staircase' ? supportBlock : undefined,
-        supportMode);
+        supportMode, staircaseMode);
     } finally {
       setBusyLiteFlat(false);
     }
@@ -113,7 +114,7 @@ export function ExportPanel({
     try {
       await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename,
         structure === 'staircase' ? supportBlock : undefined,
-        supportMode);
+        supportMode, staircaseMode);
     } finally {
       setBusyZip(false);
     }
@@ -125,7 +126,7 @@ export function ExportPanel({
     setLinkState('uploading');
     try {
       const url = await uploadPermalink(sourceImage, src, {
-        dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, bnScale,
+        dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, staircaseMode, bnScale,
       });
       setLinkUrl(url);
       setLinkState('idle');
