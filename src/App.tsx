@@ -219,7 +219,7 @@ export default function App() {
   }, [imageData, compareMode]);
 
 
-  const modeShades = mapMode === '2d' ? [2] : [0, 1, 2];
+  const modeShades = mapMode === '2d' ? [1] : [0, 1, 2];
 
   // When adjustments are disabled, use zero adjustments for processing
   const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
@@ -401,14 +401,14 @@ export default function App() {
   const handleSelectionChange = useCallback((sel: BlockSelection) => {
     pushToHistory();
     setBlockSelection(sel);
-    const shades = mapMode === '2d' ? [2] : [0, 1, 2];
+    const shades = mapMode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
-    const shades = mode === '2d' ? [2] : [0, 1, 2];
+    const shades = mode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
@@ -447,7 +447,7 @@ export default function App() {
     pushToHistory();
     const next: BlockSelection = { ...blockSelection, [csId]: [] };
     setBlockSelection(next);
-    const shades = mapMode === '2d' ? [2] : [0, 1, 2];
+    const shades = mapMode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
   }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams]);
@@ -515,7 +515,7 @@ export default function App() {
     setAdjustments(DEFAULT_ADJUSTMENTS);
     setMapMode('2d');
     if (sourceImage) {
-      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [2]));
+      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1]));
       runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
     }
   }, [sourceImage, compareMode, compareLeft, compareRight]);
@@ -566,7 +566,7 @@ export default function App() {
         setViewBanner(true);
         setUndoStack([]);
         setRedoStack([]);
-        const shades = (s.mapMode ?? '2d') === '2d' ? [2] : [0, 1, 2];
+        const shades = (s.mapMode ?? '2d') === '2d' ? [1] : [0, 1, 2];
         const palette = buildComputedPalette(
           buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades),
         );

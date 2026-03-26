@@ -80,7 +80,7 @@ const BASE_COLORS: [number, number, number, string][] = [
 const SHADE_MULTIPLIERS = [180, 220, 255, 135];
 
 function applyShade(value: number, mult: number): number {
-  return Math.round((value * mult) / 255);
+  return Math.floor((value * mult) / 255);
 }
 
 // Build the full palette: 61 base × 4 shades = 244 colors
