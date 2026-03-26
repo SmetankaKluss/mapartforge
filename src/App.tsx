@@ -126,6 +126,8 @@ export default function App() {
   bgColorRef.current = bgColor;
   // Always holds the originally-uploaded image so crop modal can re-crop from source
   const uploadedImageRef = useRef<HTMLImageElement | null>(null);
+  // Raw file for color-accurate bitmap creation (bypasses ICC profile correction)
+  const uploadedFileRef  = useRef<File | null>(null);
   const workerRef     = useRef<Worker | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCancel, setShowCancel] = useState(false);
@@ -304,8 +306,10 @@ export default function App() {
     };
     worker.onerror = () => done();
 
-    // Create transferable bitmap, then dispatch to worker
-    createImageBitmap(img).then(bitmap => {
+    // Create transferable bitmap, then dispatch to worker.
+    // Use raw File if available to bypass ICC profile color correction.
+    const bitmapSource: ImageBitmapSource = uploadedFileRef.current ?? img;
+    createImageBitmap(bitmapSource, { colorSpaceConversion: 'none' }).then(bitmap => {
       // If a newer runProcess call superseded this one, discard
       if (workerRef.current !== worker) { bitmap.close(); return; }
       if (compare) {
@@ -322,8 +326,9 @@ export default function App() {
     }).catch(() => done());
   }
 
-  const handleImageLoaded = useCallback((img: HTMLImageElement) => {
+  const handleImageLoaded = useCallback((img: HTMLImageElement, file?: File) => {
     uploadedImageRef.current = img;   // save original for crop modal
+    uploadedFileRef.current  = file ?? null;
     // Detect transparency by sampling pixels at reduced scale
     const tc = document.createElement('canvas');
     tc.width  = Math.min(img.naturalWidth,  64);

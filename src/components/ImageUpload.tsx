@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import type { DragEvent, ChangeEvent, ClipboardEvent } from 'react';
 
 interface Props {
-  onImageLoaded: (img: HTMLImageElement) => void;
+  onImageLoaded: (img: HTMLImageElement, file: File) => void;
 }
 
 export function ImageUpload({ onImageLoaded }: Props) {
@@ -14,7 +14,7 @@ export function ImageUpload({ onImageLoaded }: Props) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      onImageLoaded(img);
+      onImageLoaded(img, file);
       URL.revokeObjectURL(url);
     };
     img.src = url;
