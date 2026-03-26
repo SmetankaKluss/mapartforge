@@ -31,8 +31,7 @@ async function scaleSource(
 ): Promise<Uint8ClampedArray> {
   const offscreen = new OffscreenCanvas(width, height);
   const ctx = offscreen.getContext('2d')!;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingEnabled = false;
   if (bgMode === 'color') {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);

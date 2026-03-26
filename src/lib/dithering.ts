@@ -39,12 +39,18 @@ export const DEFAULT_KLUSS_PARAMS: KlussParams = {
 // ── Computed-palette bundle ───────────────────────────────────────────────
 
 export interface ComputedPalette {
-  colors: PaletteColor[];
-  labs:   Lab[];
+  colors:      PaletteColor[];
+  labs:        Lab[];
+  exactLookup: Map<number, number>; // (r<<16|g<<8|b) → palette index
 }
 
 export function buildComputedPalette(colors: PaletteColor[]): ComputedPalette {
-  return { colors, labs: colors.map(c => rgbToOklab(c.r, c.g, c.b)) };
+  const exactLookup = new Map<number, number>();
+  colors.forEach((c, i) => {
+    const key = (c.r << 16) | (c.g << 8) | c.b;
+    if (!exactLookup.has(key)) exactLookup.set(key, i);
+  });
+  return { colors, labs: colors.map(c => rgbToOklab(c.r, c.g, c.b)), exactLookup };
 }
 
 /** Full default palette — pre-built once at module load. */
@@ -60,7 +66,13 @@ function findClosestColor(
   r: number, g: number, b: number,
   cp: ComputedPalette,
 ): { color: PaletteColor; index: number; dist: number } {
-  const lab = rgbToOklab(clamp(r), clamp(g), clamp(b));
+  // Fast path: exact RGB match — no OKLab needed
+  const cr = clamp(r), cg = clamp(g), cb = clamp(b);
+  const exactIdx = cp.exactLookup.get((cr << 16) | (cg << 8) | cb);
+  if (exactIdx !== undefined) {
+    return { color: cp.colors[exactIdx], index: exactIdx, dist: 0 };
+  }
+  const lab = rgbToOklab(cr, cg, cb);
   let minDist = Infinity;
   let bestIndex = 0;
   for (let i = 0; i < cp.labs.length; i++) {
