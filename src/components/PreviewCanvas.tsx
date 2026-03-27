@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { MapCanvas } from './MapCanvas';
+import { MapCanvas, drawImageData } from './MapCanvas';
 import { BlockCanvas } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
@@ -99,9 +99,11 @@ function buildRepaintEntries(r: number, g: number, b: number, cp: ComputedPalett
   const hoveredLab = rgbToOklab(r, g, b);
   const seen = new Set<number>();
   const entries: RepaintEntry[] = [];
+  // Use shade 2 as representative in 3D mode; fall back to shade 1 for 2D (shade-1-only palette).
+  const repShade = cp.colors.some(c => c.shade === 2) ? 2 : 1;
   for (let i = 0; i < cp.colors.length; i++) {
     const c = cp.colors[i];
-    if (c.shade !== 2) continue;
+    if (c.shade !== repShade) continue;
     const row = COLOUR_ROWS.find(row => row.baseId === c.baseId);
     if (!row || seen.has(row.csId)) continue;
     seen.add(row.csId);
@@ -297,7 +299,7 @@ export function PreviewCanvas({
       const { activeTool, paintBlock, scale, width, height, cp, brushSize } = propsRef.current;
       if (!isDraggingRef.current || activeTool !== 'brush' || !paintBlock || !paintBufferRef.current) return;
       const canvas = canvasZoneRef.current?.querySelector('canvas');
-      if (!canvas) return;
+      if (!(canvas instanceof HTMLCanvasElement)) return;
       const rect = canvas.getBoundingClientRect();
       const cx = Math.floor((e.clientX - rect.left) / scale);
       const cy = Math.floor((e.clientY - rect.top)  / scale);
@@ -314,19 +316,17 @@ export function PreviewCanvas({
           paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
-      scheduleRender();
+      // Draw directly to the visible canvas — bypasses React state so no re-render lag
+      drawImageData(canvas, paintBufferRef.current!, width, height, scale, false);
     }
 
     function onGlobalMouseUp() {
       if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
-      if (paintRenderFrameRef.current !== null) { cancelAnimationFrame(paintRenderFrameRef.current); }
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-      paintRenderScheduledRef.current = false;
       if (paintBufferRef.current) {
         onImageUpdateRef.current(paintBufferRef.current);
         paintBufferRef.current = null;
-        setPaintVersion(v => v + 1);
       }
     }
 
@@ -335,7 +335,6 @@ export function PreviewCanvas({
     return () => {
       window.removeEventListener('mousemove', onGlobalMouseMove);
       window.removeEventListener('mouseup',   onGlobalMouseUp);
-      if (paintRenderFrameRef.current !== null) cancelAnimationFrame(paintRenderFrameRef.current);
     };
   }, []); // stable — uses only refs
 
@@ -476,13 +475,11 @@ export function PreviewCanvas({
           paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock.baseId, paintBlock.shade, cp);
         }
       }
-      // Batch render like mousemove does — don't render immediately on mousedown
-      if (paintRenderFrameRef.current !== null) cancelAnimationFrame(paintRenderFrameRef.current);
-      paintRenderFrameRef.current = requestAnimationFrame(() => {
-        paintRenderScheduledRef.current = false;
-        setPaintVersion(v => v + 1);
-      });
-      paintRenderScheduledRef.current = true;
+      // Draw directly to the visible canvas — no React re-render needed mid-drag
+      const canvas = canvasZoneRef.current?.querySelector('canvas');
+      if (canvas instanceof HTMLCanvasElement) {
+        drawImageData(canvas, paintBufferRef.current, width, height, scale, false);
+      }
     } else if (activeTool === 'fill') {
       const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
       const i = (pos.py * buf.width + pos.px) * 4;

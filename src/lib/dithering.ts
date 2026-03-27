@@ -50,6 +50,17 @@ export function buildComputedPalette(colors: PaletteColor[]): ComputedPalette {
     const key = (c.r << 16) | (c.g << 8) | c.b;
     if (!exactLookup.has(key)) exactLookup.set(key, i);
   });
+  // Cross-shade lookup: map other shades of active base colors to their active equivalent.
+  // This ensures pre-mapped art pixels (e.g. shade-2 colors in a 2D shade-1 palette) are
+  // recognised as the correct base color instead of falling through to OKLab nearest-neighbor.
+  const activeByBase = new Map<number, number>(); // baseId → first index in colors[]
+  colors.forEach((c, i) => { if (!activeByBase.has(c.baseId)) activeByBase.set(c.baseId, i); });
+  for (const pc of PALETTE) {
+    const idx = activeByBase.get(pc.baseId);
+    if (idx === undefined) continue;
+    const key = (pc.r << 16) | (pc.g << 8) | pc.b;
+    if (!exactLookup.has(key)) exactLookup.set(key, idx);
+  }
   return { colors, labs: colors.map(c => rgbToOklab(c.r, c.g, c.b)), exactLookup };
 }
 
