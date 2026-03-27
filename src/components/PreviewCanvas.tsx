@@ -217,9 +217,6 @@ export function PreviewCanvas({
   const paintBufferRef   = useRef<ImageData | null>(null);
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
-  const paintRenderScheduledRef = useRef(false);
-  const paintRenderFrameRef = useRef<number | null>(null);
-  const [paintVersion, setPaintVersion] = useState(0);
 
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
@@ -617,9 +614,6 @@ export function PreviewCanvas({
       <span className={`split-label split-label-right${labelsVisible ? ' visible' : ''}`}>PROCESSED</span>
     </div>
   ) : processedLayer;
-
-  // paintVersion is used only to force re-renders when paint buffer mutates
-  void paintVersion;
 
   return (
     <div
