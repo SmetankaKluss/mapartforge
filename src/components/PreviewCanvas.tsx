@@ -279,15 +279,6 @@ export function PreviewCanvas({
   // ── Global mousemove + mouseup for brush drag ───────────────────────────────
 
   useEffect(() => {
-    function scheduleRender() {
-      if (paintRenderScheduledRef.current) return;
-      paintRenderScheduledRef.current = true;
-      paintRenderFrameRef.current = requestAnimationFrame(() => {
-        paintRenderScheduledRef.current = false;
-        setPaintVersion(v => v + 1);
-      });
-    }
-
     function onGlobalMouseMove(e: MouseEvent) {
       // Split drag takes priority
       if (isDraggingSplitRef.current && splitContainerRef.current) {
