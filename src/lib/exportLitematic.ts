@@ -251,6 +251,7 @@ async function buildLitematicBytes(
   const blockToIdx   = new Map<string, number>([['minecraft:air', 0]]);
   const pixelBlock   = new Array<number>(width * height);
   const pixelBaseId  = new Int32Array(width * height);
+  const pixelShade   = new Int32Array(width * height);
 
   for (let z = 0; z < sizeZ; z++) {
     for (let x = 0; x < sizeX; x++) {
@@ -273,6 +274,7 @@ async function buildLitematicBytes(
       }
       pixelBlock[z * sizeX + x]  = idx;
       pixelBaseId[z * sizeX + x] = entry?.baseId ?? 0;
+      pixelShade[z * sizeX + x]  = entry?.shade ?? 1;
     }
   }
 
@@ -370,11 +372,14 @@ async function buildLitematicBytes(
           const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
           if (indices[vi] === 0) indices[vi] = supIdx;
         } else if (supportMode === 2) {
-          // Mode 2: 1 block under every art block
-          const sy = pixelY - 1;
-          if (sy < 0) continue;
-          const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
-          if (indices[vi] === 0) indices[vi] = supIdx;
+          // Mode 2: shade-dependent support — stepping shades get 2 blocks, flat gets 1
+          const numSup = pixelShade[pi] === 1 ? 1 : 2;
+          for (let k = 1; k <= numSup; k++) {
+            const sy = pixelY - k;
+            if (sy < 0) break;
+            const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
+            if (indices[vi] === 0) indices[vi] = supIdx;
+          }
         } else if (supportMode === 3) {
           // Mode 3: 2 blocks under every art block
           for (let k = 1; k <= 2; k++) {
