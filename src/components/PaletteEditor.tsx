@@ -35,6 +35,19 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     if (showSaveModal) modalInputRef.current?.focus();
   }, [showSaveModal]);
 
+  // Auto-detect matching preset when blockSelection changes externally
+  useEffect(() => {
+    const allPresets = { ...BUILTIN_PRESETS, ...customPresets };
+    for (const [name, sel] of Object.entries(allPresets)) {
+      if (JSON.stringify(blockSelection) === JSON.stringify(sel)) {
+        setSelectedPreset(name);
+        return;
+      }
+    }
+    setSelectedPreset('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockSelection]);
+
   const persistPresets = useCallback((p: Record<string, BlockSelection>) => {
     setCustomPresets(p);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));

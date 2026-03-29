@@ -52,9 +52,14 @@ const SUPPORT_BLOCKS_PALETTE = [
 ] as const;
 
 const SUPPORT_MODE_TITLES: Record<1 | 2 | 3, string> = {
-  1: 'Under floating blocks only (sand, gravel, lichens…)',
-  2: 'One block under every art block',
-  3: 'Two blocks under every art block',
+  1: '1 block under floating blocks only (sand, gravel, lichens…)',
+  2: 'Shade-dependent: stepping shades get 2, flat gets 1',
+  3: '2 blocks under every art block',
+};
+
+const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
+  1: 'Critical',
+  2: 'Optimal',
 };
 
 const MAX_HISTORY = 20;
@@ -828,7 +833,7 @@ export default function App() {
                   <div className="paint-active-swatch">
                     {paintBlock ? (
                       <>
-                        <span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} />
+                        <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span>
                         <span className="paint-swatch-name">{paintBlock.displayName}</span>
                       </>
                     ) : (
@@ -1050,7 +1055,7 @@ export default function App() {
                             onClick={() => setSupportMode(m)}
                             title={SUPPORT_MODE_TITLES[m]}
                             disabled={supportBlock === 'air'}
-                          >{m}</button>
+                          >{SUPPORT_MODE_LABELS[m]}</button>
                         ))}
                       </div>
                     </div>

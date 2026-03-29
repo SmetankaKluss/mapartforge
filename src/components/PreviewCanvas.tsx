@@ -136,15 +136,16 @@ function paintPixelInBuffer(
   const i = (py * buf.width + px) * 4;
   const tc = getTargetColor(targetShade, targetBaseId, cp);
   if (!tc) return;
-  buf.data[i] = tc.r; buf.data[i + 1] = tc.g; buf.data[i + 2] = tc.b;
+  buf.data[i] = tc.r; buf.data[i + 1] = tc.g; buf.data[i + 2] = tc.b; buf.data[i + 3] = 255;
 }
 
 function floodFill(
   buf: ImageData, startX: number, startY: number,
-  srcBaseId: number, tgtBaseId: number,
+  srcBaseId: number, srcShade: number,
+  tgtBaseId: number, tgtShade: number,
   cp: ComputedPalette, colorLookup: Map<number, { baseId: number; shade: number }>,
 ): void {
-  if (srcBaseId === tgtBaseId) return;
+  if (srcBaseId === tgtBaseId && srcShade === tgtShade) return;
   const { width: w, height: h, data } = buf;
   const visited = new Uint8Array(w * h);
   const stack = [startY * w + startX];
@@ -156,9 +157,9 @@ function floodFill(
     const bi = flat * 4;
     const key = (data[bi] << 16) | (data[bi + 1] << 8) | data[bi + 2];
     const info = colorLookup.get(key);
-    if (!info || info.baseId !== srcBaseId) continue;
-    const tc = getTargetColor(info.shade, tgtBaseId, cp);
-    if (tc) { data[bi] = tc.r; data[bi + 1] = tc.g; data[bi + 2] = tc.b; }
+    if (!info || info.baseId !== srcBaseId || info.shade !== srcShade) continue;
+    const tc = getTargetColor(tgtShade, tgtBaseId, cp);
+    if (tc) { data[bi] = tc.r; data[bi + 1] = tc.g; data[bi + 2] = tc.b; data[bi + 3] = 255; }
     if (bx > 0)     stack.push(flat - 1);
     if (bx < w - 1) stack.push(flat + 1);
     if (by > 0)     stack.push(flat - w);
@@ -473,8 +474,8 @@ export function PreviewCanvas({
       const i = (pos.py * buf.width + pos.px) * 4;
       const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
       const existing = colorLookup.get(key);
-      if (!existing || existing.baseId === paintBlock.baseId) return;
-      floodFill(buf, pos.px, pos.py, existing.baseId, paintBlock.baseId, cp, colorLookup);
+      if (!existing || (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade)) return;
+      floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup);
       onImageUpdate(buf); // commits + pushes history
     }
   }

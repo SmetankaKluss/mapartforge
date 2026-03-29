@@ -596,7 +596,7 @@ input, select, textarea { outline: none; }
 /* Paint swatch */
 .paint-swatch-wrapper { position: relative; display: flex; align-items: center; gap: 3px; }
 .paint-active-swatch { display: flex; align-items: center; gap: 5px; padding: 0 8px 0 4px; background: var(--bg-input); border: 1px solid var(--border); height: 28px; min-width: 80px; overflow: hidden; }
-.paint-swatch-icon-wrap { width: 16px; height: 16px; overflow: hidden; flex-shrink: 0; }
+.paint-swatch-icon-wrap { width: 16px; height: 16px; overflow: hidden; flex-shrink: 0; position: relative; line-height: 0; }
 /* Used directly in toolbar (no wrap) — show as 16×16 by scaling 32×32 sprite */
 .paint-active-swatch .paint-swatch-icon {
   display: block; width: 32px; height: 32px; background-repeat: no-repeat;
@@ -604,7 +604,7 @@ input, select, textarea { outline: none; }
   flex-shrink: 0;
 }
 /* Used inside paint-swatch-icon-wrap */
-.paint-swatch-icon-wrap .paint-swatch-icon { display: block; width: 32px; height: 32px; background-repeat: no-repeat; image-rendering: pixelated; transform: scale(0.5); transform-origin: 0 0; }
+.paint-swatch-icon-wrap .paint-swatch-icon { display: block; width: 32px; height: 32px; background-repeat: no-repeat; image-rendering: pixelated; transform: scale(0.5); transform-origin: 0 0; position: absolute; top: 0; left: 0; }
 .paint-swatch-name { font-size: 9px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
 .paint-no-block { font-size: 9px; color: var(--text-muted); font-style: italic; }
 .paint-choose-btn { padding: 0 7px; height: 26px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; transition: border-color 0.12s, color 0.12s; }
@@ -1015,11 +1015,12 @@ input, select, textarea { outline: none; }
 .support-depth-group.disabled { opacity: 0.35; pointer-events: none; }
 .support-mode-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); white-space: nowrap; }
 .support-mode-btn {
-  width: 26px; height: 26px; flex-shrink: 0;
+  height: 26px; padding: 0 6px; flex-shrink: 0;
   background: transparent; border: 1px solid var(--border);
   color: var(--text-muted); font-family: var(--font-pixel); font-size: 8px;
   cursor: pointer; transition: border-color 0.12s, color 0.12s, background 0.12s;
   display: flex; align-items: center; justify-content: center;
+  white-space: nowrap;
 }
 .support-mode-btn:hover:not(:disabled) { border-color: rgba(87,255,110,0.5); color: var(--accent); }
 .support-mode-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 5px var(--accent-glow); }
