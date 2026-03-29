@@ -1156,6 +1156,90 @@ input, select, textarea { outline: none; }
 .crop-tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .crop-ratio-hint { font-family: var(--font-pixel); font-size: 7px; color: var(--text-dim); white-space: nowrap; }
 
+/* ── New Canvas Button ──────────────────────────────────────────────────── */
+.new-canvas-row { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.new-canvas-btn {
+  width: 100%; padding: 5px 10px;
+  background: transparent; border: 1px dashed rgba(87, 255, 110, 0.25);
+  color: var(--text-muted); font-family: var(--font-mono); font-size: 10px;
+  cursor: pointer; transition: border-color 0.12s, color 0.12s, box-shadow 0.12s;
+  letter-spacing: 0.04em;
+}
+.new-canvas-btn:hover:not(:disabled) {
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+.new-canvas-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── New Canvas Modal ───────────────────────────────────────────────────── */
+.nc-modal {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  display: flex; flex-direction: column; width: 340px; max-width: 95vw;
+  box-shadow: 0 0 40px rgba(0,0,0,0.7);
+}
+.nc-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.nc-label {
+  font-family: var(--font-pixel); font-size: 7px; color: var(--accent);
+  letter-spacing: 0.1em; margin-bottom: 8px;
+}
+.nc-grid-options { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.nc-size-btn {
+  padding: 4px 10px; background: transparent;
+  border: 1px solid var(--border); color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.nc-size-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nc-size-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 5px var(--accent-glow); }
+.nc-size-hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+
+.nc-bg-options { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.nc-bg-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 9px; background: transparent;
+  border: 1px solid var(--border); color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.nc-bg-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nc-bg-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 5px var(--accent-glow); }
+.nc-bg-preview {
+  display: inline-block; width: 12px; height: 12px;
+  border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0;
+}
+.nc-white { background: #ffffff; }
+.nc-transparent {
+  background-image: linear-gradient(45deg, #555 25%, transparent 25%),
+                    linear-gradient(-45deg, #555 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #555 75%),
+                    linear-gradient(-45deg, transparent 75%, #555 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 0 3px, 3px -3px, -3px 0px;
+  background-color: #333;
+}
+.nc-swatches {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  max-height: 88px; overflow-y: auto; padding: 2px;
+}
+.nc-swatch {
+  width: 18px; height: 18px; border: 1px solid transparent;
+  cursor: pointer; transition: transform 0.08s, border-color 0.08s;
+  flex-shrink: 0;
+}
+.nc-swatch:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.6); }
+.nc-swatch.selected { border-color: var(--accent); box-shadow: 0 0 4px var(--accent-glow); transform: scale(1.1); }
+.nc-no-palette { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+.nc-btn {
+  padding: 5px 14px; background: transparent;
+  border: 1px solid var(--border); color: var(--text-muted);
+  font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.nc-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nc-btn-create { border-color: rgba(87,255,110,0.4); color: rgba(87,255,110,0.8); }
+.nc-btn-create:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.nc-btn-create:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
 /* ── Crop Modal ────────────────────────────────────────────────────────── */
 .crop-backdrop {
   position: fixed; inset: 0; z-index: 200;

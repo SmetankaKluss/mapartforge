@@ -28,6 +28,7 @@ import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { WikiModal } from './components/WikiModal';
+import { NewCanvasModal } from './components/NewCanvasModal';
 import { createTour, shouldAutoStart } from './lib/tour';
 import 'driver.js/dist/driver.css';
 import './App.css';
@@ -122,6 +123,7 @@ export default function App() {
   const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
   const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCropModal, setShowCropModal] = useState(false);
+  const [showNewCanvasModal, setShowNewCanvasModal] = useState(false);
   const [sourceHasAlpha, setSourceHasAlpha] = useState(false);
   const [bgMode, setBgMode] = useState<'color' | 'transparent'>('color');
   const [bgColor, setBgColor] = useState('#ffffff');
@@ -361,6 +363,31 @@ export default function App() {
     setRedoStack([]);
     runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
   }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
+
+  const handleCreateBlankCanvas = useCallback((
+    bg: { r: number; g: number; b: number; a: number } | null,
+    grid: MapGrid,
+  ) => {
+    setShowNewCanvasModal(false);
+    const width  = gridPixelWidth(grid);
+    const height = gridPixelHeight(grid);
+    const data   = new ImageData(width, height);
+    if (bg) {
+      for (let i = 0; i < data.data.length; i += 4) {
+        data.data[i]     = bg.r;
+        data.data[i + 1] = bg.g;
+        data.data[i + 2] = bg.b;
+        data.data[i + 3] = bg.a;
+      }
+    }
+    setMapGrid(grid);
+    setSourceImage(null);
+    uploadedImageRef.current = null;
+    uploadedFileRef.current  = null;
+    setUndoStack([]);
+    setRedoStack([]);
+    setImageData(data);
+  }, []);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
@@ -651,6 +678,14 @@ export default function App() {
         <aside className="panel panel-left">
           <div className="panel-scroll">
             <ImageUpload onImageLoaded={handleImageLoaded} />
+            <div className="new-canvas-row">
+              <button
+                className="new-canvas-btn"
+                onClick={() => setShowNewCanvasModal(true)}
+                disabled={processing}
+                title="Create a blank canvas to draw from scratch"
+              >+ New canvas</button>
+            </div>
             {sourceHasAlpha && (
               <div className="alpha-controls">
                 <span className="alpha-label">Transparency</span>
@@ -1152,6 +1187,16 @@ export default function App() {
         targetW={pw} targetH={ph}
         onApply={handleCropApply}
         onCancel={() => setShowCropModal(false)}
+      />
+    )}
+
+    {/* ── New Canvas modal ── */}
+    {showNewCanvasModal && (
+      <NewCanvasModal
+        currentGrid={mapGrid}
+        paletteColors={activePalette.colors}
+        onConfirm={handleCreateBlankCanvas}
+        onClose={() => setShowNewCanvasModal(false)}
       />
     )}
 
