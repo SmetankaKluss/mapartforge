@@ -50,13 +50,13 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
       <div className="nc-modal" onClick={e => e.stopPropagation()}>
 
         <div className="crop-modal-header">
-          <span className="crop-modal-title">NEW CANVAS</span>
+          <span className="crop-modal-title">НОВЫЙ ХОЛСТ</span>
           <button className="crop-modal-close" onClick={onClose}>✕</button>
         </div>
 
         {/* ── Size ── */}
         <div className="nc-section">
-          <div className="nc-label">SIZE (maps)</div>
+          <div className="nc-label">РАЗМЕР (карт)</div>
           <div className="nc-grid-options">
             {GRID_OPTIONS.map(g => {
               const active = g.wide === grid.wide && g.tall === grid.tall;
@@ -76,7 +76,7 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
 
         {/* ── Background ── */}
         <div className="nc-section">
-          <div className="nc-label">BACKGROUND</div>
+          <div className="nc-label">ФОН</div>
           <div className="nc-bg-options">
 
             <button
@@ -84,7 +84,7 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
               onClick={() => setBgType('white')}
             >
               <span className="nc-bg-preview nc-white" />
-              White
+              Белый
             </button>
 
             <button
@@ -92,7 +92,7 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
               onClick={() => setBgType('transparent')}
             >
               <span className="nc-bg-preview nc-transparent" />
-              Transparent
+              Прозрачный
             </button>
 
             <button
@@ -103,7 +103,7 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
                 ? <span className="nc-bg-preview" style={{ background: `rgb(${picked.r},${picked.g},${picked.b})` }} />
                 : <span className="nc-bg-preview nc-transparent" />
               }
-              Palette…
+              Из палитры…
             </button>
 
           </div>
@@ -111,7 +111,7 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
           {bgType === 'color' && (
             <div className="nc-swatches">
               {swatches.length === 0
-                ? <span className="nc-no-palette">Select a palette preset first</span>
+                ? <span className="nc-no-palette">Сначала выберите пресет палитры</span>
                 : swatches.map(c => (
                   <button
                     key={c.baseId}
@@ -128,13 +128,13 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
 
         {/* ── Footer ── */}
         <div className="crop-modal-footer">
-          <button className="nc-btn" onClick={onClose}>Cancel</button>
+          <button className="nc-btn" onClick={onClose}>Отмена</button>
           <button
             className="nc-btn nc-btn-create"
             onClick={handleCreate}
             disabled={!canCreate}
           >
-            Create
+            Создать
           </button>
         </div>
 

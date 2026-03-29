@@ -142,9 +142,9 @@ export function ExportPanel({
 
   return (
     <section className="sidebar-section" id="tour-export">
-      <h3 className="section-title">Export</h3>
+      <h3 className="section-title">Экспорт</h3>
       {!hasContent && (
-        <p className="export-empty">Process an image to enable export.</p>
+        <p className="export-empty">Обработай изображение для экспорта.</p>
       )}
       {hasContent && (
         <div className="export-buttons">
@@ -152,27 +152,27 @@ export function ExportPanel({
             className="export-btn"
             onClick={handlePng}
             disabled={base || busyPng}
-            title={compareMode ? 'Download left and right panels as separate PNGs' : 'Download processed image as PNG'}
+            title={compareMode ? 'Скачать левую и правую панели как отдельные PNG' : 'Скачать обработанное изображение как PNG'}
           >
-            {busyPng ? 'Saving…' : compareMode ? '↓ PNG ×2' : '↓ PNG'}
+            {busyPng ? 'Сохранение…' : compareMode ? '↓ PNG ×2' : '↓ PNG'}
           </button>
 
           <button
             className="export-btn"
             onClick={handleMapDat}
             disabled={base || busyMapdat}
-            title="Download Minecraft map.dat file(s) — one per 128×128 tile"
+            title="Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл"
           >
-            {busyMapdat ? 'Building…' : mapCount > 1 ? `↓ MAP.DAT (${mapCount} files)` : '↓ MAP.DAT'}
+            {busyMapdat ? 'Сборка…' : mapCount > 1 ? `↓ MAP.DAT (${mapCount} файлов)` : '↓ MAP.DAT'}
           </button>
 
           <button
             className="export-btn"
             onClick={handleLitematic}
             disabled={base || busyAnyLite}
-            title={mapMode === '3d' ? 'Staircase structure — extra shading tones from height variation' : 'Single flat layer — standard survival-friendly 2D map art'}
+            title={mapMode === '3d' ? 'Лестничная структура — дополнительные оттенки за счёт высоты' : 'Один плоский слой — стандартный 2D мап-арт для выживания'}
           >
-            {busyLiteFlat ? 'Building…' : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
+            {busyLiteFlat ? 'Сборка…' : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
           </button>
 
           {isMultiMap && (
@@ -180,24 +180,24 @@ export function ExportPanel({
               className="export-btn export-btn-zip"
               onClick={handleZip}
               disabled={base || busyAnyLite}
-              title={`Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files, zipped`}
+              title={`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`}
             >
-              {busyZip ? 'Zipping…' : `↓ ZIP (${mapGrid.wide * mapGrid.tall} maps)`}
+              {busyZip ? 'Архивирование…' : `↓ ZIP (${mapGrid.wide * mapGrid.tall} карт)`}
             </button>
           )}
         </div>
       )}
       {compareMode && hasContent && (
-        <p className="export-note">Compare mode: PNG exports both panels; other formats use the left panel.</p>
+        <p className="export-note">Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.</p>
       )}
       <div className="link-row">
         <button
           className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
           onClick={handleGetLink}
           disabled={base || linkState === 'uploading' || !sourceImage}
-          title={!hasContent ? 'Process an image first' : 'Generate a permalink to this map art with current settings'}
+          title={!hasContent ? 'Сначала обработай изображение' : 'Создать постоянную ссылку на этот мап-арт с текущими настройками'}
         >
-          {linkState === 'uploading' ? 'Uploading…' : linkState === 'error' ? 'Upload failed' : '🔗 GET LINK'}
+          {linkState === 'uploading' ? 'Загрузка…' : linkState === 'error' ? 'Ошибка загрузки' : '🔗 ПОЛУЧИТЬ ССЫЛКУ'}
         </button>
       </div>
       {linkUrl && (

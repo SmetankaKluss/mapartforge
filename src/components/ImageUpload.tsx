@@ -90,12 +90,12 @@ export function ImageUpload({ onImageLoaded }: Props) {
       onDrop={onDrop}
       onPaste={onPaste}
       tabIndex={0}
-      title="Press Ctrl+V to paste an image from clipboard"
+      title="Нажми Ctrl+V чтобы вставить изображение из буфера"
     >
       <div className="upload-icon">⛏</div>
-      <p className="upload-label">Drop an image here</p>
-      <p className="upload-sub">or click to browse</p>
-      <p className="upload-hint">Ctrl+V to paste from clipboard</p>
+      <p className="upload-label">Перетащи изображение сюда</p>
+      <p className="upload-sub">или нажми для выбора файла</p>
+      <p className="upload-hint">Ctrl+V — вставить из буфера</p>
       <input
         ref={inputRef}
         type="file"

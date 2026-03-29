@@ -161,8 +161,8 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     <section className="sidebar-section">
       {/* Section header */}
       <h3 className="section-title">
-        Palette
-        <span className="palette-count">{paletteSize} colors · {blockCount} blocks</span>
+        Палитра
+        <span className="palette-count">{paletteSize} цветов · {blockCount} блоков</span>
       </h3>
 
       {/* ── Row 1: preset dropdown ── */}
@@ -173,14 +173,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           onChange={e => handlePresetSelect(e.target.value)}
           disabled={disabled}
         >
-          <option value="">— select preset —</option>
-          <optgroup label="Built-in">
+          <option value="">— выбрать пресет —</option>
+          <optgroup label="Встроенные">
             {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
               <option key={name} value={name}>{name}</option>
             ))}
           </optgroup>
           {customNames.length > 0 && (
-            <optgroup label="Custom">
+            <optgroup label="Свои">
               {customNames.map(n => <option key={n} value={n}>{n}</option>)}
             </optgroup>
           )}
@@ -190,7 +190,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
             className="pe-btn pe-btn-delete"
             onClick={handleDelete}
             disabled={disabled}
-            title="Delete preset"
+            title="Удалить пресет"
           >✕</button>
         )}
       </div>
@@ -200,7 +200,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         <div className="pe-search-wrap">
           <input
             className="pe-search-input"
-            placeholder="Search blocks…"
+            placeholder="Поиск блоков…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             spellCheck={false}
@@ -209,7 +209,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
             <button
               className="pe-search-clear"
               onClick={() => setSearchQuery('')}
-              title="Clear search"
+              title="Очистить поиск"
               tabIndex={-1}
             >×</button>
           )}
@@ -218,14 +218,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           className="pe-save-btn"
           onClick={openSaveModal}
           disabled={disabled}
-          title="Save current block selection as a preset"
-        >Save</button>
+          title="Сохранить текущий выбор блоков как пресет"
+        >Сохранить</button>
         <button
           className={`pe-clear-btn${clearPending ? ' pending' : ''}`}
           onClick={handleClear}
           disabled={disabled}
-          title={clearPending ? 'Click again to confirm' : 'Deselect all blocks'}
-        >{clearPending ? 'Sure?' : 'Clear'}</button>
+          title={clearPending ? 'Нажми ещё раз для подтверждения' : 'Снять выбор со всех блоков'}
+        >{clearPending ? 'Точно?' : 'Сброс'}</button>
       </div>
 
       {/* ── Row 3: share palette ── */}
@@ -234,14 +234,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           className="pe-share-btn"
           onClick={() => setPaletteUrl(buildPaletteUrl(blockSelection))}
           disabled={disabled}
-          title="Generate a shareable link for the current block selection"
-        >⬡ Share palette</button>
+          title="Создать ссылку для текущей палитры блоков"
+        >⬡ Поделиться палитрой</button>
       </div>
 
       {/* ── Scrollable colour rows ── */}
       <div className="pe-rows">
         {filteredRows.length === 0 ? (
-          <p className="pe-no-results">No blocks match "{searchQuery}"</p>
+          <p className="pe-no-results">Блоки не найдены: «{searchQuery}»</p>
         ) : (
           filteredRows.map(row => {
             const activeIds = blockSelection[row.csId] ?? [];
@@ -270,7 +270,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
                     className="pe-row-toggle"
                     onClick={() => !disabled && toggleRow(row.csId)}
                     disabled={disabled}
-                    title={allOn ? 'Deselect all' : 'Select all'}
+                    title={allOn ? 'Снять всё' : 'Выбрать всё'}
                   >{activeIds.length === 0 ? '○' : allOn ? '●' : '◑'}</button>
                 </div>
 
@@ -317,11 +317,11 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           aria-label="Save preset"
         >
           <div className="pe-modal" onClick={e => e.stopPropagation()}>
-            <div className="pe-modal-title">Save preset</div>
+            <div className="pe-modal-title">Сохранить пресет</div>
             <input
               ref={modalInputRef}
               className={`pe-modal-input${modalNameInvalid ? ' invalid' : ''}`}
-              placeholder="Preset name…"
+              placeholder="Название пресета…"
               value={modalName}
               onChange={e => setModalName(e.target.value)}
               onKeyDown={e => {
@@ -331,18 +331,18 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
               spellCheck={false}
             />
             {modalNameInvalid && (
-              <p className="pe-modal-error">Built-in preset names are reserved.</p>
+              <p className="pe-modal-error">Это название зарезервировано для встроенных пресетов.</p>
             )}
             <div className="pe-modal-actions">
               <button
                 className="pe-modal-btn pe-modal-btn-save"
                 onClick={confirmSave}
                 disabled={!modalName.trim() || modalNameInvalid}
-              >SAVE</button>
+              >СОХРАНИТЬ</button>
               <button
                 className="pe-modal-btn pe-modal-btn-cancel"
                 onClick={cancelSave}
-              >CANCEL</button>
+              >ОТМЕНА</button>
             </div>
           </div>
         </div>

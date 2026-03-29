@@ -184,32 +184,32 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props)
   return (
     <section className="sidebar-section">
       <div className="mat-header">
-        <h3 className="section-title" style={{ margin: 0 }}>Materials</h3>
+        <h3 className="section-title" style={{ margin: 0 }}>Материалы</h3>
         <label
           className="mat-mode-toggle"
-          title={`Show the highest single-map demand for each block across all ${numMaps} map section${numMaps !== 1 ? 's' : ''} — useful for knowing how much to carry per trip`}
+          title={`Показать максимальное количество каждого блока в любой из ${numMaps} секций — удобно для расчёта что взять с собой`}
         >
           <input
             type="checkbox"
             checked={maxPerMap}
             onChange={e => setMaxPerMap(e.target.checked)}
           />
-          <span>Max / map</span>
+          <span>Макс / карта</span>
         </label>
       </div>
       {maxPerMap && (
         <p className="mat-mode-hint">
-          Per block: highest count found in any single 128×128 map section ({mapGrid.wide}×{mapGrid.tall} grid).
+          На блок: максимум в любой секции 128×128 (сетка {mapGrid.wide}×{mapGrid.tall}).
         </p>
       )}
       <div className="mat-table-wrap">
         <table className="mat-table">
           <thead>
             <tr>
-              <th className="mat-th mat-col-block">BLOCK</th>
-              <th className="mat-th mat-col-num">{maxPerMap ? 'MAX/MAP' : 'TOTAL'}</th>
-              <th className="mat-th mat-col-stacks">STACKS</th>
-              <th className="mat-th mat-col-shulkers">SHULKERS</th>
+              <th className="mat-th mat-col-block">БЛОК</th>
+              <th className="mat-th mat-col-num">{maxPerMap ? 'МАКС/К' : 'ВСЕГО'}</th>
+              <th className="mat-th mat-col-stacks">СТАКИ</th>
+              <th className="mat-th mat-col-shulkers">ШАЛКЕРЫ</th>
             </tr>
           </thead>
           <tbody>
@@ -241,7 +241,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props)
           <tfoot>
             <tr className="mat-total-row">
               <td className="mat-col-block">
-                <span className="mat-total-label">{maxPerMap ? 'SUM OF MAX' : 'TOTAL'}</span>
+                <span className="mat-total-label">{maxPerMap ? 'СУММА МАКС' : 'ИТОГО'}</span>
               </td>
               <td className="mat-col-num mat-num-cell mat-total-num">{fmtN(total)}</td>
               <td className="mat-col-stacks mat-num-cell mat-total-num">{fmtStacks(total)}</td>
@@ -252,7 +252,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props)
       </div>
       <div className="mat-copy-row">
         <button className="mat-copy-btn" onClick={handleCopy}>
-          {copied ? '✓ COPIED!' : '⎘ COPY LIST'}
+          {copied ? '✓ СКОПИРОВАНО!' : '⎘ КОПИРОВАТЬ'}
         </button>
       </div>
     </section>

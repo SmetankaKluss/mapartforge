@@ -18,9 +18,9 @@ interface Props {
 }
 
 const SLIDERS: { key: keyof ImageAdjustments; label: string }[] = [
-  { key: 'brightness', label: 'Brightness' },
-  { key: 'contrast',   label: 'Contrast'   },
-  { key: 'saturation', label: 'Saturation' },
+  { key: 'brightness', label: 'Яркость'    },
+  { key: 'contrast',   label: 'Контраст'   },
+  { key: 'saturation', label: 'Насыщенность' },
 ];
 
 export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disabled, showAdjustments, onToggleAdjustments, collapsed, onToggle }: Props) {
@@ -74,14 +74,14 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
         <button
           className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
           onClick={onToggleAdjustments}
-          title={showAdjustments ? 'Disable adjustments' : 'Enable adjustments'}
+          title={showAdjustments ? 'Отключить коррекцию' : 'Включить коррекцию'}
         >☀</button>
         {!isDefault && (
-          <button className="adj-reset-btn" onClick={reset} disabled={disabled} title="Reset all to 0">
-            Reset
+          <button className="adj-reset-btn" onClick={reset} disabled={disabled} title="Сбросить всё на 0">
+            Сброс
           </button>
         )}
-        <span style={{ flex: 1, textAlign: 'right' }}>Adjustments</span>
+        <span style={{ flex: 1, textAlign: 'right' }}>Коррекция</span>
       </h3>
 
       <div className={`control-group-content${collapsed ? ' collapsed' : ''}`}>
@@ -90,7 +90,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
       {sourceImage && (
         <div className="adj-thumb-row">
           <canvas ref={thumbRef} className="adj-thumb" width={THUMB_SIZE} height={THUMB_SIZE} />
-          <span className="adj-thumb-label">Preview</span>
+          <span className="adj-thumb-label">Предпросмотр</span>
         </div>
       )}
 

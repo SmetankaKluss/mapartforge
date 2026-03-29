@@ -53,9 +53,9 @@ const SUPPORT_BLOCKS_PALETTE = [
 ] as const;
 
 const SUPPORT_MODE_TITLES: Record<1 | 2 | 3, string> = {
-  1: '1 block under floating blocks only (sand, gravel, lichens…)',
-  2: 'Shade-dependent: stepping shades get 2, flat gets 1',
-  3: '2 blocks under every art block',
+  1: '1 блок только под плавающими блоками (песок, гравий, лишайник…)',
+  2: 'Зависит от оттенка: переходные оттенки получают 2, плоские — 1',
+  3: '2 блока под каждым блоком арта',
 };
 
 const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
@@ -661,15 +661,15 @@ export default function App() {
 
       {viewBanner && (
         <div className="view-banner">
-          <span>█ LOADED FROM LINK</span>
-          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Dismiss">✕</button>
+          <span>█ ЗАГРУЖЕНО ПО ССЫЛКЕ</span>
+          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Закрыть">✕</button>
         </div>
       )}
 
       {paletteBanner && (
         <div className="view-banner palette-banner">
-          <span>⬡ PALETTE LOADED FROM LINK</span>
-          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title="Dismiss">✕</button>
+          <span>⬡ ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ</span>
+          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title="Закрыть">✕</button>
         </div>
       )}
 
@@ -683,30 +683,30 @@ export default function App() {
                 className="new-canvas-btn"
                 onClick={() => setShowNewCanvasModal(true)}
                 disabled={processing}
-                title="Create a blank canvas to draw from scratch"
-              >+ New canvas</button>
+                title="Создать пустой холст для рисования с нуля"
+              >+ Новый холст</button>
             </div>
             {sourceHasAlpha && (
               <div className="alpha-controls">
-                <span className="alpha-label">Transparency</span>
+                <span className="alpha-label">Прозрачность</span>
                 <div className="alpha-mode-btns">
                   <button
                     className={`alpha-mode-btn${bgMode === 'color' ? ' active' : ''}`}
                     onClick={() => setBgMode('color')}
-                    title="Fill transparent areas with a background color"
-                  >Fill BG</button>
+                    title="Заполнить прозрачные области фоновым цветом"
+                  >Фон</button>
                   <button
                     className={`alpha-mode-btn${bgMode === 'transparent' ? ' active' : ''}`}
                     onClick={() => setBgMode('transparent')}
-                    title="Keep transparent areas empty (air blocks in export)"
-                  >Transparent</button>
+                    title="Оставить прозрачные области пустыми (воздух в экспорте)"
+                  >Прозрачно</button>
                   {bgMode === 'color' && (
                     <input
                       type="color"
                       className="alpha-color-picker"
                       value={bgColor}
                       onChange={e => setBgColor(e.target.value)}
-                      title="Background fill color"
+                      title="Цвет заливки фона"
                     />
                   )}
                 </div>
@@ -718,8 +718,8 @@ export default function App() {
                   className="crop-tool-btn"
                   onClick={() => setShowCropModal(true)}
                   disabled={processing}
-                  title={`Crop source image to ${pw}×${ph} map grid ratio`}
-                >✂ Crop to ratio</button>
+                  title={`Обрезать изображение под пропорции карты ${pw}×${ph}`}
+                >✂ Обрезать</button>
                 <span className="crop-ratio-hint">{mapGrid.wide}:{mapGrid.tall}</span>
               </div>
             )}
@@ -773,7 +773,7 @@ export default function App() {
                 }
               }}
             >
-              <span className="reset-icon">↺</span> {resetDefaultsPending ? 'Sure?' : 'Reset defaults'}
+              <span className="reset-icon">↺</span> {resetDefaultsPending ? 'Точно?' : 'Сбросить всё'}
             </button>
           </div>
         </aside>
@@ -784,8 +784,8 @@ export default function App() {
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
-              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title="Undo (Ctrl+Z)">↩</button>
-              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title="Redo (Ctrl+Y)">↪</button>
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title="Отменить (Ctrl+Z)">↩</button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title="Повторить (Ctrl+Y)">↪</button>
             </div>
             <div className="toolbar-sep" />
 
@@ -805,7 +805,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
-                    title="Eyedropper (E)"
+                    title="Пипетка (E)"
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
@@ -815,7 +815,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
-                    title="Brush (B)"
+                    title="Кисть (B)"
                     disabled={!paintBlock}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
@@ -826,7 +826,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
-                    title="Fill (F)"
+                    title="Заливка (F)"
                     disabled={!paintBlock}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
@@ -839,7 +839,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')}
-                    title="Eraser (X)"
+                    title="Ластик (X)"
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 13h12v1H2z"/>
@@ -852,7 +852,7 @@ export default function App() {
                 {(activeTool === 'brush' || activeTool === 'eraser') && (
                   <div className="toolbar-group">
                     {([1, 2, 3] as const).map(s => (
-                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}px`}>{s}px</button>
+                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Кисть ${s}px`}>{s}px</button>
                     ))}
                   </div>
                 )}
@@ -921,7 +921,7 @@ export default function App() {
                 <div className="toolbar-group">
                   <button
                     className="tool-btn tool-btn-zoom-reset"
-                    title="Reset zoom to 100%"
+                    title="Сбросить масштаб до 100%"
                     onClick={() => setZoom(100)}
                   >⌖</button>
                   <button
@@ -930,10 +930,10 @@ export default function App() {
                     onClick={() => setSplitPos(50)}
                   >⟺</button>
                   {!compareMode && (
-                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Block textures">Blocks</button>
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Текстуры блоков">Блоки</button>
                   )}
-                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Compare">Compare</button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Grid">Grid</button>
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Сравнение">Сравнить</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Сетка">Сетка</button>
                 </div>
               </>
             )}
@@ -945,25 +945,25 @@ export default function App() {
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title="Keyboard shortcuts">⌨</button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title="Клавиатурные сочетания">⌨</button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
-                  <div className="shortcuts-panel-title">SHORTCUTS</div>
-                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Redo</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Export PNG</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Export .litematic</span></div>
+                  <div className="shortcuts-panel-title">ГОРЯЧИЕ КЛАВИШИ</div>
+                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Отменить</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Повторить</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Экспорт PNG</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Экспорт .litematic</span></div>
                   <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>Z</kbd><span>Toggle grid</span></div>
-                  <div className="shortcut-row"><kbd>O</kbd><span>Reset split to 50%</span></div>
-                  <div className="shortcut-row"><kbd>C</kbd><span>Toggle compare</span></div>
-                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>Select dithering</span></div>
+                  <div className="shortcut-row"><kbd>Z</kbd><span>Сетка</span></div>
+                  <div className="shortcut-row"><kbd>O</kbd><span>Сброс разделителя</span></div>
+                  <div className="shortcut-row"><kbd>C</kbd><span>Режим сравнения</span></div>
+                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>Выбор дизеринга</span></div>
                   <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper</span></div>
-                  <div className="shortcut-row"><kbd>B</kbd><span>Brush</span></div>
-                  <div className="shortcut-row"><kbd>F</kbd><span>Fill</span></div>
-                  <div className="shortcut-row"><kbd>X</kbd><span>Eraser</span></div>
-                  <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect tool</span></div>
+                  <div className="shortcut-row"><kbd>E</kbd><span>Пипетка</span></div>
+                  <div className="shortcut-row"><kbd>B</kbd><span>Кисть</span></div>
+                  <div className="shortcut-row"><kbd>F</kbd><span>Заливка</span></div>
+                  <div className="shortcut-row"><kbd>X</kbd><span>Ластик</span></div>
+                  <div className="shortcut-row"><kbd>Esc</kbd><span>Снять инструмент</span></div>
                 </div>
               )}
             </div>
@@ -972,7 +972,7 @@ export default function App() {
           {compareMode && hasContent && (
             <div className="compare-selectors">
               <div className="compare-selector">
-                <label className="compare-selector-label">LEFT</label>
+                <label className="compare-selector-label">ЛЕВЫЙ</label>
                 <select
                   className="compare-selector-select"
                   value={compareLeft}
@@ -984,7 +984,7 @@ export default function App() {
               </div>
               <span className="compare-vs">VS</span>
               <div className="compare-selector">
-                <label className="compare-selector-label">RIGHT</label>
+                <label className="compare-selector-label">ПРАВЫЙ</label>
                 <select
                   className="compare-selector-select"
                   value={compareRight}
@@ -1037,10 +1037,10 @@ export default function App() {
               <div className="processing-overlay">
                 <div className="processing-overlay-inner">
                   <div className="processing-spinner" />
-                  <span className="processing-label">PROCESSING… {DITHERING_LABELS[dithering].toUpperCase()}</span>
+                  <span className="processing-label">ОБРАБОТКА… {DITHERING_LABELS[dithering].toUpperCase()}</span>
                   <span className="processing-pct">{processingProgress}%</span>
                   {showCancel && (
-                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ CANCEL</button>
+                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ ОТМЕНА</button>
                   )}
                 </div>
                 <div className="processing-bar-track">
@@ -1065,7 +1065,7 @@ export default function App() {
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
                 <div className="support-block-section">
-                  <div className="support-block-section-title">Support block (3D)</div>
+                  <div className="support-block-section-title">Опорный блок (3D)</div>
                   <div className="support-block-grid">
                     {SUPPORT_BLOCKS_PALETTE.map(b => (
                       <button
@@ -1089,13 +1089,13 @@ export default function App() {
                       <button
                         className={`support-block-item support-none-btn${supportBlock === 'air' ? ' active' : ''}`}
                         onClick={() => setSupportBlock('air')}
-                        title="No support blocks"
+                        title="Без опорных блоков"
                       >
                         <span className="support-block-no-icon">∅</span>
-                        <span className="support-block-item-label">None</span>
+                        <span className="support-block-item-label">Нет</span>
                       </button>
                       <div className={`support-depth-group${supportBlock === 'air' ? ' disabled' : ''}`}>
-                        <span className="support-mode-label">Depth</span>
+                        <span className="support-mode-label">Глубина</span>
                         {([1, 2] as const).map(m => (
                           <button
                             key={m}
@@ -1148,15 +1148,15 @@ export default function App() {
         <div className="mobile-tab-bar">
           <button className={`mobile-tab-btn${mobileTab === 'settings' ? ' active' : ''}`} onClick={() => setMobileTab('settings')}>
             <span className="mobile-tab-icon">⚙</span>
-            <span className="mobile-tab-label">Settings</span>
+            <span className="mobile-tab-label">Настройки</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
             <span className="mobile-tab-icon">▦</span>
-            <span className="mobile-tab-label">Palette</span>
+            <span className="mobile-tab-label">Палитра</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
             <span className="mobile-tab-icon">⬇</span>
-            <span className="mobile-tab-label">Export</span>
+            <span className="mobile-tab-label">Экспорт</span>
           </button>
         </div>
       </div>
