@@ -300,9 +300,10 @@ async function buildLitematicBytes(
       }
     }
 
-    // ── Noobline: 1 cobblestone per column at z=0 (north shading reference) ──
+    // ── Noobline: 1 block per column at z=0 (north shading reference) ──
+    // Block type matches user's support block selection; Y is shade-dependent.
     {
-      const noobId = 'minecraft:cobblestone';
+      const noobId = `minecraft:${(!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt}`;
       let noobIdx = blockToIdx.get(noobId);
       if (noobIdx === undefined) {
         noobIdx = blockPalette.length;
@@ -310,11 +311,17 @@ async function buildLitematicBytes(
         blockPalette.push(noobId);
       }
       for (let x = 0; x < sizeX; x++) {
-        // Noobline block is placed at the same Y as the first art block,
-        // directly to its north (z=0), strictly adjacent — not above or below.
-        const nooblineY = yGrid![0 * sizeX + x];
-        const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
-        indices[vi] = noobIdx;
+        const pi = 0 * sizeX + x;
+        if (pixelBlock[pi] === 0) continue; // skip transparent columns
+        const artY = yGrid![pi];
+        const firstShade = pixelShade[pi];
+        // Position noobline to create the correct height difference for map shading:
+        // shade 0 (dark): noobline above art by 1; shade 2 (bright): noobline below by 1
+        const nooblineY = firstShade === 0 ? artY + 1 : firstShade === 2 ? artY - 1 : artY;
+        if (nooblineY >= 0 && nooblineY < sizeY) {
+          const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+          indices[vi] = noobIdx;
+        }
       }
     }
   } else {
@@ -357,6 +364,19 @@ async function buildLitematicBytes(
       blockToIdx.set(supId, supIdx);
     }
 
+    // Track Y levels per column for mode 2: dark blocks at previously-seen Y get 1 support
+    const seenYPerCol: Set<number>[] = [];
+    if (supportMode === 2) {
+      for (let x = 0; x < sizeX; x++) {
+        const seen = new Set<number>();
+        for (let z = 0; z < sizeZ; z++) {
+          const pi = z * sizeX + x;
+          if (pixelBlock[pi] !== 0) seen.add(yGrid![pi]);
+        }
+        seenYPerCol[x] = seen;
+      }
+    }
+
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
@@ -372,8 +392,18 @@ async function buildLitematicBytes(
           const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
           if (indices[vi] === 0) indices[vi] = supIdx;
         } else if (supportMode === 2) {
-          // Mode 2: shade-dependent support — stepping shades get 2 blocks, flat gets 1
-          const numSup = pixelShade[pi] === 1 ? 1 : 2;
+          // Mode 2: shade-dependent support.
+          // Medium → 1 block, Bright → 2 blocks (always a new Y level).
+          // Dark → 2 blocks if at a new Y level, 1 block if Y was previously seen.
+          let numSup: number;
+          if (pixelShade[pi] === 1) {
+            numSup = 1; // medium: always 1
+          } else if (pixelShade[pi] === 2) {
+            numSup = 2; // bright: always stepping up → 2
+          } else {
+            // shade 0 (dark): 1 if Y was previously seen in this column, else 2
+            numSup = seenYPerCol[x]?.has(yGrid![pi]) ? 1 : 2;
+          }
           for (let k = 1; k <= numSup; k++) {
             const sy = pixelY - k;
             if (sy < 0) break;
