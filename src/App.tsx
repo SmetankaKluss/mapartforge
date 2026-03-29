@@ -58,8 +58,8 @@ const SUPPORT_MODE_TITLES: Record<1 | 2 | 3, string> = {
 };
 
 const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
-  1: 'Critical',
-  2: 'Optimal',
+  1: 'Crit.',
+  2: 'Opt.',
 };
 
 const MAX_HISTORY = 20;
@@ -214,6 +214,7 @@ export default function App() {
         case 'KeyE': setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper'); break;
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
+        case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
         case 'Escape': setActiveTool(null); break;
         case 'KeyZ': setShowGrid(g => !g); break;
         case 'KeyO': if (!compareMode) setSplitPos(50); break;
@@ -800,9 +801,20 @@ export default function App() {
                       <path d="M13 6l.5 4.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
                     </svg>
                   </button>
+                  <button
+                    className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`}
+                    onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')}
+                    title="Eraser (X)"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M2 13h12v1H2z"/>
+                      <path d="M4.5 3L2 10h3l1-3h4l1 3h3L11.5 3z" opacity=".85"/>
+                      <path d="M5 7h6v1H5z" opacity=".4"/>
+                    </svg>
+                  </button>
                 </div>
 
-                {activeTool === 'brush' && (
+                {(activeTool === 'brush' || activeTool === 'eraser') && (
                   <div className="toolbar-group">
                     {([1, 2, 3] as const).map(s => (
                       <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Brush ${s}px`}>{s}px</button>
@@ -915,6 +927,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>E</kbd><span>Eyedropper</span></div>
                   <div className="shortcut-row"><kbd>B</kbd><span>Brush</span></div>
                   <div className="shortcut-row"><kbd>F</kbd><span>Fill</span></div>
+                  <div className="shortcut-row"><kbd>X</kbd><span>Eraser</span></div>
                   <div className="shortcut-row"><kbd>Esc</kbd><span>Deselect tool</span></div>
                 </div>
               )}

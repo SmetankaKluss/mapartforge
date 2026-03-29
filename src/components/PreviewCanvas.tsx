@@ -10,7 +10,7 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 
 // ── Exported types ────────────────────────────────────────────────────────────
 
-export type PaintTool = 'eyedropper' | 'brush' | 'fill';
+export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser';
 
 export interface PaintBlock {
   csId: number;
@@ -137,6 +137,11 @@ function paintPixelInBuffer(
   const tc = getTargetColor(targetShade, targetBaseId, cp);
   if (!tc) return;
   buf.data[i] = tc.r; buf.data[i + 1] = tc.g; buf.data[i + 2] = tc.b; buf.data[i + 3] = 255;
+}
+
+function erasePixelInBuffer(buf: ImageData, px: number, py: number): void {
+  const i = (py * buf.width + px) * 4;
+  buf.data[i] = 0; buf.data[i + 1] = 0; buf.data[i + 2] = 0; buf.data[i + 3] = 0;
 }
 
 function floodFill(
@@ -286,14 +291,13 @@ export function PreviewCanvas({
         return;
       }
       const { activeTool, paintBlock, scale, width, height, cp, brushSize } = propsRef.current;
-      if (!isDraggingRef.current || activeTool !== 'brush' || !paintBlock || !paintBufferRef.current) return;
+      if (!isDraggingRef.current || (activeTool !== 'brush' && activeTool !== 'eraser') || (activeTool === 'brush' && !paintBlock) || !paintBufferRef.current) return;
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (!(canvas instanceof HTMLCanvasElement)) return;
       const rect = canvas.getBoundingClientRect();
       const cx = Math.floor((e.clientX - rect.left) / scale);
       const cy = Math.floor((e.clientY - rect.top)  / scale);
       if (cx < 0 || cx >= width || cy < 0 || cy >= height) return;
-      // Track center to avoid repainting the same brush center
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
@@ -302,7 +306,11 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+          if (activeTool === 'eraser') {
+            erasePixelInBuffer(paintBufferRef.current!, bx, by);
+          } else {
+            paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+          }
         }
       }
       // Draw directly to the visible canvas — bypasses React state so no re-render lag
@@ -444,11 +452,30 @@ export function PreviewCanvas({
       return;
     }
 
-    if (!imageData || !paintBlock) return;
+    if (!imageData) return;
+    if (activeTool !== 'eraser' && !paintBlock) return;
     const pos = getPixelCoords(e);
     if (!pos) return;
 
-    if (activeTool === 'brush') {
+    if (activeTool === 'eraser') {
+      isDraggingRef.current = true;
+      paintedSetRef.current = new Set();
+      paintBufferRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+      const { px: cx, py: cy } = pos;
+      paintedSetRef.current.add(cy * width + cx);
+      const half = Math.floor(brushSize / 2);
+      for (let dy = 0; dy < brushSize; dy++) {
+        for (let dx = 0; dx < brushSize; dx++) {
+          const bx = cx - half + dx, by = cy - half + dy;
+          if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
+          erasePixelInBuffer(paintBufferRef.current, bx, by);
+        }
+      }
+      const canvas = canvasZoneRef.current?.querySelector('canvas');
+      if (canvas instanceof HTMLCanvasElement) {
+        drawImageData(canvas, paintBufferRef.current, width, height, scale, false);
+      }
+    } else if (activeTool === 'brush') {
       isDraggingRef.current = true;
       paintedSetRef.current = new Set();
       // Clone current imageData into paint buffer
@@ -552,7 +579,7 @@ export function PreviewCanvas({
 
   // ── Cursor style ────────────────────────────────────────────────────────────
 
-  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush'
+  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush' || activeTool === 'eraser'
     ? 'crosshair'
     : undefined;
 

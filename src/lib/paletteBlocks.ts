@@ -2819,4 +2819,8 @@ export const BUILTIN_PRESETS: Readonly<Record<string, BlockSelection>> = {
   'Carpet Only': dyeOnly(b => b.nbtName.endsWith('_carpet')),
 };
 
-export const DEFAULT_SELECTION: BlockSelection = ALL;
+const EMPTY: BlockSelection = Object.fromEntries(
+  COLOUR_ROWS.map(row => [row.csId, []]),
+);
+
+export const DEFAULT_SELECTION: BlockSelection = EMPTY;
