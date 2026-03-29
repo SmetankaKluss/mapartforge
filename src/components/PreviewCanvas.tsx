@@ -501,8 +501,8 @@ export function PreviewCanvas({
       const i = (pos.py * buf.width + pos.px) * 4;
       const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
       const existing = colorLookup.get(key);
-      if (!existing || (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade)) return;
-      floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup);
+      if (!existing || (existing.baseId === paintBlock!.baseId && existing.shade === paintBlock!.shade)) return;
+      floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock!.baseId, paintBlock!.shade, cp, colorLookup);
       onImageUpdate(buf); // commits + pushes history
     }
   }
