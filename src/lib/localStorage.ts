@@ -43,7 +43,8 @@ function migrateBlockSelection(sel: BlockSelection): BlockSelection {
   const migrated = { ...sel };
   for (const row of COLOUR_ROWS) {
     const saved = migrated[row.csId];
-    if (saved === undefined) continue; // row was fully excluded — respect that
+    // Skip if row was fully excluded (undefined) or intentionally empty (length === 0)
+    if (saved === undefined || saved.length === 0) continue;
     const savedSet = new Set(saved);
     const newIds = row.blocks
       .map(b => b.blockId)

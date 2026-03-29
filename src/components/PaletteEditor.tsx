@@ -57,7 +57,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
 
   function handlePresetSelect(name: string) {
     setSelectedPreset(name);
-    if (!name) return;
+    if (!name) {
+      // Reset to empty selection when "select preset" is chosen
+      const emptySelection = Object.fromEntries(
+        COLOUR_ROWS.map(row => [row.csId, []])
+      );
+      onSelectionChange(emptySelection);
+      return;
+    }
     if (name in BUILTIN_PRESETS) {
       onSelectionChange(BUILTIN_PRESETS[name]);
     } else if (name in customPresets) {
