@@ -30,6 +30,7 @@ import { CropModal } from './components/CropModal';
 import { WikiModal } from './components/WikiModal';
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { createTour, shouldAutoStart } from './lib/tour';
+import { useLocale } from './lib/locale';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -83,6 +84,8 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
 const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
 
 export default function App() {
+  const { lang, toggle: toggleLang, t } = useLocale();
+
   // ── Restore persisted settings — lazy init runs exactly once on mount ─
   const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
 
@@ -623,12 +626,12 @@ export default function App() {
   }, []);
 
   // ── Onboarding tour ───────────────────────────────────────────────────────
-  const startTour = useCallback(() => { createTour(setMobileTab).drive(); }, []);
+  const startTour = useCallback(() => { createTour(setMobileTab, lang).drive(); }, [lang]);
   useEffect(() => {
     if (shouldAutoStart()) {
       // Slight delay so the DOM is fully painted
-      const t = setTimeout(() => createTour(setMobileTab).drive(), 600);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => createTour(setMobileTab, lang).drive(), 600);
+      return () => clearTimeout(timer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -652,23 +655,24 @@ export default function App() {
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
           </div>
           <div className="header-spacer" />
-          <button className="tour-btn" onClick={startTour} title="Start guided tour">? GUIDE</button>
-          <button className="wiki-btn" onClick={() => setShowWiki(true)} title="Read full documentation">📖 WIKI</button>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title="Support development on Boosty">❤ SUPPORT</a>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title="Support development">v1.0</a>
+          <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('ГИД', 'GUIDE')}</button>
+          <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 WIKI</button>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('ПОДДЕРЖАТЬ', 'SUPPORT')}</a>
+          <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>v1.0</a>
         </div>
       </header>
 
       {viewBanner && (
         <div className="view-banner">
-          <span>█ ЗАГРУЖЕНО ПО ССЫЛКЕ</span>
+          <span>█ {t('ЗАГРУЖЕНО ПО ССЫЛКЕ', 'LOADED FROM LINK')}</span>
           <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Закрыть">✕</button>
         </div>
       )}
 
       {paletteBanner && (
         <div className="view-banner palette-banner">
-          <span>⬡ ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ</span>
+          <span>⬡ {t('ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ', 'PALETTE LOADED FROM LINK')}</span>
           <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title="Закрыть">✕</button>
         </div>
       )}
@@ -683,30 +687,30 @@ export default function App() {
                 className="new-canvas-btn"
                 onClick={() => setShowNewCanvasModal(true)}
                 disabled={processing}
-                title="Создать пустой холст для рисования с нуля"
-              >+ Новый холст</button>
+                title={t('Создать пустой холст для рисования с нуля', 'Create blank canvas to draw from scratch')}
+              >+ {t('Новый холст', 'New canvas')}</button>
             </div>
             {sourceHasAlpha && (
               <div className="alpha-controls">
-                <span className="alpha-label">Прозрачность</span>
+                <span className="alpha-label">{t('Прозрачность', 'Transparency')}</span>
                 <div className="alpha-mode-btns">
                   <button
                     className={`alpha-mode-btn${bgMode === 'color' ? ' active' : ''}`}
                     onClick={() => setBgMode('color')}
-                    title="Заполнить прозрачные области фоновым цветом"
-                  >Фон</button>
+                    title={t('Заполнить прозрачные области фоновым цветом', 'Fill transparent areas with background color')}
+                  >{t('Фон', 'BG')}</button>
                   <button
                     className={`alpha-mode-btn${bgMode === 'transparent' ? ' active' : ''}`}
                     onClick={() => setBgMode('transparent')}
-                    title="Оставить прозрачные области пустыми (воздух в экспорте)"
-                  >Прозрачно</button>
+                    title={t('Оставить прозрачные области пустыми (воздух в экспорте)', 'Keep transparent areas empty (air in export)')}
+                  >{t('Прозрачно', 'Transparent')}</button>
                   {bgMode === 'color' && (
                     <input
                       type="color"
                       className="alpha-color-picker"
                       value={bgColor}
                       onChange={e => setBgColor(e.target.value)}
-                      title="Цвет заливки фона"
+                      title={t('Цвет заливки фона', 'Background fill color')}
                     />
                   )}
                 </div>
@@ -718,8 +722,8 @@ export default function App() {
                   className="crop-tool-btn"
                   onClick={() => setShowCropModal(true)}
                   disabled={processing}
-                  title={`Обрезать изображение под пропорции карты ${pw}×${ph}`}
-                >✂ Обрезать</button>
+                  title={t(`Обрезать изображение под пропорции карты ${pw}×${ph}`, `Crop image to map ratio ${pw}×${ph}`)}
+                >✂ {t('Обрезать', 'Crop')}</button>
                 <span className="crop-ratio-hint">{mapGrid.wide}:{mapGrid.tall}</span>
               </div>
             )}
@@ -742,6 +746,7 @@ export default function App() {
               processing={processing}
               collapsedSections={collapsedSections}
               onToggleSection={handleToggleSection}
+              t={t}
             />
             <div className="panel-section">
             <Adjustments
@@ -761,7 +766,7 @@ export default function App() {
             <button
               className={`reset-defaults-btn${resetDefaultsPending ? ' pending' : ''}`}
               disabled={processing}
-              title={resetDefaultsPending ? 'Click again to confirm reset' : 'Reset all settings to defaults'}
+              title={resetDefaultsPending ? t('Нажми ещё раз для подтверждения', 'Click again to confirm reset') : t('Сбросить все настройки', 'Reset all settings to defaults')}
               onClick={() => {
                 if (!resetDefaultsPending) {
                   setResetDefaultsPending(true);
@@ -773,7 +778,7 @@ export default function App() {
                 }
               }}
             >
-              <span className="reset-icon">↺</span> {resetDefaultsPending ? 'Точно?' : 'Сбросить всё'}
+              <span className="reset-icon">↺</span> {resetDefaultsPending ? t('Точно?', 'Sure?') : t('Сбросить всё', 'Reset All')}
             </button>
           </div>
         </aside>
@@ -796,7 +801,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === null ? ' active' : ''}`}
                     onClick={() => setActiveTool(null)}
-                    title="Select / deselect tool (Esc)"
+                    title={t('Выбрать / снять инструмент (Esc)', 'Select / deselect tool (Esc)')}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 2l4 11.5 2.3-4.3L13 14l1.5-1.5-4.7-4.7L14.5 5 2 2z"/>
@@ -860,7 +865,7 @@ export default function App() {
                 {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && (
                   <div className="toolbar-group shade-selector">
                     {([0, 1, 2] as const).map(sh => {
-                      const shadeLabel = ['▼ Dark', '■ Mid', '▲ Bright'];
+                      const shadeLabel = [t('▼ Тёмный', '▼ Dark'), t('■ Средний', '■ Mid'), t('▲ Светлый', '▲ Bright')];
                       const sc = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === sh);
                       const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
                       return (
@@ -884,10 +889,10 @@ export default function App() {
                         <span className="paint-swatch-name">{paintBlock.displayName}</span>
                       </>
                     ) : (
-                      <span className="paint-no-block">no block</span>
+                      <span className="paint-no-block">{t('нет блока', 'no block')}</span>
                     )}
                   </div>
-                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title="Choose block">▾</button>
+                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}>▾</button>
                   {showBlockPicker && (
                     <BlockPickerPopup
                       blockSelection={blockSelection}
@@ -926,7 +931,7 @@ export default function App() {
                   >⌖</button>
                   <button
                     className="tool-btn"
-                    title="Reset split to center"
+                    title={t('Сбросить разделитель', 'Reset split to center')}
                     onClick={() => setSplitPos(50)}
                   >⟺</button>
                   {!compareMode && (
@@ -940,7 +945,7 @@ export default function App() {
 
             {/* TABLET DRAWER TOGGLE */}
             <div className="toolbar-sep tablet-right-sep" />
-            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title="Palette & Export">📦</button>
+            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title={t('Палитра и экспорт', 'Palette & Export')}>📦</button>
 
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
@@ -1037,10 +1042,10 @@ export default function App() {
               <div className="processing-overlay">
                 <div className="processing-overlay-inner">
                   <div className="processing-spinner" />
-                  <span className="processing-label">ОБРАБОТКА… {DITHERING_LABELS[dithering].toUpperCase()}</span>
+                  <span className="processing-label">{t('ОБРАБОТКА…', 'PROCESSING…')} {DITHERING_LABELS[dithering].toUpperCase()}</span>
                   <span className="processing-pct">{processingProgress}%</span>
                   {showCancel && (
-                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ ОТМЕНА</button>
+                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ {t('ОТМЕНА', 'CANCEL')}</button>
                   )}
                 </div>
                 <div className="processing-bar-track">

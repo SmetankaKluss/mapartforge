@@ -1,11 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import type { DragEvent, ChangeEvent, ClipboardEvent } from 'react';
+import { useLocale } from '../lib/locale';
 
 interface Props {
   onImageLoaded: (img: HTMLImageElement, file: File) => void;
 }
 
 export function ImageUpload({ onImageLoaded }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -90,12 +92,12 @@ export function ImageUpload({ onImageLoaded }: Props) {
       onDrop={onDrop}
       onPaste={onPaste}
       tabIndex={0}
-      title="Нажми Ctrl+V чтобы вставить изображение из буфера"
+      title={t('Нажми Ctrl+V чтобы вставить изображение из буфера', 'Press Ctrl+V to paste image from clipboard')}
     >
       <div className="upload-icon">⛏</div>
-      <p className="upload-label">Перетащи изображение сюда</p>
-      <p className="upload-sub">или нажми для выбора файла</p>
-      <p className="upload-hint">Ctrl+V — вставить из буфера</p>
+      <p className="upload-label">{t('Перетащи изображение сюда', 'Drag image here')}</p>
+      <p className="upload-sub">{t('или нажми для выбора файла', 'or click to browse')}</p>
+      <p className="upload-hint">{t('Ctrl+V — вставить из буфера', 'Ctrl+V — paste from clipboard')}</p>
       <input
         ref={inputRef}
         type="file"

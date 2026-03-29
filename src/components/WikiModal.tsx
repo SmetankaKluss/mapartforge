@@ -112,16 +112,12 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
       title: 'Dithering Algorithms',
       content: (
         <div>
-          <p>
-            Dithering simulates colors that don't exist in Minecraft's palette by mixing nearby pixels. Each algorithm has a different "feel":
-          </p>
+          <p>Dithering simulates colors that don't exist in Minecraft's palette by mixing nearby pixels. Each algorithm has a different "feel":</p>
           <h4>None</h4>
           <p>No dithering. Uses the nearest available color for each pixel. Fast, clean, but limited color range.</p>
 
           <h4>Floyd–Steinberg (Recommended for most)</h4>
-          <p>
-            Classic serpentine diffusion. Good balance of color accuracy and smoothness. Spreads error in a predictable pattern.
-          </p>
+          <p>Classic serpentine diffusion. Good balance of color accuracy and smoothness. Spreads error in a predictable pattern.</p>
 
           <h4>Stucki</h4>
           <p>Smoother than Floyd–Steinberg but slower. Uses 12-neighbor diffusion. Better for photos with subtle gradients.</p>
@@ -133,17 +129,13 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           <p>Apple HyperCard style. Weaker diffusion, produces a "retro pixel art" feel. Good for low-detail images.</p>
 
           <h4>Blue Noise</h4>
-          <p>
-            Ordered (aperiodic) dithering using Improved Gradient Noise. Creates a more uniform, natural-looking pattern than error diffusion.
-          </p>
+          <p>Ordered (aperiodic) dithering using Improved Gradient Noise. Creates a more uniform, natural-looking pattern than error diffusion.</p>
 
           <h4>Yliluoma #2</h4>
           <p>Pattern dithering optimized for pixel art. Works best with stylized, already-pixelated images.</p>
 
           <h4>KlussDither (Our Custom Algorithm)</h4>
-          <p>
-            Designed for anime and illustrations. Uses IGN-blend dithering with:
-          </p>
+          <p>Designed for anime and illustrations. Uses IGN-blend dithering with:</p>
           <ul>
             <li>Gamma-corrected error diffusion (perceptually accurate)</li>
             <li>Serpentine scanning (reduces banding)</li>
@@ -154,9 +146,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           <p><b>Best for:</b> Anime, illustrations, drawn art. Often produces the richest results.</p>
 
           <h4>Intensity slider</h4>
-          <p>
-            Controls how strongly the dithering spreads error. Low (20–40%) = cleaner, smoother. High (80–100%) = more color-accurate but noisier. Most images look good at 70–85%.
-          </p>
+          <p>Controls how strongly the dithering spreads error. Low (20–40%) = cleaner, smoother. High (80–100%) = more color-accurate but noisier. Most images look good at 70–85%.</p>
         </div>
       ),
     },
@@ -186,9 +176,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>How 3D shading works:</h4>
-          <p>
-            Minecraft map shading depends on the pixel's northward neighbor (Z-1):
-          </p>
+          <p>Minecraft map shading depends on the pixel's northward neighbor (Z-1):</p>
           <ul>
             <li><b>Shade 0 (dark):</b> North is higher → place current block 1 level lower</li>
             <li><b>Shade 1 (medium):</b> Same height → place current block at same level</li>
@@ -197,9 +185,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           <p>This creates the 3D staircase effect when viewed on a map.</p>
 
           <h4>Support blocks in 3D mode</h4>
-          <p>
-            Some blocks (sand, gravel, glow lichen, etc.) can't float in mid-air. Choose a support block (e.g., stone, deepslate) and MapKluss will place it underneath:
-          </p>
+          <p>Some blocks (sand, gravel, glow lichen, etc.) can't float in mid-air. Choose a support block (e.g., stone, deepslate) and MapKluss will place it underneath:</p>
           <ul>
             <li><b>Mode 1:</b> Under floating blocks only (sand, gravel, lichen…)</li>
             <li><b>Mode 2:</b> One block under every art block (default, safest)</li>
@@ -213,9 +199,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
       title: 'Block Palette',
       content: (
         <div>
-          <p>
-            The <b>Palette</b> panel on the right lets you choose which Minecraft blocks to use. More blocks = more colors available = higher quality.
-          </p>
+          <p>The <b>Palette</b> panel on the right lets you choose which Minecraft blocks to use. More blocks = more colors available = higher quality.</p>
 
           <h4>How to use:</h4>
           <ul>
@@ -234,9 +218,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>Presets</h4>
-          <p>
-            Quick-start palettes for common scenarios:
-          </p>
+          <p>Quick-start palettes for common scenarios:</p>
           <ul>
             <li><b>All blocks:</b> Every available color (default, best quality)</li>
             <li><b>Carpet Only:</b> Only dyed carpet colors (easy to farm, limited palette)</li>
@@ -244,9 +226,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>Share palette</h4>
-          <p>
-            Click <b>⬡ Share palette</b> to generate a link that encodes your exact block selection. Share with teammates to ensure everyone uses the same colors.
-          </p>
+          <p>Click <b>⬡ Share palette</b> to generate a link that encodes your exact block selection. Share with teammates to ensure everyone uses the same colors.</p>
 
           <h4>Tips for quality:</h4>
           <ul>
@@ -262,14 +242,10 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
       title: 'Paint Tools',
       content: (
         <div>
-          <p>
-            After processing an image, a toolbar appears above the preview with tools to refine your map art manually.
-          </p>
+          <p>After processing an image, a toolbar appears above the preview with tools to refine your map art manually.</p>
 
           <h4>Cursor / Select</h4>
-          <p>
-            Default mode. Hover any pixel to see:
-          </p>
+          <p>Default mode. Hover any pixel to see:</p>
           <ul>
             <li>Block name and texture</li>
             <li>RGB color value</li>
@@ -277,34 +253,22 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>Eyedropper (E)</h4>
-          <p>
-            Click a pixel to pick its block and shade. The selected block appears in the toolbar. Useful for sampling colors from your preview.
-          </p>
+          <p>Click a pixel to pick its block and shade. The selected block appears in the toolbar. Useful for sampling colors from your preview.</p>
 
           <h4>Brush (B)</h4>
-          <p>
-            Paint pixels with the selected block. Brush sizes 1×1, 2×2, 3×3 available. In 3D mode, the brush preserves the shade you picked.
-          </p>
+          <p>Paint pixels with the selected block. Brush sizes 1×1, 2×2, 3×3 available. In 3D mode, the brush preserves the shade you picked.</p>
 
           <h4>Fill (F)</h4>
-          <p>
-            Flood-fill: click a pixel to replace all connected pixels of the same color with your selected block. Useful for fixing large miscolored areas.
-          </p>
+          <p>Flood-fill: click a pixel to replace all connected pixels of the same color with your selected block. Useful for fixing large miscolored areas.</p>
 
           <h4>Block picker</h4>
-          <p>
-            Click <b>▾</b> to open a quick-select grid of all available blocks. Left-click to select, hover to preview shade colors (in 3D mode).
-          </p>
+          <p>Click <b>▾</b> to open a quick-select grid of all available blocks. Left-click to select, hover to preview shade colors (in 3D mode).</p>
 
           <h4>Shade selector (3D mode only)</h4>
-          <p>
-            Three color swatches show dark/medium/bright variants of the selected block. Click to choose which shade to paint with.
-          </p>
+          <p>Three color swatches show dark/medium/bright variants of the selected block. Click to choose which shade to paint with.</p>
 
           <h4>Undo / Redo</h4>
-          <p>
-            <code>↩</code> Undo (Ctrl+Z), <code>↪</code> Redo (Ctrl+Y). Full paint history.
-          </p>
+          <p><code>↩</code> Undo (Ctrl+Z), <code>↪</code> Redo (Ctrl+Y). Full paint history.</p>
 
           <h4>View options</h4>
           <ul>
@@ -321,9 +285,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
       content: (
         <div>
           <h4>↓ PNG</h4>
-          <p>
-            Download the processed map art as an image file. Useful for:
-          </p>
+          <p>Download the processed map art as an image file. Useful for:</p>
           <ul>
             <li>Previewing the final result offline</li>
             <li>Sharing a preview before building</li>
@@ -331,9 +293,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>↓ MAP.DAT</h4>
-          <p>
-            Ready-to-use Minecraft map files. One per 128×128 tile.
-          </p>
+          <p>Ready-to-use Minecraft map files. One per 128×128 tile.</p>
           <ul>
             <li><b>Where to place:</b> <code>.minecraft/saves/[world]/data/map_*.dat</code></li>
             <li><b>How to view:</b> Open the map in-game by right-clicking a map in your inventory</li>
@@ -342,9 +302,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>↓ LITEMATIC</h4>
-          <p>
-            Building schematic for the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a>.
-          </p>
+          <p>Building schematic for the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a>.</p>
           <ul>
             <li><b>Format:</b> Single .litematic file containing the full structure</li>
             <li><b>2D mode:</b> Flat schematic (blocks at Y=0)</li>
@@ -354,9 +312,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>↓ ZIP (Multi-map grids only)</h4>
-          <p>
-            Splits a multi-map grid into separate 128×128 .litematic files, one per tile.
-          </p>
+          <p>Splits a multi-map grid into separate 128×128 .litematic files, one per tile.</p>
           <ul>
             <li><b>File naming:</b> <code>mapart_1.litematic</code>, <code>mapart_2.litematic</code>, etc. (Z-order: left→right, top→bottom)</li>
             <li><b>Use case:</b> Building with a team — each person takes 1–2 tiles</li>
@@ -364,9 +320,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>🔗 GET LINK</h4>
-          <p>
-            Generate a shareable permalink that encodes your image + all settings.
-          </p>
+          <p>Generate a shareable permalink that encodes your image + all settings.</p>
           <ul>
             <li><b>What's saved:</b> Image data, grid size, dithering, intensity, palette selection, adjustments, map mode</li>
             <li><b>No account needed:</b> Works via URL parameters</li>
@@ -492,9 +446,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>Still stuck?</h4>
-          <p>
-            Check the <b>? GUIDE</b> button for a step-by-step interactive tour, or review the relevant section above.
-          </p>
+          <p>Check the <b>? GUIDE</b> button for a step-by-step interactive tour, or review the relevant section above.</p>
         </div>
       ),
     },

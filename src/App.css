@@ -128,6 +128,8 @@ input, select, textarea { outline: none; }
 .wiki-btn:hover { background: rgba(96,200,240,0.12); }
 .support-btn { font-family: var(--font-pixel); font-size: 7px; color: #ff6b9d; background: none; border: 1px solid #ff6b9d; padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; text-decoration: none; display: inline-block; }
 .support-btn:hover { background: rgba(255, 107, 157, 0.12); color: #ff6b9d; }
+.lang-toggle-btn { font-family: var(--font-pixel); font-size: 7px; color: var(--text-muted); background: none; border: 1px solid var(--border); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
+.lang-toggle-btn:hover { color: var(--text); border-color: var(--text); }
 .header-ver { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); text-decoration: none; display: inline-block; }
 .header-ver:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -1124,6 +1126,10 @@ input, select, textarea { outline: none; }
 .hover-tooltip-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 4px; }
 .hover-tooltip-sub { font-size: 9px; color: var(--text-muted); margin-bottom: 3px; }
 .hover-tooltip-coord { font-size: 9px; color: var(--text-dim); }
+.hover-tooltip-block { display: flex; gap: 8px; margin-bottom: 6px; }
+.hover-tooltip-info { display: flex; flex-direction: column; gap: 2px; }
+.hover-tooltip-name { font-family: var(--font-mono); font-size: 9px; color: var(--text); line-height: 1.1; }
+.hover-tooltip-group { font-family: var(--font-mono); font-size: 8px; color: var(--text-muted); line-height: 1.1; }
 .hover-btn-remove { background: none; border: 1px solid rgba(255,68,85,0.35); color: var(--red); padding: 3px 6px; font-size: 9px; pointer-events: auto; margin-top: 4px; transition: border-color 0.1s; }
 .hover-btn-remove:hover { border-color: var(--red); }
 .hover-btn-repaint { background: none; border: 1px solid rgba(96,200,240,0.35); color: var(--cyan); padding: 3px 6px; font-size: 9px; pointer-events: auto; margin-top: 3px; transition: border-color 0.1s; }

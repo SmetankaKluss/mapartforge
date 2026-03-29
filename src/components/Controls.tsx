@@ -24,6 +24,7 @@ interface Props {
   processing: boolean;
   collapsedSections: Record<string, boolean>;
   onToggleSection: (key: string) => void;
+  t: (ru: string, en: string) => string;
 }
 
 const BN_SCALES = [1, 2] as const;
@@ -35,88 +36,90 @@ interface DitheringOption {
   tooltip: { fullName: string; description: string; bestFor: string };
 }
 
-const DITHERING_OPTIONS: DitheringOption[] = [
-  {
-    value: 'none',
-    label: 'None',
-    desc: 'Ближайший цвет OKLAB',
-    tooltip: {
-      fullName: 'Без дизеринга',
-      description: 'Каждый пиксель напрямую заменяется ближайшим цветом палитры по расстоянию OKLAB. Без распространения ошибки.',
-      bestFor: 'Логотипы, пиксель-арт и изображения с небольшим количеством плоских цветов.',
+function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOption[] {
+  return [
+    {
+      value: 'none',
+      label: 'None',
+      desc: t('Ближайший цвет OKLAB', 'Nearest OKLAB'),
+      tooltip: {
+        fullName: t('Без дизеринга', 'No dithering'),
+        description: t('Каждый пиксель напрямую заменяется ближайшим цветом палитры по расстоянию OKLAB. Без распространения ошибки.', 'Each pixel is directly replaced with the nearest palette color by OKLAB distance. No error diffusion.'),
+        bestFor: t('Логотипы, пиксель-арт и изображения с небольшим количеством плоских цветов.', 'Logos, pixel art, and images with few flat colors.'),
+      },
     },
-  },
-  {
-    value: 'floyd-steinberg',
-    label: 'Floyd–Steinberg',
-    desc: 'Классическая змейковая диффузия',
-    tooltip: {
-      fullName: 'Floyd–Steinberg',
-      description: 'Распределяет ошибку квантования на 4 соседних пикселя при змейковом сканировании. Классика, быстро работает.',
-      bestFor: 'Фотографии и общее использование.',
+    {
+      value: 'floyd-steinberg',
+      label: 'Floyd–Steinberg',
+      desc: t('Классическая змейковая диффузия', 'Classic serpentine diffusion'),
+      tooltip: {
+        fullName: 'Floyd–Steinberg',
+        description: t('Распределяет ошибку квантования на 4 соседних пикселя при змейковом сканировании. Классика, быстро работает.', 'Distributes quantization error to 4 neighboring pixels in serpentine scan. Classic and fast.'),
+        bestFor: t('Фотографии и общее использование.', 'Photos and general use.'),
+      },
     },
-  },
-  {
-    value: 'stucki',
-    label: 'Stucki',
-    desc: 'Плавная диффузия на 12 соседей',
-    tooltip: {
-      fullName: 'Stucki',
-      description: 'Распространяет ошибку на 12 соседей через более широкое ядро. Даёт более плавные градиенты, чем Floyd–Steinberg.',
-      bestFor: 'Плавные градиенты и портреты.',
+    {
+      value: 'stucki',
+      label: 'Stucki',
+      desc: t('Плавная диффузия на 12 соседей', 'Smooth diffusion to 12 neighbors'),
+      tooltip: {
+        fullName: 'Stucki',
+        description: t('Распространяет ошибку на 12 соседей через более широкое ядро. Даёт более плавные градиенты, чем Floyd–Steinberg.', 'Spreads error to 12 neighbors with a wider kernel. Produces smoother gradients than Floyd–Steinberg.'),
+        bestFor: t('Плавные градиенты и портреты.', 'Smooth gradients and portraits.'),
+      },
     },
-  },
-  {
-    value: 'jjn',
-    label: 'JJN',
-    desc: 'Jarvis–Judice–Ninke',
-    tooltip: {
-      fullName: 'Jarvis–Judice–Ninke',
-      description: '12-пиксельное ядро с иным распределением весов — более округлое и размытое распространение ошибки.',
-      bestFor: 'Детальные фото с мелкими текстурами.',
+    {
+      value: 'jjn',
+      label: 'JJN',
+      desc: 'Jarvis–Judice–Ninke',
+      tooltip: {
+        fullName: 'Jarvis–Judice–Ninke',
+        description: t('12-пиксельное ядро с иным распределением весов — более округлое и размытое распространение ошибки.', '12-pixel kernel with different weight distribution — more rounded and blurred error spread.'),
+        bestFor: t('Детальные фото с мелкими текстурами.', 'Detailed photos with fine textures.'),
+      },
     },
-  },
-  {
-    value: 'atkinson',
-    label: 'Atkinson',
-    desc: 'Стиль Apple HyperCard',
-    tooltip: {
-      fullName: 'Atkinson',
-      description: 'Распространяет только ¾ ошибки, сохраняя яркие блики и давая более чёткий результат.',
-      bestFor: 'Контрастные изображения и иллюстрации.',
+    {
+      value: 'atkinson',
+      label: 'Atkinson',
+      desc: t('Стиль Apple HyperCard', 'Apple HyperCard style'),
+      tooltip: {
+        fullName: 'Atkinson',
+        description: t('Распространяет только ¾ ошибки, сохраняя яркие блики и давая более чёткий результат.', 'Spreads only ¾ of error, preserving bright highlights and giving a crisper result.'),
+        bestFor: t('Контрастные изображения и иллюстрации.', 'High-contrast images and illustrations.'),
+      },
     },
-  },
-  {
-    value: 'blue-noise',
-    label: 'Blue Noise',
-    desc: 'Апериодический (IGN)',
-    tooltip: {
-      fullName: 'Blue Noise (IGN)',
-      description: 'Упорядоченный дизеринг на основе чересстрочного градиентного шума. Избегает повторяющихся полосовых артефактов.',
-      bestFor: 'Художественный результат и стилизованный мап-арт.',
+    {
+      value: 'blue-noise',
+      label: 'Blue Noise',
+      desc: t('Апериодический (IGN)', 'Aperiodic (IGN)'),
+      tooltip: {
+        fullName: 'Blue Noise (IGN)',
+        description: t('Упорядоченный дизеринг на основе чересстрочного градиентного шума. Избегает повторяющихся полосовых артефактов.', 'Ordered dithering based on interleaved gradient noise. Avoids repeating striped artifacts.'),
+        bestFor: t('Художественный результат и стилизованный мап-арт.', 'Artistic results and stylized map art.'),
+      },
     },
-  },
-  {
-    value: 'yliluoma2',
-    label: 'Yliluoma #2',
-    desc: 'Паттерновый дизеринг для пиксель-арта',
-    tooltip: {
-      fullName: 'Алгоритм Yliluoma #2',
-      description: 'Группирует пиксели в паттерны из цветов палитры вместо диффузии ошибки. Даёт чёткий, живописный результат.',
-      bestFor: 'Пиксель-арт стиль и большие мультикарточные сетки.',
+    {
+      value: 'yliluoma2',
+      label: 'Yliluoma #2',
+      desc: t('Паттерновый дизеринг для пиксель-арта', 'Pattern dithering for pixel art'),
+      tooltip: {
+        fullName: t('Алгоритм Yliluoma #2', 'Yliluoma #2 Algorithm'),
+        description: t('Группирует пиксели в паттерны из цветов палитры вместо диффузии ошибки. Даёт чёткий, живописный результат.', 'Groups pixels into patterns from palette colors instead of error diffusion. Gives a crisp, painterly result.'),
+        bestFor: t('Пиксель-арт стиль и большие мультикарточные сетки.', 'Pixel art style and large multi-map grids.'),
+      },
     },
-  },
-  {
-    value: 'kluss',
-    label: 'KlussDither',
-    desc: 'IGN-дизеринг для аниме-арта',
-    tooltip: {
-      fullName: 'KlussDither',
-      description: 'Определяет «чистые зоны» и снаппит их напрямую. В зонах дизеринга использует IGN-пороговое выделение между двумя ближайшими цветами палитры. Мягкая диффузия Stucki сглаживает градиенты поверх.',
-      bestFor: 'Аниме-арт, иллюстрации и изображения с большими плоскими областями.',
+    {
+      value: 'kluss',
+      label: 'KlussDither',
+      desc: t('IGN-дизеринг для аниме-арта', 'IGN dithering for anime art'),
+      tooltip: {
+        fullName: 'KlussDither',
+        description: t('Определяет «чистые зоны» и снаппит их напрямую. В зонах дизеринга использует IGN-пороговое выделение между двумя ближайшими цветами палитры. Мягкая диффузия Stucki сглаживает градиенты поверх.', 'Detects "clean zones" and snaps them directly. In dithering zones uses IGN threshold selection between two nearest palette colors. Soft Stucki diffusion smooths gradients on top.'),
+        bestFor: t('Аниме-арт, иллюстрации и изображения с большими плоскими областями.', 'Anime art, illustrations, and images with large flat areas.'),
+      },
     },
-  },
-];
+  ];
+}
 
 const ERROR_DIFFUSION: DitheringMode[] = ['floyd-steinberg', 'stucki', 'jjn', 'atkinson'];
 
@@ -159,7 +162,9 @@ export function Controls({
   staircaseMode, onStaircaseModeChange,
   processing,
   collapsedSections, onToggleSection,
+  t,
 }: Props) {
+  const DITHERING_OPTIONS = getDitheringOptions(t);
   const showIntensity = dithering !== 'none';
   const blockW = mapGrid.wide * MAP_BLOCK_SIZE;
   const blockH = mapGrid.tall * MAP_BLOCK_SIZE;
@@ -214,7 +219,7 @@ export function Controls({
       <section className="control-group">
         <h3 className="control-title">
           <span className={`section-arrow${collapsedSections['map-grid'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-grid')}>▼</span>
-          Карта
+          {t('Размер', 'Size')}
         </h3>
         <div className={`control-group-content${collapsedSections['map-grid'] ? ' collapsed' : ''}`}>
         <div className="grid-options">
@@ -313,14 +318,14 @@ export function Controls({
               className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
               onClick={() => onMapModeChange('2d')}
               disabled={processing}
-              title="2D плоский — один оттенок на цвет, ~61 цвет"
-            >2D ПЛОСКИЙ</button>
+              title="2D flat — one shade per color, ~61 colors"
+            >2D FLAT</button>
             <button
               className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
               onClick={() => onMapModeChange('3d')}
               disabled={processing}
-              title="3D лестница — 3 оттенка на цвет, ~183 цвета"
-            >3D ЛЕСТНИЦА</button>
+              title="3D staircase — 3 shades per color, ~183 colors"
+            >3D STAIR</button>
           </div>
           {mapMode === '3d' && (
             <div className="mode-toggle" style={{ marginTop: '6px' }}>
@@ -328,16 +333,16 @@ export function Controls({
                 className={`mode-btn${staircaseMode === 'classic' ? ' active' : ''}`}
                 onClick={() => onStaircaseModeChange('classic')}
                 disabled={processing}
-                title="Классический: каждый оттенок на своей высоте"
+                title="Classic: each shade at its own height"
                 style={{ fontSize: '10px' }}
-              >Классик</button>
+              >Classic</button>
               <button
                 className={`mode-btn${staircaseMode === 'optimized' ? ' active' : ''}`}
                 onClick={() => onStaircaseModeChange('optimized')}
                 disabled={processing}
-                title="Оптимизированный: все оттенки на высоте 0, только текстура"
+                title="Optimized: all shades at height 0, texture only"
                 style={{ fontSize: '10px' }}
-              >Оптим.</button>
+              >Optimized</button>
             </div>
           )}
         </div>
@@ -347,7 +352,7 @@ export function Controls({
       <section className="control-group">
         <h3 className="control-title">
           <span className={`section-arrow${collapsedSections['dithering'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('dithering')}>▼</span>
-          Дизеринг
+          {t('Дизеринг', 'Dithering')}
         </h3>
         <div className={`control-group-content${collapsedSections['dithering'] ? ' collapsed' : ''}`}>
         <div className="dither-options">
@@ -441,7 +446,7 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, cleanThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Пиксели ближе этого расстояния OKLAB снаппятся без дизеринга. ~0.015 = среднее расстояние палитры Minecraft.</p>
+            <p className="intensity-hint">{t('Пиксели ближе этого расстояния OKLAB снаппятся без дизеринга. ~0.015 = среднее расстояние палитры Minecraft.', 'Pixels closer than this OKLAB distance snap without dithering. ~0.015 = average Minecraft palette distance.')}</p>
           </div>
 
           {/* Error strength */}
@@ -519,7 +524,7 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, jitter: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Blue-noise возмущение в зоне дизеринга. 0 = выкл; ~8 = слабо; ~20 = сильно. Разбивает структуру Stucki.</p>
+            <p className="intensity-hint">{t('Blue-noise возмущение в зоне дизеринга. 0 = выкл; ~8 = слабо; ~20 = сильно. Разбивает структуру Stucki.', 'Blue-noise jitter in dithering zone. 0 = off; ~8 = weak; ~20 = strong. Breaks up Stucki pattern.')}</p>
           </div>
 
           <button
@@ -556,30 +561,30 @@ export function Controls({
             className="intensity-slider"
           />
           <div className="intensity-labels">
-            <span>Слабо</span><span>Полная</span>
+            <span>{t('Слабо', 'Low')}</span><span>{t('Полная', 'Full')}</span>
           </div>
           {ERROR_DIFFUSION.includes(dithering) && (
-            <p className="intensity-hint">Сила распространения ошибки.</p>
+            <p className="intensity-hint">{t('Сила распространения ошибки.', 'Error diffusion strength.')}</p>
           )}
           {dithering === 'blue-noise' && (
-            <p className="intensity-hint">Диапазон порога шума.</p>
+            <p className="intensity-hint">{t('Диапазон порога шума.', 'Noise threshold range.')}</p>
           )}
           {dithering === 'yliluoma2' && (
-            <p className="intensity-hint">Размер паттерна (1–8 цветов в кластере).</p>
+            <p className="intensity-hint">{t('Размер паттерна (1–8 цветов в кластере).', 'Pattern size (1–8 colors per cluster).')}</p>
           )}
           {dithering === 'kluss' && (
-            <p className="intensity-hint">0% = без дизеринга (чистый снапп), 100% = полная диффузия Stucki.</p>
+            <p className="intensity-hint">{t('0% = без дизеринга (чистый снапп), 100% = полная диффузия Stucki.', '0% = no dithering (pure snap), 100% = full Stucki diffusion.')}</p>
           )}
           </div>
         </section>
       )}
 
       <section className="control-group">
-        <p className="oklab-badge">✓ Подбор цвета OKLAB</p>
+        <p className="oklab-badge">✓ {t('Подбор цвета OKLAB', 'OKLAB color selection')}</p>
       </section>
 
       {processing && (
-        <div className="processing-badge">Обработка…</div>
+        <div className="processing-badge">{t('Обработка…', 'Processing…')}</div>
       )}
     </div>
   );

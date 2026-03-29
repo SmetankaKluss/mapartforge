@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NumInput } from './NumInput';
 import { applyAdjustments } from '../lib/adjustments';
+import { useLocale } from '../lib/locale';
 import type { ImageAdjustments } from '../lib/adjustments';
 
 const THUMB_SIZE = 80; // px
@@ -17,13 +18,14 @@ interface Props {
   onToggle: () => void;
 }
 
-const SLIDERS: { key: keyof ImageAdjustments; label: string }[] = [
-  { key: 'brightness', label: 'Яркость'    },
-  { key: 'contrast',   label: 'Контраст'   },
-  { key: 'saturation', label: 'Насыщенность' },
-];
-
 export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disabled, showAdjustments, onToggleAdjustments, collapsed, onToggle }: Props) {
+  const { t } = useLocale();
+
+  const SLIDERS: { key: keyof ImageAdjustments; label: string }[] = [
+    { key: 'brightness', label: t('Яркость', 'Brightness')      },
+    { key: 'contrast',   label: t('Контраст', 'Contrast')        },
+    { key: 'saturation', label: t('Насыщенность', 'Saturation') },
+  ];
   const thumbRef = useRef<HTMLCanvasElement>(null);
 
   // Redraw thumbnail whenever source image or adjustments change
@@ -74,14 +76,14 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
         <button
           className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
           onClick={onToggleAdjustments}
-          title={showAdjustments ? 'Отключить коррекцию' : 'Включить коррекцию'}
+          title={t('Отключить коррекцию', 'Disable adjustments')}
         >☀</button>
         {!isDefault && (
-          <button className="adj-reset-btn" onClick={reset} disabled={disabled} title="Сбросить всё на 0">
-            Сброс
+          <button className="adj-reset-btn" onClick={reset} disabled={disabled} title={t('Сбросить всё на 0', 'Reset all to 0')}>
+            {t('Сброс', 'Reset')}
           </button>
         )}
-        <span style={{ flex: 1, textAlign: 'right' }}>Коррекция</span>
+        <span style={{ flex: 1, textAlign: 'right' }}>{t('Коррекция', 'Adjustments')}</span>
       </h3>
 
       <div className={`control-group-content${collapsed ? ' collapsed' : ''}`}>
@@ -90,7 +92,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
       {sourceImage && (
         <div className="adj-thumb-row">
           <canvas ref={thumbRef} className="adj-thumb" width={THUMB_SIZE} height={THUMB_SIZE} />
-          <span className="adj-thumb-label">Предпросмотр</span>
+          <span className="adj-thumb-label">{t('Предпросмотр', 'Preview')}</span>
         </div>
       )}
 
