@@ -309,7 +309,7 @@ export function PreviewCanvas({
           if (activeTool === 'eraser') {
             erasePixelInBuffer(paintBufferRef.current!, bx, by);
           } else {
-            paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+            paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
           }
         }
       }
@@ -488,7 +488,7 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+          paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
         }
       }
       // Draw directly to the visible canvas — no React re-render needed mid-drag
