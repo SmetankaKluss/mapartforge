@@ -41,7 +41,8 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   useEffect(() => {
     const allPresets = { ...BUILTIN_PRESETS, ...customPresets };
     for (const [name, sel] of Object.entries(allPresets)) {
-      if (JSON.stringify(blockSelection) === JSON.stringify(sel)) {
+      const norm = (o: BlockSelection) => JSON.stringify(Object.keys(o).sort().map(k => [k, [...(o[+k] ?? [])].sort()]));
+      if (norm(blockSelection) === norm(sel)) {
         setSelectedPreset(name);
         return;
       }
