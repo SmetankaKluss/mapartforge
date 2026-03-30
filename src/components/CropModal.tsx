@@ -127,13 +127,12 @@ export function CropModal({ sourceImage, targetW, targetH, onApply, onCancel }: 
     canvas.width  = Math.round(c.w);
     canvas.height = Math.round(c.h);
     canvas.getContext('2d')!.drawImage(sourceImage, c.x, c.y, c.w, c.h, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => { URL.revokeObjectURL(url); onApply(img); };
-      img.src = url;
-    }, 'image/png');
+    // Use data URL instead of blob URL: data URLs remain valid indefinitely,
+    // avoiding a Chrome bug where revoking a blob URL before createImageBitmap
+    // causes the processing step to silently fail.
+    const img = new Image();
+    img.onload = () => onApply(img);
+    img.src = canvas.toDataURL('image/png');
   }
 
   // Display coords for overlay

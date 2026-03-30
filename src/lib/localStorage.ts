@@ -15,29 +15,44 @@ export interface SavedSettings {
   bnScale: number;
 }
 
-const STORAGE_KEY = 'mapartforge-v3';
+const STORAGE_KEY = 'mapartforge-v4';
+
+// Version tag stored alongside blockSelection to detect corrupt data from earlier bugs.
+// Increment this if the blockSelection schema changes in a breaking way.
+const BS_VERSION = 4;
+
+interface RawStorage extends Partial<SavedSettings> {
+  __bsv?: number;
+}
 
 export function saveSettings(s: Partial<SavedSettings>): void {
   try {
     const existing = loadSettings();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...existing, ...s }));
+    const payload: RawStorage = { ...existing, ...s };
+    if (s.blockSelection !== undefined) {
+      payload.__bsv = BS_VERSION;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch { /* storage full or unavailable */ }
 }
 
 export function loadSettings(): Partial<SavedSettings> {
   try {
-    // Try current version first
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SavedSettings>;
-      if (parsed.blockSelection) {
-        parsed.blockSelection = migrateBlockSelection(parsed.blockSelection);
+      const parsed = JSON.parse(raw) as RawStorage;
+      const { __bsv, ...settings } = parsed;
+      // If blockSelection exists but was written by buggy code (no version tag or old version),
+      // drop it so DEFAULT_SELECTION is used instead.
+      if (settings.blockSelection && (!__bsv || __bsv < BS_VERSION)) {
+        delete settings.blockSelection;
+      } else if (settings.blockSelection) {
+        settings.blockSelection = migrateBlockSelection(settings.blockSelection);
       }
-      return parsed;
+      return settings;
     }
-    // Migrate from any older version: carry over all settings except blockSelection
-    // (older blockSelection formats may be incompatible or contain all-variants bug)
-    for (const legacyKey of ['mapartforge-v2', 'mapartforge-v1']) {
+    // Migrate from any older version: carry over all settings except blockSelection.
+    for (const legacyKey of ['mapartforge-v3', 'mapartforge-v2', 'mapartforge-v1']) {
       const legacyRaw = localStorage.getItem(legacyKey);
       if (legacyRaw) {
         const legacy = JSON.parse(legacyRaw) as Partial<SavedSettings>;
@@ -55,12 +70,13 @@ function migrateBlockSelection(sel: BlockSelection): BlockSelection {
   const migrated = { ...sel };
   for (const row of COLOUR_ROWS) {
     const saved = migrated[row.csId];
-    // Skip if row was fully excluded (undefined) or intentionally empty (length === 0)
     if (saved === undefined || saved.length === 0) continue;
+    // Only extend selection if user already had ALL variants (they want everything)
+    const allIds = row.blocks.map(b => b.blockId);
     const savedSet = new Set(saved);
-    const newIds = row.blocks
-      .map(b => b.blockId)
-      .filter(id => !savedSet.has(id));
+    const allSelected = allIds.every(id => savedSet.has(id));
+    if (!allSelected) continue;
+    const newIds = allIds.filter(id => !savedSet.has(id));
     if (newIds.length > 0) {
       migrated[row.csId] = [...saved, ...newIds].sort((a, b) => a - b);
     }
