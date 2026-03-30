@@ -15,7 +15,7 @@ export interface SavedSettings {
   bnScale: number;
 }
 
-const STORAGE_KEY = 'mapartforge-v1';
+const STORAGE_KEY = 'mapartforge-v3';
 
 export function saveSettings(s: Partial<SavedSettings>): void {
   try {
@@ -26,15 +26,27 @@ export function saveSettings(s: Partial<SavedSettings>): void {
 
 export function loadSettings(): Partial<SavedSettings> {
   try {
+    // Try current version first
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Partial<SavedSettings>;
-    // Forward-migration: if a saved blockSelection exists, ensure any block
-    // ids added since it was saved are also enabled (new blocks default to on).
-    if (parsed.blockSelection) {
-      parsed.blockSelection = migrateBlockSelection(parsed.blockSelection);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<SavedSettings>;
+      if (parsed.blockSelection) {
+        parsed.blockSelection = migrateBlockSelection(parsed.blockSelection);
+      }
+      return parsed;
     }
-    return parsed;
+    // Migrate from any older version: carry over all settings except blockSelection
+    // (older blockSelection formats may be incompatible or contain all-variants bug)
+    for (const legacyKey of ['mapartforge-v2', 'mapartforge-v1']) {
+      const legacyRaw = localStorage.getItem(legacyKey);
+      if (legacyRaw) {
+        const legacy = JSON.parse(legacyRaw) as Partial<SavedSettings>;
+        const { blockSelection: _dropped, ...rest } = legacy;
+        void _dropped;
+        return rest;
+      }
+    }
+    return {};
   } catch { return {}; }
 }
 
