@@ -91,11 +91,11 @@ function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOp
     {
       value: 'blue-noise',
       label: 'Blue Noise',
-      desc: t('OKLAB-порог (IGN)', 'OKLAB threshold (IGN)'),
+      desc: t('Апериодический (IGN)', 'Aperiodic (IGN)'),
       tooltip: {
-        fullName: 'Blue Noise (OKLAB IGN)',
-        description: t('Для каждого пикселя находит два ближайших цвета палитры в пространстве OKLAB и выбирает между ними с помощью порога IGN. Пропорция выбора равна перцепционному расстоянию — без искажений оттенка, без повторяющихся артефактов.', 'For each pixel finds the two nearest palette colors in OKLAB space and picks between them using an IGN threshold. Selection ratio equals perceptual distance — no hue distortion, no repeating artifacts.'),
-        bestFor: t('Художественный результат, фотографии, плавные градиенты.', 'Artistic results, photos, smooth gradients.'),
+        fullName: 'Blue Noise (IGN)',
+        description: t('Упорядоченный дизеринг на основе чересстрочного градиентного шума. Избегает повторяющихся полосовых артефактов.', 'Ordered dithering based on interleaved gradient noise. Avoids repeating striped artifacts.'),
+        bestFor: t('Художественный результат и стилизованный мап-арт.', 'Artistic results and stylized map art.'),
       },
     },
     {
@@ -111,11 +111,11 @@ function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOp
     {
       value: 'kluss',
       label: 'KlussDither',
-      desc: t('OKLAB-порог + Stucki в линейном свете', 'OKLAB threshold + linear-light Stucki'),
+      desc: t('IGN-дизеринг для аниме-арта', 'IGN dithering for anime art'),
       tooltip: {
         fullName: 'KlussDither',
-        description: t('Снаппит «чистые зоны» без диффузии. В зонах дизеринга: OKLAB-пороговый выбор между двумя ближайшими цветами палитры через IGN (апериодичный, без направленных артефактов) + диффузия ошибки Stucki в линейном пространстве для точной коррекции градиентов.', 'Snaps "clean zones" without diffusion. In dithering zones: OKLAB threshold selection between the two nearest palette colors via IGN (aperiodic, no directional artifacts) + Stucki error diffusion in linear light space for accurate gradient correction.'),
-        bestFor: t('Аниме-арт, иллюстрации, изображения с плоскими зонами и тонкими деталями.', 'Anime art, illustrations, images with flat zones and fine detail.'),
+        description: t('Определяет «чистые зоны» и снаппит их напрямую. В зонах дизеринга использует IGN-пороговое выделение между двумя ближайшими цветами палитры. Мягкая диффузия Stucki сглаживает градиенты поверх.', 'Detects "clean zones" and snaps them directly. In dithering zones uses IGN threshold selection between two nearest palette colors. Soft Stucki diffusion smooths gradients on top.'),
+        bestFor: t('Аниме-арт, иллюстрации и изображения с большими плоскими областями.', 'Anime art, illustrations, and images with large flat areas.'),
       },
     },
   ];

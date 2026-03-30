@@ -93,41 +93,6 @@ function findClosestColor(
   return { color: cp.colors[bestIndex], index: bestIndex, dist: minDist };
 }
 
-/**
- * Find the two nearest palette colors to (r, g, b) in OKLAB space.
- * Returns squared distances (as oklabDistance returns squared values).
- * Used by OKLAB-threshold dithering in Blue Noise and KlussDither modes.
- */
-function findTwoNearest(
-  r: number, g: number, b: number,
-  cp: ComputedPalette,
-): { c1: PaletteColor; d1: number; i1: number; c2: PaletteColor; d2: number } {
-  const lab = rgbToOklab(clamp(r), clamp(g), clamp(b));
-  let d1 = Infinity, d2 = Infinity;
-  let i1 = 0, i2 = 1;
-  for (let i = 0; i < cp.labs.length; i++) {
-    const d = oklabDistance(lab, cp.labs[i]);
-    if (d < d1) { d2 = d1; i2 = i1; d1 = d; i1 = i; }
-    else if (d < d2) { d2 = d; i2 = i; }
-  }
-  return { c1: cp.colors[i1], d1, i1, c2: cp.colors[i2 < cp.colors.length ? i2 : i1], d2 };
-}
-
-/**
- * OKLAB-space ordered dithering threshold.
- * Given squared distances d1 (to nearest) and d2 (to second nearest),
- * returns the blend fraction f ∈ [0,1]: proportion of pixels that should
- * show the second color so the spatially-averaged output matches the source.
- * formula: f = sqrt(d1) / (sqrt(d1) + sqrt(d2)), scaled by intensity.
- * Derivation: for a source exactly at the OKLAB midpoint between c1 and c2,
- * d1=d2 → f=0.5 → 50% c1, 50% c2 → correct average.
- */
-function oklabBlendFraction(d1: number, d2: number, intensity: number): number {
-  const sd1 = Math.sqrt(d1), sd2 = Math.sqrt(d2);
-  const sum = sd1 + sd2;
-  return sum > 0 ? (sd1 / sum) * intensity : 0;
-}
-
 // ── Error-diffusion helpers ───────────────────────────────────────────────
 
 /**
@@ -699,33 +664,19 @@ async function applyKlussDither(
       if (x < width - 1 && y < height - 1 ) { const d = oklabDistance(lab, srcLabs[idx + width + 1]); if (d > maxND) maxND = d; }
 
       // ── Convert linear buffer → sRGB for palette lookup ───────────────
+      // Per-channel jitter uses decorrelated IGN phases so R/G/B are
+      // perturbed independently — prevents the monochromatic gray shift
+      // that a single shared amplitude produces at high jitter values.
       let qrS = linToSRGBByte(rBuf[idx]);
       let qgS = linToSRGBByte(gBuf[idx]);
       let qbS = linToSRGBByte(bBuf[idx]);
-
-      // Optional extra per-channel sRGB jitter (decorrelated phases).
-      // Shifts the working point in sRGB space before the OKLAB lookup.
-      // At jitter=0 (default): skipped entirely — pure OKLAB threshold.
       if (jitter > 0 && maxND < t && srcNearestDist[idx] >= cleanThreshold) {
         qrS = Math.max(0, Math.min(255, Math.round(qrS + (ign(x,       y      ) - 0.5) * jitter)));
         qgS = Math.max(0, Math.min(255, Math.round(qgS + (ign(x + 197, y + 103) - 0.5) * jitter)));
         qbS = Math.max(0, Math.min(255, Math.round(qbS + (ign(x + 439, y + 251) - 0.5) * jitter)));
       }
 
-      // ── OKLAB-threshold selection ──────────────────────────────────────
-      // Find the two nearest palette colors to the working buffer pixel.
-      // Use IGN to pick between them proportional to the blend fraction:
-      //   f = sqrt(d1)/(sqrt(d1)+sqrt(d2))
-      // where d1=nearest, d2=second-nearest (squared OKLAB distances).
-      // This produces a blue-noise-distributed selection of the two best
-      // colors — aperiodic and free of the directional Stucki worm artifact —
-      // while the subsequent error diffusion corrects residual inaccuracies.
-      // Using a unique IGN phase per scan direction avoids serpentine correlation.
-      const { c1: klC1, d1: bufD1, c2: klC2, d2: bufD2 } = findTwoNearest(qrS, qgS, qbS, cp);
-      const kIgn_t = ign(x + (ltr ? 7919 : 3571), y + 2017);
-      const kIgn_f = oklabBlendFraction(bufD1, bufD2, 1.0);
-      const color   = kIgn_t < kIgn_f ? klC2 : klC1;
-      const bufDist = bufD1;
+      const { color, dist: bufDist } = findClosestColor(qrS, qgS, qbS, cp);
 
       out[idx * 4]     = color.r;
       out[idx * 4 + 1] = color.g;
@@ -734,6 +685,8 @@ async function applyKlussDither(
 
       // Skip diffusion if: hard boundary | source snaps cleanly |
       // buffer has already converged to a palette colour | zero intensity.
+      // Buffer-based snap catches pixels where accumulated error has drifted
+      // the working value close enough to a palette entry to snap cleanly.
       const shouldSnap = srcNearestDist[idx] < cleanThreshold || bufDist < cleanThreshold;
       if (maxND >= t || shouldSnap || intensity <= 0) {
         continue;
@@ -831,28 +784,18 @@ export async function applyDithering(
     return out;
   }
 
-  // ── Blue Noise: OKLAB-space ordered dithering ──────────────────────────
-  //
-  // Instead of adding an RGB offset (which distorts hue), we find the two
-  // nearest palette colors per pixel in OKLAB space and use the IGN threshold
-  // to pick between them. The blend fraction f = sqrt(d1)/(sqrt(d1)+sqrt(d2))
-  // ensures the spatially-averaged output matches the source color perceptually.
-  // This eliminates the monochromatic gray-shift artifact of the old RGB-offset
-  // approach and produces perceptually correct color blending.
+  // ── Blue noise ─────────────────────────────────────────────────────────
   if (mode === 'blue-noise') {
+    const scale = intensity * 48;
     const s = Math.max(1, bnScale);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
         if (data[i * 4 + 3] < 128) { out[i * 4 + 3] = 0; continue; }
-
-        const { c1, d1, c2, d2 } = findTwoNearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], cp);
-
-        // IGN threshold — tiled at bnScale for smooth / coarse grain control
-        const t = ign(Math.floor(x / s), Math.floor(y / s));
-        const f = oklabBlendFraction(d1, d2, intensity);
-        const color = t < f ? c2 : c1;
-
+        const offset = (ign(Math.floor(x / s), Math.floor(y / s)) - 0.5) * scale;
+        const { color } = findClosestColor(
+          data[i * 4] + offset, data[i * 4 + 1] + offset, data[i * 4 + 2] + offset, cp,
+        );
         out[i * 4] = color.r; out[i * 4 + 1] = color.g;
         out[i * 4 + 2] = color.b; out[i * 4 + 3] = 255;
       }
