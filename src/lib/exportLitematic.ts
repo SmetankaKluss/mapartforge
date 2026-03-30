@@ -56,17 +56,23 @@ function columnRawHeights(
 ): number[] {
   const col = new Array<number>(height);
   let y = 0;
+  let prevTransparent = true; // treat north boundary as transparent gap
   for (let z = 0; z < height; z++) {
     const i = (z * width + x) * 4;
-    // Transparent pixels are air — treat as shade 1 (neutral, no height change)
-    // so they don't cause upward drift that leaves adjacent blocks floating.
-    let shade: number;
     if (data[i + 3] < 128) {
-      shade = 1;
-    } else {
-      const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-      shade = lookup.get(key)?.shade ?? 1;
+      // Transparent pixel: air at ground level.
+      // Do NOT carry accumulated height — new solid segment after gap must start fresh.
+      col[z] = 0;
+      prevTransparent = true;
+      continue;
     }
+    // First solid pixel after a transparent gap: reset accumulator to ground.
+    if (prevTransparent) {
+      y = 0;
+      prevTransparent = false;
+    }
+    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    const shade = lookup.get(key)?.shade ?? 1;
     y = shade === 0 ? y - 1 : shade === 2 ? y + 1 : y;
     col[z] = y;
   }
