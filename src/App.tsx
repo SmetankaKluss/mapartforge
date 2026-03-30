@@ -360,6 +360,8 @@ export default function App() {
 
   const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
     setShowCropModal(false);
+    uploadedFileRef.current = null;   // use cropped image, not original file
+    uploadedImageRef.current = croppedImg;
     setSourceImage(croppedImg);
     setSplitPos(50);
     setUndoStack([]);
