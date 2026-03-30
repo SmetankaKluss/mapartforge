@@ -58,8 +58,15 @@ function columnRawHeights(
   let y = 0;
   for (let z = 0; z < height; z++) {
     const i = (z * width + x) * 4;
-    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-    const shade = lookup.get(key)?.shade ?? 2;
+    // Transparent pixels are air — treat as shade 1 (neutral, no height change)
+    // so they don't cause upward drift that leaves adjacent blocks floating.
+    let shade: number;
+    if (data[i + 3] < 128) {
+      shade = 1;
+    } else {
+      const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+      shade = lookup.get(key)?.shade ?? 1;
+    }
     y = shade === 0 ? y - 1 : shade === 2 ? y + 1 : y;
     col[z] = y;
   }
