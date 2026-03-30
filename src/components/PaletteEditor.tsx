@@ -4,6 +4,7 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { buildPaletteUrl } from '../lib/paletteShare';
 import { PaletteShareModal } from './PaletteShareModal';
+import { useLocale } from '../lib/locale';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled }: Props) {
+  const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
   const [selectedPreset,  setSelectedPreset]  = useState('');
   const [searchQuery,     setSearchQuery]     = useState('');
@@ -161,8 +163,8 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     <section className="sidebar-section">
       {/* Section header */}
       <h3 className="section-title">
-        Палитра
-        <span className="palette-count">{paletteSize} цветов · {blockCount} блоков</span>
+        {t('Палитра', 'Palette')}
+        <span className="palette-count">{paletteSize} {t('цветов', 'colors')} · {blockCount} {t('блоков', 'blocks')}</span>
       </h3>
 
       {/* ── Row 1: preset dropdown ── */}
@@ -173,14 +175,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           onChange={e => handlePresetSelect(e.target.value)}
           disabled={disabled}
         >
-          <option value="">— выбрать пресет —</option>
-          <optgroup label="Встроенные">
+          <option value="">{t('— выбрать пресет —', '— select preset —')}</option>
+          <optgroup label={t('Встроенные', 'Built-in')}>
             {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
               <option key={name} value={name}>{name}</option>
             ))}
           </optgroup>
           {customNames.length > 0 && (
-            <optgroup label="Свои">
+            <optgroup label={t('Свои', 'Custom')}>
               {customNames.map(n => <option key={n} value={n}>{n}</option>)}
             </optgroup>
           )}
@@ -190,7 +192,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
             className="pe-btn pe-btn-delete"
             onClick={handleDelete}
             disabled={disabled}
-            title="Удалить пресет"
+            title={t('Удалить пресет', 'Delete preset')}
           >✕</button>
         )}
       </div>
@@ -200,7 +202,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         <div className="pe-search-wrap">
           <input
             className="pe-search-input"
-            placeholder="Поиск блоков…"
+            placeholder={t('Поиск блоков…', 'Search blocks…')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             spellCheck={false}
@@ -209,7 +211,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
             <button
               className="pe-search-clear"
               onClick={() => setSearchQuery('')}
-              title="Очистить поиск"
+              title={t('Очистить поиск', 'Clear search')}
               tabIndex={-1}
             >×</button>
           )}
@@ -218,14 +220,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           className="pe-save-btn"
           onClick={openSaveModal}
           disabled={disabled}
-          title="Сохранить текущий выбор блоков как пресет"
-        >Сохранить</button>
+          title={t('Сохранить текущий выбор блоков как пресет', 'Save current block selection as preset')}
+        >{t('Сохранить', 'Save')}</button>
         <button
           className={`pe-clear-btn${clearPending ? ' pending' : ''}`}
           onClick={handleClear}
           disabled={disabled}
-          title={clearPending ? 'Нажми ещё раз для подтверждения' : 'Снять выбор со всех блоков'}
-        >{clearPending ? 'Точно?' : 'Сброс'}</button>
+          title={clearPending ? t('Нажми ещё раз для подтверждения', 'Click again to confirm') : t('Снять выбор со всех блоков', 'Clear selection from all blocks')}
+        >{clearPending ? t('Точно?', 'Sure?') : t('Сброс', 'Reset')}</button>
       </div>
 
       {/* ── Row 3: share palette ── */}
@@ -234,14 +236,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           className="pe-share-btn"
           onClick={() => setPaletteUrl(buildPaletteUrl(blockSelection))}
           disabled={disabled}
-          title="Создать ссылку для текущей палитры блоков"
-        >⬡ Поделиться палитрой</button>
+          title={t('Создать ссылку для текущей палитры блоков', 'Create link for current palette')}
+        >⬡ {t('Поделиться палитрой', 'Share palette')}</button>
       </div>
 
       {/* ── Scrollable colour rows ── */}
       <div className="pe-rows">
         {filteredRows.length === 0 ? (
-          <p className="pe-no-results">Блоки не найдены: «{searchQuery}»</p>
+          <p className="pe-no-results">{t('Блоки не найдены', 'No blocks found')}: «{searchQuery}»</p>
         ) : (
           filteredRows.map(row => {
             const activeIds = blockSelection[row.csId] ?? [];
@@ -270,7 +272,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
                     className="pe-row-toggle"
                     onClick={() => !disabled && toggleRow(row.csId)}
                     disabled={disabled}
-                    title={allOn ? 'Снять всё' : 'Выбрать всё'}
+                    title={allOn ? t('Снять всё', 'Deselect all') : t('Выбрать всё', 'Select all')}
                   >{activeIds.length === 0 ? '○' : allOn ? '●' : '◑'}</button>
                 </div>
 
@@ -317,11 +319,11 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           aria-label="Save preset"
         >
           <div className="pe-modal" onClick={e => e.stopPropagation()}>
-            <div className="pe-modal-title">Сохранить пресет</div>
+            <div className="pe-modal-title">{t('Сохранить пресет', 'Save preset')}</div>
             <input
               ref={modalInputRef}
               className={`pe-modal-input${modalNameInvalid ? ' invalid' : ''}`}
-              placeholder="Название пресета…"
+              placeholder={t('Название пресета…', 'Preset name…')}
               value={modalName}
               onChange={e => setModalName(e.target.value)}
               onKeyDown={e => {
@@ -331,18 +333,18 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
               spellCheck={false}
             />
             {modalNameInvalid && (
-              <p className="pe-modal-error">Это название зарезервировано для встроенных пресетов.</p>
+              <p className="pe-modal-error">{t('Это название зарезервировано для встроенных пресетов.', 'This name is reserved for built-in presets.')}</p>
             )}
             <div className="pe-modal-actions">
               <button
                 className="pe-modal-btn pe-modal-btn-save"
                 onClick={confirmSave}
                 disabled={!modalName.trim() || modalNameInvalid}
-              >СОХРАНИТЬ</button>
+              >{t('СОХРАНИТЬ', 'SAVE')}</button>
               <button
                 className="pe-modal-btn pe-modal-btn-cancel"
                 onClick={cancelSave}
-              >ОТМЕНА</button>
+              >{t('ОТМЕНА', 'CANCEL')}</button>
             </div>
           </div>
         </div>

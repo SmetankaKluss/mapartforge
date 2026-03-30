@@ -10,6 +10,7 @@ import { exportLitematic, exportLitematicZip } from '../lib/exportLitematic';
 import type { SupportMode } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
 import { LinkModal } from './LinkModal';
+import { useLocale } from '../lib/locale';
 
 interface Props {
   imageData:   ImageData | null;
@@ -56,6 +57,7 @@ export function ExportPanel({
   supportBlock, supportMode,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
+  const { t } = useLocale();
   const [busyPng]                         = useState(false);
   const [busyMapdat,   setBusyMapdat]     = useState(false);
   const [busyLiteFlat, setBusyLiteFlat]   = useState(false);
@@ -142,9 +144,9 @@ export function ExportPanel({
 
   return (
     <section className="sidebar-section" id="tour-export">
-      <h3 className="section-title">Экспорт</h3>
+      <h3 className="section-title">{t('Экспорт', 'Export')}</h3>
       {!hasContent && (
-        <p className="export-empty">Обработай изображение для экспорта.</p>
+        <p className="export-empty">{t('Обработай изображение для экспорта.', 'Process image to export.')}</p>
       )}
       {hasContent && (
         <div className="export-buttons">
@@ -152,27 +154,27 @@ export function ExportPanel({
             className="export-btn"
             onClick={handlePng}
             disabled={base || busyPng}
-            title={compareMode ? 'Скачать левую и правую панели как отдельные PNG' : 'Скачать обработанное изображение как PNG'}
+            title={compareMode ? t('Скачать левую и правую панели как отдельные PNG', 'Download left and right panels as separate PNG') : t('Скачать обработанное изображение как PNG', 'Download processed image as PNG')}
           >
-            {busyPng ? 'Сохранение…' : compareMode ? '↓ PNG ×2' : '↓ PNG'}
+            {busyPng ? t('Сохранение…', 'Saving…') : compareMode ? '↓ PNG ×2' : '↓ PNG'}
           </button>
 
           <button
             className="export-btn"
             onClick={handleMapDat}
             disabled={base || busyMapdat}
-            title="Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл"
+            title={t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}
           >
-            {busyMapdat ? 'Сборка…' : mapCount > 1 ? `↓ MAP.DAT (${mapCount} файлов)` : '↓ MAP.DAT'}
+            {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `↓ MAP.DAT (${mapCount} ${t('файлов', 'files')})` : '↓ MAP.DAT'}
           </button>
 
           <button
             className="export-btn"
             onClick={handleLitematic}
             disabled={base || busyAnyLite}
-            title={mapMode === '3d' ? 'Лестничная структура — дополнительные оттенки за счёт высоты' : 'Один плоский слой — стандартный 2D мап-арт для выживания'}
+            title={mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
           >
-            {busyLiteFlat ? 'Сборка…' : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
+            {busyLiteFlat ? t('Сборка…', 'Building…') : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
           </button>
 
           {isMultiMap && (
@@ -180,24 +182,24 @@ export function ExportPanel({
               className="export-btn export-btn-zip"
               onClick={handleZip}
               disabled={base || busyAnyLite}
-              title={`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`}
+              title={t(`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`, `Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files in archive`)}
             >
-              {busyZip ? 'Архивирование…' : `↓ ZIP (${mapGrid.wide * mapGrid.tall} карт)`}
+              {busyZip ? t('Архивирование…', 'Archiving…') : `↓ ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})`}
             </button>
           )}
         </div>
       )}
       {compareMode && hasContent && (
-        <p className="export-note">Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.</p>
+        <p className="export-note">{t('Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.', 'Compare mode: PNG exports both panels; other formats use left panel.')}</p>
       )}
       <div className="link-row">
         <button
           className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
           onClick={handleGetLink}
           disabled={base || linkState === 'uploading' || !sourceImage}
-          title={!hasContent ? 'Сначала обработай изображение' : 'Создать постоянную ссылку на этот мап-арт с текущими настройками'}
+          title={!hasContent ? t('Сначала обработай изображение', 'Process image first') : t('Создать постоянную ссылку на этот мап-арт с текущими настройками', 'Create permanent link to this map art with current settings')}
         >
-          {linkState === 'uploading' ? 'Загрузка…' : linkState === 'error' ? 'Ошибка загрузки' : '🔗 ПОЛУЧИТЬ ССЫЛКУ'}
+          {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}
         </button>
       </div>
       {linkUrl && (

@@ -53,11 +53,11 @@ const SUPPORT_BLOCKS_PALETTE = [
   { nbt: 'blackstone',   csId: 28, blockId: 9,  label: 'Blackstone' },
 ] as const;
 
-const SUPPORT_MODE_TITLES: Record<1 | 2 | 3, string> = {
-  1: '1 блок только под плавающими блоками (песок, гравий, лишайник…)',
-  2: 'Зависит от оттенка: переходные оттенки получают 2, плоские — 1',
-  3: '2 блока под каждым блоком арта',
-};
+const getSupportModeTitles = (t: (ru: string, en: string) => string): Record<1 | 2 | 3, string> => ({
+  1: t('1 блок только под плавающими блоками (песок, гравий, лишайник…)', '1 block under floating blocks (sand, gravel, moss…)'),
+  2: t('Зависит от оттенка: переходные оттенки получают 2, плоские — 1', 'Depends on shade: gradients get 2, flat get 1'),
+  3: t('2 блока под каждым блоком арта', '2 blocks under each art block'),
+});
 
 const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
   1: 'Crit.',
@@ -666,14 +666,14 @@ export default function App() {
       {viewBanner && (
         <div className="view-banner">
           <span>█ {t('ЗАГРУЖЕНО ПО ССЫЛКЕ', 'LOADED FROM LINK')}</span>
-          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title="Закрыть">✕</button>
+          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title={t('Закрыть', 'Close')}>✕</button>
         </div>
       )}
 
       {paletteBanner && (
         <div className="view-banner palette-banner">
           <span>⬡ {t('ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ', 'PALETTE LOADED FROM LINK')}</span>
-          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title="Закрыть">✕</button>
+          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title={t('Закрыть', 'Close')}>✕</button>
         </div>
       )}
 
@@ -789,8 +789,8 @@ export default function App() {
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
-              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title="Отменить (Ctrl+Z)">↩</button>
-              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title="Повторить (Ctrl+Y)">↪</button>
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}>↩</button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}>↪</button>
             </div>
             <div className="toolbar-sep" />
 
@@ -810,7 +810,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
-                    title="Пипетка (E)"
+                    title={t('Пипетка (E)', 'Eyedropper (E)')}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
@@ -820,7 +820,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
-                    title="Кисть (B)"
+                    title={t('Кисть (B)', 'Brush (B)')}
                     disabled={!paintBlock}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
@@ -831,7 +831,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
-                    title="Заливка (F)"
+                    title={t('Заливка (F)', 'Fill (F)')}
                     disabled={!paintBlock}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
@@ -844,7 +844,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')}
-                    title="Ластик (X)"
+                    title={t('Ластик (X)', 'Eraser (X)')}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 13h12v1H2z"/>
@@ -857,7 +857,7 @@ export default function App() {
                 {(activeTool === 'brush' || activeTool === 'eraser') && (
                   <div className="toolbar-group">
                     {([1, 2, 3] as const).map(s => (
-                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={`Кисть ${s}px`}>{s}px</button>
+                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={t(`Кисть ${s}px`, `Brush ${s}px`)}>{s}px</button>
                     ))}
                   </div>
                 )}
@@ -926,7 +926,7 @@ export default function App() {
                 <div className="toolbar-group">
                   <button
                     className="tool-btn tool-btn-zoom-reset"
-                    title="Сбросить масштаб до 100%"
+                    title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
                     onClick={() => setZoom(100)}
                   >⌖</button>
                   <button
@@ -935,10 +935,10 @@ export default function App() {
                     onClick={() => setSplitPos(50)}
                   >⟺</button>
                   {!compareMode && (
-                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title="Текстуры блоков">Блоки</button>
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')}>{t('Блоки', 'Blocks')}</button>
                   )}
-                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title="Сравнение">Сравнить</button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title="Сетка">Сетка</button>
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}>{t('Сетка', 'Grid')}</button>
                 </div>
               </>
             )}
@@ -950,25 +950,25 @@ export default function App() {
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title="Клавиатурные сочетания">⌨</button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}>⌨</button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
-                  <div className="shortcuts-panel-title">ГОРЯЧИЕ КЛАВИШИ</div>
-                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>Отменить</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>Повторить</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>Экспорт PNG</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>Экспорт .litematic</span></div>
+                  <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
+                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>{t('Отменить', 'Undo')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>{t('Повторить', 'Redo')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>{t('Экспорт PNG', 'Export PNG')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>{t('Экспорт .litematic', 'Export .litematic')}</span></div>
                   <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>Z</kbd><span>Сетка</span></div>
-                  <div className="shortcut-row"><kbd>O</kbd><span>Сброс разделителя</span></div>
-                  <div className="shortcut-row"><kbd>C</kbd><span>Режим сравнения</span></div>
-                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>Выбор дизеринга</span></div>
+                  <div className="shortcut-row"><kbd>Z</kbd><span>{t('Сетка', 'Grid')}</span></div>
+                  <div className="shortcut-row"><kbd>O</kbd><span>{t('Сброс разделителя', 'Reset split')}</span></div>
+                  <div className="shortcut-row"><kbd>C</kbd><span>{t('Режим сравнения', 'Compare mode')}</span></div>
+                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
                   <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>E</kbd><span>Пипетка</span></div>
-                  <div className="shortcut-row"><kbd>B</kbd><span>Кисть</span></div>
-                  <div className="shortcut-row"><kbd>F</kbd><span>Заливка</span></div>
-                  <div className="shortcut-row"><kbd>X</kbd><span>Ластик</span></div>
-                  <div className="shortcut-row"><kbd>Esc</kbd><span>Снять инструмент</span></div>
+                  <div className="shortcut-row"><kbd>E</kbd><span>{t('Пипетка', 'Eyedropper')}</span></div>
+                  <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
+                  <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
+                  <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
+                  <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
                 </div>
               )}
             </div>
@@ -977,7 +977,7 @@ export default function App() {
           {compareMode && hasContent && (
             <div className="compare-selectors">
               <div className="compare-selector">
-                <label className="compare-selector-label">ЛЕВЫЙ</label>
+                <label className="compare-selector-label">{t('ЛЕВЫЙ', 'LEFT')}</label>
                 <select
                   className="compare-selector-select"
                   value={compareLeft}
@@ -989,7 +989,7 @@ export default function App() {
               </div>
               <span className="compare-vs">VS</span>
               <div className="compare-selector">
-                <label className="compare-selector-label">ПРАВЫЙ</label>
+                <label className="compare-selector-label">{t('ПРАВЫЙ', 'RIGHT')}</label>
                 <select
                   className="compare-selector-select"
                   value={compareRight}
@@ -1070,7 +1070,7 @@ export default function App() {
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
                 <div className="support-block-section">
-                  <div className="support-block-section-title">Опорный блок (3D)</div>
+                  <div className="support-block-section-title">{t('Опорный блок (3D)', 'Support block (3D)')}</div>
                   <div className="support-block-grid">
                     {SUPPORT_BLOCKS_PALETTE.map(b => (
                       <button
@@ -1094,19 +1094,19 @@ export default function App() {
                       <button
                         className={`support-block-item support-none-btn${supportBlock === 'air' ? ' active' : ''}`}
                         onClick={() => setSupportBlock('air')}
-                        title="Без опорных блоков"
+                        title={t('Без опорных блоков', 'No support blocks')}
                       >
                         <span className="support-block-no-icon">∅</span>
-                        <span className="support-block-item-label">Нет</span>
+                        <span className="support-block-item-label">{t('Нет', 'None')}</span>
                       </button>
                       <div className={`support-depth-group${supportBlock === 'air' ? ' disabled' : ''}`}>
-                        <span className="support-mode-label">Глубина</span>
+                        <span className="support-mode-label">{t('Глубина', 'Depth')}</span>
                         {([1, 2] as const).map(m => (
                           <button
                             key={m}
                             className={`support-mode-btn${supportMode === m ? ' active' : ''}`}
                             onClick={() => setSupportMode(m)}
-                            title={SUPPORT_MODE_TITLES[m]}
+                            title={getSupportModeTitles(t)[m]}
                             disabled={supportBlock === 'air'}
                           >{SUPPORT_MODE_LABELS[m]}</button>
                         ))}

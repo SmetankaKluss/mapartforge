@@ -248,7 +248,7 @@ export function Controls({
               setShowCustom(v => !v);
             }}
             disabled={processing}
-            title="Произвольный размер"
+            title={t('Произвольный размер', 'Custom size')}
           >
             <svg width="22" height="15" viewBox="0 0 22 15" aria-hidden fill="currentColor" opacity="0.8">
               <rect x="0" y="0" width="6" height="6" rx="1"/>
@@ -258,7 +258,7 @@ export function Controls({
               <rect x="8" y="9" width="6" height="6" rx="1"/>
               <rect x="16" y="9" width="6" height="6" rx="1"/>
             </svg>
-            <span className="grid-label">Свой</span>
+            <span className="grid-label">{t('Свой', 'Custom')}</span>
           </button>
         </div>
 
@@ -289,19 +289,19 @@ export function Controls({
                 className="custom-grid-apply"
                 onClick={applyCustom}
                 disabled={processing}
-              >Применить</button>
+              >{t('Применить', 'Apply')}</button>
             </div>
             <p className="custom-grid-info">
-              {customW}×{customH} карт — <strong>{customW * MAP_BLOCK_SIZE}×{customH * MAP_BLOCK_SIZE}</strong> блоков
+              {customW}×{customH} {t('карт', 'maps')} — <strong>{customW * MAP_BLOCK_SIZE}×{customH * MAP_BLOCK_SIZE}</strong> {t('блоков', 'blocks')}
               {(customW > 5 || customH > 5) && (
-                <span className="custom-grid-warn"> ⚠ Большая сетка может быть медленной</span>
+                <span className="custom-grid-warn"> ⚠ {t('Большая сетка может быть медленной', 'Large grid may be slow')}</span>
               )}
             </p>
           </div>
         )}
 
         <p className="grid-info">
-          {mapGrid.wide}×{mapGrid.tall} карт — <strong>{blockW}×{blockH}</strong> блоков
+          {mapGrid.wide}×{mapGrid.tall} {t('карт', 'maps')} — <strong>{blockW}×{blockH}</strong> {t('блоков', 'blocks')}
         </p>
         </div>
       </section>
@@ -310,7 +310,7 @@ export function Controls({
       <section className="control-group">
         <h3 className="control-title">
           <span className={`section-arrow${collapsedSections['map-mode'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-mode')}>▼</span>
-          Режим
+          {t('Режим', 'Mode')}
         </h3>
         <div className={`control-group-content${collapsedSections['map-mode'] ? ' collapsed' : ''}`}>
           <div className="mode-toggle">
@@ -413,8 +413,8 @@ export function Controls({
           </div>
           <p className="intensity-hint">
             {bnScale === 1
-              ? 'Мелкое зерно — возможны полосы.'
-              : `Области ${bnScale}×${bnScale} блока используют один порог шума.`}
+              ? t('Мелкое зерно — возможны полосы.', 'Fine grain — artifacts possible.')
+              : t(`Области ${bnScale}×${bnScale} блока используют один порог шума.`, `${bnScale}×${bnScale} block areas use one noise threshold.`)}
           </p>
           </div>
         </section>
@@ -425,14 +425,14 @@ export function Controls({
         <section className="control-group">
           <h3 className="control-title">
             <span className={`section-arrow${collapsedSections['klussettings'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('klussettings')}>▼</span>
-            Настройки KlussDither
+            {t('Настройки KlussDither', 'KlussDither Settings')}
           </h3>
           <div className={`control-group-content${collapsedSections['klussettings'] ? ' collapsed' : ''}`}>
 
           {/* Clean threshold */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Порог чистоты</span>
+              <span className="kluss-param-label">{t('Порог чистоты', 'Cleanliness Threshold')}</span>
               <NumInput value={liveKluss.cleanThreshold} min={0.001} max={0.05} step={0.001} decimals={3}
                 onCommit={v => { const p = { ...liveKluss, cleanThreshold: v }; setLiveKluss(p); onKlussParamsChange(p); }}
                 disabled={processing} />
@@ -452,7 +452,7 @@ export function Controls({
           {/* Error strength */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Сила ошибки</span>
+              <span className="kluss-param-label">{t('Сила ошибки', 'Error Strength')}</span>
               <NumInput value={liveKluss.maxCandidateDist} min={0.10} max={3.00} step={0.10} decimals={1}
                 onCommit={v => { const p = { ...liveKluss, maxCandidateDist: v }; setLiveKluss(p); onKlussParamsChange(p); }}
                 disabled={processing} />
@@ -466,13 +466,13 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, maxCandidateDist: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Сила диффузии Stucki. 1.0 = стандарт; 3.0 = усиленный; 0.1 = едва заметный.</p>
+            <p className="intensity-hint">{t('Сила диффузии Stucki. 1.0 = стандарт; 3.0 = усиленный; 0.1 = едва заметный.', 'Stucki diffusion strength. 1.0 = standard; 3.0 = enhanced; 0.1 = subtle.')}</p>
           </div>
 
           {/* Error cap */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Предел ошибки</span>
+              <span className="kluss-param-label">{t('Предел ошибки', 'Error Cap')}</span>
               <span className="intensity-value">{Math.max(1, Math.round(liveKluss.errorCap)) * 64} RGB</span>
             </div>
             <input
@@ -484,13 +484,13 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, errorCap: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Макс. распространение ошибки на канал. Меньше = мягче переходы; 256 = без ограничений (полный Stucki).</p>
+            <p className="intensity-hint">{t('Макс. распространение ошибки на канал. Меньше = мягче переходы; 256 = без ограничений (полный Stucki).', 'Max error spread per channel. Lower = softer transitions; 256 = unlimited (full Stucki).')}</p>
           </div>
 
           {/* Zone boundary threshold */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Граница зон</span>
+              <span className="kluss-param-label">{t('Граница зон', 'Zone Boundary')}</span>
               <NumInput value={liveKluss.zoneBoundaryThreshold} min={0.02} max={0.50} step={0.01} decimals={2}
                 onCommit={v => { const p = { ...liveKluss, zoneBoundaryThreshold: v }; setLiveKluss(p); onKlussParamsChange(p); }}
                 disabled={processing} />
@@ -504,13 +504,13 @@ export function Controls({
               onTouchEnd={e => onKlussParamsChange({ ...liveKluss, zoneBoundaryThreshold: Number((e.target as HTMLInputElement).value) })}
               disabled={processing}
             />
-            <p className="intensity-hint">Жёсткие края цветов снаппятся чисто — предотвращает диффузию через резкие границы зон.</p>
+            <p className="intensity-hint">{t('Жёсткие края цветов снаппятся чисто — предотвращает диффузию через резкие границы зон.', 'Hard color edges snap cleanly — prevents diffusion across sharp zone boundaries.')}</p>
           </div>
 
           {/* Jitter */}
           <div className="kluss-param">
             <div className="kluss-param-header">
-              <span className="kluss-param-label">Джиттер</span>
+              <span className="kluss-param-label">{t('Джиттер', 'Jitter')}</span>
               <NumInput value={liveKluss.jitter} min={0} max={24} step={1} decimals={0}
                 onCommit={v => { const p = { ...liveKluss, jitter: v }; setLiveKluss(p); onKlussParamsChange(p); }}
                 disabled={processing} />
@@ -531,7 +531,7 @@ export function Controls({
             className="kluss-reset-btn"
             onClick={() => onKlussParamsChange(DEFAULT_KLUSS_PARAMS)}
             disabled={processing}
-          >Сбросить настройки</button>
+          >{t('Сбросить настройки', 'Reset settings')}</button>
           </div>
         </section>
       )}
@@ -541,7 +541,7 @@ export function Controls({
         <section className="control-group">
           <h3 className="control-title">
             <span className={`section-arrow${collapsedSections['intensity'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('intensity')}>▼</span>
-            Интенсивность
+            {t('Интенсивность', 'Intensity')}
             <span className="slider-value-wrap">
               <NumInput value={intensity} min={0} max={100} step={1} onCommit={v => { onIntensityChange(v); onIntensityCommit(v); }} disabled={processing} />
               <span className="num-input-unit">%</span>
