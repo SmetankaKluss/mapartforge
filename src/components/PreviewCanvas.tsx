@@ -22,6 +22,12 @@ export interface PaintBlock {
   colourName: string;
 }
 
+/** Sentinel value: painting with this block erases pixels (alpha = 0). */
+export const TRANSPARENT_PAINT_BLOCK: PaintBlock = {
+  csId: -1, blockId: -1, baseId: -1, shade: 1,
+  displayName: 'Transparent', colourName: 'Air',
+};
+
 // ── Internal types ────────────────────────────────────────────────────────────
 
 interface HoverInfo {
@@ -318,6 +324,7 @@ export function PreviewCanvas({
       }
       const { activeTool, paintBlock, scale, width, height, cp, brushSize } = propsRef.current;
       if (!isDraggingRef.current || (activeTool !== 'brush' && activeTool !== 'eraser') || (activeTool === 'brush' && !paintBlock) || !paintBufferRef.current) return;
+
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (!(canvas instanceof HTMLCanvasElement)) return;
       const rect = canvas.getBoundingClientRect();
@@ -332,7 +339,7 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          if (activeTool === 'eraser') {
+          if (activeTool === 'eraser' || paintBlock?.baseId === -1) {
             erasePixelInBuffer(paintBufferRef.current!, bx, by);
           } else {
             paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
@@ -479,7 +486,7 @@ export function PreviewCanvas({
     }
 
     if (!imageData) return;
-    if (activeTool !== 'eraser' && !paintBlock) return;
+    if (activeTool !== 'eraser' && activeTool !== 'fill' && !paintBlock) return;
     const pos = getPixelCoords(e);
     if (!pos) return;
 
@@ -514,7 +521,11 @@ export function PreviewCanvas({
         for (let dx = 0; dx < brushSize; dx++) {
           const bx = cx - half + dx, by = cy - half + dy;
           if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
+          if (paintBlock!.baseId === -1) {
+            erasePixelInBuffer(paintBufferRef.current, bx, by);
+          } else {
+            paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
+          }
         }
       }
       // Draw directly to the visible canvas — no React re-render needed mid-drag
@@ -529,7 +540,7 @@ export function PreviewCanvas({
       const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
       const existing = colorLookup.get(key);
       if (!existing) return;
-      if (!paintBlock) {
+      if (!paintBlock || paintBlock.baseId === -1) {
         floodFillTransparent(buf, pos.px, pos.py, existing.baseId, existing.shade, colorLookup);
       } else {
         if (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade) return;

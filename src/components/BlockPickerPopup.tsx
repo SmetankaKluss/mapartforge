@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { PaintBlock } from './PreviewCanvas';
+import { TRANSPARENT_PAINT_BLOCK } from './PreviewCanvas';
 import { SPRITE_URL } from './BlockCanvas';
 
 interface Props {
@@ -72,6 +73,19 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
         />
       </div>
       <div className="block-picker-list">
+        {(!q || 'transparent'.includes(q) || 'air'.includes(q)) && (
+          <button
+            className={`block-picker-item${current?.baseId === -1 ? ' selected' : ''}`}
+            onClick={() => onSelect(TRANSPARENT_PAINT_BLOCK)}
+            title="Transparent (Air)"
+          >
+            <div className="block-picker-icon-wrap">
+              <span className="block-picker-icon block-picker-icon-transparent" />
+            </div>
+            <span className="block-picker-name">Transparent</span>
+            <span className="block-picker-group">Air</span>
+          </button>
+        )}
         {items.map(item => (
           <button
             key={item.csId}

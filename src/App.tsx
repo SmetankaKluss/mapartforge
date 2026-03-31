@@ -830,7 +830,6 @@ export default function App() {
                     className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
                     title={t('Кисть (B)', 'Brush (B)')}
-                    disabled={!paintBlock}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
@@ -870,7 +869,7 @@ export default function App() {
                   </div>
                 )}
 
-                {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && (
+                {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
                   <div className="toolbar-group shade-selector">
                     {([0, 1, 2] as const).map(sh => {
                       const shadeLabel = [t('▼ Тёмный', '▼ Dark'), t('■ Средний', '■ Mid'), t('▲ Светлый', '▲ Bright')];
@@ -891,13 +890,18 @@ export default function App() {
 
                 <div className="toolbar-group paint-swatch-wrapper">
                   <div className="paint-active-swatch">
-                    {paintBlock ? (
+                    {paintBlock && paintBlock.baseId === -1 ? (
+                      <>
+                        <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span>
+                        <span className="paint-swatch-name">{t('Прозрачный', 'Transparent')}</span>
+                      </>
+                    ) : paintBlock ? (
                       <>
                         <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span>
                         <span className="paint-swatch-name">{paintBlock.displayName}</span>
                       </>
                     ) : (
-                      <span className="paint-no-block">{activeTool === 'fill' ? t('прозрачный', 'transparent') : t('нет блока', 'no block')}</span>
+                      <span className="paint-no-block">{t('нет блока', 'no block')}</span>
                     )}
                   </div>
                   <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}>▾</button>
