@@ -93,6 +93,7 @@ export default function App() {
   const [imageData, setImageData]       = useState<ImageData | null>(null);
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
   const [splitPos, setSplitPos] = useState(50);
+  const [showSplitLine, setShowSplitLine] = useState(true);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
   const [compareMode, setCompareMode]   = useState(false);
@@ -351,6 +352,8 @@ export default function App() {
     for (let i = 3; i < td.length; i += 4) { if (td[i] < 255) { hasAlpha = true; break; } }
     setSourceHasAlpha(hasAlpha);
     if (!hasAlpha) { setBgMode('color'); bgModeRef.current = 'color'; }
+    setOriginalData(null);
+    setCompareData(null);
     setSourceImage(img);
     setSplitPos(50);
     setUndoStack([]);
@@ -362,6 +365,8 @@ export default function App() {
     setShowCropModal(false);
     uploadedFileRef.current = null;   // use cropped image, not original file
     uploadedImageRef.current = croppedImg;
+    setOriginalData(null);
+    setCompareData(null);
     setSourceImage(croppedImg);
     setSplitPos(50);
     setUndoStack([]);
@@ -389,6 +394,8 @@ export default function App() {
     setSourceImage(null);
     uploadedImageRef.current = null;
     uploadedFileRef.current  = null;
+    setOriginalData(null);
+    setCompareData(null);
     setUndoStack([]);
     setRedoStack([]);
     setImageData(data);
@@ -833,8 +840,7 @@ export default function App() {
                   <button
                     className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`}
                     onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
-                    title={t('Заливка (F)', 'Fill (F)')}
-                    disabled={!paintBlock}
+                    title={t('Заливка (F). Без блока — заливка прозрачным', 'Fill (F). No block selected — fills with transparent')}
                   >
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
                       <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
@@ -891,7 +897,7 @@ export default function App() {
                         <span className="paint-swatch-name">{paintBlock.displayName}</span>
                       </>
                     ) : (
-                      <span className="paint-no-block">{t('нет блока', 'no block')}</span>
+                      <span className="paint-no-block">{activeTool === 'fill' ? t('прозрачный', 'transparent') : t('нет блока', 'no block')}</span>
                     )}
                   </div>
                   <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}>▾</button>
@@ -931,6 +937,11 @@ export default function App() {
                     title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
                     onClick={() => setZoom(100)}
                   >⌖</button>
+                  <button
+                    className={`tool-btn${showSplitLine ? ' active' : ''}`}
+                    title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
+                    onClick={() => setShowSplitLine(v => !v)}
+                  >╎</button>
                   <button
                     className="tool-btn"
                     title={t('Сбросить разделитель', 'Reset split to center')}
@@ -1034,7 +1045,7 @@ export default function App() {
                   onImageUpdate={handleImageUpdate}
                   onToolChange={setActiveTool}
                   onPaintBlockChange={setPaintBlock}
-                  splitPos={imageData && originalData ? splitPos : undefined}
+                  splitPos={imageData && originalData && showSplitLine ? splitPos : undefined}
                   onSplitPosChange={setSplitPos}
                 />
               </div>
