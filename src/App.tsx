@@ -27,7 +27,8 @@ import { downloadPng } from './lib/exportPng';
 import { exportLitematic } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
-import { WikiModal } from './components/WikiModal';
+import { lazy, Suspense } from 'react';
+const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
@@ -658,7 +659,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-inner">
-          <img src="/logo.png" height="32" style={{ width: 'auto' }} alt="MapKluss" />
+          <img src="/logo-opt.png" width="64" height="64" style={{ height: '32px', width: 'auto' }} alt="MapKluss" fetchPriority="high" />
           <div className="header-titles">
             <h1 className="app-title">MAPKLUSS</h1>
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
@@ -1224,7 +1225,7 @@ export default function App() {
     )}
 
     {/* ── Wiki modal ── */}
-    {showWiki && <WikiModal onClose={() => setShowWiki(false)} />}
+    {showWiki && <Suspense fallback={null}><WikiModal onClose={() => setShowWiki(false)} /></Suspense>}
     </>
   );
 }
