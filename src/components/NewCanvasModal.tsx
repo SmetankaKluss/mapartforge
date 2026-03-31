@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { MapGrid } from '../lib/types';
+import { MAP_BLOCK_SIZE } from '../lib/types';
 import type { PaletteColor } from '../lib/palette';
 
 interface Props {
@@ -18,12 +19,22 @@ const GRID_OPTIONS: MapGrid[] = [
   { wide: 4, tall: 4 },
 ];
 
+const MAX_CUSTOM = 10;
+
+function isPresetGrid(g: MapGrid): boolean {
+  return GRID_OPTIONS.some(o => o.wide === g.wide && o.tall === g.tall);
+}
+
 type BgType = 'white' | 'transparent' | 'color';
 
 export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose }: Props) {
-  const [grid, setGrid]     = useState<MapGrid>(currentGrid);
-  const [bgType, setBgType] = useState<BgType>('white');
-  const [picked, setPicked] = useState<PaletteColor | null>(null);
+  const [grid, setGrid]         = useState<MapGrid>(currentGrid);
+  const [bgType, setBgType]     = useState<BgType>('white');
+  const [picked, setPicked]     = useState<PaletteColor | null>(null);
+  const [showCustom, setShowCustom] = useState(!isPresetGrid(currentGrid));
+  const [customW, setCustomW]   = useState(currentGrid.wide);
+  const [customH, setCustomH]   = useState(currentGrid.tall);
+
 
   // One swatch per unique baseId (deduplicated palette row colors)
   const swatches = Array.from(
@@ -59,19 +70,41 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
           <div className="nc-label">РАЗМЕР (карт)</div>
           <div className="nc-grid-options">
             {GRID_OPTIONS.map(g => {
-              const active = g.wide === grid.wide && g.tall === grid.tall;
+              const active = !showCustom && g.wide === grid.wide && g.tall === grid.tall;
               return (
                 <button
                   key={`${g.wide}x${g.tall}`}
                   className={`nc-size-btn${active ? ' active' : ''}`}
-                  onClick={() => setGrid(g)}
+                  onClick={() => { setGrid(g); setShowCustom(false); }}
                 >
                   {g.wide}×{g.tall}
                 </button>
               );
             })}
+            <button
+              className={`nc-size-btn${showCustom ? ' active' : ''}`}
+              onClick={() => { setShowCustom(v => !v); if (!showCustom) { setCustomW(grid.wide); setCustomH(grid.tall); } }}
+            >
+              Свой
+            </button>
           </div>
-          <div className="nc-size-hint">{grid.wide * 128} × {grid.tall * 128} px</div>
+          {showCustom && (
+            <div className="nc-custom-row">
+              <input
+                type="number" className="nc-custom-input"
+                min={1} max={MAX_CUSTOM} value={customW}
+                onChange={e => { const v = Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))); setCustomW(v); setGrid({ wide: v, tall: customH }); }}
+              />
+              <span className="nc-custom-sep">×</span>
+              <input
+                type="number" className="nc-custom-input"
+                min={1} max={MAX_CUSTOM} value={customH}
+                onChange={e => { const v = Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))); setCustomH(v); setGrid({ wide: customW, tall: v }); }}
+              />
+              <span className="nc-custom-unit">карт</span>
+            </div>
+          )}
+          <div className="nc-size-hint">{grid.wide * MAP_BLOCK_SIZE} × {grid.tall * MAP_BLOCK_SIZE} px</div>
         </div>
 
         {/* ── Background ── */}

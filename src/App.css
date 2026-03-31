@@ -413,6 +413,8 @@ input, select, textarea { outline: none; }
 .adj-slider-row { padding: 4px 12px; }
 
 /* Adjustments sleep mode (disabled but visible) */
+.control-group.section-disabled { opacity: 0.45; pointer-events: none; }
+.section-disabled-hint { font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); margin-left: 4px; }
 .control-group.adj-disabled {
   opacity: 0.4; pointer-events: none;
 }
@@ -1199,6 +1201,11 @@ input, select, textarea { outline: none; }
 .nc-size-btn:hover { border-color: var(--accent); color: var(--accent); }
 .nc-size-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 5px var(--accent-glow); }
 .nc-size-hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+.nc-custom-row { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+.nc-custom-input { width: 46px; padding: 3px 5px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); font-family: var(--font-mono); font-size: 11px; text-align: center; }
+.nc-custom-input:focus { outline: none; border-color: var(--accent); }
+.nc-custom-sep { color: var(--text-muted); font-size: 12px; }
+.nc-custom-unit { color: var(--text-muted); font-size: 9px; font-family: var(--font-mono); }
 
 .nc-bg-options { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .nc-bg-btn {

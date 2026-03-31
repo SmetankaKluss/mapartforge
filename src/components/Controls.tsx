@@ -22,6 +22,7 @@ interface Props {
   staircaseMode: 'classic' | 'optimized';
   onStaircaseModeChange: (mode: 'classic' | 'optimized') => void;
   processing: boolean;
+  isBlankCanvas: boolean;
   collapsedSections: Record<string, boolean>;
   onToggleSection: (key: string) => void;
   t: (ru: string, en: string) => string;
@@ -161,6 +162,7 @@ export function Controls({
   mapMode, onMapModeChange,
   staircaseMode, onStaircaseModeChange,
   processing,
+  isBlankCanvas,
   collapsedSections, onToggleSection,
   t,
 }: Props) {
@@ -216,10 +218,11 @@ export function Controls({
     <div className="controls">
 
       {/* ── Map grid selector ─────────────────────────────────── */}
-      <section className="control-group">
+      <section className={`control-group${isBlankCanvas ? ' section-disabled' : ''}`}>
         <h3 className="control-title">
           <span className={`section-arrow${collapsedSections['map-grid'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-grid')}>▼</span>
           {t('Размер', 'Size')}
+          {isBlankCanvas && <span className="section-disabled-hint"> {t('(холст)', '(canvas)')}</span>}
         </h3>
         <div className={`control-group-content${collapsedSections['map-grid'] ? ' collapsed' : ''}`}>
         <div className="grid-options">
@@ -230,7 +233,7 @@ export function Controls({
                 key={`${g.wide}x${g.tall}`}
                 className={`grid-btn ${active ? 'active' : ''}`}
                 onClick={() => { onMapGridChange(g); setShowCustom(false); }}
-                disabled={processing}
+                disabled={processing || isBlankCanvas}
                 title={`${g.wide}×${g.tall} maps`}
               >
                 <GridIcon wide={g.wide} tall={g.tall} />
@@ -247,7 +250,7 @@ export function Controls({
               setCustomH(mapGrid.tall);
               setShowCustom(v => !v);
             }}
-            disabled={processing}
+            disabled={processing || isBlankCanvas}
             title={t('Произвольный размер', 'Custom size')}
           >
             <svg width="22" height="15" viewBox="0 0 22 15" aria-hidden fill="currentColor" opacity="0.8">
