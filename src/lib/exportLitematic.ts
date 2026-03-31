@@ -80,9 +80,36 @@ function columnRawHeights(
 }
 
 /**
+ * Return start/end (exclusive) of each solid (non-transparent) run in column x.
+ */
+function solidSegments(
+  data: Uint8ClampedArray, width: number, height: number, x: number,
+): { start: number; end: number }[] {
+  const segs: { start: number; end: number }[] = [];
+  let start = -1;
+  for (let z = 0; z <= height; z++) {
+    const transp = z === height || data[(z * width + x) * 4 + 3] < 128;
+    if (!transp && start === -1) { start = z; }
+    else if (transp && start !== -1) { segs.push({ start, end: z }); start = -1; }
+  }
+  return segs;
+}
+
+/**
+ * Shift a segment of col[] so its minimum value = 0.
+ * This grounds each disconnected island to floor level independently.
+ */
+function groundSegment(col: number[], start: number, end: number): void {
+  let min = Infinity;
+  for (let z = start; z < end; z++) if (col[z] < min) min = col[z];
+  if (isFinite(min) && min !== 0) {
+    for (let z = start; z < end; z++) col[z] -= min;
+  }
+}
+
+/**
  * Classic 3D: each X-column is an independent "sausage".
- * Per-column normalisation — shift so column min = 0.
- * Each column touches y=0 at its own lowest point, independent of neighbours.
+ * Each solid segment is normalised independently so no island floats.
  */
 function computeStaircaseClassic(
   data: Uint8ClampedArray,
@@ -94,9 +121,11 @@ function computeStaircaseClassic(
   let maxY = 0;
   for (let x = 0; x < width; x++) {
     const col = columnRawHeights(data, width, height, lookup, x);
-    const colMin = Math.min(...col);
+    for (const { start, end } of solidSegments(data, width, height, x)) {
+      groundSegment(col, start, end);
+    }
     for (let z = 0; z < height; z++) {
-      const v = col[z] - colMin;
+      const v = col[z];
       yGrid[z * width + x] = v;
       if (v > maxY) maxY = v;
     }
@@ -166,7 +195,16 @@ function computeStaircaseOptimized(
   let maxY = 0;
   for (let x = 0; x < width; x++) {
     const col = columnRawHeights(data, width, height, lookup, x);
-    applyValleyAlgorithm(col);
+    // Process each solid segment independently: valley-optimise then ground to y=0.
+    // Running the valley algorithm on the full column (including transparent gaps)
+    // caused islands after a gap to float — the algorithm had no way to know
+    // where the ground was relative to the air sections.
+    for (const { start, end } of solidSegments(data, width, height, x)) {
+      const seg = col.slice(start, end);
+      applyValleyAlgorithm(seg);
+      for (let z = start; z < end; z++) col[z] = seg[z - start];
+      groundSegment(col, start, end);
+    }
     for (let z = 0; z < height; z++) {
       const v = col[z];
       yGrid[z * width + x] = v;
