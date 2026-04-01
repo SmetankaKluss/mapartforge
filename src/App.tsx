@@ -32,7 +32,7 @@ const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ defau
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer } from './lib/layers';
-import { createLayer, updateLayerImageData } from './lib/layers';
+import { createLayer, updateLayerImageData, compositeLayersToImageData } from './lib/layers';
 import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
@@ -278,8 +278,7 @@ export default function App() {
     [blockSelection, mapMode],
   );
 
-  // Keep exportRef current each render so keyboard shortcuts access fresh state
-  exportRef.current = { imageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode };
+  // exportRef is updated below, after compositeImageData is computed
 
   function handleCancelProcessing() {
     workerRef.current?.terminate();
@@ -784,7 +783,17 @@ export default function App() {
   const pw = gridPixelWidth(mapGrid);
   const ph = gridPixelHeight(mapGrid);
 
-  const hasContent = imageData !== null || compareData !== null;
+  // Composite of all visible layers — used for export and MaterialsList
+  const compositeImageData: ImageData | null = useMemo(() => {
+    const hasAny = layers.some(l => l.visible && l.imageData);
+    if (!hasAny) return null;
+    return compositeLayersToImageData(layers, pw, ph);
+  }, [layers, pw, ph]);
+
+  // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
+  exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode };
+
+  const hasContent = compositeImageData !== null || compareData !== null;
 
   return (
     <>
@@ -1312,7 +1321,7 @@ export default function App() {
             </div>
             <div className="mobile-export-content">
               <MaterialsList
-                imageData={compareMode ? (compareData?.left ?? null) : imageData}
+                imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
                 cp={activePalette}
                 blockSelection={blockSelection}
                 mapGrid={mapGrid}
@@ -1321,7 +1330,7 @@ export default function App() {
           </div>
           <div className="panel-footer mobile-export-content">
             <ExportPanel
-              imageData={imageData}
+              imageData={compositeImageData}
               compareData={compareData}
               compareMode={compareMode}
               dithering={dithering}
