@@ -151,7 +151,7 @@ export default function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
-  const [brushSize, setBrushSize]       = useState<1 | 2 | 3>(1);
+  const [brushSize, setBrushSize]       = useState<number>(1);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
@@ -255,6 +255,7 @@ export default function App() {
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
+        case 'KeyL': setActiveTool(t => t === 'line' ? null : 'line'); break;
         case 'Escape': setActiveTool(null); break;
         case 'KeyZ': setShowGrid(g => !g); break;
         case 'KeyO': if (!compareMode) setSplitPos(50); break;
@@ -545,8 +546,10 @@ export default function App() {
   // ── Layer management ─────────────────────────────────────────────────────────
 
   const handleAddLayer = useCallback(() => {
-    const l = createLayer(`Слой ${Date.now() % 10000}`);
-    setLayerState(prev => ({ layers: [...prev.layers, l], activeLayerId: l.id }));
+    setLayerState(prev => {
+      const l = createLayer(`Слой ${prev.layers.length + 1}`);
+      return { layers: [...prev.layers, l], activeLayerId: l.id };
+    });
   }, []);
 
   const handleDeleteLayer = useCallback((id: string) => {
@@ -956,13 +959,27 @@ export default function App() {
                       <path d="M5 7h6v1H5z" opacity=".4"/>
                     </svg>
                   </button>
+                  <button
+                    className={`tool-btn${activeTool === 'line' ? ' active' : ''}`}
+                    onClick={() => setActiveTool(t => t === 'line' ? null : 'line')}
+                    title={t('Прямая линия (L)', 'Straight line (L)')}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+                      <line x1="2" y1="14" x2="14" y2="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                  </button>
                 </div>
 
-                {(activeTool === 'brush' || activeTool === 'eraser') && (
-                  <div className="toolbar-group">
-                    {([1, 2, 3] as const).map(s => (
-                      <button key={s} className={`tool-btn${brushSize === s ? ' active' : ''}`} onClick={() => setBrushSize(s)} title={t(`Кисть ${s}px`, `Brush ${s}px`)}>{s}px</button>
-                    ))}
+                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'line') && (
+                  <div className="toolbar-group brush-size-group">
+                    <input
+                      type="range" min={1} max={20} step={1}
+                      value={brushSize}
+                      className="brush-size-slider"
+                      onChange={e => setBrushSize(Number(e.target.value))}
+                      title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)}
+                    />
+                    <span className="brush-size-label">{brushSize}px</span>
                   </div>
                 )}
 
@@ -1082,6 +1099,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
                   <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
                   <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
+                  <div className="shortcut-row"><kbd>L</kbd><span>{t('Линия', 'Line')}</span></div>
                   <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
                 </div>
               )}

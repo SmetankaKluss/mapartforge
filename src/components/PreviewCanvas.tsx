@@ -10,7 +10,7 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 
 // ── Exported types ────────────────────────────────────────────────────────────
 
-export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser';
+export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'line';
 
 export interface PaintBlock {
   csId: number;
@@ -66,7 +66,7 @@ interface Props {
   blockSelection: BlockSelection;
   activeTool: PaintTool | null;
   paintBlock: PaintBlock | null;
-  brushSize: 1 | 2 | 3;
+  brushSize: number;
   onRemoveBlock: (csId: number) => void;
   onImageUpdate: (data: ImageData) => void;
   onToolChange: (tool: PaintTool | null) => void;
@@ -148,6 +148,41 @@ function paintPixelInBuffer(
 function erasePixelInBuffer(buf: ImageData, px: number, py: number): void {
   const i = (py * buf.width + px) * 4;
   buf.data[i] = 0; buf.data[i + 1] = 0; buf.data[i + 2] = 0; buf.data[i + 3] = 0;
+}
+
+/** Paint a circular brush stroke at (cx, cy). */
+function paintBrushCircle(
+  buf: ImageData, cx: number, cy: number, brushSize: number,
+  erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+): void {
+  const r = Math.floor(brushSize / 2);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue; // circular mask
+      const bx = cx + dx, by = cy + dy;
+      if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
+      if (erase) erasePixelInBuffer(buf, bx, by);
+      else paintPixelInBuffer(buf, bx, by, baseId, shade, cp);
+    }
+  }
+}
+
+/** Bresenham line — calls paintBrushCircle at each point. */
+function drawBresenhamLine(
+  buf: ImageData, x0: number, y0: number, x1: number, y1: number,
+  brushSize: number, erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+): void {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    paintBrushCircle(buf, x0, y0, brushSize, erase, baseId, shade, cp);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 <  dx) { err += dx; y0 += sy; }
+  }
 }
 
 function floodFill(
@@ -256,6 +291,10 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
 
+  // Line tool state
+  const lineStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lineBaseRef  = useRef<ImageData | null>(null); // snapshot before line preview
+
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
   const splitContainerRef    = useRef<HTMLDivElement>(null);
@@ -268,7 +307,7 @@ export function PreviewCanvas({
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
   const canvasZoneRef = useRef<HTMLDivElement>(null);
-  const propsRef = useRef({ activeTool, paintBlock, scale, width, height, cp, colorLookup: null as unknown as Map<number, LookupEntry>, brushSize: 1 as 1 | 2 | 3, showGrid: false });
+  const propsRef = useRef({ activeTool, paintBlock, scale, width, height, cp, colorLookup: null as unknown as Map<number, LookupEntry>, brushSize: 1 as number, showGrid: false });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
   propsRef.current = { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize, showGrid };
@@ -323,6 +362,22 @@ export function PreviewCanvas({
         return;
       }
       const { activeTool, paintBlock, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
+
+      // ── Line tool preview ──
+      if (activeTool === 'line' && lineStartRef.current && lineBaseRef.current) {
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (!(canvas instanceof HTMLCanvasElement)) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = Math.max(0, Math.min(width  - 1, Math.floor((e.clientX - rect.left) / scale)));
+        const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top)  / scale)));
+        // Draw preview: clone base, then draw line on it
+        const preview = new ImageData(new Uint8ClampedArray(lineBaseRef.current.data), lineBaseRef.current.width, lineBaseRef.current.height);
+        const erase = paintBlock?.baseId === -1;
+        drawBresenhamLine(preview, lineStartRef.current.x, lineStartRef.current.y, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+        drawImageData(canvas, preview, width, height, scale, showGrid);
+        return;
+      }
+
       if (!isDraggingRef.current || (activeTool !== 'brush' && activeTool !== 'eraser') || (activeTool === 'brush' && !paintBlock) || !paintBufferRef.current) return;
 
       const canvas = canvasZoneRef.current?.querySelector('canvas');
@@ -334,24 +389,34 @@ export function PreviewCanvas({
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
-      const half = Math.floor(brushSize / 2);
-      for (let dy = 0; dy < brushSize; dy++) {
-        for (let dx = 0; dx < brushSize; dx++) {
-          const bx = cx - half + dx, by = cy - half + dy;
-          if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          if (activeTool === 'eraser' || paintBlock?.baseId === -1) {
-            erasePixelInBuffer(paintBufferRef.current!, bx, by);
-          } else {
-            paintPixelInBuffer(paintBufferRef.current!, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
-          }
-        }
-      }
+      const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
+      paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
       // Draw directly to the visible canvas — bypasses React state so no re-render lag
       drawImageData(canvas, paintBufferRef.current!, width, height, scale, showGrid);
     }
 
-    function onGlobalMouseUp() {
+    function onGlobalMouseUp(e: MouseEvent) {
       if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
+
+      // ── Line tool commit ──
+      const { activeTool, paintBlock, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
+      if (activeTool === 'line' && lineStartRef.current && lineBaseRef.current) {
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = Math.max(0, Math.min(width  - 1, Math.floor((e.clientX - rect.left) / scale)));
+          const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top)  / scale)));
+          const result = new ImageData(new Uint8ClampedArray(lineBaseRef.current.data), lineBaseRef.current.width, lineBaseRef.current.height);
+          const erase = paintBlock?.baseId === -1;
+          drawBresenhamLine(result, lineStartRef.current.x, lineStartRef.current.y, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+          onImageUpdateRef.current(result);
+          drawImageData(canvas, result, width, height, scale, showGrid);
+        }
+        lineStartRef.current = null;
+        lineBaseRef.current = null;
+        return;
+      }
+
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       if (paintBufferRef.current) {
@@ -490,49 +555,23 @@ export function PreviewCanvas({
     const pos = getPixelCoords(e);
     if (!pos) return;
 
-    if (activeTool === 'eraser') {
+    if (activeTool === 'eraser' || activeTool === 'brush') {
       isDraggingRef.current = true;
       paintedSetRef.current = new Set();
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
       const { px: cx, py: cy } = pos;
       paintedSetRef.current.add(cy * width + cx);
-      const half = Math.floor(brushSize / 2);
-      for (let dy = 0; dy < brushSize; dy++) {
-        for (let dx = 0; dx < brushSize; dx++) {
-          const bx = cx - half + dx, by = cy - half + dy;
-          if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          erasePixelInBuffer(paintBufferRef.current, bx, by);
-        }
-      }
+      const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
+      paintBrushCircle(paintBufferRef.current, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
         drawImageData(canvas, paintBufferRef.current, width, height, scale, showGrid);
       }
-    } else if (activeTool === 'brush') {
-      isDraggingRef.current = true;
-      paintedSetRef.current = new Set();
-      // Clone current imageData into paint buffer
-      paintBufferRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
-      // Paint first brush stroke
-      const { px: cx, py: cy } = pos;
-      paintedSetRef.current.add(cy * width + cx);
-      const half = Math.floor(brushSize / 2);
-      for (let dy = 0; dy < brushSize; dy++) {
-        for (let dx = 0; dx < brushSize; dx++) {
-          const bx = cx - half + dx, by = cy - half + dy;
-          if (bx < 0 || bx >= width || by < 0 || by >= height) continue;
-          if (paintBlock!.baseId === -1) {
-            erasePixelInBuffer(paintBufferRef.current, bx, by);
-          } else {
-            paintPixelInBuffer(paintBufferRef.current, bx, by, paintBlock!.baseId, paintBlock!.shade, cp);
-          }
-        }
-      }
-      // Draw directly to the visible canvas — no React re-render needed mid-drag
-      const canvas = canvasZoneRef.current?.querySelector('canvas');
-      if (canvas instanceof HTMLCanvasElement) {
-        drawImageData(canvas, paintBufferRef.current, width, height, scale, showGrid);
-      }
+    } else if (activeTool === 'line') {
+      if (!paintBlock) return;
+      const { px, py } = pos;
+      lineStartRef.current = { x: px, y: py };
+      lineBaseRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
     } else if (activeTool === 'fill') {
       const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
       const i = (pos.py * buf.width + pos.px) * 4;
@@ -622,7 +661,7 @@ export function PreviewCanvas({
 
   // ── Cursor style ────────────────────────────────────────────────────────────
 
-  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush' || activeTool === 'eraser'
+  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'line'
     ? 'crosshair'
     : undefined;
 

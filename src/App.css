@@ -1853,3 +1853,8 @@ input, select, textarea { outline: none; }
 
 /* Artist mode: right panel expands slightly */
 .panel-right.artist-mode { --panel-right: 340px; }
+
+/* ── Brush size slider ───────────────────────────────────────────────────── */
+.brush-size-group { display: flex; align-items: center; gap: 6px; }
+.brush-size-slider { width: 72px; accent-color: var(--accent); cursor: pointer; }
+.brush-size-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); min-width: 28px; }
