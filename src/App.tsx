@@ -33,6 +33,7 @@ import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer } from './lib/layers';
 import { createLayer, updateLayerImageData } from './lib/layers';
+import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
 import 'driver.js/dist/driver.css';
@@ -610,6 +611,44 @@ export default function App() {
     const groups: Record<number, number[]> = {};
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
     exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat', undefined, undefined, sm);
+  }, []);
+
+  // ── Project save / load ──────────────────────────────────────────────────────
+
+  const handleSaveProject = useCallback(() => {
+    const json = serializeProject(layers, activeLayerId, mapGrid);
+    const name = `MapKluss_${mapGrid.wide}x${mapGrid.tall}_${new Date().toISOString().slice(0,10)}.mapkluss`;
+    downloadProject(json, name);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, activeLayerId, mapGrid]);
+
+  const projectFileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleLoadProject = useCallback(() => {
+    // Create hidden file input on demand
+    if (!projectFileInputRef.current) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.mapkluss,application/json';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        file.text().then(json => {
+          const result = deserializeProject(json);
+          if (!result) { alert('Не удалось загрузить проект — файл повреждён или несовместим.'); return; }
+          setMapGrid(result.grid);
+          setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId });
+          setSourceImage(null);
+          setOriginalData(null);
+          setCompareData(null);
+          setUndoStack([]);
+          setRedoStack([]);
+        });
+      };
+      projectFileInputRef.current = input;
+    }
+    projectFileInputRef.current.value = '';
+    projectFileInputRef.current.click();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keyboard shortcuts: 1-8 select dithering, C toggles compare mode
@@ -1193,17 +1232,27 @@ export default function App() {
         <aside className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`}>
           <div className="panel-scroll">
             {editorMode === 'artist' && (
-              <LayersPanel
-                layers={layers}
-                activeLayerId={activeLayerId}
-                onSetActive={id => setLayerState(prev => ({ ...prev, activeLayerId: id }))}
-                onToggleVisible={handleToggleLayerVisible}
-                onAdd={handleAddLayer}
-                onDelete={handleDeleteLayer}
-                onRename={handleRenameLayer}
-                onMoveUp={handleMoveLayerUp}
-                onMoveDown={handleMoveLayerDown}
-              />
+              <>
+                <LayersPanel
+                  layers={layers}
+                  activeLayerId={activeLayerId}
+                  onSetActive={id => setLayerState(prev => ({ ...prev, activeLayerId: id }))}
+                  onToggleVisible={handleToggleLayerVisible}
+                  onAdd={handleAddLayer}
+                  onDelete={handleDeleteLayer}
+                  onRename={handleRenameLayer}
+                  onMoveUp={handleMoveLayerUp}
+                  onMoveDown={handleMoveLayerDown}
+                />
+                <div className="project-btns">
+                  <button className="project-btn" onClick={handleSaveProject} title={t('Скачать проект (.mapkluss)', 'Download project (.mapkluss)')}>
+                    ↓ {t('Сохранить проект', 'Save project')}
+                  </button>
+                  <button className="project-btn" onClick={handleLoadProject} title={t('Загрузить проект (.mapkluss)', 'Load project (.mapkluss)')}>
+                    ↑ {t('Загрузить проект', 'Load project')}
+                  </button>
+                </div>
+              </>
             )}
             <div className="mobile-palette-content">
               <PaletteEditor

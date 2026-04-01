@@ -1858,3 +1858,8 @@ input, select, textarea { outline: none; }
 .brush-size-group { display: flex; align-items: center; gap: 6px; }
 .brush-size-slider { width: 72px; accent-color: var(--accent); cursor: pointer; }
 .brush-size-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); min-width: 28px; }
+
+/* ── Project save/load buttons ───────────────────────────────────────────── */
+.project-btns { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px 8px; border-bottom: 1px solid var(--border); }
+.project-btn { font-family: var(--font-mono); font-size: 10px; color: var(--cyan); background: none; border: 1px solid rgba(96,200,240,0.3); padding: 5px 10px; cursor: pointer; text-align: left; }
+.project-btn:hover { background: rgba(96,200,240,0.08); border-color: var(--cyan); }
