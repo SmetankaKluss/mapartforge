@@ -1819,3 +1819,37 @@ input, select, textarea { outline: none; }
 .wiki-content::-webkit-scrollbar-thumb:hover {
   background: rgba(87,255,110,0.5);
 }
+
+/* ── Artist mode toggle ──────────────────────────────────────────────────── */
+.artist-mode-btn { font-family: var(--font-pixel); font-size: 7px; background: none; border: 1px solid var(--gold); color: var(--gold); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
+.artist-mode-btn:hover { background: var(--gold-dim); }
+.artist-mode-btn.active { background: var(--gold-dim); box-shadow: 0 0 6px var(--gold-glow); }
+
+/* ── Layers panel ────────────────────────────────────────────────────────── */
+.layers-panel { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.layers-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 6px; }
+.layers-panel-title { font-family: var(--font-pixel); font-size: 7px; color: var(--accent); letter-spacing: 0.1em; }
+.layers-add-btn { background: none; border: 1px solid var(--accent); color: var(--accent); font-size: 14px; line-height: 1; width: 20px; height: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.layers-add-btn:hover { background: var(--accent-dim); }
+
+.layers-list { display: flex; flex-direction: column; gap: 1px; padding: 0 6px 6px; }
+
+.layer-row { display: flex; align-items: center; gap: 4px; padding: 4px 6px; background: var(--bg-input); border: 1px solid transparent; cursor: pointer; min-height: 30px; }
+.layer-row:hover { border-color: var(--border); }
+.layer-row.active { border-color: var(--accent); background: var(--accent-dim); }
+
+.layer-vis-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 0; width: 18px; flex-shrink: 0; opacity: 1; }
+.layer-vis-btn.hidden { opacity: 0.4; }
+
+.layer-name { flex: 1; font-family: var(--font-mono); font-size: 10px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; }
+.layer-name-input { flex: 1; font-family: var(--font-mono); font-size: 10px; color: var(--text); background: var(--bg); border: 1px solid var(--accent); padding: 0 3px; outline: none; width: 100%; }
+
+.layer-move-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.layer-move-btn { background: none; border: none; color: var(--text-dim); font-size: 8px; cursor: pointer; padding: 0; line-height: 1; height: 12px; }
+.layer-move-btn:hover { color: var(--accent); }
+
+.layer-del-btn { background: none; border: none; color: var(--text-dim); font-size: 10px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+.layer-del-btn:hover { color: var(--red); }
+
+/* Artist mode: right panel expands slightly */
+.panel-right.artist-mode { --panel-right: 340px; }

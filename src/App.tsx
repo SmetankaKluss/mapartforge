@@ -30,6 +30,9 @@ import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
 const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
+import { LayersPanel } from './components/LayersPanel';
+import type { Layer } from './lib/layers';
+import { createLayer, updateLayerImageData } from './lib/layers';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
 import 'driver.js/dist/driver.css';
@@ -72,6 +75,16 @@ interface HistoryEntry {
   blockSelection: BlockSelection;
 }
 
+interface LayerState {
+  layers: Layer[];
+  activeLayerId: string;
+}
+
+function makeInitialLayerState(): LayerState {
+  const l = createLayer('Слой 1');
+  return { layers: [l], activeLayerId: l.id };
+}
+
 const DITHERING_LABELS: Record<DitheringMode, string> = {
   'none':            'None',
   'floyd-steinberg': 'Floyd–Steinberg',
@@ -91,8 +104,27 @@ export default function App() {
   const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
 
   const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
-  const [imageData, setImageData]       = useState<ImageData | null>(null);
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
+
+  // ── Layer system ─────────────────────────────────────────────────────────────
+  const [layerState, setLayerState] = useState<LayerState>(makeInitialLayerState);
+  const layers = layerState.layers;
+  const activeLayerId = layerState.activeLayerId;
+  const activeLayer = layers.find(l => l.id === activeLayerId) ?? layers[0];
+  // imageData = active layer's imageData (for painting tools + display in Phase 1)
+  const imageData: ImageData | null = activeLayer?.imageData ?? null;
+  // setImageData wrapper — updates active layer without touching other layers
+  function setImageData(data: ImageData | null) {
+    setLayerState(prev => ({
+      ...prev,
+      layers: updateLayerImageData(prev.layers, prev.activeLayerId, data),
+    }));
+  }
+
+  // ── Artist mode toggle ────────────────────────────────────────────────────────
+  const [editorMode, setEditorMode] = useState<'simple' | 'artist'>(
+    () => (localStorage.getItem('mapartforge-editor-mode') as 'simple' | 'artist' | null) ?? 'simple',
+  );
   const [splitPos, setSplitPos] = useState(50);
   const [showSplitLine, setShowSplitLine] = useState(true);
   const [showGrid, setShowGrid]         = useState(false);
@@ -150,10 +182,10 @@ export default function App() {
   const [tabletRightOpen, setTabletRightOpen] = useState(false);
 
   // Always-current ref — updated each render so callbacks never see stale state
-  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection }>({
-    imageData: null, blockSelection: DEFAULT_SELECTION,
+  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[] }>({
+    imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers,
   });
-  latestRef.current = { imageData, blockSelection };
+  latestRef.current = { imageData, blockSelection, layers };
 
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode });
@@ -168,6 +200,7 @@ export default function App() {
   useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
   useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
+  useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
 
   // Push current state onto undo stack before a tracked action
   const pushToHistory = useCallback(() => {
@@ -359,6 +392,8 @@ export default function App() {
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
+    // Reset to single layer when loading a new image
+    setLayerState(makeInitialLayerState);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
   }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
@@ -399,7 +434,10 @@ export default function App() {
     setCompareData(null);
     setUndoStack([]);
     setRedoStack([]);
-    setImageData(data);
+    // Reset to single fresh layer with blank canvas data
+    const newLayer = createLayer('Слой 1');
+    newLayer.imageData = data;
+    setLayerState({ layers: [newLayer], activeLayerId: newLayer.id });
   }, []);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
@@ -502,6 +540,58 @@ export default function App() {
     pushToHistory();
     setImageData(data);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Layer management ─────────────────────────────────────────────────────────
+
+  const handleAddLayer = useCallback(() => {
+    const l = createLayer(`Слой ${Date.now() % 10000}`);
+    setLayerState(prev => ({ layers: [...prev.layers, l], activeLayerId: l.id }));
+  }, []);
+
+  const handleDeleteLayer = useCallback((id: string) => {
+    setLayerState(prev => {
+      if (prev.layers.length <= 1) return prev; // always keep at least 1
+      const newLayers = prev.layers.filter(l => l.id !== id);
+      const newActive = prev.activeLayerId === id
+        ? (newLayers[newLayers.length - 1]?.id ?? '')
+        : prev.activeLayerId;
+      return { layers: newLayers, activeLayerId: newActive };
+    });
+  }, []);
+
+  const handleRenameLayer = useCallback((id: string, name: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, name } : l),
+    }));
+  }, []);
+
+  const handleToggleLayerVisible = useCallback((id: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l),
+    }));
+  }, []);
+
+  const handleMoveLayerUp = useCallback((id: string) => {
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === id);
+      if (idx >= prev.layers.length - 1) return prev;
+      const next = [...prev.layers];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return { ...prev, layers: next };
+    });
+  }, []);
+
+  const handleMoveLayerDown = useCallback((id: string) => {
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === id);
+      if (idx <= 0) return prev;
+      const next = [...prev.layers];
+      [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+      return { ...prev, layers: next };
+    });
   }, []);
 
   // ── Export shortcuts (stable — uses exportRef for fresh state) ───────────
@@ -665,6 +755,11 @@ export default function App() {
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
           </div>
           <div className="header-spacer" />
+          <button
+            className={`tour-btn artist-mode-btn${editorMode === 'artist' ? ' active' : ''}`}
+            onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
+            title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
+          >🎨 {t('ХУДОЖНИК', 'ARTIST')}</button>
           <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('ГИД', 'GUIDE')}</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 WIKI</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('ПОДДЕРЖАТЬ', 'SUPPORT')}</a>
@@ -1077,8 +1172,21 @@ export default function App() {
 
         {/* ── RIGHT PANEL ── */}
         {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
-        <aside className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}`}>
+        <aside className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`}>
           <div className="panel-scroll">
+            {editorMode === 'artist' && (
+              <LayersPanel
+                layers={layers}
+                activeLayerId={activeLayerId}
+                onSetActive={id => setLayerState(prev => ({ ...prev, activeLayerId: id }))}
+                onToggleVisible={handleToggleLayerVisible}
+                onAdd={handleAddLayer}
+                onDelete={handleDeleteLayer}
+                onRename={handleRenameLayer}
+                onMoveUp={handleMoveLayerUp}
+                onMoveDown={handleMoveLayerDown}
+              />
+            )}
             <div className="mobile-palette-content">
               <PaletteEditor
                 blockSelection={blockSelection}

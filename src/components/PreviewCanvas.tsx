@@ -268,10 +268,10 @@ export function PreviewCanvas({
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
   const canvasZoneRef = useRef<HTMLDivElement>(null);
-  const propsRef = useRef({ activeTool, paintBlock, scale, width, height, cp, colorLookup: null as unknown as Map<number, LookupEntry>, brushSize: 1 as 1 | 2 | 3 });
+  const propsRef = useRef({ activeTool, paintBlock, scale, width, height, cp, colorLookup: null as unknown as Map<number, LookupEntry>, brushSize: 1 as 1 | 2 | 3, showGrid: false });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize };
+  propsRef.current = { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize, showGrid };
   // Keep ref current each render so stable global handlers see latest callback
   onSplitPosChangeRef.current = onSplitPosChange;
 
@@ -322,7 +322,7 @@ export function PreviewCanvas({
         onSplitPosChangeRef.current?.(pos);
         return;
       }
-      const { activeTool, paintBlock, scale, width, height, cp, brushSize } = propsRef.current;
+      const { activeTool, paintBlock, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
       if (!isDraggingRef.current || (activeTool !== 'brush' && activeTool !== 'eraser') || (activeTool === 'brush' && !paintBlock) || !paintBufferRef.current) return;
 
       const canvas = canvasZoneRef.current?.querySelector('canvas');
@@ -347,7 +347,7 @@ export function PreviewCanvas({
         }
       }
       // Draw directly to the visible canvas — bypasses React state so no re-render lag
-      drawImageData(canvas, paintBufferRef.current!, width, height, scale, false);
+      drawImageData(canvas, paintBufferRef.current!, width, height, scale, showGrid);
     }
 
     function onGlobalMouseUp() {
@@ -506,7 +506,7 @@ export function PreviewCanvas({
       }
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
-        drawImageData(canvas, paintBufferRef.current, width, height, scale, false);
+        drawImageData(canvas, paintBufferRef.current, width, height, scale, showGrid);
       }
     } else if (activeTool === 'brush') {
       isDraggingRef.current = true;
@@ -531,7 +531,7 @@ export function PreviewCanvas({
       // Draw directly to the visible canvas — no React re-render needed mid-drag
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
-        drawImageData(canvas, paintBufferRef.current, width, height, scale, false);
+        drawImageData(canvas, paintBufferRef.current, width, height, scale, showGrid);
       }
     } else if (activeTool === 'fill') {
       const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
