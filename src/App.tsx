@@ -34,7 +34,7 @@ const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ defau
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
-import { createLayer, updateLayerImageData, compositeLayersToImageData, mergeLayersDown, mergeVisible } from './lib/layers';
+import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible } from './lib/layers';
 import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
@@ -129,10 +129,13 @@ export default function App() {
   // imageData = active layer's imageData (for painting tools + display in Phase 1)
   const imageData: ImageData | null = activeLayer?.imageData ?? null;
   // setImageData wrapper — updates active layer without touching other layers
-  function setImageData(data: ImageData | null) {
+  // dirty=true marks the layer as manually edited (blocks re-processing from source on settings change)
+  function setImageData(data: ImageData | null, dirty = false) {
     setLayerState(prev => ({
       ...prev,
-      layers: updateLayerImageData(prev.layers, prev.activeLayerId, data),
+      layers: prev.layers.map(l =>
+        l.id === prev.activeLayerId ? { ...l, imageData: data, isDirty: dirty } : l,
+      ),
     }));
   }
 
@@ -193,6 +196,9 @@ export default function App() {
   const uploadedFileRef  = useRef<File | null>(null);
   const workerRef     = useRef<Worker | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // When re-processing a manually-edited layer, store the alpha mask here so it can
+  // be re-applied after the worker returns (preserves deletions/transparency edits).
+  const pendingAlphaMaskRef = useRef<Uint8Array | null>(null);
   const [showCancel, setShowCancel] = useState(false);
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
@@ -384,7 +390,18 @@ export default function App() {
       } else if (msg.type === 'result') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
-        setImageData(mk(msg.processedData));
+        const processed = mk(msg.processedData);
+        const alphaMask = pendingAlphaMaskRef.current;
+        pendingAlphaMaskRef.current = null;
+        if (alphaMask) {
+          // Re-apply the alpha channel from before re-processing (preserves deleted background)
+          for (let i = 0; i < alphaMask.length; i++) {
+            processed.data[i * 4 + 3] = alphaMask[i];
+          }
+          setImageData(processed, true);  // keep dirty — manual edits still present
+        } else {
+          setImageData(processed);  // fresh process, not dirty
+        }
         setOriginalData(mk(msg.originalData));
         done();
       } else if (msg.type === 'compare_result') {
@@ -492,7 +509,18 @@ export default function App() {
       ...prev,
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, dithering: mode } : l),
     }));
-    if (sourceImage && activeLayerHasContent(activeLayerRef)) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) {
+      if (activeLayerRef.current?.isDirty) {
+        // Layer was manually edited — re-process but re-apply the current alpha mask afterwards
+        const img = activeLayerRef.current.imageData;
+        if (img) {
+          const mask = new Uint8Array(img.width * img.height);
+          for (let i = 0; i < mask.length; i++) mask[i] = img.data[i * 4 + 3];
+          pendingAlphaMaskRef.current = mask;
+        }
+      }
+      runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
@@ -548,7 +576,17 @@ export default function App() {
     }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    if (sourceImage && activeLayerHasContent(activeLayerRef)) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) {
+      if (activeLayerRef.current?.isDirty) {
+        const img = activeLayerRef.current.imageData;
+        if (img) {
+          const mask = new Uint8Array(img.width * img.height);
+          for (let i = 0; i < mask.length; i++) mask[i] = img.data[i * 4 + 3];
+          pendingAlphaMaskRef.current = mask;
+        }
+      }
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
 
   const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
@@ -600,7 +638,7 @@ export default function App() {
 
   const handleImageUpdate = useCallback((data: ImageData) => {
     pushToHistory();
-    setImageData(data);
+    setImageData(data, true);  // manual paint → mark dirty
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -614,7 +652,7 @@ export default function App() {
       if (!selectionMask[i]) continue;
       buf.data[i * 4] = 0; buf.data[i * 4 + 1] = 0; buf.data[i * 4 + 2] = 0; buf.data[i * 4 + 3] = 0;
     }
-    setImageData(buf);
+    setImageData(buf, true);  // manual edit → dirty
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageData, selectionMask]);
   handleDeleteSelectionRef.current = handleDeleteSelection;
@@ -630,7 +668,7 @@ export default function App() {
       if (!selectionMask[i]) continue;
       buf.data[i * 4] = color.r; buf.data[i * 4 + 1] = color.g; buf.data[i * 4 + 2] = color.b; buf.data[i * 4 + 3] = 255;
     }
-    setImageData(buf);
+    setImageData(buf, true);  // manual edit → dirty
   }, [imageData, selectionMask, paintBlock, activePalette]);
 
   const handleInvertSelection = useCallback(() => {
@@ -658,7 +696,7 @@ export default function App() {
     const newLayer = createLayer('Выделение', newLayerData);
     setLayerState(prev => {
       const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
-      const updated = prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, imageData: erasedData } : l);
+      const updated = prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, imageData: erasedData, isDirty: true } : l);
       const insertAt = idx >= 0 ? idx + 1 : updated.length;
       const newLayers = [...updated.slice(0, insertAt), newLayer, ...updated.slice(insertAt)];
       return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
@@ -1296,25 +1334,25 @@ export default function App() {
                         className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
                         title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
-                      >▭</button>
+                      ><i className="fi fi-br-square" /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
                         title={t('Лассо (L)', 'Lasso (L)')}
-                      >⌇</button>
+                      ><i className="fi fi-br-lasso" /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
                         title={t('Волшебная палочка (W)', 'Magic wand (W)')}
-                      >✦</button>
+                      ><i className="fi fi-br-magic-wand" /></button>
                     </div>
                     {selectionMask && (
                       <div className="toolbar-group selection-ops">
-                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}>✕</button>
-                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}>⬛</button>
-                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}>⬜</button>
-                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}>⧉</button>
-                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}>○</button>
+                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><i className="fi fi-br-trash" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><i className="fi fi-br-fill" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><i className="fi fi-br-arrows-retweet" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><i className="fi fi-br-layer-plus" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><i className="fi fi-br-circle-xmark" /></button>
                         <span className="selection-count">{selectedPixelCount}px</span>
                       </div>
                     )}

@@ -18,6 +18,7 @@ export interface Layer {
   mapMode?: '2d' | '3d';
   staircaseMode?: 'classic' | 'optimized';
   buildMode: LayerBuildMode;
+  isDirty?: boolean;  // true if manually edited (prevents re-processing from source)
 }
 
 export interface LayerGroup {

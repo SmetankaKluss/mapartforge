@@ -618,12 +618,11 @@ export function PreviewCanvas({
       if (overlay.height !== ch) overlay.height = ch;
       const ctx = overlay.getContext('2d');
       if (!ctx) return;
-      if (!mask) { ctx.clearRect(0, 0, cw, ch); return; }
       // Advance phase ~8px/s
       const dt = Math.min(time - lastTime, 100);
       lastTime = time;
       antsPhaseRef.current = (antsPhaseRef.current + dt * 0.008) % 8;
-      // Draw selection drag preview if active
+      // Draw selection drag preview if active (must happen even if mask is null)
       const drag = selectionDragRef.current;
       if (drag) {
         ctx.clearRect(0, 0, cw, ch);
@@ -666,6 +665,7 @@ export function PreviewCanvas({
         }
         return;
       }
+      if (!mask) { ctx.clearRect(0, 0, cw, ch); return; }
       drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
     }
     antsRafRef.current = requestAnimationFrame(frame);
