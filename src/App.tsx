@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -100,6 +100,16 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
 };
 const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
 
+/** Returns true if the layer ref's imageData has at least one non-transparent pixel. */
+function activeLayerHasContent(ref: React.MutableRefObject<{ imageData: ImageData | null } | undefined>): boolean {
+  const img = ref.current?.imageData;
+  if (!img) return false;
+  for (let i = 3; i < img.data.length; i += 4) {
+    if (img.data[i] > 0) return true;
+  }
+  return false;
+}
+
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
 
@@ -193,6 +203,10 @@ export default function App() {
     imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers,
   });
   latestRef.current = { imageData, blockSelection, layers };
+
+  // Ref to active layer — used in callbacks to check if layer has real content
+  const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
+  activeLayerRef.current = activeLayer;
 
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode, layers: layerState.layers });
@@ -462,8 +476,8 @@ export default function App() {
       ...prev,
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, dithering: mode } : l),
     }));
-    if (sourceImage && editorMode === 'simple') runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
-  }, [sourceImage, editorMode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
@@ -518,8 +532,8 @@ export default function App() {
     }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    if (sourceImage && editorMode === 'simple') runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
-  }, [sourceImage, editorMode, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
 
   const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
     setStaircaseMode(mode);

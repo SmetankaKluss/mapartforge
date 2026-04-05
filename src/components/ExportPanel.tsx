@@ -204,7 +204,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite || !hybridLayers?.length}
               title={t('Все видимые слои в одной схематике — 3D и 2D части объединены', 'All visible layers in one schematic — 3D and 2D parts combined')}
             >
-              {busyHybrid ? t('Сборка…', 'Building…') : '↓ ГИБРИД'}
+              {busyHybrid ? t('Сборка…', 'Building…') : '↓ LITEMATIC'}
             </button>
             <button
               className="export-btn"
