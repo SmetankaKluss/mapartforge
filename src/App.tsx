@@ -694,6 +694,7 @@ export default function App() {
       erasedData.data[i * 4 + 3] = 0;
     }
     const newLayer = createLayer('Выделение', newLayerData);
+    newLayer.isDirty = true;  // manually created — must not be overwritten by runProcess
     setLayerState(prev => {
       const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
       const updated = prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, imageData: erasedData, isDirty: true } : l);

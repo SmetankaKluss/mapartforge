@@ -107,7 +107,7 @@ export function mergeLayersDown(
   const bottom = layers[idx - 1];
   const top    = layers[idx];
   const merged = compositeLayersToImageData([bottom, top], width, height);
-  const newLayer: Layer = { ...bottom, imageData: merged };
+  const newLayer: Layer = { ...bottom, imageData: merged, isDirty: bottom.isDirty || top.isDirty };
   const next = [...layers];
   next.splice(idx - 1, 2, newLayer);
   return next;
@@ -121,7 +121,7 @@ export function mergeVisible(
   if (visibleWithData.length <= 1) return layers;
   const merged = compositeLayersToImageData(visibleWithData, width, height);
   const firstVisIdx = layers.findIndex(l => l.visible && l.imageData);
-  const mergedLayer: Layer = { ...visibleWithData[0], imageData: merged, name: 'Слитые слои' };
+  const mergedLayer: Layer = { ...visibleWithData[0], imageData: merged, name: 'Слитые слои', isDirty: visibleWithData.some(l => l.isDirty) };
   return layers.reduce<Layer[]>((acc, l, i) => {
     if (!l.visible || !l.imageData) { acc.push(l); return acc; }
     if (i === firstVisIdx) { acc.push(mergedLayer); return acc; }
