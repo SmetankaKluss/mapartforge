@@ -31,8 +31,8 @@ import { lazy, Suspense } from 'react';
 const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
-import type { Layer } from './lib/layers';
-import { createLayer, updateLayerImageData, compositeLayersToImageData } from './lib/layers';
+import type { Layer, LayerGroup } from './lib/layers';
+import { createLayer, updateLayerImageData, compositeLayersToImageData, mergeLayersDown, mergeVisible } from './lib/layers';
 import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
@@ -79,11 +79,12 @@ interface HistoryEntry {
 interface LayerState {
   layers: Layer[];
   activeLayerId: string;
+  groups: LayerGroup[];
 }
 
 function makeInitialLayerState(): LayerState {
   const l = createLayer('Слой 1');
-  return { layers: [l], activeLayerId: l.id };
+  return { layers: [l], activeLayerId: l.id, groups: [] };
 }
 
 const DITHERING_LABELS: Record<DitheringMode, string> = {
@@ -112,6 +113,7 @@ export default function App() {
   const layers = layerState.layers;
   const activeLayerId = layerState.activeLayerId;
   const activeLayer = layers.find(l => l.id === activeLayerId) ?? layers[0];
+  const layerGroups = layerState.groups;
   // imageData = active layer's imageData (for painting tools + display in Phase 1)
   const imageData: ImageData | null = activeLayer?.imageData ?? null;
   // setImageData wrapper — updates active layer without touching other layers
@@ -152,8 +154,11 @@ export default function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
+  const [patternBlocks, setPatternBlocks] = useState<PaintBlock[]>([]);
+  const [showPatternPicker, setShowPatternPicker] = useState<number | null>(null); // index of open picker
   const [brushSize, setBrushSize]       = useState<number>(1);
-  const [showBlockPicker, setShowBlockPicker] = useState(false);
+  const [textSize]                       = useState<number>(8);
+  const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
   const [supportBlock,  setSupportBlock]  = useState('stone');
@@ -202,6 +207,18 @@ export default function App() {
   useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
+
+  // Per-layer settings: restore mapMode/staircaseMode/dithering when active layer changes
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
+  useEffect(() => {
+    const layer = layersRef.current.find(l => l.id === activeLayerId);
+    if (!layer) return;
+    if (layer.mapMode !== undefined) setMapMode(layer.mapMode);
+    if (layer.staircaseMode !== undefined) setStaircaseMode(layer.staircaseMode);
+    if (layer.dithering !== undefined) setDithering(layer.dithering);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLayerId]);
 
   // Push current state onto undo stack before a tracked action
   const pushToHistory = useCallback(() => {
@@ -256,7 +273,6 @@ export default function App() {
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
-        case 'KeyL': setActiveTool(t => t === 'line' ? null : 'line'); break;
         case 'Escape': setActiveTool(null); break;
         case 'KeyZ': setShowGrid(g => !g); break;
         case 'KeyO': if (!compareMode) setSplitPos(50); break;
@@ -267,7 +283,7 @@ export default function App() {
   }, [imageData, compareMode]);
 
 
-  const modeShades = mapMode === '2d' ? [1] : [0, 1, 2];
+  const modeShades = (mapMode === '2d') ? [1] : [0, 1, 2];
 
   // When adjustments are disabled, use zero adjustments for processing
   const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
@@ -393,8 +409,6 @@ export default function App() {
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
-    // Reset to single layer when loading a new image
-    setLayerState(makeInitialLayerState);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
   }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
@@ -438,13 +452,17 @@ export default function App() {
     // Reset to single fresh layer with blank canvas data
     const newLayer = createLayer('Слой 1');
     newLayer.imageData = data;
-    setLayerState({ layers: [newLayer], activeLayerId: newLayer.id });
+    setLayerState({ layers: [newLayer], activeLayerId: newLayer.id, groups: [] });
   }, []);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
-    if (sourceImage) runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
-  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, dithering: mode } : l),
+    }));
+    if (sourceImage && editorMode === 'simple') runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, editorMode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
@@ -493,10 +511,22 @@ export default function App() {
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
+    }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
+    if (sourceImage && editorMode === 'simple') runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+  }, [sourceImage, editorMode, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
+
+  const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
+    setStaircaseMode(mode);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, staircaseMode: mode } : l),
+    }));
+  }, []);
 
   const handleAdjChange = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
@@ -547,10 +577,12 @@ export default function App() {
 
   const handleAddLayer = useCallback(() => {
     setLayerState(prev => {
-      const l = createLayer(`Слой ${prev.layers.length + 1}`);
-      return { layers: [...prev.layers, l], activeLayerId: l.id };
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const l = createLayer(`Слой ${prev.layers.length + 1}`, new ImageData(w, h));
+      return { ...prev, layers: [...prev.layers, l], activeLayerId: l.id };
     });
-  }, []);
+  }, [mapGrid]);
 
   const handleDeleteLayer = useCallback((id: string) => {
     setLayerState(prev => {
@@ -559,7 +591,7 @@ export default function App() {
       const newActive = prev.activeLayerId === id
         ? (newLayers[newLayers.length - 1]?.id ?? '')
         : prev.activeLayerId;
-      return { layers: newLayers, activeLayerId: newActive };
+      return { ...prev, layers: newLayers, activeLayerId: newActive };
     });
   }, []);
 
@@ -594,6 +626,86 @@ export default function App() {
       const next = [...prev.layers];
       [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
       return { ...prev, layers: next };
+    });
+  }, []);
+
+  const handleOpacityChange = useCallback((id: string, opacity: number) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, opacity } : l),
+    }));
+  }, []);
+
+  const handleToggleLock = useCallback((id: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l),
+    }));
+  }, []);
+
+  const handleMoveLayer = useCallback((fromIdx: number, toIdx: number) => {
+    setLayerState(prev => {
+      const display = [...prev.layers].reverse();
+      if (fromIdx < 0 || fromIdx >= display.length || toIdx < 0 || toIdx >= display.length) return prev;
+      const moved = display.splice(fromIdx, 1)[0];
+      display.splice(toIdx, 0, moved);
+      return { ...prev, layers: display.reverse() };
+    });
+  }, []);
+
+  const handleMergeDown = useCallback(() => {
+    setLayerState(prev => {
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const newLayers = mergeLayersDown(prev.layers, prev.activeLayerId, w, h);
+      const mergedIdx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const newActive = newLayers[Math.max(0, mergedIdx - 1)]?.id ?? newLayers[0]?.id ?? prev.activeLayerId;
+      return { ...prev, layers: newLayers, activeLayerId: newActive };
+    });
+  }, [mapGrid]);
+
+  const handleMergeVisible = useCallback(() => {
+    setLayerState(prev => {
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const newLayers = mergeVisible(prev.layers, w, h);
+      const firstVisible = newLayers.find(l => l.visible && l.imageData);
+      return { ...prev, layers: newLayers, activeLayerId: firstVisible?.id ?? prev.activeLayerId };
+    });
+  }, [mapGrid]);
+
+  const handleCreateGroup = useCallback((layerIds: string[]) => {
+    const groupId = `group-${Date.now()}`;
+    const newGroup: LayerGroup = { id: groupId, name: 'Группа', visible: true, collapsed: false };
+    setLayerState(prev => ({
+      ...prev,
+      groups: [...prev.groups, newGroup],
+      layers: prev.layers.map(l => layerIds.includes(l.id) ? { ...l, groupId } : l),
+    }));
+  }, []);
+
+  const handleToggleGroupCollapse = useCallback((groupId: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      groups: prev.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g),
+    }));
+  }, []);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      groups: prev.groups.filter(g => g.id !== groupId),
+      layers: prev.layers.map(l => l.groupId === groupId ? { ...l, groupId: null } : l),
+    }));
+  }, []);
+
+  const handleTextCommit = useCallback((textImageData: ImageData, layerName: string) => {
+    setLayerState(prev => {
+      const newLayer = createLayer(layerName, textImageData, true);
+      const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const insertAt = idx >= 0 ? idx + 1 : prev.layers.length;
+      const newLayers = [...prev.layers.slice(0, insertAt), newLayer, ...prev.layers.slice(insertAt)];
+      return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
     });
   }, []);
 
@@ -635,7 +747,7 @@ export default function App() {
           const result = deserializeProject(json);
           if (!result) { alert('Не удалось загрузить проект — файл повреждён или несовместим.'); return; }
           setMapGrid(result.grid);
-          setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId });
+          setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId, groups: [] });
           setSourceImage(null);
           setOriginalData(null);
           setCompareData(null);
@@ -790,6 +902,13 @@ export default function App() {
     return compositeLayersToImageData(layers, pw, ph);
   }, [layers, pw, ph]);
 
+  // Composite of all visible layers EXCEPT the active one — shown as backdrop during painting
+  const otherLayersData: ImageData | null = useMemo(() => {
+    const others = layers.filter(l => l.id !== activeLayerId && l.visible && l.imageData);
+    if (others.length === 0) return null;
+    return compositeLayersToImageData(others, pw, ph);
+  }, [layers, activeLayerId, pw, ph]);
+
   // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
   exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode };
 
@@ -898,7 +1017,7 @@ export default function App() {
               mapMode={mapMode}
               onMapModeChange={handleMapModeChange}
               staircaseMode={staircaseMode}
-              onStaircaseModeChange={setStaircaseMode}
+              onStaircaseModeChange={handleStaircaseModeChange}
               processing={processing}
               isBlankCanvas={sourceImage === null && imageData !== null}
               collapsedSections={collapsedSections}
@@ -946,91 +1065,80 @@ export default function App() {
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
-              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}>↩</button>
-              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}>↪</button>
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}><i className="fi fi-br-rotate-left" /></button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><i className="fi fi-br-rotate-right" /></button>
             </div>
             <div className="toolbar-sep" />
 
             {/* TOOLS: select / eyedropper / brush / fill — only when image loaded */}
             {!compareMode && imageData && (
               <div className="toolbar-paint-tools">
+                {/* Tool buttons */}
                 <div className="toolbar-group">
-                  <button
-                    className={`tool-btn${activeTool === null ? ' active' : ''}`}
-                    onClick={() => setActiveTool(null)}
-                    title={t('Выбрать / снять инструмент (Esc)', 'Select / deselect tool (Esc)')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M2 2l4 11.5 2.3-4.3L13 14l1.5-1.5-4.7-4.7L14.5 5 2 2z"/>
-                    </svg>
+                  <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Выбрать / снять (Esc)', 'Select / deselect (Esc)')}>
+                    <i className="fi fi-br-cursor" />
                   </button>
-                  <button
-                    className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`}
-                    onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')}
-                    title={t('Пипетка (E)', 'Eyedropper (E)')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M13.5 1a2 2 0 00-2.83 0L9.5 2.17 8.83 1.5 7.5 2.83l.67.67-5.34 5.33A1 1 0 003 10v2h2a1 1 0 00.71-.29L11 6.5l.67.67 1.33-1.34-.67-.66L13.5 4a2 2 0 000-2.83l-.7-.7.7.53zM4 11H4v-1l5-5 1 1-5 5H4z"/>
-                      <circle cx="2.5" cy="13.5" r="1.8"/>
-                    </svg>
+                  <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')}>
+                    <i className="fi fi-br-eye-dropper" />
                   </button>
-                  <button
-                    className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`}
-                    onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')}
-                    title={t('Кисть (B)', 'Brush (B)')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M12.146 1.146a1.5 1.5 0 012.121 2.121l-8 8a1 1 0 01-.379.242l-3 1a1 1 0 01-1.27-1.27l1-3a1 1 0 01.242-.379l8-8z"/>
-                      <path d="M3 13.5c0-1 .5-1.5 1-1.5s1 .5 1 1.5S4.5 15.5 4 16c-.5-.5-1-1.5-1-2.5z" opacity=".7"/>
-                    </svg>
+                  <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')}>
+                    <i className="fi fi-br-brush" />
                   </button>
-                  <button
-                    className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`}
-                    onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')}
-                    title={t('Заливка (F). Без блока — заливка прозрачным', 'Fill (F). No block selected — fills with transparent')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M2 4h8v1l1 1v5a2 2 0 01-2 2H3a2 2 0 01-2-2V6l1-1V4z" opacity=".8"/>
-                      <path d="M3 2h6l1 2H2L3 2z"/>
-                      <circle cx="13" cy="11" r="2.2"/>
-                      <path d="M13 6l.5 4.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-                    </svg>
+                  <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')}>
+                    <i className="fi fi-br-fill" />
                   </button>
-                  <button
-                    className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`}
-                    onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')}
-                    title={t('Ластик (X)', 'Eraser (X)')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M2 13h12v1H2z"/>
-                      <path d="M4.5 3L2 10h3l1-3h4l1 3h3L11.5 3z" opacity=".85"/>
-                      <path d="M5 7h6v1H5z" opacity=".4"/>
-                    </svg>
+                  <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
+                    <i className="fi fi-br-eraser" />
                   </button>
-                  <button
-                    className={`tool-btn${activeTool === 'line' ? ' active' : ''}`}
-                    onClick={() => setActiveTool(t => t === 'line' ? null : 'line')}
-                    title={t('Прямая линия (L)', 'Straight line (L)')}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                      <line x1="2" y1="14" x2="14" y2="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+                  {/* text and pattern tools hidden — work in progress */}
                 </div>
 
-                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'line') && (
+                {/* Brush size */}
+                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern') && (
                   <div className="toolbar-group brush-size-group">
-                    <input
-                      type="range" min={1} max={20} step={1}
-                      value={brushSize}
-                      className="brush-size-slider"
-                      onChange={e => setBrushSize(Number(e.target.value))}
-                      title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)}
-                    />
+                    <input type="range" min={1} max={20} step={1} value={brushSize} className="brush-size-slider" onChange={e => setBrushSize(Number(e.target.value))} title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
                     <span className="brush-size-label">{brushSize}px</span>
                   </div>
                 )}
 
+                {/* Pattern blocks — hidden while text/pattern tools are WIP */}
+                {false && editorMode === 'artist' && activeTool === 'pattern' && (
+                  <div className="toolbar-group pattern-blocks-group" style={{ position: 'relative', flexWrap: 'wrap', gap: 3 }}>
+                    {patternBlocks.map((pb, idx) => (
+                      <div key={idx} className="pattern-block-chip" style={{ position: 'relative' }}>
+                        {pb.baseId === -1 ? (
+                          <span className="paint-swatch-icon block-picker-icon-transparent pattern-chip-swatch" onClick={() => setShowPatternPicker(idx)} title={t('Сменить блок', 'Change block')} />
+                        ) : (
+                          <span className="paint-swatch-icon pattern-chip-swatch" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${pb.blockId * 32}px -${pb.csId * 32}px` }} onClick={() => setShowPatternPicker(idx)} title={pb.displayName} />
+                        )}
+                        <button className="pattern-chip-remove" onClick={() => setPatternBlocks(prev => prev.filter((_, i) => i !== idx))} disabled={patternBlocks.length <= 1} title={t('Удалить', 'Remove')}>×</button>
+                        {showPatternPicker === idx && (
+                          <BlockPickerPopup
+                            blockSelection={blockSelection}
+                            current={pb}
+                            onSelect={b => { setPatternBlocks(prev => prev.map((x, i) => i === idx ? b : x)); setShowPatternPicker(null); }}
+                            onClose={() => setShowPatternPicker(null)}
+                            mapMode={mapMode}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ position: 'relative' }}>
+                      <button className="tool-btn" title={t('Добавить блок', 'Add block')} onClick={() => setShowPatternPicker(-1)}>+</button>
+                      {showPatternPicker === -1 && (
+                        <BlockPickerPopup
+                          blockSelection={blockSelection}
+                          current={null}
+                          onSelect={b => { setPatternBlocks(prev => [...prev, b]); setShowPatternPicker(null); }}
+                          onClose={() => setShowPatternPicker(null)}
+                          mapMode={mapMode}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shade selector (3D mode, brush/fill) */}
                 {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
                   <div className="toolbar-group shade-selector">
                     {([0, 1, 2] as const).map(sh => {
@@ -1038,30 +1146,19 @@ export default function App() {
                       const sc = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === sh);
                       const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
                       return (
-                        <button
-                          key={sh}
-                          className={`shade-btn${paintBlock.shade === sh ? ' active' : ''}`}
-                          style={{ '--shade-color': bg } as React.CSSProperties}
-                          title={shadeLabel[sh]}
-                          onClick={() => setPaintBlock(pb => pb ? { ...pb, shade: sh } : pb)}
-                        />
+                        <button key={sh} className={`shade-btn${paintBlock.shade === sh ? ' active' : ''}`} style={{ '--shade-color': bg } as React.CSSProperties} title={shadeLabel[sh]} onClick={() => setPaintBlock(pb => pb ? { ...pb, shade: sh } : pb)} />
                       );
                     })}
                   </div>
                 )}
 
+                {/* Main paint block picker */}
                 <div className="toolbar-group paint-swatch-wrapper">
                   <div className="paint-active-swatch">
                     {paintBlock && paintBlock.baseId === -1 ? (
-                      <>
-                        <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span>
-                        <span className="paint-swatch-name">{t('Прозрачный', 'Transparent')}</span>
-                      </>
+                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span><span className="paint-swatch-name">{t('Прозрачный', 'Transparent')}</span></>
                     ) : paintBlock ? (
-                      <>
-                        <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span>
-                        <span className="paint-swatch-name">{paintBlock.displayName}</span>
-                      </>
+                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span><span className="paint-swatch-name">{paintBlock.displayName}</span></>
                     ) : (
                       <span className="paint-no-block">{t('нет блока', 'no block')}</span>
                     )}
@@ -1201,17 +1298,21 @@ export default function App() {
               <div>
                 <PreviewCanvas
                   mode={textureMode}
-                  imageData={imageData} originalData={originalData}
+                  imageData={compositeImageData ?? imageData} paintData={imageData} originalData={originalData}
                   showOriginal={false} showGrid={showGrid}
                   width={pw} height={ph} scale={displayScale}
                   cp={activePalette} blockSelection={blockSelection}
                   activeTool={activeTool}
                   paintBlock={paintBlock}
+                  patternBlocks={patternBlocks}
                   brushSize={brushSize}
+                  textSize={textSize}
+                  otherLayersData={otherLayersData}
                   onRemoveBlock={handleRemoveBlock}
                   onImageUpdate={handleImageUpdate}
                   onToolChange={setActiveTool}
                   onPaintBlockChange={setPaintBlock}
+                  onTextCommit={handleTextCommit}
                   splitPos={imageData && originalData && showSplitLine ? splitPos : undefined}
                   onSplitPosChange={setSplitPos}
                 />
@@ -1252,6 +1353,15 @@ export default function App() {
                   onRename={handleRenameLayer}
                   onMoveUp={handleMoveLayerUp}
                   onMoveDown={handleMoveLayerDown}
+                  onOpacityChange={handleOpacityChange}
+                  onToggleLock={handleToggleLock}
+                  onMoveLayer={handleMoveLayer}
+                  onMergeDown={handleMergeDown}
+                  onMergeVisible={handleMergeVisible}
+                  groups={layerGroups}
+                  onCreateGroup={handleCreateGroup}
+                  onDeleteGroup={handleDeleteGroup}
+                  onToggleGroupCollapse={handleToggleGroupCollapse}
                 />
                 <div className="project-btns">
                   <button className="project-btn" onClick={handleSaveProject} title={t('Скачать проект (.mapkluss)', 'Download project (.mapkluss)')}>
@@ -1325,6 +1435,10 @@ export default function App() {
                 cp={activePalette}
                 blockSelection={blockSelection}
                 mapGrid={mapGrid}
+                mapMode={mapMode}
+                staircaseMode={staircaseMode}
+                supportBlock={supportBlock}
+                supportMode={supportMode}
               />
             </div>
           </div>

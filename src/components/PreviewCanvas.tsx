@@ -1,7 +1,9 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { MapCanvas, drawImageData } from './MapCanvas';
 import { BlockCanvas } from './BlockCanvas';
+import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
+import { BlockPickerPopup } from './BlockPickerPopup';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
@@ -10,7 +12,7 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 
 // ── Exported types ────────────────────────────────────────────────────────────
 
-export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'line';
+export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text';
 
 export interface PaintBlock {
   csId: number;
@@ -27,6 +29,18 @@ export const TRANSPARENT_PAINT_BLOCK: PaintBlock = {
   csId: -1, blockId: -1, baseId: -1, shade: 1,
   displayName: 'Transparent', colourName: 'Air',
 };
+
+// ── Text fonts ────────────────────────────────────────────────────────────────
+
+export const TEXT_FONTS = [
+  { label: 'Monospace', value: 'monospace' },
+  { label: 'Sans-serif', value: 'sans-serif' },
+  { label: 'Serif', value: 'serif' },
+  { label: 'Courier New', value: '"Courier New"' },
+  { label: 'Impact', value: 'Impact' },
+  { label: 'Georgia', value: 'Georgia' },
+  { label: 'Arial Black', value: '"Arial Black"' },
+];
 
 // ── Internal types ────────────────────────────────────────────────────────────
 
@@ -53,9 +67,25 @@ interface RepaintEntry {
   dist: number;
 }
 
+type CanvasDrag = {
+  type: 'move' | 'tl' | 'tr' | 'bl' | 'br';
+  startPx: number; startPy: number;
+  startScaleX: number; startScaleY: number;
+  startMouseX: number; startMouseY: number;  // viewport clientX/Y
+  baseW: number; baseH: number;
+};
+
+type TextState = {
+  px: number; py: number;
+  value: string; font: string; size: number;
+  strokeWidth: number; strokeBlock: PaintBlock | null;
+  scaleX: number; scaleY: number;
+} | null;
+
 interface Props {
   mode: 'pixel' | 'block';
-  imageData: ImageData | null;
+  imageData: ImageData | null;     // composite of all visible layers — for display & tooltips
+  paintData: ImageData | null;     // active layer only — for painting operations
   originalData: ImageData | null;
   showOriginal: boolean;
   showGrid: boolean;
@@ -66,11 +96,15 @@ interface Props {
   blockSelection: BlockSelection;
   activeTool: PaintTool | null;
   paintBlock: PaintBlock | null;
+  patternBlocks: PaintBlock[];
   brushSize: number;
+  textSize: number;
+  otherLayersData?: ImageData | null;
   onRemoveBlock: (csId: number) => void;
   onImageUpdate: (data: ImageData) => void;
   onToolChange: (tool: PaintTool | null) => void;
   onPaintBlockChange: (block: PaintBlock) => void;
+  onTextCommit?: (textImageData: ImageData, layerName: string) => void;
   splitPos?: number;
   onSplitPosChange?: (p: number) => void;
 }
@@ -105,7 +139,6 @@ function buildRepaintEntries(r: number, g: number, b: number, cp: ComputedPalett
   const hoveredLab = rgbToOklab(r, g, b);
   const seen = new Set<number>();
   const entries: RepaintEntry[] = [];
-  // Use shade 2 as representative in 3D mode; fall back to shade 1 for 2D (shade-1-only palette).
   const repShade = cp.colors.some(c => c.shade === 2) ? 2 : 1;
   for (let i = 0; i < cp.colors.length; i++) {
     const c = cp.colors[i];
@@ -158,7 +191,7 @@ function paintBrushCircle(
   const r = Math.floor(brushSize / 2);
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue; // circular mask
+      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       if (erase) erasePixelInBuffer(buf, bx, by);
@@ -167,21 +200,91 @@ function paintBrushCircle(
   }
 }
 
-/** Bresenham line — calls paintBrushCircle at each point. */
-function drawBresenhamLine(
-  buf: ImageData, x0: number, y0: number, x1: number, y1: number,
-  brushSize: number, erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+/** Pattern brush — randomly picks a block from patternBlocks[] for each pixel. */
+function paintPatternBrush(
+  buf: ImageData, cx: number, cy: number, brushSize: number,
+  patternBlocks: PaintBlock[],
+  cp: ComputedPalette,
 ): void {
-  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    paintBrushCircle(buf, x0, y0, brushSize, erase, baseId, shade, cp);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; x0 += sx; }
-    if (e2 <  dx) { err += dx; y0 += sy; }
+  if (patternBlocks.length === 0) return;
+  const r = Math.floor(brushSize / 2);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+      const bx = cx + dx, by = cy + dy;
+      if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
+      const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
+      if (block.baseId === -1) erasePixelInBuffer(buf, bx, by);
+      else paintPixelInBuffer(buf, bx, by, block.baseId, block.shade, cp);
+    }
+  }
+}
+
+/** Returns unscaled text canvas dimensions. */
+function getTextBaseSize(text: string, size: number) {
+  const fs = Math.max(4, size);
+  return {
+    baseW: Math.ceil(fs * (text || ' ').length * 0.75) + fs * 2,
+    baseH: Math.ceil(fs * 1.6),
+  };
+}
+
+/** Render text onto buf at (originX, originY) using the active paintBlock color, with optional stroke and scale. */
+function stampText(
+  buf: ImageData, text: string, originX: number, originY: number,
+  textSize: number, font: string, paintBlock: PaintBlock,
+  strokeWidth: number, strokeBlock: PaintBlock | null,
+  scaleX: number, scaleY: number,
+  cp: ComputedPalette,
+): void {
+  if (!getTargetColor(paintBlock.shade, paintBlock.baseId, cp) && paintBlock.baseId !== -1) return;
+  const tc2d = document.createElement('canvas');
+  const fontSize = Math.max(4, textSize);
+  tc2d.width  = Math.ceil(fontSize * text.length * 0.75) + fontSize * 2;
+  tc2d.height = Math.ceil(fontSize * 1.6);
+  const ctx = tc2d.getContext('2d')!;
+  ctx.clearRect(0, 0, tc2d.width, tc2d.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${fontSize}px ${font}`;
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, 0, 0);
+  // Apply scale
+  const scaledW = Math.max(1, Math.round(tc2d.width * scaleX));
+  const scaledH = Math.max(1, Math.round(tc2d.height * scaleY));
+  const scaled = document.createElement('canvas');
+  scaled.width = scaledW; scaled.height = scaledH;
+  const scaledCtx = scaled.getContext('2d')!;
+  scaledCtx.imageSmoothingEnabled = false;
+  scaledCtx.drawImage(tc2d, 0, 0, scaledW, scaledH);
+  const src = scaled.getContext('2d')!.getImageData(0, 0, scaledW, scaledH);
+
+  // First pass: stroke dilation
+  const sw = Math.round(strokeWidth);
+  if (sw > 0 && strokeBlock && strokeBlock.baseId !== -1) {
+    for (let sy = 0; sy < src.height; sy++) {
+      for (let sx = 0; sx < src.width; sx++) {
+        if (src.data[(sy * src.width + sx) * 4 + 3] < 64) continue;
+        for (let dy = -sw; dy <= sw; dy++) {
+          for (let dx = -sw; dx <= sw; dx++) {
+            if (dx * dx + dy * dy > sw * sw) continue;
+            const bx = originX + sx + dx, by = originY + sy + dy;
+            if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
+            paintPixelInBuffer(buf, bx, by, strokeBlock.baseId, strokeBlock.shade, cp);
+          }
+        }
+      }
+    }
+  }
+
+  // Second pass: text pixels on top
+  for (let sy = 0; sy < src.height; sy++) {
+    for (let sx = 0; sx < src.width; sx++) {
+      if (src.data[(sy * src.width + sx) * 4 + 3] < 64) continue;
+      const bx = originX + sx, by = originY + sy;
+      if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
+      if (paintBlock.baseId === -1) erasePixelInBuffer(buf, bx, by);
+      else paintPixelInBuffer(buf, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+    }
   }
 }
 
@@ -239,6 +342,31 @@ function floodFillTransparent(
   }
 }
 
+/** Flood fill starting from a transparent pixel — fills connected transparent area with a block. */
+function floodFillFromTransparent(
+  buf: ImageData, startX: number, startY: number,
+  tgtBaseId: number, tgtShade: number,
+  cp: ComputedPalette,
+): void {
+  const { width: w, height: h, data } = buf;
+  const visited = new Uint8Array(w * h);
+  const stack = [startY * w + startX];
+  while (stack.length > 0) {
+    const flat = stack.pop()!;
+    if (visited[flat]) continue;
+    visited[flat] = 1;
+    const bx = flat % w, by = (flat / w) | 0;
+    const bi = flat * 4;
+    if (data[bi + 3] >= 128) continue; // stop at non-transparent pixels
+    const tc = getTargetColor(tgtShade, tgtBaseId, cp);
+    if (tc) { data[bi] = tc.r; data[bi + 1] = tc.g; data[bi + 2] = tc.b; data[bi + 3] = 255; }
+    if (bx > 0)     stack.push(flat - 1);
+    if (bx < w - 1) stack.push(flat + 1);
+    if (by > 0)     stack.push(flat - w);
+    if (by < h - 1) stack.push(flat + w);
+  }
+}
+
 function repaintPixels(
   src: ImageData, srcBaseId: number, targetBaseId: number,
   cp: ComputedPalette, fixedShade?: number,
@@ -270,11 +398,53 @@ function repaintPixels(
 
 const HIDE_DELAY = 150;
 
+/** Simple alpha-composite: draw `top` over `bottom` into a new ImageData. */
+function compositeTwo(bottom: ImageData, top: ImageData, w: number, h: number): ImageData {
+  const result = new ImageData(new Uint8ClampedArray(bottom.data), w, h);
+  const dst = result.data;
+  const src = top.data;
+  for (let i = 0; i < dst.length; i += 4) {
+    const sa = src[i + 3];
+    if (sa === 0) continue;
+    if (sa === 255) {
+      dst[i] = src[i]; dst[i+1] = src[i+1]; dst[i+2] = src[i+2]; dst[i+3] = 255;
+    } else {
+      const da = dst[i + 3];
+      const outA = sa + da * (255 - sa) / 255;
+      if (outA === 0) continue;
+      dst[i]   = (src[i]   * sa + dst[i]   * da * (255 - sa) / 255) / outA;
+      dst[i+1] = (src[i+1] * sa + dst[i+1] * da * (255 - sa) / 255) / outA;
+      dst[i+2] = (src[i+2] * sa + dst[i+2] * da * (255 - sa) / 255) / outA;
+      dst[i+3] = outA;
+    }
+  }
+  return result;
+}
+
+/** Bresenham line: call paintBrushCircle for every pixel between (x0,y0) and (x1,y1). */
+function drawBrushLine(
+  buf: ImageData, x0: number, y0: number, x1: number, y1: number,
+  brushSize: number, erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+): void {
+  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  while (true) {
+    paintBrushCircle(buf, x0, y0, brushSize, erase, baseId, shade, cp);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx)  { err += dx; y0 += sy; }
+  }
+}
+
 export function PreviewCanvas({
-  mode, imageData, originalData, showOriginal, showGrid,
+  mode, imageData, paintData, originalData, showOriginal, showGrid,
   width, height, scale, cp, blockSelection,
-  activeTool, paintBlock, brushSize,
+  activeTool, paintBlock, patternBlocks, brushSize, textSize,
+  otherLayersData,
   onRemoveBlock, onImageUpdate, onToolChange, onPaintBlockChange,
+  onTextCommit,
   splitPos, onSplitPosChange,
 }: Props) {
   // Tooltip state
@@ -290,10 +460,19 @@ export function PreviewCanvas({
   const paintBufferRef   = useRef<ImageData | null>(null);
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
+  const lastBrushPosRef  = useRef<{ px: number; py: number } | null>(null);
 
-  // Line tool state
-  const lineStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lineBaseRef  = useRef<ImageData | null>(null); // snapshot before line preview
+  // Text tool state
+  const [textState, setTextState] = useState<TextState>(null);
+  const [showStrokePicker, setShowStrokePicker] = useState(false);
+  const [textCursor, setTextCursor] = useState<string | null>(null);
+  const textStateRef    = useRef<TextState>(null);
+  textStateRef.current  = textState;
+  const setTextStateRef = useRef(setTextState);
+  setTextStateRef.current = setTextState;
+  const textBaseRef     = useRef<ImageData | null>(null);
+  // canvasDrag lives in a ref (not state) — avoids React commit-timing issues during drag
+  const canvasDragRef   = useRef<CanvasDrag | null>(null);
 
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
@@ -303,18 +482,81 @@ export function PreviewCanvas({
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
 
+  // Brush cursor overlay state
+  const [brushCursorPos, setBrushCursorPos] = useState<{ clientX: number; clientY: number } | null>(null);
+  const setBrushCursorPosRef = useRef(setBrushCursorPos);
+  setBrushCursorPosRef.current = setBrushCursorPos;
+
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
+  const onTextCommitRef = useRef(onTextCommit);
+  onTextCommitRef.current = onTextCommit;
   const canvasZoneRef = useRef<HTMLDivElement>(null);
-  const propsRef = useRef({ activeTool, paintBlock, scale, width, height, cp, colorLookup: null as unknown as Map<number, LookupEntry>, brushSize: 1 as number, showGrid: false });
+  const imageDataRef  = useRef<ImageData | null>(null);
+  imageDataRef.current = imageData;
+  const propsRef = useRef<{
+    activeTool: PaintTool | null; paintBlock: PaintBlock | null;
+    patternBlocks: PaintBlock[];
+    scale: number; width: number; height: number;
+    cp: ComputedPalette; colorLookup: Map<number, LookupEntry>;
+    brushSize: number; showGrid: boolean;
+    otherLayersData: ImageData | null | undefined;
+  }>({
+    activeTool: null, paintBlock: null,
+    patternBlocks: [],
+    scale: 1, width: 128, height: 128,
+    cp: { colors: [], labs: [], exactLookup: new Map() }, colorLookup: new Map(),
+    brushSize: 1, showGrid: false,
+    otherLayersData: null,
+  });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, scale, width, height, cp, colorLookup, brushSize, showGrid };
-  // Keep ref current each render so stable global handlers see latest callback
+  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData };
   onSplitPosChangeRef.current = onSplitPosChange;
 
-  const displayImageData = paintBufferRef.current ?? imageData;
+  const displayImageData = (() => {
+    const buf = paintBufferRef.current;
+    if (buf && otherLayersData) return compositeTwo(otherLayersData, buf, width, height);
+    return buf ?? imageData;
+  })();
+
+  // ── Text preview effect — draws text overlay + selection box ───────────────
+  // useLayoutEffect runs synchronously before paint — keeps canvas in sync
+  useLayoutEffect(() => {
+    const canvas = canvasZoneRef.current?.querySelector('canvas');
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+
+    if (!textState || !textBaseRef.current) return;
+
+    const preview = new ImageData(new Uint8ClampedArray(textBaseRef.current.data), textBaseRef.current.width, textBaseRef.current.height);
+    if (textState.value.trim() && paintBlock && paintBlock.baseId !== -1) {
+      stampText(preview, textState.value, textState.px, textState.py, textState.size, textState.font, paintBlock, textState.strokeWidth, textState.strokeBlock, textState.scaleX, textState.scaleY, cp);
+    }
+    drawImageData(canvas, preview, w, h, s, sg);
+
+    // Draw selection box on top of the canvas
+    const ctx = canvas.getContext('2d')!;
+    const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
+    const sw = Math.max(1, Math.round(bw * textState.scaleX));
+    const sh = Math.max(1, Math.round(bh * textState.scaleY));
+    const x1 = textState.px * s, y1 = textState.py * s;
+    const x2 = x1 + sw * s,     y2 = y1 + sh * s;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(87,255,110,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    ctx.setLineDash([]);
+    const hs = 9;
+    for (const [hx, hy] of [[x1,y1],[x2,y1],[x1,y2],[x2,y2]] as [number,number][]) {
+      ctx.fillStyle = '#161623';
+      ctx.fillRect(hx - hs/2, hy - hs/2, hs, hs);
+      ctx.strokeRect(hx - hs/2, hy - hs/2, hs, hs);
+    }
+    ctx.restore();
+  });
 
   // ── Cleanup timers ──────────────────────────────────────────────────────────
 
@@ -343,17 +585,40 @@ export function PreviewCanvas({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        if (textStateRef.current) { cancelText(); return; }
         setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Global mousemove + mouseup for brush drag ───────────────────────────────
+  // ── Global mousemove + mouseup ──────────────────────────────────────────────
 
   useEffect(() => {
     function onGlobalMouseMove(e: MouseEvent) {
+      // Canvas drag for text tool (move / scale handles)
+      if (canvasDragRef.current) {
+        const cd = canvasDragRef.current;
+        const { scale: s } = propsRef.current;
+        const dx = (e.clientX - cd.startMouseX) / s;
+        const dy = (e.clientY - cd.startMouseY) / s;
+        let px = cd.startPx, py = cd.startPy;
+        let sx = cd.startScaleX, sy = cd.startScaleY;
+        if (cd.type === 'move') {
+          px = Math.max(0, cd.startPx + dx);
+          py = Math.max(0, cd.startPy + dy);
+        } else {
+          if (cd.type === 'br') { sx = Math.max(0.1, cd.startScaleX + dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY + dy / cd.baseH); }
+          else if (cd.type === 'bl') { sx = Math.max(0.1, cd.startScaleX - dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY + dy / cd.baseH); px = cd.startPx + dx; }
+          else if (cd.type === 'tr') { sx = Math.max(0.1, cd.startScaleX + dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY - dy / cd.baseH); py = cd.startPy + dy; }
+          else { sx = Math.max(0.1, cd.startScaleX - dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY - dy / cd.baseH); px = cd.startPx + dx; py = cd.startPy + dy; }
+        }
+        setTextStateRef.current(st => st ? { ...st, px, py, scaleX: sx, scaleY: sy } : st);
+        return;
+      }
+
       // Split drag takes priority
       if (isDraggingSplitRef.current && splitContainerRef.current) {
         const rect = splitContainerRef.current.getBoundingClientRect();
@@ -361,24 +626,20 @@ export function PreviewCanvas({
         onSplitPosChangeRef.current?.(pos);
         return;
       }
-      const { activeTool, paintBlock, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
+      const { activeTool, paintBlock, patternBlocks, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
 
-      // ── Line tool preview ──
-      if (activeTool === 'line' && lineStartRef.current && lineBaseRef.current) {
-        const canvas = canvasZoneRef.current?.querySelector('canvas');
-        if (!(canvas instanceof HTMLCanvasElement)) return;
-        const rect = canvas.getBoundingClientRect();
-        const cx = Math.max(0, Math.min(width  - 1, Math.floor((e.clientX - rect.left) / scale)));
-        const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top)  / scale)));
-        // Draw preview: clone base, then draw line on it
-        const preview = new ImageData(new Uint8ClampedArray(lineBaseRef.current.data), lineBaseRef.current.width, lineBaseRef.current.height);
-        const erase = paintBlock?.baseId === -1;
-        drawBresenhamLine(preview, lineStartRef.current.x, lineStartRef.current.y, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
-        drawImageData(canvas, preview, width, height, scale, showGrid);
-        return;
+      // Update brush cursor
+      if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern') {
+        setBrushCursorPosRef.current({ clientX: e.clientX, clientY: e.clientY });
       }
 
-      if (!isDraggingRef.current || (activeTool !== 'brush' && activeTool !== 'eraser') || (activeTool === 'brush' && !paintBlock) || !paintBufferRef.current) return;
+      // Brush / eraser / pattern drag
+      const needsPattern = activeTool === 'pattern';
+      if (!isDraggingRef.current ||
+          (activeTool !== 'brush' && activeTool !== 'eraser' && activeTool !== 'pattern') ||
+          ((activeTool === 'brush') && !paintBlock) ||
+          (needsPattern && patternBlocks.length === 0) ||
+          !paintBufferRef.current) return;
 
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (!(canvas instanceof HTMLCanvasElement)) return;
@@ -389,33 +650,23 @@ export function PreviewCanvas({
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
-      const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
-      paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
-      // Draw directly to the visible canvas — bypasses React state so no re-render lag
-      drawImageData(canvas, paintBufferRef.current!, width, height, scale, showGrid);
+      if (activeTool === 'pattern') {
+        paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp);
+      } else {
+        const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
+        paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+      }
+      {
+        const { otherLayersData: oLD } = propsRef.current;
+        const bufToDraw = (oLD && paintBufferRef.current) ? compositeTwo(oLD, paintBufferRef.current, width, height) : paintBufferRef.current!;
+        drawImageData(canvas, bufToDraw, width, height, scale, showGrid);
+      }
     }
 
     function onGlobalMouseUp(e: MouseEvent) {
-      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
+      if (canvasDragRef.current) { canvasDragRef.current = null; return; }
 
-      // ── Line tool commit ──
-      const { activeTool, paintBlock, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
-      if (activeTool === 'line' && lineStartRef.current && lineBaseRef.current) {
-        const canvas = canvasZoneRef.current?.querySelector('canvas');
-        if (canvas instanceof HTMLCanvasElement) {
-          const rect = canvas.getBoundingClientRect();
-          const cx = Math.max(0, Math.min(width  - 1, Math.floor((e.clientX - rect.left) / scale)));
-          const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top)  / scale)));
-          const result = new ImageData(new Uint8ClampedArray(lineBaseRef.current.data), lineBaseRef.current.width, lineBaseRef.current.height);
-          const erase = paintBlock?.baseId === -1;
-          drawBresenhamLine(result, lineStartRef.current.x, lineStartRef.current.y, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
-          onImageUpdateRef.current(result);
-          drawImageData(canvas, result, width, height, scale, showGrid);
-        }
-        lineStartRef.current = null;
-        lineBaseRef.current = null;
-        return;
-      }
+      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
 
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
@@ -423,6 +674,20 @@ export function PreviewCanvas({
         onImageUpdateRef.current(paintBufferRef.current);
         paintBufferRef.current = null;
       }
+      // Save last painted pixel position for shift+click line
+      const { activeTool, scale, width, height } = propsRef.current;
+      if (activeTool === 'brush' || activeTool === 'eraser') {
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+          const rect = canvas.getBoundingClientRect();
+          const px = Math.floor((e.clientX - rect.left) / scale);
+          const py = Math.floor((e.clientY - rect.top) / scale);
+          if (px >= 0 && px < width && py >= 0 && py < height) {
+            lastBrushPosRef.current = { px, py };
+          }
+        }
+      }
+      void e;
     }
 
     window.addEventListener('mousemove', onGlobalMouseMove);
@@ -483,8 +748,6 @@ export function PreviewCanvas({
     return { pixelX: px, pixelY: py, r, g, b, ...info };
   }
 
-  // ── Paint tool handlers ─────────────────────────────────────────────────────
-
   // ── Split slider helpers ─────────────────────────────────────────────────────
 
   function showSplitLabels() {
@@ -526,10 +789,42 @@ export function PreviewCanvas({
 
   function handleContainerMouseEnter() { if (splitPos != null) showSplitLabels(); }
 
+  // ── Text tool helpers ───────────────────────────────────────────────────────
+
+  function confirmText() {
+    if (!textState) return;
+    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+    if (textState.value.trim() && paintBlock && paintBlock.baseId !== -1) {
+      // Create text-only transparent ImageData
+      const textOnly = new ImageData(w, h);  // all transparent
+      stampText(textOnly, textState.value, textState.px, textState.py, textState.size, textState.font, paintBlock, textState.strokeWidth, textState.strokeBlock, textState.scaleX, textState.scaleY, cp);
+      onTextCommitRef.current?.(textOnly, 'Текст');
+    }
+    setTextState(null);
+    textBaseRef.current = null;
+    canvasDragRef.current = null;
+    // restore canvas
+    const canvas = canvasZoneRef.current?.querySelector('canvas');
+    if (canvas instanceof HTMLCanvasElement && imageDataRef.current) {
+      drawImageData(canvas, imageDataRef.current, w, h, s, sg);
+    }
+  }
+
+  function cancelText() {
+    setTextState(null);
+    textBaseRef.current = null;
+    canvasDragRef.current = null;
+    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+    const canvas = canvasZoneRef.current?.querySelector('canvas');
+    if (canvas instanceof HTMLCanvasElement && imageDataRef.current) {
+      drawImageData(canvas, imageDataRef.current, w, h, s, sg);
+    }
+  }
+
+  // ── Paint tool handler ──────────────────────────────────────────────────────
+
   function handleZoneMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    // If split drag is in progress (e.g. event bubbled through), ignore
     if (isDraggingSplitRef.current) return;
-    // Alt+drag anywhere on canvas → move split divider
     if (e.altKey && splitPos != null && splitContainerRef.current) {
       e.preventDefault();
       isDraggingSplitRef.current = true;
@@ -538,65 +833,167 @@ export function PreviewCanvas({
       showSplitLabels();
       return;
     }
+
     if (!activeTool || showOriginal) return;
-    e.preventDefault(); // prevent text selection during drag
+    e.preventDefault();
 
     if (activeTool === 'eyedropper') {
       const info = lookupAtEvent(e);
       if (info) {
         onPaintBlockChange({ csId: info.csId, blockId: info.blockId, baseId: info.baseId, shade: info.shade, displayName: info.displayName, colourName: info.colourName });
-        onToolChange('brush'); // auto-switch to brush after picking
+        onToolChange('brush');
       }
       return;
     }
 
-    if (!imageData) return;
-    if (activeTool !== 'eraser' && activeTool !== 'fill' && !paintBlock) return;
+    if (activeTool === 'text') {
+      if (!paintData) return;
+      const pos = getPixelCoords(e);
+
+      if (textState) {
+        const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
+        const sw = Math.max(1, Math.round(bw * textState.scaleX));
+        const sh = Math.max(1, Math.round(bh * textState.scaleY));
+        const hs = Math.max(3, Math.round(9 / scale));  // handle size in canvas pixels
+
+        // Corner hit test (scale handles)
+        const corners: Array<['tl'|'tr'|'bl'|'br', number, number]> = [
+          ['tl', textState.px,      textState.py],
+          ['tr', textState.px + sw, textState.py],
+          ['bl', textState.px,      textState.py + sh],
+          ['br', textState.px + sw, textState.py + sh],
+        ];
+        if (pos) {
+          for (const [id, hx, hy] of corners) {
+            if (Math.abs(pos.px - hx) <= hs && Math.abs(pos.py - hy) <= hs) {
+              e.preventDefault();
+              canvasDragRef.current = { type: id, startPx: textState.px, startPy: textState.py, startScaleX: textState.scaleX, startScaleY: textState.scaleY, startMouseX: e.clientX, startMouseY: e.clientY, baseW: bw, baseH: bh };
+              return;
+            }
+          }
+          // Inside box → move
+          if (pos.px >= textState.px && pos.px <= textState.px + sw && pos.py >= textState.py && pos.py <= textState.py + sh) {
+            e.preventDefault();
+            canvasDragRef.current = { type: 'move', startPx: textState.px, startPy: textState.py, startScaleX: textState.scaleX, startScaleY: textState.scaleY, startMouseX: e.clientX, startMouseY: e.clientY, baseW: bw, baseH: bh };
+            return;
+          }
+        }
+        // Click outside → confirm existing and create new
+        confirmText();
+      }
+
+      if (!paintBlock) return;
+      if (!pos) return;
+      // Create new text at click
+      textBaseRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
+      canvasDragRef.current = null;
+      setTextState({ px: pos.px, py: pos.py, value: '', font: 'monospace', size: textSize, strokeWidth: 0, strokeBlock: null, scaleX: 1, scaleY: 1 });
+      return;
+    }
+
+    if (!paintData) return;
+    if (activeTool !== 'eraser' && activeTool !== 'fill' && activeTool !== 'pattern' && !paintBlock) return;
+    if (activeTool === 'pattern' && patternBlocks.length === 0) return;
     const pos = getPixelCoords(e);
     if (!pos) return;
 
     if (activeTool === 'eraser' || activeTool === 'brush') {
+      const { px: cx, py: cy } = pos;
+      const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
+
+      // Shift+click: draw straight line from last brush position
+      if (e.shiftKey && lastBrushPosRef.current && paintData) {
+        const buf = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
+        drawBrushLine(buf, lastBrushPosRef.current.px, lastBrushPosRef.current.py, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+        onImageUpdate(buf);
+        lastBrushPosRef.current = { px: cx, py: cy };
+        return;
+      }
+
       isDraggingRef.current = true;
       paintedSetRef.current = new Set();
-      paintBufferRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
-      const { px: cx, py: cy } = pos;
+      paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(cy * width + cx);
-      const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
       paintBrushCircle(paintBufferRef.current, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+      lastBrushPosRef.current = { px: cx, py: cy };
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
-        drawImageData(canvas, paintBufferRef.current, width, height, scale, showGrid);
+        const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;
+        drawImageData(canvas, bufToDraw, width, height, scale, showGrid);
       }
-    } else if (activeTool === 'line') {
-      if (!paintBlock) return;
-      const { px, py } = pos;
-      lineStartRef.current = { x: px, y: py };
-      lineBaseRef.current = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
     } else if (activeTool === 'fill') {
-      const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+      const buf = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       const i = (pos.py * buf.width + pos.px) * 4;
-      if (buf.data[i + 3] < 128) return; // clicked on transparent pixel — nothing to fill
-      const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
-      const existing = colorLookup.get(key);
-      if (!existing) return;
-      if (!paintBlock || paintBlock.baseId === -1) {
-        floodFillTransparent(buf, pos.px, pos.py, existing.baseId, existing.shade, colorLookup);
+
+      if (buf.data[i + 3] < 128) {
+        // Clicked on transparent pixel — fill connected transparent area with paintBlock
+        if (!paintBlock || paintBlock.baseId === -1) return;
+        floodFillFromTransparent(buf, pos.px, pos.py, paintBlock.baseId, paintBlock.shade, cp);
       } else {
-        if (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade) return;
-        floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup);
+        const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
+        const existing = colorLookup.get(key);
+        if (!existing) return;
+        if (!paintBlock || paintBlock.baseId === -1) {
+          floodFillTransparent(buf, pos.px, pos.py, existing.baseId, existing.shade, colorLookup);
+        } else {
+          if (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade) return;
+          floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup);
+        }
       }
-      onImageUpdate(buf); // commits + pushes history
+      onImageUpdate(buf);
+    } else if (activeTool === 'pattern') {
+      isDraggingRef.current = true;
+      paintedSetRef.current = new Set();
+      paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
+      const { px: cx, py: cy } = pos;
+      paintedSetRef.current.add(cy * width + cx);
+      paintPatternBrush(paintBufferRef.current, cx, cy, brushSize, patternBlocks, cp);
+      const canvas = canvasZoneRef.current?.querySelector('canvas');
+      if (canvas instanceof HTMLCanvasElement) {
+        const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;
+        drawImageData(canvas, bufToDraw, width, height, scale, showGrid);
+      }
     }
   }
 
   // ── Tooltip handlers ────────────────────────────────────────────────────────
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    // During brush drag: handled globally — but also cancel any tooltip hide
+    if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill') {
+      setBrushCursorPos({ clientX: e.clientX, clientY: e.clientY });
+    }
     if (isDraggingRef.current) { cancelHide(); return; }
-    // Other tools active: no tooltip
-    if (activeTool) return;
 
+    // Text cursor: detect hit area
+    if (activeTool === 'text' && textState) {
+      const canvas = canvasZoneRef.current?.querySelector('canvas');
+      if (canvas instanceof HTMLCanvasElement) {
+        const rect = canvas.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / scale;
+        const py = (e.clientY - rect.top)  / scale;
+        const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
+        const sw = Math.max(1, Math.round(bw * textState.scaleX));
+        const sh = Math.max(1, Math.round(bh * textState.scaleY));
+        const hs = Math.max(3, 9 / scale);
+        const corners: Array<[string, number, number]> = [
+          ['nwse-resize', textState.px,      textState.py],
+          ['nesw-resize', textState.px + sw, textState.py],
+          ['nesw-resize', textState.px,      textState.py + sh],
+          ['nwse-resize', textState.px + sw, textState.py + sh],
+        ];
+        let cur: string | null = null;
+        for (const [cursor, hx, hy] of corners) {
+          if (Math.abs(px - hx) <= hs && Math.abs(py - hy) <= hs) { cur = cursor; break; }
+        }
+        if (!cur && px >= textState.px && px <= textState.px + sw && py >= textState.py && py <= textState.py + sh) {
+          cur = 'move';
+        }
+        setTextCursor(cur);
+      }
+      return;
+    }
+
+    if (activeTool) return;
     if (isPinned) return;
     const info = lookupAtEvent(e);
     if (!info) { scheduleHide(); return; }
@@ -606,8 +1003,8 @@ export function PreviewCanvas({
   }
 
   function handleZoneClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (isDraggingSplitRef.current) return; // ignore click if split drag just ended
-    if (activeTool) return; // paint tools handle clicks via mousedown
+    if (isDraggingSplitRef.current) return;
+    if (activeTool) return;
     const info = lookupAtEvent(e);
     if (info) {
       setIsPinned(true);
@@ -620,7 +1017,7 @@ export function PreviewCanvas({
     }
   }
 
-  function handleZoneLeave() { if (!isPinned && !activeTool) scheduleHide(); }
+  function handleZoneLeave() { if (!isPinned && !activeTool) scheduleHide(); setBrushCursorPos(null); if (activeTool === 'text') setTextCursor(null); }
   function handleTooltipEnter() { cancelHide(); }
   function handleTooltipLeave() { if (!isPinned) scheduleHide(); }
 
@@ -631,20 +1028,18 @@ export function PreviewCanvas({
   }
 
   function handleRepaintItemClick(entry: RepaintEntry) {
-    if (!hoverInfo || !imageData) return;
+    if (!hoverInfo || !paintData) return;
     if (is3D) {
-      // Show shade picker for this block
       setRepaintTarget(entry);
     } else {
-      // 2D mode — only one shade, apply immediately
-      onImageUpdate(repaintPixels(imageData, hoverInfo.baseId, entry.baseId, cp));
+      onImageUpdate(repaintPixels(paintData, hoverInfo.baseId, entry.baseId, cp));
       closeTooltip();
     }
   }
 
   function handleRepaintShade(shade: 0 | 1 | 2) {
-    if (!hoverInfo || !imageData || !repaintTarget) return;
-    onImageUpdate(repaintPixels(imageData, hoverInfo.baseId, repaintTarget.baseId, cp, shade));
+    if (!hoverInfo || !paintData || !repaintTarget) return;
+    onImageUpdate(repaintPixels(paintData, hoverInfo.baseId, repaintTarget.baseId, cp, shade));
     closeTooltip();
   }
 
@@ -652,7 +1047,7 @@ export function PreviewCanvas({
 
   const TOOLTIP_W = 220;
   const TOOLTIP_H = repaintTarget ? 160 : showRepaint ? 320 : 130;
-  const RIGHT_PANEL_W = 260; // matches --panel-right CSS variable
+  const RIGHT_PANEL_W = 260;
   const spaceOnRight = window.innerWidth - RIGHT_PANEL_W - (mousePos.x + 12);
   const ttLeft = spaceOnRight >= TOOLTIP_W
     ? mousePos.x + 12
@@ -661,9 +1056,34 @@ export function PreviewCanvas({
 
   // ── Cursor style ────────────────────────────────────────────────────────────
 
-  const zoneCursor = activeTool === 'eyedropper' || activeTool === 'fill' || activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'line'
+  const hasBrushCursor = activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern';
+  const zoneCursor = hasBrushCursor
+    ? 'none'
+    : activeTool === 'text'
+    ? (textCursor ?? 'crosshair')
+    : activeTool === 'eyedropper'
     ? 'crosshair'
     : undefined;
+
+  const brushCircle = (() => {
+    if (!brushCursorPos || !hasBrushCursor) return null;
+    const canvas = canvasZoneRef.current?.querySelector('canvas');
+    if (!canvas) return null;
+    const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+    const px = Math.floor((brushCursorPos.clientX - rect.left) / scale);
+    const py = Math.floor((brushCursorPos.clientY - rect.top) / scale);
+    const isPoint = activeTool === 'fill';
+    const toolSize = isPoint ? 1 : brushSize;
+    const r = Math.floor(toolSize / 2);
+    const span = 2 * r + 1;
+    const sizePx = Math.max(scale, span * scale);
+    return {
+      x: rect.left + (px + 0.5) * scale,
+      y: rect.top  + (py + 0.5) * scale,
+      size: sizePx,
+      isPoint,
+    };
+  })();
 
   // ── Canvas child ────────────────────────────────────────────────────────────
 
@@ -688,11 +1108,9 @@ export function PreviewCanvas({
       onTouchMove={handleContainerTouchMove}
       onTouchEnd={handleContainerTouchEnd}
     >
-      {/* Bottom: processed (always full width) */}
       <div style={isDraggingSplit ? { pointerEvents: 'none' } : undefined}>
         {processedLayer}
       </div>
-      {/* Top: original clipped to left side of divider */}
       {originalData && (
         <div
           className="split-original-layer"
@@ -705,7 +1123,6 @@ export function PreviewCanvas({
           />
         </div>
       )}
-      {/* Divider line + handle */}
       <div
         className="split-divider"
         style={{ left: `${splitPos}%` }}
@@ -719,7 +1136,6 @@ export function PreviewCanvas({
           onClick={e => e.stopPropagation()}
         >◀▶</div>
       </div>
-      {/* Labels */}
       <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>ORIGINAL</span>
       <span className={`split-label split-label-right${labelsVisible ? ' visible' : ''}`}>PROCESSED</span>
     </div>
@@ -736,6 +1152,95 @@ export function PreviewCanvas({
       onClick={handleZoneClick}
     >
       {inner}
+
+      {brushCircle && (() => {
+        const s = brushCircle.size;
+        const style: React.CSSProperties = {
+          position: 'fixed',
+          left: brushCircle.x,
+          top: brushCircle.y,
+          width: s,
+          height: s,
+          transform: 'translate(-50%, -50%)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          overflow: 'visible',
+        };
+        if (brushCircle.isPoint) {
+          return (
+            <svg style={style} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+              <line x1={s/2} y1={0} x2={s/2} y2={s} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
+              <line x1={0} y1={s/2} x2={s} y2={s/2} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
+            </svg>
+          );
+        }
+        const r = s / 2;
+        return (
+          <svg style={style} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+            <circle cx={r} cy={r} r={r - 1} fill="rgba(255,60,60,0.18)" stroke="rgba(255,60,60,0.85)" strokeWidth="1.5"/>
+          </svg>
+        );
+      })()}
+
+      {/* ── Text toolbar (top-center bar, visible when textState active) ── */}
+      {textState !== null && activeTool === 'text' && (
+        <div
+          className="text-toolbar"
+          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', gap: 6, alignItems: 'center', background: '#1a1a2e', border: '1px solid rgba(87,255,110,0.4)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {/* Text input */}
+          <input
+            className="text-toolbar-input"
+            autoFocus
+            value={textState.value}
+            onChange={e => setTextState(s => s ? { ...s, value: e.target.value } : s)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmText(); }
+            }}
+            placeholder="Введи текст…"
+            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'rgba(87,255,110,0.9)', fontFamily: textState.font, fontSize: 13, minWidth: 120 }}
+          />
+          {/* Font selector */}
+          <select
+            value={textState.font}
+            onChange={e => setTextState(s => s ? { ...s, font: e.target.value } : s)}
+            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, padding: '2px 4px' }}
+          >
+            {TEXT_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+          {/* Size */}
+          <input type="number" min={4} max={64} value={textState.size}
+            onChange={e => setTextState(s => s ? { ...s, size: Math.max(4, Math.min(64, +e.target.value)) } : s)}
+            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, width: 48, textAlign: 'center', padding: '2px 4px' }}
+          />
+          {/* Stroke width */}
+          <input type="number" min={0} max={4} value={textState.strokeWidth}
+            onChange={e => setTextState(s => s ? { ...s, strokeWidth: Math.max(0, Math.min(4, +e.target.value)) } : s)}
+            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, width: 36, textAlign: 'center', padding: '2px 4px' }}
+            title="Обводка"
+          />
+          {/* Stroke block picker */}
+          <div style={{ position: 'relative' }}>
+            {textState.strokeBlock
+              ? <span className="paint-swatch-icon text-stroke-swatch"
+                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${textState.strokeBlock.blockId * 32}px -${textState.strokeBlock.csId * 32}px` }}
+                  title={textState.strokeBlock.displayName} onClick={() => setShowStrokePicker(v => !v)} />
+              : <span className="paint-swatch-icon text-stroke-swatch text-stroke-swatch--none"
+                  title="Выбрать цвет обводки" onClick={() => setShowStrokePicker(v => !v)}>+</span>
+            }
+            {showStrokePicker && (
+              <BlockPickerPopup blockSelection={blockSelection} current={textState.strokeBlock}
+                onSelect={b => { setTextState(s => s ? { ...s, strokeBlock: b } : s); setShowStrokePicker(false); }}
+                onClose={() => setShowStrokePicker(false)} />
+            )}
+          </div>
+          {/* Confirm / Cancel */}
+          <button onClick={confirmText} style={{ background: 'rgba(87,255,110,0.15)', border: '1px solid rgba(87,255,110,0.5)', color: 'rgba(87,255,110,0.9)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✓</button>
+          <button onClick={cancelText} style={{ background: 'rgba(60,60,60,0.3)', border: '1px solid rgba(120,120,120,0.3)', color: 'rgba(180,180,180,0.7)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
+        </div>
+      )}
 
       {hoverInfo && !activeTool && (
         <div

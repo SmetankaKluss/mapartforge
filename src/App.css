@@ -1851,6 +1851,30 @@ input, select, textarea { outline: none; }
 .layer-del-btn { background: none; border: none; color: var(--text-dim); font-size: 10px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
 .layer-del-btn:hover { color: var(--red); }
 
+/* Build mode select in layer row */
+.layer-buildmode-select {
+  background: #0d0d1a; border: 1px solid rgba(87,255,110,0.25); color: rgba(87,255,110,0.6);
+  font-family: var(--font-mono); font-size: 9px; border-radius: 3px;
+  padding: 1px 3px; cursor: pointer; flex-shrink: 0; max-width: 38px;
+}
+.layer-buildmode-select:hover { border-color: var(--accent); }
+
+/* Layer selected (Ctrl+click multi-select) */
+.layer-row-v2.layer-selected { background: rgba(87,255,110,0.1); outline: 1px solid rgba(87,255,110,0.4); }
+
+/* Layer inside a group (indented) */
+.layer-in-group { padding-left: 20px !important; }
+
+/* Group header row */
+.layer-group-header {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 8px; background: rgba(87,255,110,0.06);
+  border-left: 2px solid rgba(87,255,110,0.3);
+  cursor: default;
+}
+.layer-group-collapse { background: none; border: none; color: var(--accent); font-size: 9px; cursor: pointer; padding: 0 2px; }
+.layer-group-name { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); flex: 1; }
+
 /* Artist mode: right panel expands slightly */
 .panel-right.artist-mode { --panel-right: 340px; }
 
@@ -1863,3 +1887,62 @@ input, select, textarea { outline: none; }
 .project-btns { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px 8px; border-bottom: 1px solid var(--border); }
 .project-btn { font-family: var(--font-mono); font-size: 10px; color: var(--cyan); background: none; border: 1px solid rgba(96,200,240,0.3); padding: 5px 10px; cursor: pointer; text-align: left; }
 .project-btn:hover { background: rgba(96,200,240,0.08); border-color: var(--cyan); }
+
+/* ── Flaticon uicons in tool buttons ─────────────────────────────────────── */
+.tool-btn .fi { font-size: 13px; line-height: 1; display: block; }
+
+/* ── Pattern brush block chips ───────────────────────────────────────────── */
+.pattern-blocks-group { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.pattern-block-chip { position: relative; display: flex; align-items: center; }
+.pattern-chip-swatch {
+  display: inline-block; width: 20px; height: 20px;
+  background-size: 640px 640px; border: 1px solid var(--border);
+  cursor: pointer; flex-shrink: 0;
+  transition: border-color 0.12s;
+}
+.pattern-chip-swatch:hover { border-color: var(--accent); }
+.pattern-chip-remove {
+  position: absolute; top: -5px; right: -5px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: rgba(40,40,50,0.92); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 9px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0; z-index: 1;
+}
+.pattern-chip-remove:hover:not(:disabled) { background: rgba(255,60,60,0.3); border-color: rgba(255,60,60,0.7); color: #ff4444; }
+.pattern-chip-remove:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Text toolbar (top-center, Photoshop-like) ───────────────────────────── */
+.text-toolbar {
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.text-toolbar-input {
+  caret-color: var(--accent);
+}
+.text-toolbar-input::placeholder { color: rgba(87,255,110,0.35); }
+.text-stroke-swatch { width: 16px; height: 16px; border-radius: 2px; cursor: pointer; display: inline-block; border: 1px solid var(--border); background-size: 512px 512px; flex-shrink: 0; }
+.text-stroke-swatch--none { background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); line-height: 1; }
+
+/* ── Layers panel v2 (thumbnails + opacity) ─────────────────────────────── */
+.layer-row-v2 {
+  display: flex; align-items: stretch; gap: 6px;
+  padding: 5px 6px; cursor: pointer;
+  border-bottom: 1px solid rgba(87,255,110,0.07);
+  transition: background 0.1s;
+  user-select: none;
+}
+.layer-row-v2:hover { background: rgba(87,255,110,0.05); }
+.layer-row-v2.active { background: rgba(87,255,110,0.1); border-left: 2px solid var(--accent); }
+.layer-row-main { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.layer-row-top { display: flex; align-items: center; gap: 4px; }
+.layer-row-bottom { display: flex; align-items: center; gap: 4px; }
+.layer-type-icon { font-size: 10px; color: var(--accent); opacity: 0.7; flex-shrink: 0; min-width: 12px; }
+.layer-icon-btns { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.layer-lock-btn { background: transparent; border: none; padding: 1px 3px; font-size: 11px; opacity: 0.5; cursor: pointer; }
+.layer-lock-btn:hover { opacity: 1; }
+.layer-lock-btn.locked { opacity: 0.9; }
+.layer-opacity-label { font-size: 8px; color: var(--text-dim); flex-shrink: 0; min-width: 70px; }
+.layer-opacity-slider { flex: 1; min-width: 0; accent-color: var(--accent); height: 12px; cursor: pointer; }
+.layer-opacity-val { font-size: 8px; color: var(--text-dim); min-width: 28px; text-align: right; flex-shrink: 0; }

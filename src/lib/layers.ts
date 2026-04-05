@@ -1,10 +1,14 @@
 import type { DitheringMode } from './dithering';
 
+export type LayerBuildMode = '2d' | '3d-classic' | '3d-optimized';
+
 export interface Layer {
   id: string;
   name: string;
   visible: boolean;
   locked: boolean;
+  opacity: number;       // 0–100, default 100
+  isText?: boolean;      // true for text layers
   groupId: string | null;
   imageData: ImageData | null;
   // Optional: attached source image with dithering settings (processed layers)
@@ -12,6 +16,8 @@ export interface Layer {
   dithering?: DitheringMode;
   ditheringIntensity?: number;
   mapMode?: '2d' | '3d';
+  staircaseMode?: 'classic' | 'optimized';
+  buildMode: LayerBuildMode;
 }
 
 export interface LayerGroup {
@@ -26,14 +32,17 @@ function genId(): string {
   return `layer-${Date.now()}-${_idCounter++}`;
 }
 
-export function createLayer(name: string, imageData: ImageData | null = null): Layer {
+export function createLayer(name: string, imageData: ImageData | null = null, isText?: boolean): Layer {
   return {
     id: genId(),
     name,
     visible: true,
     locked: false,
+    opacity: 100,
+    isText,
     groupId: null,
     imageData,
+    buildMode: '2d',
   };
 }
 
@@ -48,9 +57,12 @@ export function compositeLayersToImageData(
 
   for (const layer of layers) {
     if (!layer.visible || !layer.imageData) continue;
+    const opacityFactor = (layer.opacity ?? 100) / 100;
     const src = layer.imageData.data;
     for (let i = 0; i < dst.length; i += 4) {
-      const sa = src[i + 3];
+      const rawA = src[i + 3];
+      if (rawA === 0) continue;
+      const sa = Math.round(rawA * opacityFactor);
       if (sa === 0) continue;
       if (sa === 255) {
         dst[i]     = src[i];
@@ -81,6 +93,37 @@ export function cloneLayers(layers: Layer[]): Layer[] {
       ? new ImageData(new Uint8ClampedArray(l.imageData.data), l.imageData.width, l.imageData.height)
       : null,
   }));
+}
+
+/** Merge active layer down onto the layer below it. Returns updated layers array. */
+export function mergeLayersDown(
+  layers: Layer[], activeId: string, width: number, height: number,
+): Layer[] {
+  const idx = layers.findIndex(l => l.id === activeId);
+  if (idx <= 0) return layers;
+  const bottom = layers[idx - 1];
+  const top    = layers[idx];
+  const merged = compositeLayersToImageData([bottom, top], width, height);
+  const newLayer: Layer = { ...bottom, imageData: merged };
+  const next = [...layers];
+  next.splice(idx - 1, 2, newLayer);
+  return next;
+}
+
+/** Merge all visible layers into one. The merged layer takes the position of the bottommost visible layer. */
+export function mergeVisible(
+  layers: Layer[], width: number, height: number,
+): Layer[] {
+  const visibleWithData = layers.filter(l => l.visible && l.imageData);
+  if (visibleWithData.length <= 1) return layers;
+  const merged = compositeLayersToImageData(visibleWithData, width, height);
+  const firstVisIdx = layers.findIndex(l => l.visible && l.imageData);
+  const mergedLayer: Layer = { ...visibleWithData[0], imageData: merged, name: 'Слитые слои' };
+  return layers.reduce<Layer[]>((acc, l, i) => {
+    if (!l.visible || !l.imageData) { acc.push(l); return acc; }
+    if (i === firstVisIdx) { acc.push(mergedLayer); return acc; }
+    return acc; // remove other visible layers
+  }, []);
 }
 
 /** Replace the imageData of the active layer (immutable update). */

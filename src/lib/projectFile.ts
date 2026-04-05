@@ -71,6 +71,8 @@ export function deserializeProject(json: string): {
       name: sl.name,
       visible: sl.visible,
       locked: sl.locked,
+      opacity: (sl as { opacity?: number }).opacity ?? 100,
+      buildMode: (sl as { buildMode?: string }).buildMode as import('./layers').LayerBuildMode ?? '2d',
       groupId: sl.groupId,
       imageData: sl.imageDataB64 && sl.width > 0 && sl.height > 0
         ? base64ToImageData(sl.imageDataB64, sl.width, sl.height)

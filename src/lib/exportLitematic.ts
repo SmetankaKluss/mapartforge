@@ -557,6 +557,87 @@ export async function exportLitematic(
 }
 
 /**
+ * Count support blocks that would be placed in staircase mode.
+ * Returns the number of unique support block positions.
+ */
+export function countSupportBlocks(
+  imageData:     ImageData,
+  cp:            ComputedPalette,
+  groups:        BlockSelection,
+  staircaseMode: 'classic' | 'optimized',
+  supportMode:   SupportMode,
+): number {
+  const { data, width, height } = imageData;
+  const lookup  = buildLookup(cp);
+  const sizeX   = width;
+  const sizeZ   = height;
+  const sc      = staircaseMode === 'optimized'
+    ? computeStaircaseOptimized(data, width, height, lookup)
+    : computeStaircaseClassic(data, width, height, lookup);
+  const yGrid   = sc.yGrid;
+  const exportSizeZ = sizeZ + 1; // +1 for noobline
+
+  const pixelBaseId = new Int32Array(sizeX * sizeZ);
+  const pixelShade  = new Int32Array(sizeX * sizeZ);
+  const pixelIsAir  = new Uint8Array(sizeX * sizeZ);
+
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      const i = (z * sizeX + x) * 4;
+      const pi = z * sizeX + x;
+      if (data[i + 3] < 128) { pixelIsAir[pi] = 1; pixelBaseId[pi] = -1; continue; }
+      const key  = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+      const entry = lookup.get(key);
+      pixelBaseId[pi] = entry?.baseId ?? 0;
+      pixelShade[pi]  = entry?.shade  ?? 1;
+    }
+  }
+
+  const seenYPerCol: Set<number>[] = [];
+  if (supportMode === 2) {
+    for (let x = 0; x < sizeX; x++) {
+      const seen = new Set<number>();
+      for (let z = 0; z < sizeZ; z++) {
+        const pi = z * sizeX + x;
+        if (!pixelIsAir[pi]) seen.add(yGrid[pi]);
+      }
+      seenYPerCol[x] = seen;
+    }
+  }
+
+  const supportPositions = new Set<number>();
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      const pi   = z * sizeX + x;
+      if (pixelIsAir[pi]) continue;
+      const pixelY = yGrid[pi];
+      const artZ   = z + 1;
+
+      if (supportMode === 1) {
+        if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
+        const sy = pixelY - 1;
+        if (sy >= 0) supportPositions.add(sy * exportSizeZ * sizeX + artZ * sizeX + x);
+      } else if (supportMode === 2) {
+        const numSup = pixelShade[pi] === 1 ? 1 : pixelShade[pi] === 2 ? 2
+          : (seenYPerCol[x]?.has(yGrid[pi]) ? 1 : 2);
+        for (let k = 1; k <= numSup; k++) {
+          const sy = pixelY - k;
+          if (sy < 0) break;
+          supportPositions.add(sy * exportSizeZ * sizeX + artZ * sizeX + x);
+        }
+      } else {
+        for (let k = 1; k <= 2; k++) {
+          const sy = pixelY - k;
+          if (sy < 0) break;
+          supportPositions.add(sy * exportSizeZ * sizeX + artZ * sizeX + x);
+        }
+      }
+    }
+  }
+  return supportPositions.size;
+}
+
+/**
  * Split the canvas into 128×128 tiles and download a ZIP containing one
  * .litematic per tile, named mapart_1.litematic … mapart_N.litematic
  * in Z-order (left→right, top→bottom).

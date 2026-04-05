@@ -6,12 +6,18 @@ import { MAP_BLOCK_SIZE } from '../lib/types';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { useLocale } from '../lib/locale';
+import { countSupportBlocks } from '../lib/exportLitematic';
+import type { SupportMode } from '../lib/exportLitematic';
 
 interface Props {
   imageData: ImageData | null;
   cp: ComputedPalette;
   blockSelection: BlockSelection;
   mapGrid: MapGrid;
+  mapMode?: '2d' | '3d';
+  staircaseMode?: 'classic' | 'optimized';
+  supportBlock?: string;
+  supportMode?: SupportMode;
 }
 
 interface MaterialEntry {
@@ -147,7 +153,7 @@ function buildCopyText(entries: MaterialEntry[], total: number, maxPerMap: boole
   return lines.join('\n');
 }
 
-export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props) {
+export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode }: Props) {
   const { t } = useLocale();
   const [copied,     setCopied]     = useState(false);
   const [maxPerMap,  setMaxPerMap]  = useState(false);
@@ -157,6 +163,12 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props)
     if (!imageData) return null;
     return computeRawMaterials(imageData, cp, blockSelection, mapGrid);
   }, [imageData, cp, blockSelection, mapGrid]);
+
+  // Support block count (only in 3D staircase mode with a support block selected)
+  const supportCount = useMemo(() => {
+    if (!imageData || mapMode !== '3d' || !supportBlock || supportBlock === 'air' || !supportMode) return 0;
+    return countSupportBlocks(imageData, cp, blockSelection, staircaseMode ?? 'classic', supportMode);
+  }, [imageData, cp, blockSelection, mapMode, staircaseMode, supportBlock, supportMode]);
 
   // Cheap derivation: pick total or max-per-section based on toggle
   const materials = useMemo<MaterialEntry[]>(() => {
@@ -240,6 +252,22 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid }: Props)
               );
             })}
           </tbody>
+          {supportCount > 0 && (
+            <tbody>
+              <tr className="mat-row mat-row-support">
+                <td className="mat-col-block">
+                  <div className="mat-block-cell">
+                    <span className="mat-name" style={{ color: 'rgba(87,255,110,0.6)', fontStyle: 'italic' }}>
+                      {t('Опорные блоки', 'Support blocks')} ({supportBlock})
+                    </span>
+                  </div>
+                </td>
+                <td className="mat-col-num mat-num-cell">{fmtN(supportCount)}</td>
+                <td className="mat-col-stacks mat-num-cell">{fmtStacks(supportCount)}</td>
+                <td className="mat-col-shulkers mat-num-cell">{fmtShulkers(supportCount)}</td>
+              </tr>
+            </tbody>
+          )}
           <tfoot>
             <tr className="mat-total-row">
               <td className="mat-col-block">
