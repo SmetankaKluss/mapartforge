@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { MapCanvas, drawImageData } from './MapCanvas';
+import { type SelectionMask, maskFromRect, maskFromPolygon, maskFromFloodFill, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
 import { BlockCanvas } from './BlockCanvas';
 import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
@@ -12,7 +13,8 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 
 // ── Exported types ────────────────────────────────────────────────────────────
 
-export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text';
+export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text'
+  | 'select-rect' | 'select-lasso' | 'select-magic' | 'select-pixel';
 
 export interface PaintBlock {
   csId: number;
@@ -107,6 +109,8 @@ interface Props {
   onTextCommit?: (textImageData: ImageData, layerName: string) => void;
   splitPos?: number;
   onSplitPosChange?: (p: number) => void;
+  selectionMask?: SelectionMask | null;
+  onSelectionChange?: (mask: SelectionMask | null) => void;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -171,14 +175,17 @@ function paintPixelInBuffer(
   buf: ImageData, px: number, py: number,
   targetBaseId: number, targetShade: number,
   cp: ComputedPalette,
+  mask?: SelectionMask | null,
 ): void {
+  if (mask && !mask[py * buf.width + px]) return;
   const i = (py * buf.width + px) * 4;
   const tc = getTargetColor(targetShade, targetBaseId, cp);
   if (!tc) return;
   buf.data[i] = tc.r; buf.data[i + 1] = tc.g; buf.data[i + 2] = tc.b; buf.data[i + 3] = 255;
 }
 
-function erasePixelInBuffer(buf: ImageData, px: number, py: number): void {
+function erasePixelInBuffer(buf: ImageData, px: number, py: number, mask?: SelectionMask | null): void {
+  if (mask && !mask[py * buf.width + px]) return;
   const i = (py * buf.width + px) * 4;
   buf.data[i] = 0; buf.data[i + 1] = 0; buf.data[i + 2] = 0; buf.data[i + 3] = 0;
 }
@@ -187,6 +194,7 @@ function erasePixelInBuffer(buf: ImageData, px: number, py: number): void {
 function paintBrushCircle(
   buf: ImageData, cx: number, cy: number, brushSize: number,
   erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+  mask?: SelectionMask | null,
 ): void {
   const r = Math.floor(brushSize / 2);
   for (let dy = -r; dy <= r; dy++) {
@@ -194,8 +202,8 @@ function paintBrushCircle(
       if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
-      if (erase) erasePixelInBuffer(buf, bx, by);
-      else paintPixelInBuffer(buf, bx, by, baseId, shade, cp);
+      if (erase) erasePixelInBuffer(buf, bx, by, mask);
+      else paintPixelInBuffer(buf, bx, by, baseId, shade, cp, mask);
     }
   }
 }
@@ -205,6 +213,7 @@ function paintPatternBrush(
   buf: ImageData, cx: number, cy: number, brushSize: number,
   patternBlocks: PaintBlock[],
   cp: ComputedPalette,
+  mask?: SelectionMask | null,
 ): void {
   if (patternBlocks.length === 0) return;
   const r = Math.floor(brushSize / 2);
@@ -214,8 +223,8 @@ function paintPatternBrush(
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
-      if (block.baseId === -1) erasePixelInBuffer(buf, bx, by);
-      else paintPixelInBuffer(buf, bx, by, block.baseId, block.shade, cp);
+      if (block.baseId === -1) erasePixelInBuffer(buf, bx, by, mask);
+      else paintPixelInBuffer(buf, bx, by, block.baseId, block.shade, cp, mask);
     }
   }
 }
@@ -293,8 +302,10 @@ function floodFill(
   srcBaseId: number, srcShade: number,
   tgtBaseId: number, tgtShade: number,
   cp: ComputedPalette, colorLookup: Map<number, { baseId: number; shade: number }>,
+  mask?: SelectionMask | null,
 ): void {
   if (srcBaseId === tgtBaseId && srcShade === tgtShade) return;
+  if (mask && !mask[startY * buf.width + startX]) return;
   const { width: w, height: h, data } = buf;
   const visited = new Uint8Array(w * h);
   const stack = [startY * w + startX];
@@ -302,6 +313,7 @@ function floodFill(
     const flat = stack.pop()!;
     if (visited[flat]) continue;
     visited[flat] = 1;
+    if (mask && !mask[flat]) continue;
     const bx = flat % w, by = (flat / w) | 0;
     const bi = flat * 4;
     const key = (data[bi] << 16) | (data[bi + 1] << 8) | data[bi + 2];
@@ -320,7 +332,9 @@ function floodFillTransparent(
   buf: ImageData, startX: number, startY: number,
   srcBaseId: number, srcShade: number,
   colorLookup: Map<number, { baseId: number; shade: number }>,
+  mask?: SelectionMask | null,
 ): void {
+  if (mask && !mask[startY * buf.width + startX]) return;
   const { width: w, height: h, data } = buf;
   const visited = new Uint8Array(w * h);
   const stack = [startY * w + startX];
@@ -328,6 +342,7 @@ function floodFillTransparent(
     const flat = stack.pop()!;
     if (visited[flat]) continue;
     visited[flat] = 1;
+    if (mask && !mask[flat]) continue;
     const bx = flat % w, by = (flat / w) | 0;
     const bi = flat * 4;
     if (data[bi + 3] < 128) continue;
@@ -347,7 +362,9 @@ function floodFillFromTransparent(
   buf: ImageData, startX: number, startY: number,
   tgtBaseId: number, tgtShade: number,
   cp: ComputedPalette,
+  mask?: SelectionMask | null,
 ): void {
+  if (mask && !mask[startY * buf.width + startX]) return;
   const { width: w, height: h, data } = buf;
   const visited = new Uint8Array(w * h);
   const stack = [startY * w + startX];
@@ -355,6 +372,7 @@ function floodFillFromTransparent(
     const flat = stack.pop()!;
     if (visited[flat]) continue;
     visited[flat] = 1;
+    if (mask && !mask[flat]) continue;
     const bx = flat % w, by = (flat / w) | 0;
     const bi = flat * 4;
     if (data[bi + 3] >= 128) continue; // stop at non-transparent pixels
@@ -425,12 +443,13 @@ function compositeTwo(bottom: ImageData, top: ImageData, w: number, h: number): 
 function drawBrushLine(
   buf: ImageData, x0: number, y0: number, x1: number, y1: number,
   brushSize: number, erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
+  mask?: SelectionMask | null,
 ): void {
   let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx - dy;
   while (true) {
-    paintBrushCircle(buf, x0, y0, brushSize, erase, baseId, shade, cp);
+    paintBrushCircle(buf, x0, y0, brushSize, erase, baseId, shade, cp, mask);
     if (x0 === x1 && y0 === y1) break;
     const e2 = 2 * err;
     if (e2 > -dy) { err -= dy; x0 += sx; }
@@ -446,6 +465,7 @@ export function PreviewCanvas({
   onRemoveBlock, onImageUpdate, onToolChange, onPaintBlockChange,
   onTextCommit,
   splitPos, onSplitPosChange,
+  selectionMask, onSelectionChange,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -461,6 +481,21 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
   const lastBrushPosRef  = useRef<{ px: number; py: number } | null>(null);
+
+  // Selection state
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selectionDragRef = useRef<{
+    type: 'rect' | 'lasso' | 'pixel';
+    startPx: number; startPy: number;
+    curPx: number; curPy: number;
+    points: { x: number; y: number }[];
+    addMode: 'replace' | 'add' | 'sub';
+  } | null>(null);
+  const selectionMaskRef = useRef<SelectionMask | null>(null);
+  const antsPhaseRef = useRef(0);
+  const antsRafRef = useRef<number>(0);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   // Text tool state
   const [textState, setTextState] = useState<TextState>(null);
@@ -502,6 +537,7 @@ export function PreviewCanvas({
     cp: ComputedPalette; colorLookup: Map<number, LookupEntry>;
     brushSize: number; showGrid: boolean;
     otherLayersData: ImageData | null | undefined;
+    selectionMask: SelectionMask | null | undefined;
   }>({
     activeTool: null, paintBlock: null,
     patternBlocks: [],
@@ -509,10 +545,12 @@ export function PreviewCanvas({
     cp: { colors: [], labs: [], exactLookup: new Map() }, colorLookup: new Map(),
     brushSize: 1, showGrid: false,
     otherLayersData: null,
+    selectionMask: null,
   });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData };
+  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask };
+  selectionMaskRef.current = selectionMask ?? null;
   onSplitPosChangeRef.current = onSplitPosChange;
 
   const displayImageData = (() => {
@@ -563,6 +601,76 @@ export function PreviewCanvas({
   useEffect(() => () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     clearTimeout(labelTimerRef.current);
+  }, []);
+
+  // ── Marching ants overlay animation ─────────────────────────────────────────
+
+  useEffect(() => {
+    let lastTime = 0;
+    function frame(time: number) {
+      antsRafRef.current = requestAnimationFrame(frame);
+      const overlay = overlayCanvasRef.current;
+      if (!overlay) return;
+      const mask = selectionMaskRef.current;
+      const { width: w, height: h, scale: s } = propsRef.current;
+      const cw = w * s, ch = h * s;
+      if (overlay.width !== cw) overlay.width = cw;
+      if (overlay.height !== ch) overlay.height = ch;
+      const ctx = overlay.getContext('2d');
+      if (!ctx) return;
+      if (!mask) { ctx.clearRect(0, 0, cw, ch); return; }
+      // Advance phase ~8px/s
+      const dt = Math.min(time - lastTime, 100);
+      lastTime = time;
+      antsPhaseRef.current = (antsPhaseRef.current + dt * 0.008) % 8;
+      // Draw selection drag preview if active
+      const drag = selectionDragRef.current;
+      if (drag) {
+        ctx.clearRect(0, 0, cw, ch);
+        if (drag.type === 'rect') {
+          const x = Math.min(drag.startPx, drag.curPx) * s;
+          const y = Math.min(drag.startPy, drag.curPy) * s;
+          const rw = (Math.abs(drag.curPx - drag.startPx) + 1) * s;
+          const rh = (Math.abs(drag.curPy - drag.startPy) + 1) * s;
+          ctx.save();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = -antsPhaseRef.current;
+          ctx.strokeRect(x, y, rw, rh);
+          ctx.strokeStyle = '#000';
+          ctx.lineDashOffset = -antsPhaseRef.current + 4;
+          ctx.strokeRect(x, y, rw, rh);
+          ctx.restore();
+        } else if (drag.type === 'lasso' && drag.points.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = -antsPhaseRef.current;
+          ctx.beginPath();
+          ctx.moveTo(drag.points[0].x * s + s / 2, drag.points[0].y * s + s / 2);
+          for (let i = 1; i < drag.points.length; i++) {
+            ctx.lineTo(drag.points[i].x * s + s / 2, drag.points[i].y * s + s / 2);
+          }
+          ctx.stroke();
+          ctx.strokeStyle = '#000';
+          ctx.lineDashOffset = -antsPhaseRef.current + 4;
+          ctx.beginPath();
+          ctx.moveTo(drag.points[0].x * s + s / 2, drag.points[0].y * s + s / 2);
+          for (let i = 1; i < drag.points.length; i++) {
+            ctx.lineTo(drag.points[i].x * s + s / 2, drag.points[i].y * s + s / 2);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+        return;
+      }
+      drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
+    }
+    antsRafRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(antsRafRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Show split labels on mount / when split activates ───────────────────────
@@ -633,6 +741,33 @@ export function PreviewCanvas({
         setBrushCursorPosRef.current({ clientX: e.clientX, clientY: e.clientY });
       }
 
+      // Selection drag update
+      if (selectionDragRef.current) {
+        const drag = selectionDragRef.current;
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+          const rect = canvas.getBoundingClientRect();
+          const { scale: sc, width: ww, height: hh } = propsRef.current;
+          const cx = Math.max(0, Math.min(ww - 1, Math.floor((e.clientX - rect.left) / sc)));
+          const cy = Math.max(0, Math.min(hh - 1, Math.floor((e.clientY - rect.top) / sc)));
+          drag.curPx = cx;
+          drag.curPy = cy;
+          if (drag.type === 'lasso') {
+            const last = drag.points[drag.points.length - 1];
+            if (last.x !== cx || last.y !== cy) drag.points.push({ x: cx, y: cy });
+          } else if (drag.type === 'pixel') {
+            // Add pixel to selection on drag
+            const { selectionMask: sMask } = propsRef.current;
+            const flat = cy * ww + cx;
+            const newMask = new Uint8Array(sMask ?? new Uint8Array(ww * hh));
+            if (drag.addMode === 'sub') newMask[flat] = 0;
+            else newMask[flat] = 1;
+            onSelectionChangeRef.current?.(newMask);
+          }
+        }
+        return;
+      }
+
       // Brush / eraser / pattern drag
       const needsPattern = activeTool === 'pattern';
       if (!isDraggingRef.current ||
@@ -650,11 +785,12 @@ export function PreviewCanvas({
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
+      const { selectionMask: sMask } = propsRef.current;
       if (activeTool === 'pattern') {
-        paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp);
+        paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
       } else {
         const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
-        paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+        paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, sMask ?? undefined);
       }
       {
         const { otherLayersData: oLD } = propsRef.current;
@@ -667,6 +803,26 @@ export function PreviewCanvas({
       if (canvasDragRef.current) { canvasDragRef.current = null; return; }
 
       if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
+
+      // Finalize selection drag
+      if (selectionDragRef.current) {
+        const drag = selectionDragRef.current;
+        const { width: w, height: h, selectionMask: existingMask } = propsRef.current;
+        let newMask: SelectionMask | null = null;
+        if (drag.type === 'rect') {
+          newMask = maskFromRect(drag.startPx, drag.startPy, drag.curPx, drag.curPy, w, h);
+        } else if (drag.type === 'lasso' && drag.points.length >= 3) {
+          newMask = maskFromPolygon(drag.points, w, h);
+        }
+        if (newMask) {
+          if (drag.addMode === 'add' && existingMask) newMask = unionMask(existingMask, newMask);
+          else if (drag.addMode === 'sub' && existingMask) newMask = subtractMask(existingMask, newMask);
+          onSelectionChangeRef.current?.(newMask);
+        }
+        selectionDragRef.current = null;
+        isDraggingRef.current = false;
+        return;
+      }
 
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
@@ -834,6 +990,48 @@ export function PreviewCanvas({
       return;
     }
 
+    // Selection tools
+    if (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel') {
+      e.preventDefault();
+      const pos = getPixelCoords(e);
+      if (!pos) return;
+      const { px, py } = pos;
+      const addMode: 'replace' | 'add' | 'sub' = e.shiftKey ? 'add' : e.altKey ? 'sub' : 'replace';
+
+      if (activeTool === 'select-magic') {
+        if (!paintData) return;
+        const newMask = maskFromFloodFill(paintData, px, py, colorLookup, width, height);
+        let finalMask: SelectionMask = newMask;
+        if (addMode === 'add' && selectionMask) finalMask = unionMask(selectionMask, newMask);
+        else if (addMode === 'sub' && selectionMask) finalMask = subtractMask(selectionMask, newMask);
+        onSelectionChange?.(finalMask);
+        return;
+      }
+
+      if (activeTool === 'select-pixel') {
+        // Toggle or add pixel
+        const newMask = new Uint8Array(selectionMask ?? new Uint8Array(width * height));
+        const idx = py * width + px;
+        if (addMode === 'sub') newMask[idx] = 0;
+        else newMask[idx] = 1;
+        onSelectionChange?.(newMask);
+        // Also start drag to allow drag-to-select
+        selectionDragRef.current = { type: 'pixel', startPx: px, startPy: py, curPx: px, curPy: py, points: [], addMode };
+        isDraggingRef.current = true;
+        return;
+      }
+
+      // rect or lasso — start drag
+      selectionDragRef.current = {
+        type: activeTool === 'select-rect' ? 'rect' : 'lasso',
+        startPx: px, startPy: py,
+        curPx: px, curPy: py,
+        points: [{ x: px, y: py }],
+        addMode,
+      };
+      return;
+    }
+
     if (!activeTool || showOriginal) return;
     e.preventDefault();
 
@@ -904,7 +1102,7 @@ export function PreviewCanvas({
       // Shift+click: draw straight line from last brush position
       if (e.shiftKey && lastBrushPosRef.current && paintData) {
         const buf = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
-        drawBrushLine(buf, lastBrushPosRef.current.px, lastBrushPosRef.current.py, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+        drawBrushLine(buf, lastBrushPosRef.current.px, lastBrushPosRef.current.py, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, selectionMask ?? undefined);
         onImageUpdate(buf);
         lastBrushPosRef.current = { px: cx, py: cy };
         return;
@@ -914,7 +1112,7 @@ export function PreviewCanvas({
       paintedSetRef.current = new Set();
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(cy * width + cx);
-      paintBrushCircle(paintBufferRef.current, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp);
+      paintBrushCircle(paintBufferRef.current, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, selectionMask ?? undefined);
       lastBrushPosRef.current = { px: cx, py: cy };
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
@@ -928,16 +1126,16 @@ export function PreviewCanvas({
       if (buf.data[i + 3] < 128) {
         // Clicked on transparent pixel — fill connected transparent area with paintBlock
         if (!paintBlock || paintBlock.baseId === -1) return;
-        floodFillFromTransparent(buf, pos.px, pos.py, paintBlock.baseId, paintBlock.shade, cp);
+        floodFillFromTransparent(buf, pos.px, pos.py, paintBlock.baseId, paintBlock.shade, cp, selectionMask ?? undefined);
       } else {
         const key = (buf.data[i] << 16) | (buf.data[i + 1] << 8) | buf.data[i + 2];
         const existing = colorLookup.get(key);
         if (!existing) return;
         if (!paintBlock || paintBlock.baseId === -1) {
-          floodFillTransparent(buf, pos.px, pos.py, existing.baseId, existing.shade, colorLookup);
+          floodFillTransparent(buf, pos.px, pos.py, existing.baseId, existing.shade, colorLookup, selectionMask ?? undefined);
         } else {
           if (existing.baseId === paintBlock.baseId && existing.shade === paintBlock.shade) return;
-          floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup);
+          floodFill(buf, pos.px, pos.py, existing.baseId, existing.shade, paintBlock.baseId, paintBlock.shade, cp, colorLookup, selectionMask ?? undefined);
         }
       }
       onImageUpdate(buf);
@@ -947,7 +1145,7 @@ export function PreviewCanvas({
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       const { px: cx, py: cy } = pos;
       paintedSetRef.current.add(cy * width + cx);
-      paintPatternBrush(paintBufferRef.current, cx, cy, brushSize, patternBlocks, cp);
+      paintPatternBrush(paintBufferRef.current, cx, cy, brushSize, patternBlocks, cp, selectionMask ?? undefined);
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
         const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;
@@ -1063,6 +1261,8 @@ export function PreviewCanvas({
     ? (textCursor ?? 'crosshair')
     : activeTool === 'eyedropper'
     ? 'crosshair'
+    : (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel')
+    ? 'crosshair'
     : undefined;
 
   const brushCircle = (() => {
@@ -1097,6 +1297,7 @@ export function PreviewCanvas({
       imageData={displayImageData} originalData={originalData}
       showOriginal={showOriginal} showGrid={showGrid}
       width={width} height={height} scale={scale}
+      overlayRef={overlayCanvasRef}
     />
   );
 

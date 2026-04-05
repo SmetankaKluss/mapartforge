@@ -1946,3 +1946,15 @@ input, select, textarea { outline: none; }
 .layer-opacity-label { font-size: 8px; color: var(--text-dim); flex-shrink: 0; min-width: 70px; }
 .layer-opacity-slider { flex: 1; min-width: 0; accent-color: var(--accent); height: 12px; cursor: pointer; }
 .layer-opacity-val { font-size: 8px; color: var(--text-dim); min-width: 28px; text-align: right; flex-shrink: 0; }
+
+/* ── Selection toolbar ──────────────────────────────────────────── */
+.selection-ops { gap: 2px; }
+.sel-op-btn { font-size: 11px; min-width: 22px; padding: 0 4px; }
+.selection-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  align-self: center;
+  white-space: nowrap;
+}

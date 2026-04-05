@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { type SelectionMask, selectAllMask, invertMask, countSelected } from './lib/selectionMask';
 import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -165,6 +166,7 @@ export default function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
+  const [selectionMask, setSelectionMask] = useState<SelectionMask | null>(null);
   const [patternBlocks, setPatternBlocks] = useState<PaintBlock[]>([]);
   const [showPatternPicker, setShowPatternPicker] = useState<number | null>(null); // index of open picker
   const [brushSize, setBrushSize]       = useState<number>(1);
@@ -232,6 +234,7 @@ export default function App() {
     setMapMode(layer.mapMode ?? '2d');
     setStaircaseMode(layer.staircaseMode ?? 'classic');
     if (layer.dithering !== undefined) setDithering(layer.dithering);
+    setSelectionMask(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
 
@@ -277,6 +280,9 @@ export default function App() {
   // Keyboard shortcuts for undo/redo + export — effect registered below,
   // after handleExportPng/handleExportLitematic are declared.
 
+  // Stable ref so keyboard handler can call handleDeleteSelection without forward-ref TDZ
+  const handleDeleteSelectionRef = useRef<(() => void) | null>(null);
+
   // Keyboard shortcuts for paint tools (E / B / F / Escape) + view toggles (Z / O)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -288,14 +294,22 @@ export default function App() {
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
-        case 'Escape': setActiveTool(null); break;
+        case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
+        case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
+        case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
+        case 'Delete':
+        case 'Backspace': if (editorMode === 'artist' && selectionMask) { handleDeleteSelectionRef.current?.(); } break;
+        case 'Escape':
+          if (selectionMask && editorMode === 'artist') { setSelectionMask(null); return; }
+          setActiveTool(null);
+          break;
         case 'KeyZ': setShowGrid(g => !g); break;
         case 'KeyO': if (!compareMode) setSplitPos(50); break;
       }
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [imageData, compareMode]);
+  }, [imageData, compareMode, editorMode, selectionMask]);
 
 
   const modeShades = (mapMode === '2d') ? [1] : [0, 1, 2];
@@ -308,6 +322,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [blockSelection, mapMode],
   );
+
+  const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
 
   // exportRef is updated below, after compositeImageData is computed
 
@@ -588,6 +604,69 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Selection operations ─────────────────────────────────────────────────────
+
+  const handleDeleteSelection = useCallback(() => {
+    if (!imageData || !selectionMask) return;
+    pushToHistory();
+    const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      buf.data[i * 4] = 0; buf.data[i * 4 + 1] = 0; buf.data[i * 4 + 2] = 0; buf.data[i * 4 + 3] = 0;
+    }
+    setImageData(buf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageData, selectionMask]);
+  handleDeleteSelectionRef.current = handleDeleteSelection;
+
+  const handleFillSelection = useCallback(() => {
+    if (!imageData || !selectionMask || !paintBlock || paintBlock.baseId === -1) return;
+    const color = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === paintBlock.shade)
+      ?? activePalette.colors.find(c => c.baseId === paintBlock.baseId);
+    if (!color) return;
+    pushToHistory();
+    const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      buf.data[i * 4] = color.r; buf.data[i * 4 + 1] = color.g; buf.data[i * 4 + 2] = color.b; buf.data[i * 4 + 3] = 255;
+    }
+    setImageData(buf);
+  }, [imageData, selectionMask, paintBlock, activePalette]);
+
+  const handleInvertSelection = useCallback(() => {
+    if (!imageData) return;
+    setSelectionMask(prev => prev ? invertMask(prev, imageData.width, imageData.height) : selectAllMask(imageData.width, imageData.height));
+  }, [imageData]);
+
+  const handleMoveSelectionToLayer = useCallback(() => {
+    if (!imageData || !selectionMask) return;
+    pushToHistory();
+    const w = imageData.width, h = imageData.height;
+    const newLayerData = new ImageData(w, h);
+    const erasedData = new ImageData(new Uint8ClampedArray(imageData.data), w, h);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      newLayerData.data[i * 4]     = imageData.data[i * 4];
+      newLayerData.data[i * 4 + 1] = imageData.data[i * 4 + 1];
+      newLayerData.data[i * 4 + 2] = imageData.data[i * 4 + 2];
+      newLayerData.data[i * 4 + 3] = imageData.data[i * 4 + 3];
+      erasedData.data[i * 4]     = 0;
+      erasedData.data[i * 4 + 1] = 0;
+      erasedData.data[i * 4 + 2] = 0;
+      erasedData.data[i * 4 + 3] = 0;
+    }
+    const newLayer = createLayer('Выделение', newLayerData);
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const updated = prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, imageData: erasedData } : l);
+      const insertAt = idx >= 0 ? idx + 1 : updated.length;
+      const newLayers = [...updated.slice(0, insertAt), newLayer, ...updated.slice(insertAt)];
+      return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
+    });
+    setSelectionMask(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageData, selectionMask]);
+
   // ── Layer management ─────────────────────────────────────────────────────────
 
   const handleAddLayer = useCallback(() => {
@@ -803,7 +882,22 @@ export default function App() {
   // (declared here, after handleExportPng/handleExportLitematic, to avoid TDZ)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!e.ctrlKey) return;
+      if (!e.ctrlKey && !e.metaKey) return;
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA' && editorMode === 'artist' && imageData) {
+        e.preventDefault();
+        setSelectionMask(selectAllMask(imageData.width, imageData.height));
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD' && editorMode === 'artist') {
+        e.preventDefault();
+        setSelectionMask(null);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyI' && editorMode === 'artist' && imageData) {
+        e.preventDefault();
+        handleInvertSelection();
+        return;
+      }
       if (!e.shiftKey && e.code === 'KeyZ') { e.preventDefault(); handleUndo(); return; }
       if (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ')) { e.preventDefault(); handleRedo(); return; }
       if (!e.shiftKey && e.code === 'KeyS') { e.preventDefault(); handleExportPng(); return; }
@@ -811,7 +905,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [handleUndo, handleRedo, handleExportPng, handleExportLitematic]);
+  }, [handleUndo, handleRedo, handleExportPng, handleExportLitematic, editorMode, imageData, handleInvertSelection]);
 
   // ── Reset all settings to defaults ───────────────────────────────────────
   const handleResetDefaults = useCallback(() => {
@@ -1194,6 +1288,38 @@ export default function App() {
                     />
                   )}
                 </div>
+                {editorMode === 'artist' && (
+                  <>
+                    <div className="toolbar-sep" />
+                    <div className="toolbar-group">
+                      <button
+                        className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
+                        title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
+                      >▭</button>
+                      <button
+                        className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
+                        title={t('Лассо (L)', 'Lasso (L)')}
+                      >⌇</button>
+                      <button
+                        className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
+                        title={t('Волшебная палочка (W)', 'Magic wand (W)')}
+                      >✦</button>
+                    </div>
+                    {selectionMask && (
+                      <div className="toolbar-group selection-ops">
+                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}>✕</button>
+                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}>⬛</button>
+                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}>⬜</button>
+                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}>⧉</button>
+                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}>○</button>
+                        <span className="selection-count">{selectedPixelCount}px</span>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="toolbar-sep" />
               </div>
             )}
@@ -1335,6 +1461,8 @@ export default function App() {
                   onTextCommit={handleTextCommit}
                   splitPos={imageData && originalData && showSplitLine ? splitPos : undefined}
                   onSplitPosChange={setSplitPos}
+                  selectionMask={selectionMask}
+                  onSelectionChange={setSelectionMask}
                 />
               </div>
             )}

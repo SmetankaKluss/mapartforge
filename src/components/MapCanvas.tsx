@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MAP_BLOCK_SIZE } from '../lib/types';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   width: number;
   height: number;
   scale: number;
+  overlayRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 const PIXEL_GRID_COLOR = 'rgba(0,0,0,0.15)';
@@ -62,7 +63,7 @@ export function drawImageData(
 
 export function MapCanvas({
   imageData, originalData, showOriginal, showGrid,
-  width, height, scale,
+  width, height, scale, overlayRef,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeData = showOriginal ? originalData : imageData;
@@ -82,8 +83,14 @@ export function MapCanvas({
   }
 
   return (
-    <div className="canvas-wrapper">
+    <div className="canvas-wrapper" style={{ position: 'relative' }}>
       <canvas ref={canvasRef} className="map-canvas" />
+      {overlayRef && (
+        <canvas
+          ref={overlayRef}
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+        />
+      )}
     </div>
   );
 }
