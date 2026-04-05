@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import type { PaintTool, PaintBlock } from './components/PreviewCanvas';
@@ -939,7 +940,7 @@ export default function App() {
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 WIKI</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('ПОДДЕРЖАТЬ', 'SUPPORT')}</a>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>v1.0</a>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
         </div>
       </header>
 
