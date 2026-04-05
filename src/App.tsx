@@ -1464,6 +1464,17 @@ export default function App() {
               disabled={processing}
               supportBlock={supportBlock}
               supportMode={supportMode}
+              artistMode={editorMode === 'artist'}
+              hybridLayers={layers.filter(l => l.visible && l.imageData).map(l => ({
+                imageData: l.imageData!,
+                mapMode: l.mapMode ?? '2d',
+                staircaseMode: l.staircaseMode ?? 'classic',
+              }))}
+              activeLayerExport={activeLayer?.imageData ? {
+                imageData: activeLayer.imageData,
+                mapMode: activeLayer.mapMode ?? '2d',
+                staircaseMode: activeLayer.staircaseMode ?? 'classic',
+              } : undefined}
               sourceImage={sourceImage}
               intensity={intensity}
               adjustments={adjustments}

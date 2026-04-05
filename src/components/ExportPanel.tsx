@@ -6,8 +6,8 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ImageAdjustments } from '../lib/adjustments';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
-import { exportLitematic, exportLitematicZip } from '../lib/exportLitematic';
-import type { SupportMode } from '../lib/exportLitematic';
+import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
+import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
@@ -27,6 +27,10 @@ interface Props {
   disabled:    boolean;
   supportBlock: string;
   supportMode:  SupportMode;
+  // Artist mode
+  artistMode?:       boolean;
+  hybridLayers?:     LayerExportInfo[];
+  activeLayerExport?: LayerExportInfo;
   // Link export
   sourceImage: HTMLImageElement | null;
   intensity:   number;
@@ -55,12 +59,15 @@ export function ExportPanel({
   dithering, compareLeft, compareRight,
   mapGrid, mapMode, staircaseMode, activePalette, blockSelection, disabled,
   supportBlock, supportMode,
+  artistMode, hybridLayers, activeLayerExport,
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
   const { t } = useLocale();
   const [busyPng]                         = useState(false);
   const [busyMapdat,   setBusyMapdat]     = useState(false);
   const [busyLiteFlat, setBusyLiteFlat]   = useState(false);
+  const [busyHybrid,   setBusyHybrid]     = useState(false);
+  const [busyLayer,    setBusyLayer]      = useState(false);
   const [busyZip,      setBusyZip]        = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
@@ -122,6 +129,28 @@ export function ExportPanel({
     }
   }
 
+  async function handleHybridLitematic() {
+    if (!hybridLayers || hybridLayers.length === 0) return;
+    setBusyHybrid(true);
+    try {
+      await exportLitematicHybrid(hybridLayers, activePalette, blockSelection, 'MapartForge');
+    } finally {
+      setBusyHybrid(false);
+    }
+  }
+
+  async function handleLayerLitematic() {
+    if (!activeLayerExport) return;
+    const structure = activeLayerExport.mapMode === '3d' ? 'staircase' : 'flat';
+    setBusyLayer(true);
+    try {
+      await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
+        structure, structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+    } finally {
+      setBusyLayer(false);
+    }
+  }
+
   async function handleGetLink() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src || !sourceImage) return;
@@ -139,7 +168,7 @@ export function ExportPanel({
   }
 
   const base        = disabled || !hasContent;
-  const busyAnyLite = busyLiteFlat || busyZip;
+  const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
 
   return (
@@ -168,14 +197,33 @@ export function ExportPanel({
             {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `↓ MAP.DAT (${mapCount} ${t('файлов', 'files')})` : '↓ MAP.DAT'}
           </button>
 
-          <button
-            className="export-btn"
-            onClick={handleLitematic}
-            disabled={base || busyAnyLite}
-            title={mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
-          >
-            {busyLiteFlat ? t('Сборка…', 'Building…') : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
-          </button>
+          {artistMode ? (<>
+            <button
+              className="export-btn"
+              onClick={handleHybridLitematic}
+              disabled={base || busyAnyLite || !hybridLayers?.length}
+              title={t('Все видимые слои в одной схематике — 3D и 2D части объединены', 'All visible layers in one schematic — 3D and 2D parts combined')}
+            >
+              {busyHybrid ? t('Сборка…', 'Building…') : '↓ ГИБРИД'}
+            </button>
+            <button
+              className="export-btn"
+              onClick={handleLayerLitematic}
+              disabled={base || busyAnyLite || !activeLayerExport}
+              title={t('Только активный слой с его режимом постройки', 'Active layer only with its build mode')}
+            >
+              {busyLayer ? t('Сборка…', 'Building…') : `↓ ${t('СЛОЙ', 'LAYER')} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
+            </button>
+          </>) : (
+            <button
+              className="export-btn"
+              onClick={handleLitematic}
+              disabled={base || busyAnyLite}
+              title={mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
+            >
+              {busyLiteFlat ? t('Сборка…', 'Building…') : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
+            </button>
+          )}
 
           {isMultiMap && (
             <button
