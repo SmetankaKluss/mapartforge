@@ -43,6 +43,8 @@ export function createLayer(name: string, imageData: ImageData | null = null, is
     groupId: null,
     imageData,
     buildMode: '2d',
+    mapMode: '2d',
+    staircaseMode: 'classic',
   };
 }
 

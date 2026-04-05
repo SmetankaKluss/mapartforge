@@ -540,6 +540,206 @@ async function buildLitematicBytes(
   return gzipBytes(w.toBytes());
 }
 
+// ── Hybrid multi-layer export ────────────────────────────────────────────────
+
+export interface LayerExportInfo {
+  imageData: ImageData;
+  mapMode: '2d' | '3d';
+  staircaseMode: 'classic' | 'optimized';
+}
+
+/**
+ * Build a single litematic from multiple layers, each with its own mapMode/staircaseMode.
+ * At each (X,Z) pixel the topmost visible non-transparent layer wins.
+ * 3D-mode pixels are placed using the staircase algorithm; 2D-mode pixels are flat (Y=0).
+ */
+async function buildHybridBytes(
+  layers: LayerExportInfo[],
+  cp: ComputedPalette,
+  groups: BlockSelection,
+  name: string,
+): Promise<Uint8Array> {
+  const { width: sizeX, height: sizeZ } = layers[0].imageData;
+  const n = sizeX * sizeZ;
+
+  // 1. Per-pixel: which layer wins (topmost non-transparent), and is it 3D?
+  const pixelLayerIdx = new Int32Array(n).fill(-1);
+  const pixelIs3D     = new Uint8Array(n);           // 1 = 3D, 0 = 2D
+
+  for (let li = layers.length - 1; li >= 0; li--) {
+    const { imageData, mapMode } = layers[li];
+    const is3D = mapMode === '3d' ? 1 : 0;
+    const src  = imageData.data;
+    for (let pi = 0; pi < n; pi++) {
+      if (pixelLayerIdx[pi] !== -1) continue;      // already covered
+      if (src[pi * 4 + 3] < 128)   continue;      // transparent
+      pixelLayerIdx[pi] = li;
+      pixelIs3D[pi]     = is3D;
+    }
+  }
+
+  // 2. Composite pixel colors (from winning layer)
+  const compositeData = new Uint8ClampedArray(n * 4);
+  for (let pi = 0; pi < n; pi++) {
+    const li = pixelLayerIdx[pi];
+    if (li < 0) continue;
+    const src = layers[li].imageData.data;
+    compositeData[pi * 4]     = src[pi * 4];
+    compositeData[pi * 4 + 1] = src[pi * 4 + 1];
+    compositeData[pi * 4 + 2] = src[pi * 4 + 2];
+    compositeData[pi * 4 + 3] = 255;
+  }
+
+  // 3. Build 3D-only data for staircase computation (2D pixels → transparent)
+  const data3D = new Uint8ClampedArray(n * 4);
+  for (let pi = 0; pi < n; pi++) {
+    if (pixelLayerIdx[pi] < 0 || !pixelIs3D[pi]) { data3D[pi * 4 + 3] = 0; continue; }
+    data3D[pi * 4]     = compositeData[pi * 4];
+    data3D[pi * 4 + 1] = compositeData[pi * 4 + 1];
+    data3D[pi * 4 + 2] = compositeData[pi * 4 + 2];
+    data3D[pi * 4 + 3] = 255;
+  }
+
+  const lookup = buildLookup(cp);
+
+  // 4. Staircase computation for 3D pixels
+  const has3D = layers.some(l => l.mapMode === '3d');
+  let yGrid: Int32Array | null = null;
+  let maxY3D = 0;
+  if (has3D) {
+    // Use the first 3D layer's staircaseMode
+    const mode3D = layers.find(l => l.mapMode === '3d')?.staircaseMode ?? 'classic';
+    const sc = mode3D === 'optimized'
+      ? computeStaircaseOptimized(data3D, sizeX, sizeZ, lookup)
+      : computeStaircaseClassic(data3D, sizeX, sizeZ, lookup);
+    yGrid  = sc.yGrid;
+    maxY3D = sc.maxY;
+  }
+
+  const exportSizeZ = sizeZ + 1;                        // z=0 reserved for noobline
+  const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 2;
+
+  // 5. Block palette
+  const blockPalette: string[] = ['minecraft:air'];
+  const blockToIdx   = new Map<string, number>([['minecraft:air', 0]]);
+  const pixelBlock   = new Uint32Array(n);
+  const pixelBaseId  = new Int32Array(n).fill(-1);
+  const pixelShade   = new Int32Array(n).fill(1);
+
+  for (let pi = 0; pi < n; pi++) {
+    if (pixelLayerIdx[pi] < 0) continue;
+    const di    = pi * 4;
+    const key   = (compositeData[di] << 16) | (compositeData[di + 1] << 8) | compositeData[di + 2];
+    const entry = lookup.get(key);
+    const nbt   = entry ? getPreferredBlockNbt(entry.baseId, groups) : 'stone';
+    const id    = `minecraft:${nbt}`;
+    let idx = blockToIdx.get(id);
+    if (idx === undefined) { idx = blockPalette.length; blockToIdx.set(id, idx); blockPalette.push(id); }
+    pixelBlock[pi]  = idx;
+    pixelBaseId[pi] = entry?.baseId ?? 0;
+    pixelShade[pi]  = entry?.shade  ?? 1;
+  }
+
+  // 6. Fill volume
+  const volume  = sizeX * sizeY * exportSizeZ;
+  const indices = new Uint32Array(volume);
+
+  for (let z = 0; z < sizeZ; z++) {
+    for (let x = 0; x < sizeX; x++) {
+      const pi = z * sizeX + x;
+      if (pixelBlock[pi] === 0 && pixelLayerIdx[pi] < 0) continue;
+      const y  = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
+      const vi = y * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+      if (vi >= 0 && vi < volume) indices[vi] = pixelBlock[pi];
+    }
+  }
+
+  // 7. Noobline (z=0) — reference block for north-face shading of first art row
+  const noobId = 'minecraft:cobblestone';
+  let noobIdx = blockToIdx.get(noobId);
+  if (noobIdx === undefined) {
+    noobIdx = blockPalette.length;
+    blockToIdx.set(noobId, noobIdx);
+    blockPalette.push(noobId);
+  }
+  for (let x = 0; x < sizeX; x++) {
+    const pi = 0 * sizeX + x;
+    if (pixelLayerIdx[pi] < 0) continue;
+    const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
+    const shade    = pixelShade[pi];
+    const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
+    if (nooblineY >= 0 && nooblineY < sizeY) {
+      indices[nooblineY * exportSizeZ * sizeX + 0 * sizeX + x] = noobIdx;
+    }
+  }
+
+  // 8. Write NBT (same structure as buildLitematicBytes)
+  const packedStates = packBlockStates(indices, blockPalette.length);
+  const now = BigInt(Date.now());
+  const w   = new NbtWriter();
+
+  w.tagCompoundStart('');
+    w.tagInt('MinecraftDataVersion', 3953);
+    w.tagInt('Version', 6);
+    w.tagCompoundStart('Metadata');
+      w.tagString('Name', name);
+      w.tagString('Author', 'MapKluss');
+      w.tagString('Description', '');
+      w.tagLong('TimeCreated', now);
+      w.tagLong('TimeModified', now);
+      w.tagCompoundStart('EnclosingSize');
+        w.tagInt('x', sizeX); w.tagInt('y', sizeY); w.tagInt('z', exportSizeZ);
+      w.tagCompoundEnd();
+      w.tagInt('RegionCount', 1);
+      w.tagIntList('TileContainerEntityCount', [0]);
+    w.tagCompoundEnd();
+    w.tagCompoundStart('Regions');
+      w.tagCompoundStart(name);
+        w.tagCompoundStart('Position');
+          w.tagInt('x', 0); w.tagInt('y', 0); w.tagInt('z', 0);
+        w.tagCompoundEnd();
+        w.tagCompoundStart('Size');
+          w.tagInt('x', sizeX); w.tagInt('y', sizeY); w.tagInt('z', exportSizeZ);
+        w.tagCompoundEnd();
+        w.tagListStart('BlockStatePalette', 10, blockPalette.length);
+        for (const id of blockPalette) {
+          w.tagString('Name', id);
+          const faceProps = BLOCK_FACE_PROPS[id];
+          const needsAxis = LOG_AXIS_X.has(id);
+          if (faceProps || needsAxis) {
+            w.tagCompoundStart('Properties');
+            if (faceProps) for (const [k, v] of Object.entries(faceProps)) w.tagString(k, v);
+            if (needsAxis) w.tagString('axis', 'x');
+            w.tagCompoundEnd();
+          }
+          w.tagCompoundEnd();
+        }
+        w.tagLongArray('BlockStates', packedStates);
+        w.tagListStart('TileEntities', 10, 0);
+        w.tagListStart('Entities', 10, 0);
+        w.tagListStart('PendingBlockTicks', 10, 0);
+        w.tagListStart('PendingFluidTicks', 10, 0);
+      w.tagCompoundEnd();
+    w.tagCompoundEnd();
+  w.tagCompoundEnd();
+
+  return gzipBytes(w.toBytes());
+}
+
+/** Download a hybrid litematic: each layer uses its own mapMode/staircaseMode. */
+export async function exportLitematicHybrid(
+  layers:  LayerExportInfo[],
+  cp:      ComputedPalette,
+  groups:  BlockSelection,
+  name:    string = 'MapartForge',
+): Promise<void> {
+  if (layers.length === 0) return;
+  const has3D = layers.some(l => l.mapMode === '3d');
+  const suffix = has3D ? '_3d' : '_2d';
+  const bytes = await buildHybridBytes(layers, cp, groups, name);
+  triggerDownload(bytes, `${name}${suffix}.litematic`);
+}
+
 /** Download a single .litematic file for the full canvas. */
 export async function exportLitematic(
   imageData:        ImageData,

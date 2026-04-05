@@ -24,7 +24,7 @@ import type { SavedSettings } from './lib/localStorage';
 import { loadShare } from './lib/share';
 import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { downloadPng } from './lib/exportPng';
-import { exportLitematic } from './lib/exportLitematic';
+import { exportLitematicHybrid } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
@@ -194,7 +194,7 @@ export default function App() {
   latestRef.current = { imageData, blockSelection, layers };
 
   // Ref with all current state needed for export shortcuts (avoids stale closures)
-  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode });
+  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode, layers: layerState.layers });
 
 
   // ── Auto-save settings to localStorage ──────────────────────────────────
@@ -214,8 +214,8 @@ export default function App() {
   useEffect(() => {
     const layer = layersRef.current.find(l => l.id === activeLayerId);
     if (!layer) return;
-    if (layer.mapMode !== undefined) setMapMode(layer.mapMode);
-    if (layer.staircaseMode !== undefined) setStaircaseMode(layer.staircaseMode);
+    setMapMode(layer.mapMode ?? '2d');
+    setStaircaseMode(layer.staircaseMode ?? 'classic');
     if (layer.dithering !== undefined) setDithering(layer.dithering);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
@@ -717,11 +717,16 @@ export default function App() {
   }, []);
 
   const handleExportLitematic = useCallback(() => {
-    const { imageData: img, activePalette: ap, blockSelection: sel, mapMode: mm, staircaseMode: sm } = exportRef.current;
-    if (!img) return;
+    const { activePalette: ap, blockSelection: sel, layers: exportLayers } = exportRef.current;
+    const visLayers = exportLayers.filter(l => l.visible && l.imageData);
+    if (visLayers.length === 0) return;
     const groups: Record<number, number[]> = {};
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
-    exportLitematic(img, ap, groups, 'MapartForge', mm === '3d' ? 'staircase' : 'flat', undefined, undefined, sm);
+    exportLitematicHybrid(visLayers.map(l => ({
+      imageData: l.imageData!,
+      mapMode: l.mapMode ?? '2d',
+      staircaseMode: l.staircaseMode ?? 'classic',
+    })), ap, groups, 'MapartForge');
   }, []);
 
   // ── Project save / load ──────────────────────────────────────────────────────
@@ -910,7 +915,7 @@ export default function App() {
   }, [layers, activeLayerId, pw, ph]);
 
   // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
-  exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode };
+  exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
 
   const hasContent = compositeImageData !== null || compareData !== null;
 
