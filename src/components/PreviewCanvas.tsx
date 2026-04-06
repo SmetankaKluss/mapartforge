@@ -6,6 +6,10 @@ import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { BlockPickerPopup } from './BlockPickerPopup';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+import { paintWithPatternTile } from '../lib/patternTool';
+import type { PatternDefinition } from '../lib/patternTool';
+import { applyGradient } from '../lib/gradientTool';
+import type { GradientStop } from '../lib/gradientTool';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
@@ -14,7 +18,8 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 // ── Exported types ────────────────────────────────────────────────────────────
 
 export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text'
-  | 'select-rect' | 'select-lasso' | 'select-magic' | 'select-pixel';
+  | 'select-rect' | 'select-lasso' | 'select-magic' | 'select-pixel'
+  | 'pattern-tile' | 'gradient';
 
 export interface PaintBlock {
   csId: number;
@@ -111,6 +116,10 @@ interface Props {
   onSplitPosChange?: (p: number) => void;
   selectionMask?: SelectionMask | null;
   onSelectionChange?: (mask: SelectionMask | null) => void;
+  activePattern?: PatternDefinition | null;
+  gradientStops?: GradientStop[];
+  gradientDithering?: 'none' | 'ordered';
+  overlayRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -466,6 +475,7 @@ export function PreviewCanvas({
   onTextCommit,
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
+  activePattern, gradientStops, gradientDithering,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -496,6 +506,12 @@ export function PreviewCanvas({
   const antsRafRef = useRef<number>(0);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
+
+  // Gradient drag state
+  const gradientDragRef = useRef<{
+    startPx: { x: number; y: number };
+    curPx:   { x: number; y: number };
+  } | null>(null);
 
   // Text tool state
   const [textState, setTextState] = useState<TextState>(null);
@@ -538,6 +554,9 @@ export function PreviewCanvas({
     brushSize: number; showGrid: boolean;
     otherLayersData: ImageData | null | undefined;
     selectionMask: SelectionMask | null | undefined;
+    activePattern: PatternDefinition | null | undefined;
+    gradientStops: GradientStop[] | undefined;
+    gradientDithering: 'none' | 'ordered' | undefined;
   }>({
     activeTool: null, paintBlock: null,
     patternBlocks: [],
@@ -546,10 +565,13 @@ export function PreviewCanvas({
     brushSize: 1, showGrid: false,
     otherLayersData: null,
     selectionMask: null,
+    activePattern: null,
+    gradientStops: undefined,
+    gradientDithering: undefined,
   });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask };
+  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask, activePattern, gradientStops, gradientDithering };
   selectionMaskRef.current = selectionMask ?? null;
   onSplitPosChangeRef.current = onSplitPosChange;
 
@@ -622,6 +644,30 @@ export function PreviewCanvas({
       const dt = Math.min(time - lastTime, 100);
       lastTime = time;
       antsPhaseRef.current = (antsPhaseRef.current + dt * 0.008) % 8;
+      // Draw gradient drag preview
+      const gDrag = gradientDragRef.current;
+      if (gDrag) {
+        ctx.clearRect(0, 0, cw, ch);
+        const sx = (gDrag.startPx.x + 0.5) * s, sy = (gDrag.startPx.y + 0.5) * s;
+        const ex = (gDrag.curPx.x + 0.5) * s,   ey = (gDrag.curPx.y + 0.5) * s;
+        ctx.save();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        // Start dot
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#57ff6e'; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2); ctx.fill();
+        // End dot
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ff5757'; ctx.beginPath(); ctx.arc(ex, ey, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        return;
+      }
+
       // Draw selection drag preview if active (must happen even if mask is null)
       const drag = selectionDragRef.current;
       if (drag) {
@@ -737,8 +783,20 @@ export function PreviewCanvas({
       const { activeTool, paintBlock, patternBlocks, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
 
       // Update brush cursor
-      if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern') {
+      if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile') {
         setBrushCursorPosRef.current({ clientX: e.clientX, clientY: e.clientY });
+      }
+
+      // Gradient drag: update current endpoint and draw preview line on overlay
+      if (gradientDragRef.current && activeTool === 'gradient') {
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = Math.max(0, Math.min(width - 1, Math.floor((e.clientX - rect.left) / scale)));
+          const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top) / scale)));
+          gradientDragRef.current.curPx = { x: cx, y: cy };
+        }
+        return;
       }
 
       // Selection drag update
@@ -770,10 +828,13 @@ export function PreviewCanvas({
 
       // Brush / eraser / pattern drag
       const needsPattern = activeTool === 'pattern';
+      const needsPatternTile = activeTool === 'pattern-tile';
+      const { activePattern } = propsRef.current;
       if (!isDraggingRef.current ||
-          (activeTool !== 'brush' && activeTool !== 'eraser' && activeTool !== 'pattern') ||
+          (activeTool !== 'brush' && activeTool !== 'eraser' && activeTool !== 'pattern' && activeTool !== 'pattern-tile') ||
           ((activeTool === 'brush') && !paintBlock) ||
           (needsPattern && patternBlocks.length === 0) ||
+          (needsPatternTile && !activePattern) ||
           !paintBufferRef.current) return;
 
       const canvas = canvasZoneRef.current?.querySelector('canvas');
@@ -785,8 +846,10 @@ export function PreviewCanvas({
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
-      const { selectionMask: sMask } = propsRef.current;
-      if (activeTool === 'pattern') {
+      const { selectionMask: sMask, activePattern: aPattern } = propsRef.current;
+      if (activeTool === 'pattern-tile' && aPattern) {
+        paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
+      } else if (activeTool === 'pattern') {
         paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
       } else {
         const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
@@ -801,6 +864,20 @@ export function PreviewCanvas({
 
     function onGlobalMouseUp(e: MouseEvent) {
       if (canvasDragRef.current) { canvasDragRef.current = null; return; }
+
+      // Apply gradient on drag end
+      if (gradientDragRef.current) {
+        const gd = gradientDragRef.current;
+        gradientDragRef.current = null;
+        const { gradientStops: gStops, gradientDithering: gDither, selectionMask: sMask, cp: gcp } = propsRef.current;
+        const paintBuf = paintBufferRef.current ?? imageDataRef.current;
+        if (paintBuf && gStops && gStops.length >= 1) {
+          const buf = new ImageData(new Uint8ClampedArray(paintBuf.data), paintBuf.width, paintBuf.height);
+          applyGradient(buf, gd.startPx, gd.curPx, gStops, gcp, gDither ?? 'ordered', sMask ?? undefined);
+          onImageUpdateRef.current(buf);
+        }
+        return;
+      }
 
       if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
 
@@ -1090,10 +1167,31 @@ export function PreviewCanvas({
     }
 
     if (!paintData) return;
-    if (activeTool !== 'eraser' && activeTool !== 'fill' && activeTool !== 'pattern' && !paintBlock) return;
+    if (activeTool !== 'eraser' && activeTool !== 'fill' && activeTool !== 'pattern' && activeTool !== 'pattern-tile' && activeTool !== 'gradient' && !paintBlock) return;
     if (activeTool === 'pattern' && patternBlocks.length === 0) return;
     const pos = getPixelCoords(e);
     if (!pos) return;
+
+    if (activeTool === 'gradient') {
+      // Start gradient drag
+      gradientDragRef.current = { startPx: { x: pos.px, y: pos.py }, curPx: { x: pos.px, y: pos.py } };
+      return;
+    }
+
+    if (activeTool === 'pattern-tile') {
+      if (!activePattern) return;
+      isDraggingRef.current = true;
+      paintedSetRef.current = new Set();
+      paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
+      paintedSetRef.current.add(pos.py * width + pos.px);
+      paintWithPatternTile(paintBufferRef.current, pos.px, pos.py, brushSize, activePattern, cp, selectionMask ?? undefined);
+      const canvas = canvasZoneRef.current?.querySelector('canvas');
+      if (canvas instanceof HTMLCanvasElement) {
+        const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;
+        drawImageData(canvas, bufToDraw, width, height, scale, showGrid);
+      }
+      return;
+    }
 
     if (activeTool === 'eraser' || activeTool === 'brush') {
       const { px: cx, py: cy } = pos;
@@ -1254,12 +1352,14 @@ export function PreviewCanvas({
 
   // ── Cursor style ────────────────────────────────────────────────────────────
 
-  const hasBrushCursor = activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern';
+  const hasBrushCursor = activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile';
   const zoneCursor = hasBrushCursor
     ? 'none'
     : activeTool === 'text'
     ? (textCursor ?? 'crosshair')
     : activeTool === 'eyedropper'
+    ? 'crosshair'
+    : activeTool === 'gradient'
     ? 'crosshair'
     : (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel')
     ? 'crosshair'

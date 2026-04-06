@@ -38,6 +38,10 @@ import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible 
 import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
+import type { PatternDefinition } from './lib/patternTool';
+import { createDefaultPattern } from './lib/patternTool';
+import type { GradientStop } from './lib/gradientTool';
+import { PatternEditorPopup } from './components/PatternEditorPopup';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -173,6 +177,19 @@ export default function App() {
   const [patternBlocks, setPatternBlocks] = useState<PaintBlock[]>([]);
   const [showPatternPicker, setShowPatternPicker] = useState<number | null>(null); // index of open picker
   const [brushSize, setBrushSize]       = useState<number>(1);
+
+  // Pattern-tile tool state
+  const [savedPatterns, setSavedPatterns] = useState<PatternDefinition[]>(() => [createDefaultPattern()]);
+  const [activePatternId, setActivePatternId] = useState<string>(() => savedPatterns[0]?.id ?? '');
+  const [showPatternEditor, setShowPatternEditor] = useState(false);
+  const activePattern = savedPatterns.find(p => p.id === activePatternId) ?? savedPatterns[0] ?? null;
+  void setActivePatternId; // reserved for future multi-pattern selection UI
+
+  // Gradient tool state
+  const [gradientStops, setGradientStops] = useState<GradientStop[]>([]);
+  const [gradientDithering, setGradientDithering] = useState<'none' | 'ordered'>('ordered');
+  const [showGradientStopPicker, setShowGradientStopPicker] = useState<number | null>(null);
+  const prevGradientToolRef = useRef(false);
   const [textSize]                       = useState<number>(8);
   const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
@@ -303,6 +320,8 @@ export default function App() {
         case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
         case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
         case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
+        case 'KeyP': if (editorMode === 'artist') setActiveTool(t => t === 'pattern-tile' ? null : 'pattern-tile'); break;
+        case 'KeyG': if (editorMode === 'artist') setActiveTool(t => t === 'gradient' ? null : 'gradient'); break;
         case 'Delete':
         case 'Backspace': if (editorMode === 'artist' && selectionMask) { handleDeleteSelectionRef.current?.(); } break;
         case 'Escape':
@@ -328,6 +347,19 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [blockSelection, mapMode],
   );
+
+  // Auto-initialize gradient stops when switching to gradient tool (if paintBlock is set)
+  useEffect(() => {
+    const active = activeTool === 'gradient';
+    if (active && !prevGradientToolRef.current && gradientStops.length === 0 && paintBlock && paintBlock.baseId !== -1) {
+      setGradientStops([
+        { t: 0, block: paintBlock },
+        { t: 1, block: paintBlock },
+      ]);
+    }
+    prevGradientToolRef.current = active;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool]);
 
   const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
 
@@ -1247,7 +1279,7 @@ export default function App() {
                 </div>
 
                 {/* Brush size */}
-                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern') && (
+                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile') && (
                   <div className="toolbar-group brush-size-group">
                     <input type="range" min={1} max={20} step={1} value={brushSize} className="brush-size-slider" onChange={e => setBrushSize(Number(e.target.value))} title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
                     <span className="brush-size-label">{brushSize}px</span>
@@ -1357,6 +1389,85 @@ export default function App() {
                         <span className="selection-count">{selectedPixelCount}px</span>
                       </div>
                     )}
+
+                    {/* Pattern-tile tool */}
+                    <div className="toolbar-sep" />
+                    <div className="toolbar-group">
+                      <button
+                        className={`tool-btn${activeTool === 'pattern-tile' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
+                        title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
+                      ><i className="fi fi-br-apps" /></button>
+                      {activeTool === 'pattern-tile' && (
+                        <button
+                          className="tool-btn"
+                          onClick={() => setShowPatternEditor(true)}
+                          title={t('Редактировать паттерн', 'Edit pattern')}
+                        ><i className="fi fi-br-settings" /></button>
+                      )}
+                    </div>
+
+                    {/* Gradient tool */}
+                    <div className="toolbar-group" style={{ position: 'relative' }}>
+                      <button
+                        className={`tool-btn${activeTool === 'gradient' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(prev => prev === 'gradient' ? null : 'gradient')}
+                        title={t('Градиент (G)', 'Gradient (G)')}
+                      ><i className="fi fi-br-arrows-h" /></button>
+                    </div>
+                    {activeTool === 'gradient' && (
+                      <div className="toolbar-group gradient-stops-bar">
+                        {gradientStops.map((stop, i) => {
+                          const c = activePalette.colors.find(col => col.baseId === stop.block.baseId && col.shade === stop.block.shade)
+                            ?? activePalette.colors.find(col => col.baseId === stop.block.baseId);
+                          const bg = c ? `rgb(${c.r},${c.g},${c.b})` : '#888';
+                          return (
+                            <div key={i} className="gradient-stop-chip" style={{ position: 'relative' }}>
+                              <button
+                                className={`gradient-stop-swatch${showGradientStopPicker === i ? ' active' : ''}`}
+                                style={{ background: bg }}
+                                title={stop.block.displayName}
+                                onClick={() => setShowGradientStopPicker(prev => prev === i ? null : i)}
+                              />
+                              {i > 0 && i < gradientStops.length - 1 && (
+                                <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== i))}>×</button>
+                              )}
+                              {showGradientStopPicker === i && (
+                                <BlockPickerPopup
+                                  blockSelection={blockSelection}
+                                  current={stop.block}
+                                  onSelect={b => {
+                                    setGradientStops(prev => prev.map((s, j) => j === i ? { ...s, block: b } : s));
+                                    setShowGradientStopPicker(null);
+                                  }}
+                                  onClose={() => setShowGradientStopPicker(null)}
+                                  mapMode={mapMode}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {gradientStops.length < 6 && (
+                          <button
+                            className="tool-btn gradient-add-stop"
+                            title={t('Добавить цвет', 'Add color')}
+                            onClick={() => {
+                              if (!paintBlock || paintBlock.baseId === -1) return;
+                              setGradientStops(prev => {
+                                const last = prev[prev.length - 1];
+                                const newT = last ? Math.min(1, last.t + (1 - last.t) * 0.5) : 1;
+                                return [...prev, { t: newT, block: paintBlock }];
+                              });
+                            }}
+                          >+</button>
+                        )}
+                        <button
+                          className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
+                          title={t('Дизеринг (упорядоченный Байер)', 'Ordered dithering (Bayer)')}
+                          onClick={() => setGradientDithering(d => d === 'ordered' ? 'none' : 'ordered')}
+                        ><i className="fi fi-br-grid-alt" /></button>
+                      </div>
+                    )}
                   </>
                 )}
                 <div className="toolbar-sep" />
@@ -1430,6 +1541,8 @@ export default function App() {
                   <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
                   <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
                   <div className="shortcut-row"><kbd>L</kbd><span>{t('Линия', 'Line')}</span></div>
+                  <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
+                  <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
                   <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
                 </div>
               )}
@@ -1502,6 +1615,9 @@ export default function App() {
                   onSplitPosChange={setSplitPos}
                   selectionMask={selectionMask}
                   onSelectionChange={setSelectionMask}
+                  activePattern={activePattern}
+                  gradientStops={gradientStops}
+                  gradientDithering={gradientDithering}
                 />
               </div>
             )}
@@ -1523,6 +1639,18 @@ export default function App() {
             )}
           </div>
         </main>
+
+        {showPatternEditor && activePattern && (
+          <PatternEditorPopup
+            pattern={activePattern}
+            paintBlock={paintBlock}
+            cp={activePalette}
+            blockSelection={blockSelection}
+            mapMode={mapMode}
+            onSave={p => setSavedPatterns(prev => prev.map(x => x.id === p.id ? p : x))}
+            onClose={() => setShowPatternEditor(false)}
+          />
+        )}
 
         {/* ── RIGHT PANEL ── */}
         {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
