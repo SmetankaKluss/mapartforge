@@ -1448,8 +1448,22 @@ export default function App() {
                                 current={null}
                                 onSelect={b => {
                                   setGradientStops(prev => {
-                                    const last = prev[prev.length - 1];
-                                    const newT = last ? Math.min(1, last.t + (1 - last.t) * 0.5) : 1;
+                                    // Place first stop at 0, second at 1, subsequent ones bisect the widest gap
+                                    let newT: number;
+                                    if (prev.length === 0) {
+                                      newT = 0;
+                                    } else if (prev.length === 1) {
+                                      newT = 1;
+                                    } else {
+                                      // Find the widest gap between consecutive stops
+                                      const sorted = [...prev].sort((a, b) => a.t - b.t);
+                                      let maxGap = 0, gapStart = 0;
+                                      for (let i = 0; i < sorted.length - 1; i++) {
+                                        const gap = sorted[i + 1].t - sorted[i].t;
+                                        if (gap > maxGap) { maxGap = gap; gapStart = sorted[i].t; }
+                                      }
+                                      newT = gapStart + maxGap / 2;
+                                    }
                                     return [...prev, { t: newT, block: b }];
                                   });
                                   setShowGradientAddPicker(false);
