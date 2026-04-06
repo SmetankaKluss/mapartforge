@@ -189,7 +189,7 @@ export default function App() {
   const [gradientStops, setGradientStops] = useState<GradientStop[]>([]);
   const [gradientDithering, setGradientDithering] = useState<'none' | 'ordered'>('ordered');
   const [showGradientStopPicker, setShowGradientStopPicker] = useState<number | null>(null);
-  const prevGradientToolRef = useRef(false);
+  const [showGradientAddPicker, setShowGradientAddPicker] = useState(false);
   const [textSize]                       = useState<number>(8);
   const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
@@ -348,18 +348,6 @@ export default function App() {
     [blockSelection, mapMode],
   );
 
-  // Auto-initialize gradient stops when switching to gradient tool (if paintBlock is set)
-  useEffect(() => {
-    const active = activeTool === 'gradient';
-    if (active && !prevGradientToolRef.current && gradientStops.length === 0 && paintBlock && paintBlock.baseId !== -1) {
-      setGradientStops([
-        { t: 0, block: paintBlock },
-        { t: 1, block: paintBlock },
-      ]);
-    }
-    prevGradientToolRef.current = active;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool]);
 
   const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
 
@@ -1448,18 +1436,29 @@ export default function App() {
                           );
                         })}
                         {gradientStops.length < 6 && (
-                          <button
-                            className="tool-btn gradient-add-stop"
-                            title={t('Добавить цвет', 'Add color')}
-                            onClick={() => {
-                              if (!paintBlock || paintBlock.baseId === -1) return;
-                              setGradientStops(prev => {
-                                const last = prev[prev.length - 1];
-                                const newT = last ? Math.min(1, last.t + (1 - last.t) * 0.5) : 1;
-                                return [...prev, { t: newT, block: paintBlock }];
-                              });
-                            }}
-                          >+</button>
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              className="tool-btn gradient-add-stop"
+                              title={t('Добавить цвет', 'Add color')}
+                              onClick={() => setShowGradientAddPicker(v => !v)}
+                            >+</button>
+                            {showGradientAddPicker && (
+                              <BlockPickerPopup
+                                blockSelection={blockSelection}
+                                current={null}
+                                onSelect={b => {
+                                  setGradientStops(prev => {
+                                    const last = prev[prev.length - 1];
+                                    const newT = last ? Math.min(1, last.t + (1 - last.t) * 0.5) : 1;
+                                    return [...prev, { t: newT, block: b }];
+                                  });
+                                  setShowGradientAddPicker(false);
+                                }}
+                                onClose={() => setShowGradientAddPicker(false)}
+                                mapMode={mapMode}
+                              />
+                            )}
+                          </div>
                         )}
                         <button
                           className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
