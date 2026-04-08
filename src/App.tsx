@@ -115,6 +115,9 @@ function activeLayerHasContent(ref: React.MutableRefObject<{ imageData: ImageDat
   return false;
 }
 
+// Predefined brush sizes — all odd → half-integer radius → perfect circles, no protrusions
+const BRUSH_SIZES = [1, 3, 5, 7, 9, 11, 13, 17, 21, 25, 31, 37, 43];
+
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
 
@@ -1291,9 +1294,12 @@ export default function App() {
                 {/* Brush size */}
                 {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile') && (
                   <div className="toolbar-group brush-size-group">
-                    <input type="range" min={1} max={20} step={1} value={brushSize} className="brush-size-slider" onChange={e => setBrushSize(Number(e.target.value))} title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
-                    <NumInput value={brushSize} min={1} max={20} step={1} onCommit={setBrushSize} />
-                    <span className="brush-size-label">px</span>
+                    <input type="range" min={0} max={BRUSH_SIZES.length - 1} step={1}
+                      value={Math.max(0, BRUSH_SIZES.indexOf(brushSize))}
+                      className="brush-size-slider"
+                      onChange={e => setBrushSize(BRUSH_SIZES[Number(e.target.value)])}
+                      title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
+                    <span className="brush-size-label">{brushSize}px</span>
                   </div>
                 )}
 

@@ -101,6 +101,7 @@ export function LayersPanel({
   }
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, idx: number) {
+    if ((e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); return; }
     dragIndexRef.current = idx;
     e.dataTransfer.effectAllowed = 'move';
   }

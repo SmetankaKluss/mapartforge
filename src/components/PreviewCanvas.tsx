@@ -205,11 +205,11 @@ function paintBrushCircle(
   erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
   mask?: SelectionMask | null,
 ): void {
-  const r = brushSize / 2;
-  const ri = Math.ceil(r);
+  const r = brushSize / 2;        // half-integer for odd sizes → perfect circles
+  const ri = Math.floor(r);       // = (brushSize-1)/2 for odd sizes
   for (let dy = -ri; dy <= ri; dy++) {
     for (let dx = -ri; dx <= ri; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+      if (dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       if (erase) erasePixelInBuffer(buf, bx, by, mask);
@@ -227,10 +227,10 @@ function paintPatternBrush(
 ): void {
   if (patternBlocks.length === 0) return;
   const r = brushSize / 2;
-  const ri = Math.ceil(r);
+  const ri = Math.floor(r);
   for (let dy = -ri; dy <= ri; dy++) {
     for (let dx = -ri; dx <= ri; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+      if (dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
@@ -1389,7 +1389,7 @@ export function PreviewCanvas({
     const isPoint = activeTool === 'fill';
     const toolSize = isPoint ? 1 : brushSize;
     const r = toolSize / 2;
-    const ri = Math.ceil(r);
+    const ri = Math.floor(r);
     return {
       screenX: rect.left + (px + 0.5) * scale,
       screenY: rect.top  + (py + 0.5) * scale,

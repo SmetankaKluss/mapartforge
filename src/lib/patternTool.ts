@@ -57,11 +57,11 @@ export function paintWithPatternTile(
   if (pattern.pixels.every(p => p === null)) return;
   const { width: w, height: h } = buf;
   const pw = pattern.width, ph = pattern.height;
-  const r = (brushSize - 1) / 2;
-  const ri = Math.ceil(r);
+  const r = brushSize / 2;
+  const ri = Math.floor(r);
   for (let dy = -ri; dy <= ri; dy++) {
     for (let dx = -ri; dx <= ri; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r + 0.5) continue;
+      if (dx * dx + dy * dy > r * r) continue;
       const px = cx + dx, py = cy + dy;
       if (px < 0 || py < 0 || px >= w || py >= h) continue;
       if (mask && !mask[py * w + px]) continue;
