@@ -53,6 +53,7 @@ export function paintWithPatternTile(
   pattern: PatternDefinition,
   cp: ComputedPalette,
   mask?: Uint8Array | null,
+  anchorX = 0, anchorY = 0,
 ): void {
   if (pattern.pixels.every(p => p === null)) return;
   const { width: w, height: h } = buf;
@@ -65,8 +66,8 @@ export function paintWithPatternTile(
       const px = cx + dx, py = cy + dy;
       if (px < 0 || py < 0 || px >= w || py >= h) continue;
       if (mask && !mask[py * w + px]) continue;
-      const tx = ((px % pw) + pw) % pw;
-      const ty = ((py % ph) + ph) % ph;
+      const tx = (((px - anchorX) % pw) + pw) % pw;
+      const ty = (((py - anchorY) % ph) + ph) % ph;
       const block = pattern.pixels[ty * pw + tx];
       if (block === null) continue;
       const i = (py * w + px) * 4;

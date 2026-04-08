@@ -117,6 +117,7 @@ interface Props {
   selectionMask?: SelectionMask | null;
   onSelectionChange?: (mask: SelectionMask | null) => void;
   activePattern?: PatternDefinition | null;
+  patternAnchorMode?: 'canvas' | 'brush';
   gradientStops?: GradientStop[];
   gradientDithering?: 'none' | 'ordered';
   overlayRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -477,7 +478,7 @@ export function PreviewCanvas({
   onTextCommit,
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
-  activePattern, gradientStops, gradientDithering,
+  activePattern, patternAnchorMode, gradientStops, gradientDithering,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -493,6 +494,7 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
   const lastBrushPosRef  = useRef<{ px: number; py: number } | null>(null);
+  const patternAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
   // Selection state
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -557,6 +559,7 @@ export function PreviewCanvas({
     otherLayersData: ImageData | null | undefined;
     selectionMask: SelectionMask | null | undefined;
     activePattern: PatternDefinition | null | undefined;
+    patternAnchorMode: 'canvas' | 'brush' | undefined;
     gradientStops: GradientStop[] | undefined;
     gradientDithering: 'none' | 'ordered' | undefined;
   }>({
@@ -568,12 +571,13 @@ export function PreviewCanvas({
     otherLayersData: null,
     selectionMask: null,
     activePattern: null,
+    patternAnchorMode: undefined,
     gradientStops: undefined,
     gradientDithering: undefined,
   });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask, activePattern, gradientStops, gradientDithering };
+  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask, activePattern, patternAnchorMode, gradientStops, gradientDithering };
   selectionMaskRef.current = selectionMask ?? null;
   onSplitPosChangeRef.current = onSplitPosChange;
 
@@ -848,9 +852,10 @@ export function PreviewCanvas({
       const centerKey = cy * width + cx;
       if (paintedSetRef.current.has(centerKey)) return;
       paintedSetRef.current.add(centerKey);
-      const { selectionMask: sMask, activePattern: aPattern } = propsRef.current;
+      const { selectionMask: sMask, activePattern: aPattern, patternAnchorMode: pam } = propsRef.current;
       if (activeTool === 'pattern-tile' && aPattern) {
-        paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
+        const anch = pam === 'brush' ? (patternAnchorRef.current ?? { x: cx, y: cy }) : { x: 0, y: 0 };
+        paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined, anch.x, anch.y);
       } else if (activeTool === 'pattern') {
         paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
       } else {
@@ -905,6 +910,7 @@ export function PreviewCanvas({
 
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+      patternAnchorRef.current = null;
       if (paintBufferRef.current) {
         onImageUpdateRef.current(paintBufferRef.current);
         paintBufferRef.current = null;
@@ -1195,10 +1201,13 @@ export function PreviewCanvas({
     if (activeTool === 'pattern-tile') {
       if (!activePattern) return;
       isDraggingRef.current = true;
+      // Set brush anchor on stroke start
+      if (patternAnchorMode === 'brush') patternAnchorRef.current = { x: pos.px, y: pos.py };
       paintedSetRef.current = new Set();
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(pos.py * width + pos.px);
-      paintWithPatternTile(paintBufferRef.current, pos.px, pos.py, brushSize, activePattern, cp, selectionMask ?? undefined);
+      const anchor = patternAnchorMode === 'brush' ? { x: pos.px, y: pos.py } : { x: 0, y: 0 };
+      paintWithPatternTile(paintBufferRef.current, pos.px, pos.py, brushSize, activePattern, cp, selectionMask ?? undefined, anchor.x, anchor.y);
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
         const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;

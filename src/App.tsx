@@ -191,8 +191,29 @@ export default function App() {
   const [savedPatterns, setSavedPatterns] = useState<PatternDefinition[]>(() => [createDefaultPattern()]);
   const [activePatternId, setActivePatternId] = useState<string>(() => savedPatterns[0]?.id ?? '');
   const [showPatternEditor, setShowPatternEditor] = useState(false);
+  const [patternAnchorMode, setPatternAnchorMode] = useState<'canvas' | 'brush'>('canvas');
   const activePattern = savedPatterns.find(p => p.id === activePatternId) ?? savedPatterns[0] ?? null;
   void setActivePatternId; // reserved for future multi-pattern selection UI
+
+  function exportPattern(p: PatternDefinition) {
+    const json = JSON.stringify(p, null, 2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = `${p.name.replace(/[^a-zа-я0-9_-]/gi, '_')}.json`;
+    a.click();
+  }
+
+  function importPattern(file: File) {
+    file.text().then(text => {
+      try {
+        const p = JSON.parse(text) as PatternDefinition;
+        if (!p.width || !p.height || !Array.isArray(p.pixels)) return;
+        const imported = { ...p, id: crypto.randomUUID() };
+        setSavedPatterns(prev => [...prev, imported]);
+        setActivePatternId(imported.id);
+      } catch { /* ignore invalid */ }
+    });
+  }
 
   // Gradient tool state
   const [gradientStops, setGradientStops] = useState<GradientStop[]>([]);
@@ -1414,13 +1435,31 @@ export default function App() {
                         onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
                         title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
                       ><i className="fi fi-br-apps" /></button>
-                      {activeTool === 'pattern-tile' && (
+                      {activeTool === 'pattern-tile' && (<>
                         <button
                           className="tool-btn"
                           onClick={() => setShowPatternEditor(true)}
                           title={t('Редактировать паттерн', 'Edit pattern')}
                         ><i className="fi fi-br-settings" /></button>
-                      )}
+                        <button
+                          className={`tool-btn${patternAnchorMode === 'brush' ? ' active' : ''}`}
+                          onClick={() => setPatternAnchorMode(m => m === 'brush' ? 'canvas' : 'brush')}
+                          title={patternAnchorMode === 'brush'
+                            ? t('Якорь: от кисти (кликни для холста)', 'Anchor: brush start (click for canvas)')
+                            : t('Якорь: холст (кликни для кисти)', 'Anchor: canvas (click for brush)')}
+                        >⚓</button>
+                        <button
+                          className="tool-btn"
+                          onClick={() => activePattern && exportPattern(activePattern)}
+                          title={t('Экспорт паттерна в JSON', 'Export pattern as JSON')}
+                        >↓</button>
+                        <label className="tool-btn" title={t('Импорт паттерна из JSON', 'Import pattern from JSON')} style={{ cursor: 'pointer' }}>
+                          ↑
+                          <input type="file" accept=".json" style={{ display: 'none' }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) importPattern(f); e.target.value = ''; }}
+                          />
+                        </label>
+                      </>)}
                     </div>
 
                     {/* Gradient tool */}
@@ -1679,6 +1718,7 @@ export default function App() {
                   selectionMask={selectionMask}
                   onSelectionChange={setSelectionMask}
                   activePattern={activePattern}
+                  patternAnchorMode={patternAnchorMode}
                   gradientStops={gradientStops}
                   gradientDithering={gradientDithering}
                 />
