@@ -49,6 +49,20 @@ export function createLayer(name: string, imageData: ImageData | null = null, is
   };
 }
 
+/**
+ * Scale an ImageData to newW×newH using an offscreen canvas (bilinear via browser).
+ * Returns a new ImageData at the target size.
+ */
+export function scaleImageData(src: ImageData, newW: number, newH: number): ImageData {
+  const srcCanvas = new OffscreenCanvas(src.width, src.height);
+  const srcCtx = srcCanvas.getContext('2d')!;
+  srcCtx.putImageData(src, 0, 0);
+  const dstCanvas = new OffscreenCanvas(newW, newH);
+  const dstCtx = dstCanvas.getContext('2d')!;
+  dstCtx.drawImage(srcCanvas, 0, 0, newW, newH);
+  return dstCtx.getImageData(0, 0, newW, newH);
+}
+
 /** Composite all visible layers (bottom to top) into a single ImageData. */
 export function compositeLayersToImageData(
   layers: Layer[],

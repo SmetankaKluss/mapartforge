@@ -144,8 +144,13 @@ export function ExportPanel({
     const structure = activeLayerExport.mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLayer(true);
     try {
-      await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
-        structure, structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+      if (mapGrid.wide * mapGrid.tall > 1) {
+        await exportLitematicZip(activeLayerExport.imageData, activePalette, blockSelection, mapGrid,
+          structure, 'MapartForge_layer', structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+      } else {
+        await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
+          structure, structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+      }
     } finally {
       setBusyLayer(false);
     }
@@ -212,7 +217,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite || !activeLayerExport}
               title={t('Только активный слой с его режимом постройки', 'Active layer only with its build mode')}
             >
-              {busyLayer ? t('Сборка…', 'Building…') : `↓ ${t('СЛОЙ', 'LAYER')} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
+              {busyLayer ? t('Сборка…', 'Building…') : `↓ ${t('СЛОЙ', 'LAYER')}${isMultiMap ? ' ZIP' : ''} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
             </button>
           </>) : (
             <button

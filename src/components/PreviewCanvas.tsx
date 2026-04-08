@@ -205,10 +205,11 @@ function paintBrushCircle(
   erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
   mask?: SelectionMask | null,
 ): void {
-  const r = Math.floor(brushSize / 2);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+  const r = (brushSize - 1) / 2;
+  const ri = Math.ceil(r);
+  for (let dy = -ri; dy <= ri; dy++) {
+    for (let dx = -ri; dx <= ri; dx++) {
+      if (brushSize > 1 && dx * dx + dy * dy > r * r + 0.5) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       if (erase) erasePixelInBuffer(buf, bx, by, mask);
@@ -225,10 +226,11 @@ function paintPatternBrush(
   mask?: SelectionMask | null,
 ): void {
   if (patternBlocks.length === 0) return;
-  const r = Math.floor(brushSize / 2);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+  const r = (brushSize - 1) / 2;
+  const ri = Math.ceil(r);
+  for (let dy = -ri; dy <= ri; dy++) {
+    for (let dx = -ri; dx <= ri; dx++) {
+      if (brushSize > 1 && dx * dx + dy * dy > r * r + 0.5) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
@@ -976,9 +978,21 @@ export function PreviewCanvas({
     const { px, py } = pos;
     const idx = (py * width + px) * 4;
     const r = displayImageData.data[idx], g = displayImageData.data[idx + 1], b = displayImageData.data[idx + 2];
-    const info = colorLookup.get((r << 16) | (g << 8) | b);
-    if (!info) return null;
-    return { pixelX: px, pixelY: py, r, g, b, ...info };
+    const a = displayImageData.data[idx + 3];
+    if (a === 0) return null; // fully transparent — nothing to pick
+    const exact = colorLookup.get((r << 16) | (g << 8) | b);
+    if (exact) return { pixelX: px, pixelY: py, r, g, b, ...exact };
+    // Fallback: nearest palette color via OKLab distance
+    if (cp.colors.length === 0) return null;
+    const lab = rgbToOklab(r, g, b);
+    let bestIdx = 0, bestDist = Infinity;
+    for (let i = 0; i < cp.labs.length; i++) {
+      const d = oklabDistance(lab, cp.labs[i]);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    const nearest = colorLookup.get((cp.colors[bestIdx].r << 16) | (cp.colors[bestIdx].g << 8) | cp.colors[bestIdx].b);
+    if (!nearest) return null;
+    return { pixelX: px, pixelY: py, r, g, b, ...nearest };
   }
 
   // ── Split slider helpers ─────────────────────────────────────────────────────

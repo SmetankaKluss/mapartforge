@@ -44,7 +44,10 @@ export function NewCanvasModal({ currentGrid, paletteColors, onConfirm, onClose 
   function handleCreate() {
     let bg: { r: number; g: number; b: number; a: number } | null;
     if (bgType === 'white') {
-      bg = { r: 255, g: 255, b: 255, a: 255 };
+      // Use the lightest color from the active palette (not pure white which may not be in palette)
+      const lightest = paletteColors.reduce<PaletteColor | null>((best, c) =>
+        !best || (c.r + c.g + c.b) > (best.r + best.g + best.b) ? c : best, null);
+      bg = lightest ? { r: lightest.r, g: lightest.g, b: lightest.b, a: 255 } : { r: 255, g: 255, b: 255, a: 255 };
     } else if (bgType === 'transparent') {
       bg = null;
     } else {

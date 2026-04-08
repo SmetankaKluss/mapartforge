@@ -34,7 +34,7 @@ const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ defau
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
-import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible } from './lib/layers';
+import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
 import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
@@ -545,6 +545,17 @@ export default function App() {
 
   const handleMapGridChange = useCallback((grid: MapGrid) => {
     setMapGrid(grid);
+    const newW = gridPixelWidth(grid);
+    const newH = gridPixelHeight(grid);
+    // Scale all layers to new dimensions before re-processing
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => {
+        if (!l.imageData) return l; // empty layers stay empty
+        return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
+      }),
+    }));
+    // Only re-process from sourceImage for non-dirty layers that have content
     if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
   }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
@@ -1270,7 +1281,8 @@ export default function App() {
                 {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile') && (
                   <div className="toolbar-group brush-size-group">
                     <input type="range" min={1} max={20} step={1} value={brushSize} className="brush-size-slider" onChange={e => setBrushSize(Number(e.target.value))} title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
-                    <span className="brush-size-label">{brushSize}px</span>
+                    <NumInput value={brushSize} min={1} max={20} step={1} onCommit={setBrushSize} />
+                    <span className="brush-size-label">px</span>
                   </div>
                 )}
 
@@ -1405,27 +1417,29 @@ export default function App() {
                     </div>
                     {activeTool === 'gradient' && (
                       <div className="toolbar-group gradient-stops-bar">
-                        {gradientStops.map((stop, i) => {
+                        {[...gradientStops.map((stop, origIdx) => ({ stop, origIdx }))].sort((a, b) => a.stop.t - b.stop.t).map(({ stop, origIdx }, sortedPos) => {
                           const c = activePalette.colors.find(col => col.baseId === stop.block.baseId && col.shade === stop.block.shade)
                             ?? activePalette.colors.find(col => col.baseId === stop.block.baseId);
                           const bg = c ? `rgb(${c.r},${c.g},${c.b})` : '#888';
+                          const isFirst = sortedPos === 0;
+                          const isLast = sortedPos === gradientStops.length - 1;
                           return (
-                            <div key={i} className="gradient-stop-chip" style={{ position: 'relative' }}>
+                            <div key={origIdx} className="gradient-stop-chip" style={{ position: 'relative' }}>
                               <button
-                                className={`gradient-stop-swatch${showGradientStopPicker === i ? ' active' : ''}`}
+                                className={`gradient-stop-swatch${showGradientStopPicker === origIdx ? ' active' : ''}`}
                                 style={{ background: bg }}
-                                title={stop.block.displayName}
-                                onClick={() => setShowGradientStopPicker(prev => prev === i ? null : i)}
+                                title={`${stop.block.displayName} (${Math.round(stop.t * 100)}%)`}
+                                onClick={() => setShowGradientStopPicker(prev => prev === origIdx ? null : origIdx)}
                               />
-                              {i > 0 && i < gradientStops.length - 1 && (
-                                <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== i))}>×</button>
+                              {!isFirst && !isLast && (
+                                <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== origIdx))}>×</button>
                               )}
-                              {showGradientStopPicker === i && (
+                              {showGradientStopPicker === origIdx && (
                                 <BlockPickerPopup
                                   blockSelection={blockSelection}
                                   current={stop.block}
                                   onSelect={b => {
-                                    setGradientStops(prev => prev.map((s, j) => j === i ? { ...s, block: b } : s));
+                                    setGradientStops(prev => prev.map((s, j) => j === origIdx ? { ...s, block: b } : s));
                                     setShowGradientStopPicker(null);
                                   }}
                                   onClose={() => setShowGradientStopPicker(null)}
