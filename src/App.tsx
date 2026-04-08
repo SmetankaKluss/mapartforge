@@ -141,16 +141,15 @@ export default function App() {
   // setImageData wrapper — updates active layer without touching other layers
   // dirty=true marks the layer as manually edited (blocks re-processing from source on settings change)
   function setImageData(data: ImageData | null, dirty = false) {
-    setLayerState(prev => {
-      const targetId = processTargetLayerIdRef.current ?? prev.activeLayerId;
-      processTargetLayerIdRef.current = null;
-      return {
-        ...prev,
-        layers: prev.layers.map(l =>
-          l.id === targetId ? { ...l, imageData: data, isDirty: dirty } : l,
-        ),
-      };
-    });
+    // Capture and clear ref synchronously BEFORE setState (Strict Mode runs updaters twice)
+    const capturedTargetId = processTargetLayerIdRef.current;
+    processTargetLayerIdRef.current = null;
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l =>
+        l.id === (capturedTargetId ?? prev.activeLayerId) ? { ...l, imageData: data, isDirty: dirty } : l,
+      ),
+    }));
   }
 
   // ── Artist mode toggle ────────────────────────────────────────────────────────

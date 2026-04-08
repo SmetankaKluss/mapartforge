@@ -84,7 +84,15 @@ export function LayersPanel({
 }: Props) {
   const editingRef = useRef<HTMLInputElement | null>(null);
   const dragIndexRef = useRef<number | null>(null);
+  const sliderActiveRef = useRef(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Track when a slider is being dragged so we can block layer-drag
+  useEffect(() => {
+    const onUp = () => { sliderActiveRef.current = false; };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
 
   // Layers are stored bottom-to-top internally but displayed top-to-bottom in UI
   const displayLayers = [...layers].reverse();
@@ -101,7 +109,7 @@ export function LayersPanel({
   }
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, idx: number) {
-    if ((e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); return; }
+    if (sliderActiveRef.current) { e.preventDefault(); return; }
     dragIndexRef.current = idx;
     e.dataTransfer.effectAllowed = 'move';
   }
@@ -253,7 +261,7 @@ export function LayersPanel({
                     value={layer.opacity ?? 100}
                     className="layer-opacity-slider"
                     onDragStart={e => e.stopPropagation()}
-                    onMouseDown={e => e.stopPropagation()}
+                    onMouseDown={e => { sliderActiveRef.current = true; e.stopPropagation(); }}
                     onClick={e => e.stopPropagation()}
                     onChange={e => { e.stopPropagation(); onOpacityChange(layer.id, Number(e.target.value)); }}
                     title={`Прозрачность: ${layer.opacity ?? 100}%`}
