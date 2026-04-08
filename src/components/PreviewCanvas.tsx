@@ -6,7 +6,7 @@ import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { BlockPickerPopup } from './BlockPickerPopup';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
-import { paintWithPatternTile } from '../lib/patternTool';
+import { paintWithPatternTile, paintWithPatternStamp } from '../lib/patternTool';
 import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
@@ -854,8 +854,11 @@ export function PreviewCanvas({
       paintedSetRef.current.add(centerKey);
       const { selectionMask: sMask, activePattern: aPattern, patternAnchorMode: pam } = propsRef.current;
       if (activeTool === 'pattern-tile' && aPattern) {
-        const anch = pam === 'brush' ? (patternAnchorRef.current ?? { x: cx, y: cy }) : { x: 0, y: 0 };
-        paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined, anch.x, anch.y);
+        if (pam === 'brush') {
+          paintWithPatternStamp(paintBufferRef.current!, cx, cy, aPattern, cp, sMask ?? undefined);
+        } else {
+          paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
+        }
       } else if (activeTool === 'pattern') {
         paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
       } else {
@@ -1201,13 +1204,14 @@ export function PreviewCanvas({
     if (activeTool === 'pattern-tile') {
       if (!activePattern) return;
       isDraggingRef.current = true;
-      // Set brush anchor on stroke start
-      if (patternAnchorMode === 'brush') patternAnchorRef.current = { x: pos.px, y: pos.py };
       paintedSetRef.current = new Set();
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(pos.py * width + pos.px);
-      const anchor = patternAnchorMode === 'brush' ? { x: pos.px, y: pos.py } : { x: 0, y: 0 };
-      paintWithPatternTile(paintBufferRef.current, pos.px, pos.py, brushSize, activePattern, cp, selectionMask ?? undefined, anchor.x, anchor.y);
+      if (patternAnchorMode === 'brush') {
+        paintWithPatternStamp(paintBufferRef.current, pos.px, pos.py, activePattern, cp, selectionMask ?? undefined);
+      } else {
+        paintWithPatternTile(paintBufferRef.current, pos.px, pos.py, brushSize, activePattern, cp, selectionMask ?? undefined);
+      }
       const canvas = canvasZoneRef.current?.querySelector('canvas');
       if (canvas instanceof HTMLCanvasElement) {
         const bufToDraw = (otherLayersData && paintBufferRef.current) ? compositeTwo(otherLayersData, paintBufferRef.current, width, height) : paintBufferRef.current!;
@@ -1388,8 +1392,11 @@ export function PreviewCanvas({
     ? 'crosshair'
     : undefined;
 
+  const isStampMode = activeTool === 'pattern-tile' && patternAnchorMode === 'brush';
+
   const brushCircle = (() => {
     if (!brushCursorPos || !hasBrushCursor) return null;
+    if (isStampMode) return null; // stamp mode uses pattern preview cursor instead
     const canvas = canvasZoneRef.current?.querySelector('canvas');
     if (!canvas) return null;
     const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
@@ -1492,7 +1499,7 @@ export function PreviewCanvas({
         const rects: React.ReactNode[] = [];
         for (let dy = -ri; dy <= ri; dy++) {
           for (let dx = -ri; dx <= ri; dx++) {
-            if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+            if (dx * dx + dy * dy > r * r) continue;
             rects.push(
               <rect key={`${dx},${dy}`}
                 x={(dx + ri) * scale} y={(dy + ri) * scale}
@@ -1505,6 +1512,36 @@ export function PreviewCanvas({
         return (
           <svg style={{ position: 'fixed', left: screenX - (ri + 0.5) * scale, top: screenY - (ri + 0.5) * scale, width: w, height: w, pointerEvents: 'none', zIndex: 9999 }}>
             {rects}
+          </svg>
+        );
+      })()}
+
+      {/* ── Pattern stamp cursor (anchor-off / stamp mode) ── */}
+      {isStampMode && brushCursorPos && activePattern && (() => {
+        const canvas = canvasZoneRef.current?.querySelector('canvas');
+        if (!canvas) return null;
+        const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
+        const px = Math.floor((brushCursorPos.clientX - rect.left) / scale);
+        const py = Math.floor((brushCursorPos.clientY - rect.top) / scale);
+        const pw = activePattern.width, ph = activePattern.height;
+        const ox = px - Math.floor(pw / 2);
+        const oy = py - Math.floor(ph / 2);
+        const cells: React.ReactNode[] = [];
+        for (let ty = 0; ty < ph; ty++) {
+          for (let tx = 0; tx < pw; tx++) {
+            const block = activePattern.pixels[ty * pw + tx];
+            if (!block || block.baseId === -1) {
+              cells.push(<rect key={`${tx},${ty}`} x={tx * scale} y={ty * scale} width={scale} height={scale} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />);
+            } else {
+              const c = cp.colors.find(col => col.baseId === block.baseId && col.shade === block.shade) ?? cp.colors.find(col => col.baseId === block.baseId);
+              const fill = c ? `rgba(${c.r},${c.g},${c.b},0.85)` : 'rgba(128,128,128,0.5)';
+              cells.push(<rect key={`${tx},${ty}`} x={tx * scale} y={ty * scale} width={scale} height={scale} fill={fill} stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />);
+            }
+          }
+        }
+        return (
+          <svg style={{ position: 'fixed', left: rect.left + ox * scale, top: rect.top + oy * scale, width: pw * scale, height: ph * scale, pointerEvents: 'none', zIndex: 9999, imageRendering: 'pixelated' }}>
+            {cells}
           </svg>
         );
       })()}

@@ -1311,8 +1311,8 @@ export default function App() {
                   {/* text and pattern tools hidden — work in progress */}
                 </div>
 
-                {/* Brush size */}
-                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile') && (
+                {/* Brush size — hidden in pattern stamp mode (size = pattern dimensions) */}
+                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || (activeTool === 'pattern-tile' && patternAnchorMode !== 'brush')) && (
                   <div className="toolbar-group brush-size-group">
                     <input type="range" min={0} max={BRUSH_SIZES.length - 1} step={1}
                       value={Math.max(0, BRUSH_SIZES.indexOf(brushSize))}
