@@ -77,7 +77,7 @@ export function MapCanvas({
   if (!imageData && !originalData) {
     return (
       <div className="canvas-placeholder">
-        <span>Preview will appear here</span>
+        <span style={{ position: 'relative', top: 36 }}>{'Preview will appear here'}</span>
       </div>
     );
   }
