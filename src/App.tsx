@@ -132,15 +132,22 @@ export default function App() {
   const layerGroups = layerState.groups;
   // imageData = active layer's imageData (for painting tools + display in Phase 1)
   const imageData: ImageData | null = activeLayer?.imageData ?? null;
+  // When set, runProcess result will target this layer instead of activeLayerId
+  const processTargetLayerIdRef = useRef<string | null>(null);
+
   // setImageData wrapper — updates active layer without touching other layers
   // dirty=true marks the layer as manually edited (blocks re-processing from source on settings change)
   function setImageData(data: ImageData | null, dirty = false) {
-    setLayerState(prev => ({
-      ...prev,
-      layers: prev.layers.map(l =>
-        l.id === prev.activeLayerId ? { ...l, imageData: data, isDirty: dirty } : l,
-      ),
-    }));
+    setLayerState(prev => {
+      const targetId = processTargetLayerIdRef.current ?? prev.activeLayerId;
+      processTargetLayerIdRef.current = null;
+      return {
+        ...prev,
+        layers: prev.layers.map(l =>
+          l.id === targetId ? { ...l, imageData: data, isDirty: dirty } : l,
+        ),
+      };
+    });
   }
 
   // ── Artist mode toggle ────────────────────────────────────────────────────────
@@ -555,8 +562,12 @@ export default function App() {
         return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
       }),
     }));
-    // Only re-process from sourceImage for non-dirty layers that have content
-    if (sourceImage) runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    // Re-process only the first non-dirty layer with content (target it explicitly)
+    if (sourceImage) {
+      const srcLayer = latestRef.current.layers.find(l => !l.isDirty && l.imageData);
+      if (srcLayer) processTargetLayerIdRef.current = srcLayer.id;
+      runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
@@ -1417,20 +1428,39 @@ export default function App() {
                     </div>
                     {activeTool === 'gradient' && (
                       <div className="toolbar-group gradient-stops-bar">
-                        {[...gradientStops.map((stop, origIdx) => ({ stop, origIdx }))].sort((a, b) => a.stop.t - b.stop.t).map(({ stop, origIdx }, sortedPos) => {
+                        {(() => {
+                          const sorted = [...gradientStops.map((stop, origIdx) => ({ stop, origIdx }))].sort((a, b) => a.stop.t - b.stop.t);
+                          return sorted.map(({ stop, origIdx }, sortedPos) => {
                           const c = activePalette.colors.find(col => col.baseId === stop.block.baseId && col.shade === stop.block.shade)
                             ?? activePalette.colors.find(col => col.baseId === stop.block.baseId);
                           const bg = c ? `rgb(${c.r},${c.g},${c.b})` : '#888';
                           const isFirst = sortedPos === 0;
                           const isLast = sortedPos === gradientStops.length - 1;
+                          const swapBlocks = (posA: number, posB: number) => {
+                            const idxA = sorted[posA].origIdx;
+                            const idxB = sorted[posB].origIdx;
+                            setGradientStops(prev => {
+                              const next = [...prev];
+                              const tmp = next[idxA].block;
+                              next[idxA] = { ...next[idxA], block: next[idxB].block };
+                              next[idxB] = { ...next[idxB], block: tmp };
+                              return next;
+                            });
+                          };
                           return (
                             <div key={origIdx} className="gradient-stop-chip" style={{ position: 'relative' }}>
+                              {!isFirst && (
+                                <button className="gradient-stop-move" title="Переместить влево" onClick={() => swapBlocks(sortedPos, sortedPos - 1)}>‹</button>
+                              )}
                               <button
                                 className={`gradient-stop-swatch${showGradientStopPicker === origIdx ? ' active' : ''}`}
                                 style={{ background: bg }}
                                 title={`${stop.block.displayName} (${Math.round(stop.t * 100)}%)`}
                                 onClick={() => setShowGradientStopPicker(prev => prev === origIdx ? null : origIdx)}
                               />
+                              {!isLast && (
+                                <button className="gradient-stop-move" title="Переместить вправо" onClick={() => swapBlocks(sortedPos, sortedPos + 1)}>›</button>
+                              )}
                               {!isFirst && !isLast && (
                                 <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== origIdx))}>×</button>
                               )}
@@ -1448,7 +1478,8 @@ export default function App() {
                               )}
                             </div>
                           );
-                        })}
+                        });
+                        })()}
                         {gradientStops.length < 6 && (
                           <div style={{ position: 'relative' }}>
                             <button

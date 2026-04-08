@@ -251,6 +251,7 @@ export function LayersPanel({
                     max={100}
                     value={layer.opacity ?? 100}
                     className="layer-opacity-slider"
+                    onDragStart={e => e.stopPropagation()}
                     onMouseDown={e => e.stopPropagation()}
                     onClick={e => e.stopPropagation()}
                     onChange={e => { e.stopPropagation(); onOpacityChange(layer.id, Number(e.target.value)); }}

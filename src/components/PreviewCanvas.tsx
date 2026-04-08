@@ -205,11 +205,11 @@ function paintBrushCircle(
   erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
   mask?: SelectionMask | null,
 ): void {
-  const r = (brushSize - 1) / 2;
+  const r = brushSize / 2;
   const ri = Math.ceil(r);
   for (let dy = -ri; dy <= ri; dy++) {
     for (let dx = -ri; dx <= ri; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r + 0.5) continue;
+      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       if (erase) erasePixelInBuffer(buf, bx, by, mask);
@@ -226,11 +226,11 @@ function paintPatternBrush(
   mask?: SelectionMask | null,
 ): void {
   if (patternBlocks.length === 0) return;
-  const r = (brushSize - 1) / 2;
+  const r = brushSize / 2;
   const ri = Math.ceil(r);
   for (let dy = -ri; dy <= ri; dy++) {
     for (let dx = -ri; dx <= ri; dx++) {
-      if (brushSize > 1 && dx * dx + dy * dy > r * r + 0.5) continue;
+      if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
       const bx = cx + dx, by = cy + dy;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
       const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
@@ -1388,14 +1388,12 @@ export function PreviewCanvas({
     const py = Math.floor((brushCursorPos.clientY - rect.top) / scale);
     const isPoint = activeTool === 'fill';
     const toolSize = isPoint ? 1 : brushSize;
-    const r = Math.floor(toolSize / 2);
-    const span = 2 * r + 1;
-    const sizePx = Math.max(scale, span * scale);
+    const r = toolSize / 2;
+    const ri = Math.ceil(r);
     return {
-      x: rect.left + (px + 0.5) * scale,
-      y: rect.top  + (py + 0.5) * scale,
-      size: sizePx,
-      isPoint,
+      screenX: rect.left + (px + 0.5) * scale,
+      screenY: rect.top  + (py + 0.5) * scale,
+      r, ri, isPoint,
     };
   })();
 
@@ -1469,30 +1467,35 @@ export function PreviewCanvas({
       {inner}
 
       {brushCircle && (() => {
-        const s = brushCircle.size;
-        const style: React.CSSProperties = {
-          position: 'fixed',
-          left: brushCircle.x,
-          top: brushCircle.y,
-          width: s,
-          height: s,
-          transform: 'translate(-50%, -50%)',
-          pointerEvents: 'none',
-          zIndex: 9999,
-          overflow: 'visible',
-        };
-        if (brushCircle.isPoint) {
+        const { screenX, screenY, r, ri, isPoint } = brushCircle;
+        if (isPoint) {
+          const s = Math.max(scale * 2, 16);
           return (
-            <svg style={style} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+            <svg style={{ position: 'fixed', left: screenX, top: screenY, transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 9999, overflow: 'visible' }} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
               <line x1={s/2} y1={0} x2={s/2} y2={s} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
               <line x1={0} y1={s/2} x2={s} y2={s/2} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
             </svg>
           );
         }
-        const r = s / 2;
+        // Pixel-accurate cursor: draw each pixel that would be painted
+        const span = 2 * ri + 1;
+        const w = span * scale;
+        const rects: React.ReactNode[] = [];
+        for (let dy = -ri; dy <= ri; dy++) {
+          for (let dx = -ri; dx <= ri; dx++) {
+            if (brushSize > 1 && dx * dx + dy * dy > r * r) continue;
+            rects.push(
+              <rect key={`${dx},${dy}`}
+                x={(dx + ri) * scale} y={(dy + ri) * scale}
+                width={scale} height={scale}
+                fill="rgba(255,60,60,0.25)" stroke="rgba(255,60,60,0.75)" strokeWidth="0.5"
+              />,
+            );
+          }
+        }
         return (
-          <svg style={style} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-            <circle cx={r} cy={r} r={r - 1} fill="rgba(255,60,60,0.18)" stroke="rgba(255,60,60,0.85)" strokeWidth="1.5"/>
+          <svg style={{ position: 'fixed', left: screenX - (ri + 0.5) * scale, top: screenY - (ri + 0.5) * scale, width: w, height: w, pointerEvents: 'none', zIndex: 9999 }}>
+            {rects}
           </svg>
         );
       })()}

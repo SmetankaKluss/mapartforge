@@ -2115,6 +2115,23 @@ input, select, textarea { outline: none; }
   padding: 0;
 }
 .gradient-stop-remove:hover { background: #c00; color: #fff; border-color: #c00; }
+.gradient-stop-move {
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1;
+  width: 14px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.gradient-stop-move:hover { background: #444; color: #fff; }
 .gradient-add-stop {
   width: 22px;
   height: 22px;
