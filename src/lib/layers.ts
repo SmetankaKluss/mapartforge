@@ -50,7 +50,7 @@ export function createLayer(name: string, imageData: ImageData | null = null, is
 }
 
 /**
- * Scale an ImageData to newW×newH using an offscreen canvas (bilinear via browser).
+ * Scale an ImageData to newW×newH using nearest-neighbor (pixel-perfect, no blurring).
  * Returns a new ImageData at the target size.
  */
 export function scaleImageData(src: ImageData, newW: number, newH: number): ImageData {
@@ -59,6 +59,7 @@ export function scaleImageData(src: ImageData, newW: number, newH: number): Imag
   srcCtx.putImageData(src, 0, 0);
   const dstCanvas = new OffscreenCanvas(newW, newH);
   const dstCtx = dstCanvas.getContext('2d')!;
+  dstCtx.imageSmoothingEnabled = false;
   dstCtx.drawImage(srcCanvas, 0, 0, newW, newH);
   return dstCtx.getImageData(0, 0, newW, newH);
 }

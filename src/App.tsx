@@ -254,10 +254,10 @@ export default function App() {
   const [tabletRightOpen, setTabletRightOpen] = useState(false);
 
   // Always-current ref — updated each render so callbacks never see stale state
-  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[] }>({
-    imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers,
+  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[]; activeLayerId: string }>({
+    imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers, activeLayerId: layerState.activeLayerId,
   });
-  latestRef.current = { imageData, blockSelection, layers };
+  latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId };
 
   // Ref to active layer — used in callbacks to check if layer has real content
   const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
@@ -585,9 +585,10 @@ export default function App() {
         return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
       }),
     }));
-    // Re-process only the first non-dirty layer with content (target it explicitly)
+    // Re-process only the ACTIVE non-dirty layer — avoids mixing source images across layers
     if (sourceImage) {
-      const srcLayer = latestRef.current.layers.find(l => !l.isDirty && l.imageData);
+      const activeId = latestRef.current.activeLayerId;
+      const srcLayer = latestRef.current.layers.find(l => l.id === activeId && !l.isDirty);
       if (srcLayer) processTargetLayerIdRef.current = srcLayer.id;
       runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
     }
