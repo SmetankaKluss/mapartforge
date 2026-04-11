@@ -140,17 +140,25 @@ export default function App() {
   const processTargetLayerIdRef = useRef<string | null>(null);
 
   // setImageData wrapper — updates active layer without touching other layers
-  // dirty=true marks the layer as manually edited (blocks re-processing from source on settings change)
-  function setImageData(data: ImageData | null, dirty = false) {
+  // dirty=true    — layer painted by user (always allowed)
+  // fromProcess=true — result from runProcess worker (blocked if target isDirty)
+  function setImageData(data: ImageData | null, dirty = false, fromProcess = false) {
     // Capture and clear ref synchronously BEFORE setState (Strict Mode runs updaters twice)
     const capturedTargetId = processTargetLayerIdRef.current;
     processTargetLayerIdRef.current = null;
-    setLayerState(prev => ({
-      ...prev,
-      layers: prev.layers.map(l =>
-        l.id === (capturedTargetId ?? prev.activeLayerId) ? { ...l, imageData: data, isDirty: dirty } : l,
-      ),
-    }));
+    setLayerState(prev => {
+      const targetId = capturedTargetId ?? prev.activeLayerId;
+      const targetLayer = prev.layers.find(l => l.id === targetId);
+      // Never overwrite a manually-edited layer with a fresh auto-process result
+      // (dirty=true path = dithering-change with alpha mask preservation — still allowed)
+      if (fromProcess && !dirty && targetLayer?.isDirty) return prev;
+      return {
+        ...prev,
+        layers: prev.layers.map(l =>
+          l.id === targetId ? { ...l, imageData: data, isDirty: dirty } : l,
+        ),
+      };
+    });
   }
 
   // ── Artist mode toggle ────────────────────────────────────────────────────────
@@ -465,9 +473,9 @@ export default function App() {
           for (let i = 0; i < alphaMask.length; i++) {
             processed.data[i * 4 + 3] = alphaMask[i];
           }
-          setImageData(processed, true);  // keep dirty — manual edits still present
+          setImageData(processed, true, true);  // keep dirty — manual edits still present
         } else {
-          setImageData(processed);  // fresh process, not dirty
+          setImageData(processed, false, true);  // fresh process, not dirty
         }
         setOriginalData(mk(msg.originalData));
         done();
