@@ -448,6 +448,16 @@ export default function App() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
         const processed = mk(msg.processedData);
+        // Guard: never overwrite a manually-edited (dirty) layer with processed results
+        const targetId = processTargetLayerIdRef.current ?? latestRef.current.activeLayerId;
+        const targetLayer = latestRef.current.layers.find(l => l.id === targetId);
+        if (targetLayer?.isDirty) {
+          processTargetLayerIdRef.current = null;
+          pendingAlphaMaskRef.current = null;
+          setOriginalData(mk(msg.originalData));
+          done();
+          return;
+        }
         const alphaMask = pendingAlphaMaskRef.current;
         pendingAlphaMaskRef.current = null;
         if (alphaMask) {
