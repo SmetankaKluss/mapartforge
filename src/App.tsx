@@ -262,6 +262,10 @@ export default function App() {
   const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
   const [tabletRightOpen, setTabletRightOpen] = useState(false);
 
+  // Ref for originalData so handleMapGridChange can scale it without adding to deps
+  const originalDataRef = useRef<ImageData | null>(null);
+  originalDataRef.current = originalData;
+
   // Always-current ref — updated each render so callbacks never see stale state
   const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[]; activeLayerId: string }>({
     imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers, activeLayerId: layerState.activeLayerId,
@@ -613,6 +617,10 @@ export default function App() {
     // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
     setUndoStack([]);
     setRedoStack([]);
+    // Scale originalData (compare preview) to new dimensions
+    if (originalDataRef.current) {
+      setOriginalData(scaleImageData(originalDataRef.current, newW, newH));
+    }
     // Re-process only the ACTIVE non-dirty layer — only if one exists
     if (sourceImage) {
       const activeId = latestRef.current.activeLayerId;
