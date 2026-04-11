@@ -78,6 +78,7 @@ const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
 const MAX_HISTORY = 20;
 
 interface HistoryEntry {
+  layerId: string;          // which layer this entry belongs to
   imageData: ImageData | null;
   blockSelection: BlockSelection;
 }
@@ -293,9 +294,9 @@ export default function App() {
 
   // Push current state onto undo stack before a tracked action
   const pushToHistory = useCallback(() => {
-    const { imageData: img, blockSelection: sel } = latestRef.current;
+    const { imageData: img, blockSelection: sel, activeLayerId: lid } = latestRef.current;
     setUndoStack(prev => {
-      const next = [...prev, { imageData: img, blockSelection: sel }];
+      const next = [...prev, { layerId: lid, imageData: img, blockSelection: sel }];
       return next.length > MAX_HISTORY ? next.slice(1) : next;
     });
     setRedoStack([]);
@@ -308,7 +309,11 @@ export default function App() {
       if (prev.length === 0) return prev;
       const entry = prev[prev.length - 1];
       const cur = latestRef.current;
-      setRedoStack(r => [...r, { imageData: cur.imageData, blockSelection: cur.blockSelection }]);
+      // Save current state of the specific layer being undone (for redo)
+      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
+      setRedoStack(r => [...r, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }]);
+      // Target the correct layer, not necessarily the active one
+      processTargetLayerIdRef.current = entry.layerId;
       setImageData(entry.imageData);
       setBlockSelection(entry.blockSelection);
       return prev.slice(0, -1);
@@ -320,10 +325,12 @@ export default function App() {
       if (prev.length === 0) return prev;
       const entry = prev[prev.length - 1];
       const cur = latestRef.current;
+      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
       setUndoStack(u => {
-        const next = [...u, { imageData: cur.imageData, blockSelection: cur.blockSelection }];
+        const next = [...u, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }];
         return next.length > MAX_HISTORY ? next.slice(1) : next;
       });
+      processTargetLayerIdRef.current = entry.layerId;
       setImageData(entry.imageData);
       setBlockSelection(entry.blockSelection);
       return prev.slice(0, -1);
@@ -585,6 +592,9 @@ export default function App() {
         return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
       }),
     }));
+    // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
+    setUndoStack([]);
+    setRedoStack([]);
     // Re-process only the ACTIVE non-dirty layer — only if one exists
     if (sourceImage) {
       const activeId = latestRef.current.activeLayerId;
