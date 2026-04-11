@@ -585,12 +585,14 @@ export default function App() {
         return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
       }),
     }));
-    // Re-process only the ACTIVE non-dirty layer — avoids mixing source images across layers
+    // Re-process only the ACTIVE non-dirty layer — only if one exists
     if (sourceImage) {
       const activeId = latestRef.current.activeLayerId;
       const srcLayer = latestRef.current.layers.find(l => l.id === activeId && !l.isDirty);
-      if (srcLayer) processTargetLayerIdRef.current = srcLayer.id;
-      runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      if (srcLayer) {
+        processTargetLayerIdRef.current = srcLayer.id;
+        runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
     }
   }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
