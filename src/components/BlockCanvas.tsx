@@ -76,17 +76,23 @@ function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { cs
 export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale }: Props) {
   const { t } = useLocale();
   const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const [sprite,      setSprite]      = useState<HTMLImageElement | null>(null);
   const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
+  // Sprite pixel data stored as typed array — avoids per-pixel ctx.drawImage calls
+  const [spritePixels, setSpritePixels] = useState<{ data: Uint8ClampedArray; width: number } | null>(null);
   const [spriteReady, setSpriteReady] = useState(false);
   const [rendering,   setRendering]   = useState(false);
 
   const isLarge = width * height > 128 * 128;
 
-  // Analyze the sprite cell bounds once on load so that thin textures
-  // (e.g. carpets) are scaled to fill the full block area.
+  // Load sprite, analyze bounds, and extract raw pixel data (all done once on load)
   const onSpriteLoad = useCallback((img: HTMLImageElement) => {
-    setSprite(img);
+    const offscreen = document.createElement('canvas');
+    offscreen.width  = img.naturalWidth;
+    offscreen.height = img.naturalHeight;
+    const ctx = offscreen.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const rawData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
+    setSpritePixels({ data: rawData.data as unknown as Uint8ClampedArray, width: img.naturalWidth });
     setSpriteBounds(analyzeSpriteCells(img));
     setSpriteReady(true);
   }, []);
@@ -100,38 +106,53 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !imageData || !sprite || !spriteReady) return;
+    if (!canvas || !imageData || !spritePixels || !spriteReady) return;
 
     setRendering(true);
 
-    // requestAnimationFrame lets React paint the "Rendering…" state before
-    // we start the expensive synchronous draw loop.
     const rafId = requestAnimationFrame(() => {
       const lookup = buildLookup(cp, blockSelection);
       const ctx = canvas.getContext('2d')!;
-      canvas.width  = width  * scale;
-      canvas.height = height * scale;
-      ctx.imageSmoothingEnabled = false;
+      const cw = width  * scale;
+      const ch = height * scale;
+      canvas.width  = cw;
+      canvas.height = ch;
+
+      // Build the entire output as a single ImageData — no per-pixel canvas API calls.
+      // Nearest-neighbor samples from the sprite sheet typed array.
+      const CELL = 32;
+      const sw   = spritePixels.width;
+      const sp   = spritePixels.data;
+      const output = new ImageData(cw, ch);
+      const dst    = output.data;
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-          const i = (y * width + x) * 4;
-          const r = imageData.data[i], g = imageData.data[i + 1], b = imageData.data[i + 2];
+          const pi  = (y * width + x) * 4;
+          const r   = imageData.data[pi], g = imageData.data[pi + 1], b = imageData.data[pi + 2];
           const entry = lookup.get((r << 16) | (g << 8) | b);
-          if (entry) {
-            // Use analyzed bounds so thin textures (carpets etc.) scale to
-            // fill the full block area instead of rendering as a slim strip.
-            const bounds = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
-            const srcY = bounds ? bounds.y      : entry.csId * 32;
-            const srcH = bounds ? bounds.h      : 32;
-            ctx.drawImage(sprite, entry.blockId * 32, srcY, 32, srcH,
-              x * scale, y * scale, scale, scale);
-          } else {
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillRect(x * scale, y * scale, scale, scale);
+
+          for (let sy = 0; sy < scale; sy++) {
+            for (let sx = 0; sx < scale; sx++) {
+              const di = ((y * scale + sy) * cw + (x * scale + sx)) * 4;
+              if (entry) {
+                const bounds   = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
+                const spriteY0 = bounds ? bounds.y : entry.csId * CELL;
+                const spriteH  = bounds ? bounds.h : CELL;
+                // Nearest-neighbor sample (matches imageSmoothingEnabled=false behavior)
+                const ssx = entry.blockId * CELL + Math.floor(sx * CELL  / scale);
+                const ssy = spriteY0          + Math.floor(sy * spriteH / scale);
+                const si  = (ssy * sw + ssx) * 4;
+                dst[di]   = sp[si]; dst[di+1] = sp[si+1]; dst[di+2] = sp[si+2]; dst[di+3] = 255;
+              } else {
+                dst[di] = r; dst[di+1] = g; dst[di+2] = b; dst[di+3] = 255;
+              }
+            }
           }
         }
       }
+
+      ctx.putImageData(output, 0, 0);
 
       if (showGrid) {
         const mapsWide = width  / 128;
@@ -154,7 +175,7 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [imageData, sprite, spriteBounds, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
+  }, [imageData, spritePixels, spriteBounds, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
 
   if (!imageData) {
     return (

@@ -542,6 +542,14 @@ export function PreviewCanvas({
   const stampCursorWrapperRef = useRef<HTMLDivElement>(null);
   // Last known mouse client position (used for stamp cursor imperative positioning)
   const lastMouseClientRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  // Cached main canvas element — avoids repeated querySelector on every mousemove
+  const mainCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  function getMainCanvas(): HTMLCanvasElement | null {
+    if (mainCanvasRef.current?.isConnected) return mainCanvasRef.current;
+    const c = canvasZoneRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
+    mainCanvasRef.current = c;
+    return c;
+  }
 
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
@@ -789,28 +797,27 @@ export function PreviewCanvas({
       }
       const { activeTool, paintBlock, patternBlocks, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
 
+      // Get canvas + rect once for the entire handler — no repeated querySelector / getBoundingClientRect
+      const cvs = getMainCanvas();
+      const cr  = cvs ? cvs.getBoundingClientRect() : null;
+
       // Update brush/stamp cursor position directly in DOM — no React re-render
       if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile') {
         lastMouseClientRef.current = { clientX: e.clientX, clientY: e.clientY };
         const { scale: s, brushSize: bs, patternAnchorMode: pam, activePattern: ap } = propsRef.current;
-        const cvs = canvasZoneRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
-        if (cvs) {
-          const cr = cvs.getBoundingClientRect();
+        if (cvs && cr) {
           const isStamp = activeTool === 'pattern-tile' && pam === 'brush';
-          // Brush cursor
+          // Brush cursor — use CSS transform (no layout reflow, GPU-composited)
           const wrapper = brushCursorWrapperRef.current;
           if (wrapper && !isStamp) {
             if (activeTool === 'fill') {
-              wrapper.style.left = `${e.clientX}px`;
-              wrapper.style.top  = `${e.clientY}px`;
-              wrapper.style.transform = 'translate(-50%,-50%)';
+              const hs = Math.max(s * 2, 16) / 2;
+              wrapper.style.transform = `translate(${e.clientX - hs}px,${e.clientY - hs}px)`;
             } else {
               const px = Math.floor((e.clientX - cr.left) / s);
               const py = Math.floor((e.clientY - cr.top)  / s);
               const ri = Math.floor(bs / 2);
-              wrapper.style.left = `${cr.left + (px - ri) * s}px`;
-              wrapper.style.top  = `${cr.top  + (py - ri) * s}px`;
-              wrapper.style.transform = '';
+              wrapper.style.transform = `translate(${cr.left + (px - ri) * s}px,${cr.top + (py - ri) * s}px)`;
             }
             wrapper.style.visibility = 'visible';
           }
@@ -821,8 +828,7 @@ export function PreviewCanvas({
             const py = Math.floor((e.clientY - cr.top)  / s);
             const ox = px - Math.floor(ap.width  / 2);
             const oy = py - Math.floor(ap.height / 2);
-            stampWrapper.style.left = `${cr.left + ox * s}px`;
-            stampWrapper.style.top  = `${cr.top  + oy * s}px`;
+            stampWrapper.style.transform = `translate(${cr.left + ox * s}px,${cr.top + oy * s}px)`;
             stampWrapper.style.visibility = 'visible';
           }
         }
@@ -830,11 +836,9 @@ export function PreviewCanvas({
 
       // Gradient drag: update current endpoint and draw preview line on overlay
       if (gradientDragRef.current && activeTool === 'gradient') {
-        const canvas = canvasZoneRef.current?.querySelector('canvas');
-        if (canvas instanceof HTMLCanvasElement) {
-          const rect = canvas.getBoundingClientRect();
-          const cx = Math.max(0, Math.min(width - 1, Math.floor((e.clientX - rect.left) / scale)));
-          const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - rect.top) / scale)));
+        if (cr) {
+          const cx = Math.max(0, Math.min(width - 1, Math.floor((e.clientX - cr.left) / scale)));
+          const cy = Math.max(0, Math.min(height - 1, Math.floor((e.clientY - cr.top) / scale)));
           gradientDragRef.current.curPx = { x: cx, y: cy };
         }
         return;
@@ -843,12 +847,10 @@ export function PreviewCanvas({
       // Selection drag update
       if (selectionDragRef.current) {
         const drag = selectionDragRef.current;
-        const canvas = canvasZoneRef.current?.querySelector('canvas');
-        if (canvas instanceof HTMLCanvasElement) {
-          const rect = canvas.getBoundingClientRect();
+        if (cr) {
           const { scale: sc, width: ww, height: hh } = propsRef.current;
-          const cx = Math.max(0, Math.min(ww - 1, Math.floor((e.clientX - rect.left) / sc)));
-          const cy = Math.max(0, Math.min(hh - 1, Math.floor((e.clientY - rect.top) / sc)));
+          const cx = Math.max(0, Math.min(ww - 1, Math.floor((e.clientX - cr.left) / sc)));
+          const cy = Math.max(0, Math.min(hh - 1, Math.floor((e.clientY - cr.top) / sc)));
           drag.curPx = cx;
           drag.curPy = cy;
           if (drag.type === 'lasso') {
@@ -878,9 +880,9 @@ export function PreviewCanvas({
           (needsPatternTile && !activePattern) ||
           !paintBufferRef.current) return;
 
-      const canvas = canvasZoneRef.current?.querySelector('canvas');
-      if (!(canvas instanceof HTMLCanvasElement)) return;
-      const rect = canvas.getBoundingClientRect();
+      if (!cvs || !cr) return;
+      const canvas = cvs;
+      const rect = cr;
       const cx = Math.floor((e.clientX - rect.left) / scale);
       const cy = Math.floor((e.clientY - rect.top)  / scale);
       if (cx < 0 || cx >= width || cy < 0 || cy >= height) return;
@@ -1317,26 +1319,23 @@ export function PreviewCanvas({
   // ── Tooltip handlers ────────────────────────────────────────────────────────
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    // Brush cursor update — delegates to the same logic as onGlobalMouseMove
+    // (onGlobalMouseMove on window fires too, but React onMouseMove fires first for zone events)
     if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill') {
       const wrapper = brushCursorWrapperRef.current;
-      if (wrapper) {
-        const cvs = canvasZoneRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
-        if (cvs) {
-          const cr = cvs.getBoundingClientRect();
-          if (activeTool === 'fill') {
-            wrapper.style.left = `${e.clientX}px`;
-            wrapper.style.top  = `${e.clientY}px`;
-            wrapper.style.transform = 'translate(-50%,-50%)';
-          } else {
-            const px = Math.floor((e.clientX - cr.left) / scale);
-            const py = Math.floor((e.clientY - cr.top)  / scale);
-            const ri = Math.floor(brushSize / 2);
-            wrapper.style.left = `${cr.left + (px - ri) * scale}px`;
-            wrapper.style.top  = `${cr.top  + (py - ri) * scale}px`;
-            wrapper.style.transform = '';
-          }
-          wrapper.style.visibility = 'visible';
+      const cvs = getMainCanvas();
+      if (wrapper && cvs) {
+        const cr = cvs.getBoundingClientRect();
+        if (activeTool === 'fill') {
+          const hs = Math.max(scale * 2, 16) / 2;
+          wrapper.style.transform = `translate(${e.clientX - hs}px,${e.clientY - hs}px)`;
+        } else {
+          const px = Math.floor((e.clientX - cr.left) / scale);
+          const py = Math.floor((e.clientY - cr.top)  / scale);
+          const ri = Math.floor(brushSize / 2);
+          wrapper.style.transform = `translate(${cr.left + (px - ri) * scale}px,${cr.top + (py - ri) * scale}px)`;
         }
+        wrapper.style.visibility = 'visible';
       }
     }
     if (isDraggingRef.current) { cancelHide(); return; }
@@ -1448,8 +1447,8 @@ export function PreviewCanvas({
 
   const isStampMode = activeTool === 'pattern-tile' && patternAnchorMode === 'brush';
 
-  // Cursor SVG content — recomputed only when brushSize/scale/activeTool changes (not per mousemove)
-  const brushCursorContent = (() => {
+  // Cursor SVG content — memoized: recomputed only when tool/brushSize/scale changes, NOT per mousemove
+  const brushCursorContent = useMemo(() => {
     if (!hasBrushCursor || isStampMode) return null;
     if (activeTool === 'fill') {
       const s = Math.max(scale * 2, 16);
@@ -1477,7 +1476,8 @@ export function PreviewCanvas({
     }
     const span = 2 * ri + 1;
     return <svg width={span * scale} height={span * scale} style={{ display: 'block' }}>{rects}</svg>;
-  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasBrushCursor, isStampMode, activeTool, brushSize, scale]);
 
   // ── Canvas child ────────────────────────────────────────────────────────────
 
@@ -1548,11 +1548,11 @@ export function PreviewCanvas({
     >
       {inner}
 
-      {/* Brush cursor — position set imperatively, content re-renders only on tool/size/scale change */}
+      {/* Brush cursor — position set imperatively via transform (no layout reflow) */}
       <div
         ref={brushCursorWrapperRef}
         style={{
-          position: 'fixed', left: 0, top: 0,
+          position: 'fixed', left: 0, top: 0, willChange: 'transform',
           visibility: 'hidden', pointerEvents: 'none', zIndex: 9999,
           display: hasBrushCursor && !isStampMode ? 'block' : 'none',
         }}
@@ -1577,7 +1577,7 @@ export function PreviewCanvas({
           }
         }
         return (
-          <div ref={stampCursorWrapperRef} style={{ position: 'fixed', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: 9999 }}>
+          <div ref={stampCursorWrapperRef} style={{ position: 'fixed', left: 0, top: 0, willChange: 'transform', visibility: 'hidden', pointerEvents: 'none', zIndex: 9999 }}>
             <svg width={pw * scale} height={ph * scale} style={{ display: 'block', imageRendering: 'pixelated' }}>
               {cells}
             </svg>
