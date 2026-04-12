@@ -1186,10 +1186,10 @@ export default function App() {
             className={`tour-btn artist-mode-btn${editorMode === 'artist' ? ' active' : ''}`}
             onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
-          >🎨 {t('ХУДОЖНИК', 'ARTIST')}</button>
-          <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('ГИД', 'GUIDE')}</button>
-          <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 WIKI</button>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('ПОДДЕРЖАТЬ', 'SUPPORT')}</a>
+          >🎨 {t('Художник', 'Artist')}</button>
+          <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
+          <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
         </div>
@@ -1322,8 +1322,8 @@ export default function App() {
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
-              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}><i className="fi fi-br-rotate-left" /></button>
-              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><i className="fi fi-br-rotate-right" /></button>
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}><i className="ph-bold ph-arrow-counter-clockwise" /></button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><i className="ph-bold ph-arrow-clockwise" /></button>
             </div>
             <div className="toolbar-sep" />
 
@@ -1333,19 +1333,19 @@ export default function App() {
                 {/* Tool buttons */}
                 <div className="toolbar-group">
                   <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Выбрать / снять (Esc)', 'Select / deselect (Esc)')}>
-                    <i className="fi fi-br-cursor" />
+                    <i className="ph-bold ph-cursor" />
                   </button>
                   <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')}>
-                    <i className="fi fi-br-eye-dropper" />
+                    <i className="ph-bold ph-eyedropper" />
                   </button>
                   <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')}>
-                    <i className="fi fi-br-brush" />
+                    <i className="ph-bold ph-paint-brush" />
                   </button>
                   <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')}>
-                    <i className="fi fi-br-fill" />
+                    <i className="ph-bold ph-paint-bucket" />
                   </button>
                   <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
-                    <i className="fi fi-br-eraser" />
+                    <i className="ph-bold ph-eraser" />
                   </button>
                   {/* text and pattern tools hidden — work in progress */}
                 </div>
@@ -1424,7 +1424,7 @@ export default function App() {
                       <span className="paint-no-block">{t('нет блока', 'no block')}</span>
                     )}
                   </div>
-                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}>▾</button>
+                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}><i className="ph-bold ph-caret-down" /></button>
                   {showBlockPicker && (
                     <BlockPickerPopup
                       blockSelection={blockSelection}
@@ -1443,25 +1443,25 @@ export default function App() {
                         className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
                         title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
-                      ><i className="fi fi-br-square" /></button>
+                      ><i className="ph-bold ph-selection" /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
                         title={t('Лассо (L)', 'Lasso (L)')}
-                      ><i className="fi fi-br-lasso" /></button>
+                      ><i className="ph-bold ph-lasso" /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
                         title={t('Волшебная палочка (W)', 'Magic wand (W)')}
-                      ><i className="fi fi-br-magic-wand" /></button>
+                      ><i className="ph-bold ph-magic-wand" /></button>
                     </div>
                     {selectionMask && (
                       <div className="toolbar-group selection-ops">
-                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><i className="fi fi-br-trash" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><i className="fi fi-br-fill" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><i className="fi fi-br-arrows-retweet" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><i className="fi fi-br-layer-plus" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><i className="fi fi-br-circle-xmark" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><i className="ph-bold ph-trash" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><i className="ph-bold ph-paint-bucket" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><i className="ph-bold ph-arrows-clockwise" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><i className="ph-bold ph-stack-plus" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><i className="ph-bold ph-x-circle" /></button>
                         <span className="selection-count">{selectedPixelCount}px</span>
                       </div>
                     )}
@@ -1473,27 +1473,27 @@ export default function App() {
                         className={`tool-btn${activeTool === 'pattern-tile' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
                         title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
-                      ><i className="fi fi-br-apps" /></button>
+                      ><i className="ph-bold ph-grid-nine" /></button>
                       {activeTool === 'pattern-tile' && (<>
                         <button
                           className="tool-btn"
                           onClick={() => setShowPatternEditor(true)}
                           title={t('Редактировать паттерн', 'Edit pattern')}
-                        ><i className="fi fi-br-settings" /></button>
+                        ><i className="ph-bold ph-gear" /></button>
                         <button
                           className={`tool-btn${patternAnchorMode === 'brush' ? ' active' : ''}`}
                           onClick={() => setPatternAnchorMode(m => m === 'brush' ? 'canvas' : 'brush')}
                           title={patternAnchorMode === 'brush'
                             ? t('Якорь: от кисти (кликни для холста)', 'Anchor: brush start (click for canvas)')
                             : t('Якорь: холст (кликни для кисти)', 'Anchor: canvas (click for brush)')}
-                        >⚓</button>
+                        ><i className="ph-bold ph-anchor" /></button>
                         <button
                           className="tool-btn"
                           onClick={() => activePattern && exportPattern(activePattern)}
                           title={t('Экспорт паттерна в JSON', 'Export pattern as JSON')}
-                        >↓</button>
+                        ><i className="ph-bold ph-export" /></button>
                         <label className="tool-btn" title={t('Импорт паттерна из JSON', 'Import pattern from JSON')} style={{ cursor: 'pointer' }}>
-                          ↑
+                          <i className="ph-bold ph-upload-simple" />
                           <input type="file" accept=".json" style={{ display: 'none' }}
                             onChange={e => { const f = e.target.files?.[0]; if (f) importPattern(f); e.target.value = ''; }}
                           />
@@ -1507,7 +1507,7 @@ export default function App() {
                         className={`tool-btn${activeTool === 'gradient' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'gradient' ? null : 'gradient')}
                         title={t('Градиент (G)', 'Gradient (G)')}
-                      ><i className="fi fi-br-arrows-h" /></button>
+                      ><i className="ph-bold ph-gradient" /></button>
                     </div>
                     {activeTool === 'gradient' && (
                       <div className="toolbar-group gradient-stops-bar">
@@ -1606,7 +1606,7 @@ export default function App() {
                           className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
                           title={t('Дизеринг (упорядоченный Байер)', 'Ordered dithering (Bayer)')}
                           onClick={() => setGradientDithering(d => d === 'ordered' ? 'none' : 'ordered')}
-                        ><i className="fi fi-br-grid-alt" /></button>
+                        ><i className="ph-bold ph-grid-four" /></button>
                       </div>
                     )}
                   </>
@@ -1658,12 +1658,12 @@ export default function App() {
 
             {/* TABLET DRAWER TOGGLE */}
             <div className="toolbar-sep tablet-right-sep" />
-            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title={t('Палитра и экспорт', 'Palette & Export')}>📦</button>
+            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title={t('Палитра и экспорт', 'Palette & Export')}><i className="ph-bold ph-package" /></button>
 
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}>⌨</button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}><i className="ph-bold ph-keyboard" /></button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
                   <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>

@@ -217,6 +217,9 @@ export function Controls({
   return (
     <div className="controls">
 
+      {/* ── Group 1: Output Format (Size + Mode) ─────────────────── */}
+      <div className="ctrl-block">
+
       {/* ── Map grid selector ─────────────────────────────────── */}
       <section className={`control-group${isBlankCanvas ? ' section-disabled' : ''}`}>
         <h3 className="control-title">
@@ -322,13 +325,13 @@ export function Controls({
               onClick={() => onMapModeChange('2d')}
               disabled={processing}
               title="2D flat — one shade per color, ~61 colors"
-            >2D FLAT</button>
+            >2D Flat</button>
             <button
               className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
               onClick={() => onMapModeChange('3d')}
               disabled={processing}
               title="3D staircase — 3 shades per color, ~183 colors"
-            >3D STAIR</button>
+            >3D Stair</button>
           </div>
           {mapMode === '3d' && (
             <div className="mode-toggle" style={{ marginTop: '6px' }}>
@@ -350,6 +353,11 @@ export function Controls({
           )}
         </div>
       </section>
+
+      </div>{/* end ctrl-block: Output Format */}
+
+      {/* ── Group 2: Processing (Dithering + Intensity) ────────── */}
+      <div className="ctrl-block">
 
       {/* ── Dithering ─────────────────────────────────────────── */}
       <section className="control-group">
@@ -589,6 +597,8 @@ export function Controls({
       {processing && (
         <div className="processing-badge">{t('Обработка…', 'Processing…')}</div>
       )}
+
+      </div>{/* end ctrl-block: Processing */}
     </div>
   );
 }

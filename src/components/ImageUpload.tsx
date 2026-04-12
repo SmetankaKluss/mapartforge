@@ -95,9 +95,8 @@ export function ImageUpload({ onImageLoaded }: Props) {
       title={t('Нажми Ctrl+V чтобы вставить изображение из буфера', 'Press Ctrl+V to paste image from clipboard')}
     >
       <div className="upload-icon">⛏</div>
-      <p className="upload-label">{t('Перетащи изображение сюда', 'Drag image here')}</p>
-      <p className="upload-sub">{t('или нажми для выбора файла', 'or click to browse')}</p>
-      <p className="upload-hint">{t('Ctrl+V — вставить из буфера', 'Ctrl+V — paste from clipboard')}</p>
+      <p className="upload-sub">{t('нажми или перетащи', 'click or drag')}</p>
+      <p className="upload-hint">Ctrl+V</p>
       <input
         ref={inputRef}
         type="file"

@@ -180,7 +180,7 @@ export function ExportPanel({
     <section className="sidebar-section" id="tour-export">
       <h3 className="section-title">{t('Экспорт', 'Export')}</h3>
       {!hasContent && (
-        <p className="export-empty">{t('Обработай изображение для экспорта.', 'Process image to export.')}</p>
+        <p className="export-empty">{t('Загрузи изображение — экспорт появится здесь.', 'Upload an image to enable export.')}</p>
       )}
       {hasContent && (
         <div className="export-buttons">
