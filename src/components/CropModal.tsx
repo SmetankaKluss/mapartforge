@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useLocale } from '../lib/locale';
 
 interface CropBox { x: number; y: number; w: number; h: number; }
 type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
@@ -26,6 +27,7 @@ function initCrop(imgW: number, imgH: number, ratio: number): CropBox {
 }
 
 export function CropModal({ sourceImage, targetW, targetH, onApply, onCancel }: Props) {
+  const { t } = useLocale();
   const imgW = sourceImage.naturalWidth;
   const imgH = sourceImage.naturalHeight;
   const ratio = targetW / targetH;
@@ -146,9 +148,9 @@ export function CropModal({ sourceImage, targetW, targetH, onApply, onCancel }: 
       <div className="crop-modal" onClick={e => e.stopPropagation()}>
 
         <div className="crop-modal-header">
-          <span className="crop-modal-title">CROP IMAGE</span>
-          <span className="crop-modal-badge">{targetW} × {targetH} px ratio</span>
-          <button className="crop-modal-close" onClick={onCancel} title="Cancel (Esc)">✕</button>
+          <span className="crop-modal-title">{t('ОБРЕЗАТЬ ИЗОБРАЖЕНИЕ', 'CROP IMAGE')}</span>
+          <span className="crop-modal-badge">{targetW} × {targetH} {t('пх соотношение', 'px ratio')}</span>
+          <button className="crop-modal-close" onClick={onCancel} title={t('Отменить (Esc)', 'Cancel (Esc)')}>✕</button>
         </div>
 
         {/* Image + interactive crop overlay */}
@@ -185,12 +187,12 @@ export function CropModal({ sourceImage, targetW, targetH, onApply, onCancel }: 
           <span className="crop-info">
             {Math.round(crop.w)} × {Math.round(crop.h)} px
             &nbsp;·&nbsp;
-            {imgW} × {imgH} source
+            {imgW} × {imgH} {t('оригинал', 'source')}
           </span>
           <div className="crop-actions">
-            <button className="crop-btn crop-btn-apply" onClick={handleApply}>✓ Crop &amp; Reprocess</button>
-            <button className="crop-btn crop-btn-reset" onClick={() => setCrop(initCrop(imgW, imgH, ratio))} title="Reset to optimal fit">↺ Reset</button>
-            <button className="crop-btn crop-btn-cancel" onClick={onCancel}>Cancel</button>
+            <button className="crop-btn crop-btn-apply" onClick={handleApply}>✓ {t('Обрезать & пересчитать', 'Crop & Reprocess')}</button>
+            <button className="crop-btn crop-btn-reset" onClick={() => setCrop(initCrop(imgW, imgH, ratio))} title={t('Сбросить на оптимальное соотношение', 'Reset to optimal fit')}>↺ {t('Сброс', 'Reset')}</button>
+            <button className="crop-btn crop-btn-cancel" onClick={onCancel}>{t('Отменить', 'Cancel')}</button>
           </div>
         </div>
 

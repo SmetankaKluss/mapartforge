@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocale } from '../lib/locale';
 
 interface Props {
   url: string;
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export function LinkModal({ url, onClose }: Props) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +59,7 @@ export function LinkModal({ url, onClose }: Props) {
         {/* X button top-right */}
         <button
           onClick={onClose}
-          title="Close"
+          title={t('Закрыть', 'Close')}
           style={{
             position: 'absolute',
             top: 12,
@@ -81,7 +83,7 @@ export function LinkModal({ url, onClose }: Props) {
           letterSpacing: '0.08em',
           marginBottom: 12,
         }}>
-          LINK READY
+          {t('ССЫЛКА ГОТОВА', 'LINK READY')}
         </div>
 
         {/* Subtitle */}
@@ -91,7 +93,7 @@ export function LinkModal({ url, onClose }: Props) {
           color: 'rgba(255,255,255,0.5)',
           marginBottom: 20,
         }}>
-          Anyone with this link can view your map art
+          {t('Любой человек с этой ссылкой может просмотреть твой арт карты', 'Anyone with this link can view your map art')}
         </div>
 
         {/* URL input */}
@@ -131,7 +133,7 @@ export function LinkModal({ url, onClose }: Props) {
               transition: 'background 0.12s',
             }}
           >
-            {copied ? '✓ COPIED!' : '⎘ COPY LINK'}
+            {copied ? `✓ ${t('СКОПИРОВАНО!', 'COPIED!')}` : `⎘ ${t('СКОПИРОВАТЬ ССЫЛКУ', 'COPY LINK')}`}
           </button>
           <button
             onClick={onClose}
@@ -148,7 +150,7 @@ export function LinkModal({ url, onClose }: Props) {
               transition: 'border-color 0.12s, color 0.12s',
             }}
           >
-            ✕ CLOSE
+            ✕ {t('ЗАКРЫТЬ', 'CLOSE')}
           </button>
         </div>
       </div>

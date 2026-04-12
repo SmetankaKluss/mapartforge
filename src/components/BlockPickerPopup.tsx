@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+import { useLocale } from '../lib/locale';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { PaintBlock } from './PreviewCanvas';
 import { TRANSPARENT_PAINT_BLOCK } from './PreviewCanvas';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, mapMode }: Props) {
+  const { t } = useLocale();
   const [search, setSearch] = useState('');
   void mapMode; // reserved for future use
   const ref = useRef<HTMLDivElement>(null);
@@ -59,13 +61,13 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   return (
     <div className="block-picker-popup" ref={ref}>
       <div className="block-picker-header">
-        <span className="block-picker-title">Choose block</span>
+        <span className="block-picker-title">{t('Выбери блок', 'Choose block')}</span>
         <button className="block-picker-close" onClick={onClose}>✕</button>
       </div>
       <div className="block-picker-search-wrap">
         <input
           className="block-picker-search"
-          placeholder="Search blocks…"
+          placeholder={t('Поиск блоков…', 'Search blocks…')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -77,13 +79,13 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
           <button
             className={`block-picker-item${current?.baseId === -1 ? ' selected' : ''}`}
             onClick={() => onSelect(TRANSPARENT_PAINT_BLOCK)}
-            title="Transparent (Air)"
+            title={t('Прозрачный (Воздух)', 'Transparent (Air)')}
           >
             <div className="block-picker-icon-wrap">
               <span className="block-picker-icon block-picker-icon-transparent" />
             </div>
-            <span className="block-picker-name">Transparent</span>
-            <span className="block-picker-group">Air</span>
+            <span className="block-picker-name">{t('Прозрачный', 'Transparent')}</span>
+            <span className="block-picker-group">{t('Воздух', 'Air')}</span>
           </button>
         )}
         {items.map(item => (
@@ -107,7 +109,7 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
           </button>
         ))}
         {items.length === 0 && (
-          <div className="block-picker-empty">No blocks match "{search}"</div>
+          <div className="block-picker-empty">{t(`Блоков не найдено «${search}»`, `No blocks match "${search}"`)}</div>
         )}
       </div>
     </div>

@@ -1,13 +1,15 @@
 import { useState } from 'react';
+import { useLocale } from '../lib/locale';
 
 type WikiSection = 'overview' | 'getting-started' | 'map-grid' | 'dithering' | '2d-vs-3d' | 'blocks' | 'tools' | 'export' | 'tips' | 'troubleshoot';
 
 export function WikiModal({ onClose }: { onClose: () => void }) {
+  const { t } = useLocale();
   const [activeSection, setActiveSection] = useState<WikiSection>('overview');
 
   const sections: Record<WikiSection, { title: string; content: React.ReactNode }> = {
     overview: {
-      title: 'What is MapKluss?',
+      title: t('Что такое MapKluss?', 'What is MapKluss?'),
       content: (
         <div>
           <p>
@@ -28,7 +30,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     'getting-started': {
-      title: 'Getting Started',
+      title: t('Начало работы', 'Getting Started'),
       content: (
         <div>
           <h4>Step-by-step:</h4>
@@ -61,7 +63,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     'map-grid': {
-      title: 'Map Grid Sizes',
+      title: t('Размеры сеток карт', 'Map Grid Sizes'),
       content: (
         <div>
           <p>Each Minecraft <b>map</b> is exactly <b>128×128 blocks</b>. Choose how many maps your art spans:</p>
@@ -109,7 +111,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     dithering: {
-      title: 'Dithering Algorithms',
+      title: t('Алгоритмы дизеринга', 'Dithering Algorithms'),
       content: (
         <div>
           <p>Dithering simulates colors that don't exist in Minecraft's palette by mixing nearby pixels. Each algorithm has a different "feel":</p>
@@ -152,7 +154,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     '2d-vs-3d': {
-      title: '2D vs 3D Modes',
+      title: t('2D vs 3D режимы', '2D vs 3D Modes'),
       content: (
         <div>
           <h4>2D Flat Mode</h4>
@@ -196,7 +198,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     blocks: {
-      title: 'Block Palette',
+      title: t('Палитра блоков', 'Block Palette'),
       content: (
         <div>
           <p>The <b>Palette</b> panel on the right lets you choose which Minecraft blocks to use. More blocks = more colors available = higher quality.</p>
@@ -239,7 +241,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     tools: {
-      title: 'Paint Tools',
+      title: t('Инструменты рисования', 'Paint Tools'),
       content: (
         <div>
           <p>After processing an image, a toolbar appears above the preview with tools to refine your map art manually.</p>
@@ -281,7 +283,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     export: {
-      title: 'Export Formats',
+      title: t('Форматы экспорта', 'Export Formats'),
       content: (
         <div>
           <h4>↓ PNG</h4>
@@ -332,7 +334,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     tips: {
-      title: 'Pro Tips & Tricks',
+      title: t('Профессиональные советы и трюки', 'Pro Tips & Tricks'),
       content: (
         <div>
           <h4>Image preparation</h4>
@@ -385,7 +387,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     },
 
     troubleshoot: {
-      title: 'Troubleshooting',
+      title: t('Решение проблем', 'Troubleshooting'),
       content: (
         <div>
           <h4>Image won't load</h4>
@@ -453,16 +455,16 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
   };
 
   const sectionList: { id: WikiSection; label: string }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'getting-started', label: 'Getting Started' },
-    { id: 'map-grid', label: 'Map Sizes' },
-    { id: 'dithering', label: 'Dithering' },
-    { id: '2d-vs-3d', label: '2D vs 3D' },
-    { id: 'blocks', label: 'Blocks' },
-    { id: 'tools', label: 'Tools' },
-    { id: 'export', label: 'Export' },
-    { id: 'tips', label: 'Tips' },
-    { id: 'troubleshoot', label: 'Help' },
+    { id: 'overview', label: t('Обзор', 'Overview') },
+    { id: 'getting-started', label: t('Начало', 'Getting Started') },
+    { id: 'map-grid', label: t('Размеры', 'Map Sizes') },
+    { id: 'dithering', label: t('Дизеринг', 'Dithering') },
+    { id: '2d-vs-3d', label: t('2D vs 3D', '2D vs 3D') },
+    { id: 'blocks', label: t('Блоки', 'Blocks') },
+    { id: 'tools', label: t('Инструменты', 'Tools') },
+    { id: 'export', label: t('Экспорт', 'Export') },
+    { id: 'tips', label: t('Советы', 'Tips') },
+    { id: 'troubleshoot', label: t('Помощь', 'Help') },
   ];
 
   const current = sections[activeSection];
@@ -471,8 +473,8 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
     <div className="wiki-modal-overlay" onClick={onClose}>
       <div className="wiki-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="wiki-header">
-          <h2>MapKluss Wiki</h2>
-          <button className="wiki-close-btn" onClick={onClose} title="Close">✕</button>
+          <h2>{t('Wiki MapKluss', 'MapKluss Wiki')}</h2>
+          <button className="wiki-close-btn" onClick={onClose} title={t('Закрыть', 'Close')}>✕</button>
         </div>
 
         <div className="wiki-container">

@@ -1,0 +1,660 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img "MapKluss" [ref=e6]
+      - generic [ref=e7]:
+        - heading "MAPKLUSS" [level=1] [ref=e8]
+        - generic [ref=e9]: MINECRAFT MAP ART GENERATOR
+      - button "🎨 Художник" [ref=e10] [cursor=pointer]
+      - button "? Гид" [ref=e11] [cursor=pointer]
+      - button "📖 Wiki" [ref=e12] [cursor=pointer]
+      - link "❤ Поддержать" [ref=e13] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+      - button "EN" [ref=e14] [cursor=pointer]
+      - link "v1.5.0" [ref=e15] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+  - generic [ref=e16]:
+    - complementary [ref=e17]:
+      - generic [ref=e18]:
+        - generic "Нажми Ctrl+V чтобы вставить изображение из буфера" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: ⛏
+          - paragraph [ref=e21]: нажми или перетащи
+          - paragraph [ref=e22]: Ctrl+V
+        - button "+ Новый холст" [ref=e24] [cursor=pointer]
+        - generic [ref=e25]:
+          - button "✂ Обрезать" [ref=e26] [cursor=pointer]
+          - generic [ref=e27]: 1:1
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - heading "▼ Размер" [level=3] [ref=e31]:
+                - generic [ref=e32] [cursor=pointer]: ▼
+                - text: Размер
+              - generic [ref=e33]:
+                - generic [ref=e34]
+                - paragraph [ref=e95]
+            - generic [ref=e97]:
+              - heading "▼ Режим" [level=3] [ref=e98]:
+                - generic [ref=e99] [cursor=pointer]: ▼
+                - text: Режим
+              - generic [ref=e100]:
+                - generic [ref=e101]
+                - generic [ref=e104]
+          - generic [ref=e107]:
+            - generic [ref=e108]:
+              - heading "▼ Дизеринг" [level=3] [ref=e109]:
+                - generic [ref=e110] [cursor=pointer]: ▼
+                - text: Дизеринг
+              - generic [ref=e112]:
+                - generic [ref=e113] [cursor=pointer]
+                - generic [ref=e116] [cursor=pointer]
+                - generic [ref=e119] [cursor=pointer]
+                - generic [ref=e122] [cursor=pointer]
+                - generic [ref=e125] [cursor=pointer]
+                - generic [ref=e128] [cursor=pointer]
+                - generic [ref=e131] [cursor=pointer]
+                - generic [ref=e134] [cursor=pointer]
+            - generic [ref=e137]:
+              - heading "▼ Интенсивность 100 %" [level=3] [ref=e138]:
+                - generic [ref=e139] [cursor=pointer]: ▼
+                - text: Интенсивность
+                - generic [ref=e140]
+              - generic [ref=e143]:
+                - slider [ref=e144]: "100"
+                - generic [ref=e145]
+                - paragraph [ref=e148]: Сила распространения ошибки.
+            - paragraph [ref=e150]: ✓ Подбор цвета OKLAB
+        - generic [ref=e151]:
+          - generic:
+            - heading "▼ ☀ Коррекция" [level=3]:
+              - generic: ▼
+              - button "☀" [ref=e155] [cursor=pointer]
+              - generic: Коррекция
+            - generic:
+              - generic:
+                - generic: Предпросмотр
+              - generic:
+                - generic
+                - generic
+                - generic
+      - button "↺ Сбросить всё" [ref=e178] [cursor=pointer]:
+        - generic [ref=e179]: ↺
+        - text: Сбросить всё
+    - main [ref=e180]:
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - button "" [disabled] [ref=e183]:
+            - generic [ref=e184]: 
+          - button "" [disabled] [ref=e185]:
+            - generic [ref=e186]: 
+        - generic [ref=e2589]:
+          - generic [ref=e2590]:
+            - button "" [ref=e2591] [cursor=pointer]:
+              - generic [ref=e2592]: 
+            - button "" [ref=e2593] [cursor=pointer]:
+              - generic [ref=e2594]: 
+            - button "" [ref=e2595] [cursor=pointer]:
+              - generic [ref=e2596]: 
+            - button "" [ref=e2597] [cursor=pointer]:
+              - generic [ref=e2598]: 
+            - button "" [ref=e2599] [cursor=pointer]:
+              - generic [ref=e2600]: 
+          - generic [ref=e2601]:
+            - generic [ref=e2603]: нет блока
+            - button "▾" [ref=e2604] [cursor=pointer]
+        - generic [ref=e205]:
+          - slider "Zoom (Ctrl+scroll)" [ref=e206] [cursor=pointer]: "25"
+          - spinbutton [ref=e207]: "100"
+          - generic [ref=e208]: "%"
+        - generic [ref=e210]:
+          - button "⌖" [ref=e211] [cursor=pointer]
+          - button "╎" [ref=e212] [cursor=pointer]
+          - button "⟺" [ref=e213] [cursor=pointer]
+          - button "Блоки" [ref=e2606] [cursor=pointer]
+          - button "Сравнить" [active] [ref=e215] [cursor=pointer]
+          - button "Сетка" [ref=e216] [cursor=pointer]
+        - button "⌨" [ref=e219] [cursor=pointer]
+    - complementary [ref=e225]:
+      - generic [ref=e226]:
+        - generic [ref=e227]:
+          - generic [ref=e228]:
+            - heading "▼ Палитра 183 цветов · 61 блоков" [level=3] [ref=e229]:
+              - text: ▼ Палитра
+              - generic [ref=e230]: 183 цветов · 61 блоков
+            - combobox [ref=e232] [cursor=pointer]:
+              - option "— выбрать пресет —"
+              - option "All Blocks" [selected]
+              - option "Carpet Only"
+            - generic [ref=e233]:
+              - textbox "Поиск блоков…" [ref=e235]
+              - button "Сохранить" [ref=e236] [cursor=pointer]
+              - button "Сброс" [ref=e237] [cursor=pointer]
+            - button "⬡ Поделиться палитрой" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]:
+              - generic [ref=e241]:
+                - generic [ref=e242] [cursor=pointer]
+                - generic [ref=e246]
+              - generic [ref=e251]:
+                - generic [ref=e252] [cursor=pointer]
+                - generic [ref=e256]
+              - generic [ref=e289]:
+                - generic [ref=e290] [cursor=pointer]
+                - generic [ref=e294]
+              - generic [ref=e301]:
+                - generic [ref=e302] [cursor=pointer]
+                - generic [ref=e306]
+              - generic [ref=e311]:
+                - generic [ref=e312] [cursor=pointer]
+                - generic [ref=e316]
+              - generic [ref=e323]:
+                - generic [ref=e324] [cursor=pointer]
+                - generic [ref=e328]
+              - generic [ref=e339]:
+                - generic [ref=e340] [cursor=pointer]
+                - generic [ref=e344]
+              - generic [ref=e361]:
+                - generic [ref=e362] [cursor=pointer]
+                - generic "Clay minecraft:clay" [ref=e367] [cursor=pointer]
+              - generic [ref=e369]:
+                - generic [ref=e370] [cursor=pointer]
+                - generic [ref=e374]
+              - generic [ref=e401]:
+                - generic [ref=e402] [cursor=pointer]
+                - generic [ref=e406]
+              - generic [ref=e447]:
+                - generic [ref=e448] [cursor=pointer]
+                - generic "Water (Unsupported!) minecraft:water" [ref=e453] [cursor=pointer]
+              - generic [ref=e455]:
+                - generic [ref=e456] [cursor=pointer]
+                - generic [ref=e460]
+              - generic [ref=e471]:
+                - generic [ref=e472] [cursor=pointer]
+                - generic [ref=e476]
+              - generic [ref=e491]:
+                - generic [ref=e492] [cursor=pointer]
+                - generic [ref=e496]
+              - generic [ref=e513]:
+                - generic [ref=e514] [cursor=pointer]
+                - generic [ref=e518]
+              - generic [ref=e565]:
+                - generic [ref=e566] [cursor=pointer]
+                - generic [ref=e570]
+              - generic [ref=e589]:
+                - generic [ref=e590] [cursor=pointer]
+                - generic [ref=e594]
+              - generic [ref=e607]:
+                - generic [ref=e608] [cursor=pointer]
+                - generic [ref=e612]
+              - generic [ref=e641]:
+                - generic [ref=e642] [cursor=pointer]
+                - generic [ref=e646]
+              - generic [ref=e661]:
+                - generic [ref=e662] [cursor=pointer]
+                - generic [ref=e666]
+              - generic [ref=e683]:
+                - generic [ref=e684] [cursor=pointer]
+                - generic [ref=e688]
+              - generic [ref=e713]:
+                - generic [ref=e714] [cursor=pointer]
+                - generic [ref=e718]
+              - generic [ref=e731]:
+                - generic [ref=e732] [cursor=pointer]
+                - generic [ref=e736]
+              - generic [ref=e753]:
+                - generic [ref=e754] [cursor=pointer]
+                - generic [ref=e758]
+              - generic [ref=e777]:
+                - generic [ref=e778] [cursor=pointer]
+                - generic [ref=e782]
+              - generic [ref=e795]:
+                - generic [ref=e796] [cursor=pointer]
+                - generic [ref=e800]
+              - generic [ref=e827]:
+                - generic [ref=e828] [cursor=pointer]
+                - generic [ref=e832]
+              - generic [ref=e847]:
+                - generic [ref=e848] [cursor=pointer]
+                - generic [ref=e852]
+              - generic [ref=e881]:
+                - generic [ref=e882] [cursor=pointer]
+                - generic [ref=e886]
+              - generic [ref=e921]:
+                - generic [ref=e922] [cursor=pointer]
+                - generic [ref=e926]
+              - generic [ref=e933]:
+                - generic [ref=e934] [cursor=pointer]
+                - generic [ref=e938]
+              - generic [ref=e951]:
+                - generic [ref=e952] [cursor=pointer]
+                - generic "Lapis Lazuli Block minecraft:lapis_block" [ref=e957] [cursor=pointer]
+              - generic [ref=e959]:
+                - generic [ref=e960] [cursor=pointer]
+                - generic "Block of Emerald minecraft:emerald_block" [ref=e965] [cursor=pointer]
+              - generic [ref=e967]:
+                - generic [ref=e968] [cursor=pointer]
+                - generic [ref=e972]
+              - generic [ref=e991]:
+                - generic [ref=e992] [cursor=pointer]
+                - generic [ref=e996]
+              - generic [ref=e1009]:
+                - generic [ref=e1010] [cursor=pointer]
+                - generic [ref=e1014]
+              - generic [ref=e1029]:
+                - generic [ref=e1030] [cursor=pointer]
+                - generic "Orange Terracotta minecraft:orange_terracotta" [ref=e1035] [cursor=pointer]
+              - generic [ref=e1037]:
+                - generic [ref=e1038] [cursor=pointer]
+                - generic "Magenta Terracotta minecraft:magenta_terracotta" [ref=e1043] [cursor=pointer]
+              - generic [ref=e1045]:
+                - generic [ref=e1046] [cursor=pointer]
+                - generic "Light Blue Terracotta minecraft:light_blue_terracotta" [ref=e1051] [cursor=pointer]
+              - generic [ref=e1053]:
+                - generic [ref=e1054] [cursor=pointer]
+                - generic "Yellow Terracotta minecraft:yellow_terracotta" [ref=e1059] [cursor=pointer]
+              - generic [ref=e1061]:
+                - generic [ref=e1062] [cursor=pointer]
+                - generic "Lime Terracotta minecraft:lime_terracotta" [ref=e1067] [cursor=pointer]
+              - generic [ref=e1069]:
+                - generic [ref=e1070] [cursor=pointer]
+                - generic [ref=e1074]
+              - generic [ref=e1081]:
+                - generic [ref=e1082] [cursor=pointer]
+                - generic [ref=e1086]
+              - generic [ref=e1095]:
+                - generic [ref=e1096] [cursor=pointer]
+                - generic [ref=e1100]
+              - generic [ref=e1117]:
+                - generic [ref=e1118] [cursor=pointer]
+                - generic [ref=e1122]
+              - generic [ref=e1127]:
+                - generic [ref=e1128] [cursor=pointer]
+                - generic "Purple Terracotta minecraft:purple_terracotta" [ref=e1133] [cursor=pointer]
+              - generic [ref=e1135]:
+                - generic [ref=e1136] [cursor=pointer]
+                - generic "Blue Terracotta minecraft:blue_terracotta" [ref=e1141] [cursor=pointer]
+              - generic [ref=e1143]:
+                - generic [ref=e1144] [cursor=pointer]
+                - generic [ref=e1148]
+              - generic [ref=e1155]:
+                - generic [ref=e1156] [cursor=pointer]
+                - generic "Green Terracotta minecraft:green_terracotta" [ref=e1161] [cursor=pointer]
+              - generic [ref=e1163]:
+                - generic [ref=e1164] [cursor=pointer]
+                - generic "Red Terracotta minecraft:red_terracotta" [ref=e1169] [cursor=pointer]
+              - generic [ref=e1171]:
+                - generic [ref=e1172] [cursor=pointer]
+                - generic "Black Terracotta minecraft:black_terracotta" [ref=e1177] [cursor=pointer]
+              - generic [ref=e1179]:
+                - generic [ref=e1180] [cursor=pointer]
+                - generic "Crimson Nylium minecraft:crimson_nylium" [ref=e1185] [cursor=pointer]
+              - generic [ref=e1187]:
+                - generic [ref=e1188] [cursor=pointer]
+                - generic [ref=e1192]
+              - generic [ref=e1203]:
+                - generic [ref=e1204] [cursor=pointer]
+                - generic [ref=e1208]
+              - generic [ref=e1213]:
+                - generic [ref=e1214] [cursor=pointer]
+                - generic [ref=e1218]
+              - generic [ref=e1231]:
+                - generic [ref=e1232] [cursor=pointer]
+                - generic [ref=e1236]
+              - generic [ref=e1257]:
+                - generic [ref=e1258] [cursor=pointer]
+                - generic [ref=e1262]
+              - generic [ref=e1267]:
+                - generic [ref=e1268] [cursor=pointer]
+                - generic "Warped Wart Block minecraft:warped_wart_block" [ref=e1273] [cursor=pointer]
+              - generic [ref=e1275]:
+                - generic [ref=e1276] [cursor=pointer]
+                - generic [ref=e1280]
+              - generic [ref=e1293]:
+                - generic [ref=e1294] [cursor=pointer]
+                - generic "Block Of Raw Iron minecraft:raw_iron_block" [ref=e1299] [cursor=pointer]
+              - generic [ref=e1301]:
+                - generic [ref=e1302] [cursor=pointer]
+                - generic [ref=e1306]
+          - generic [ref=e1312]:
+            - generic [ref=e1313]: Опорный блок (3D)
+            - generic [ref=e1314]:
+              - button "Stone" [ref=e1315] [cursor=pointer]:
+                - generic [ref=e1317]: Stone
+              - button "Cobble" [ref=e1318] [cursor=pointer]:
+                - generic [ref=e1320]: Cobble
+              - button "Deepslate" [ref=e1321] [cursor=pointer]:
+                - generic [ref=e1323]: Deepslate
+              - button "Smooth" [ref=e1324] [cursor=pointer]:
+                - generic [ref=e1326]: Smooth
+              - button "Granite" [ref=e1327] [cursor=pointer]:
+                - generic [ref=e1329]: Granite
+              - button "Diorite" [ref=e1330] [cursor=pointer]:
+                - generic [ref=e1332]: Diorite
+              - button "Andesite" [ref=e1333] [cursor=pointer]:
+                - generic [ref=e1335]: Andesite
+              - button "Dirt" [ref=e1336] [cursor=pointer]:
+                - generic [ref=e1338]: Dirt
+              - button "Oak" [ref=e1339] [cursor=pointer]:
+                - generic [ref=e1341]: Oak
+              - button "Nether" [ref=e1342] [cursor=pointer]:
+                - generic [ref=e1344]: Nether
+              - button "Blackstone" [ref=e1345] [cursor=pointer]:
+                - generic [ref=e1347]: Blackstone
+              - generic [ref=e1348]:
+                - button "∅ Нет" [ref=e1349] [cursor=pointer]
+                - generic [ref=e1352]
+        - generic [ref=e2067]:
+          - generic [ref=e2068]:
+            - heading "▼ Материалы" [level=3] [ref=e2069]
+            - generic "Показать максимальное количество каждого блока в любой из 1 секций — удобно для расчёта что взять с собой" [ref=e2070] [cursor=pointer]:
+              - checkbox "Макс / карта" [ref=e2071]
+              - generic [ref=e2072]: Макс / карта
+          - table [ref=e2074]:
+            - rowgroup [ref=e2075]:
+              - row "БЛОК ВСЕГО СТАКИ ШАЛКЕРЫ" [ref=e2076]:
+                - columnheader "БЛОК" [ref=e2077]
+                - columnheader "ВСЕГО" [ref=e2078]
+                - columnheader "СТАКИ" [ref=e2079]
+                - columnheader "ШАЛКЕРЫ" [ref=e2080]
+            - rowgroup [ref=e2081]:
+              - row "Black Wool 12,031 187×64+63 6sh+25×64+63" [ref=e2082]:
+                - cell "Black Wool" [ref=e2083]
+                - cell "12,031" [ref=e2088]
+                - cell "187×64+63" [ref=e2089]
+                - cell "6sh+25×64+63" [ref=e2090]
+              - row "Blue Wool 2,203 34×64+27 1sh+7×64+27" [ref=e2091]:
+                - cell "Blue Wool" [ref=e2092]
+                - cell "2,203" [ref=e2097]
+                - cell "34×64+27" [ref=e2098]
+                - cell "1sh+7×64+27" [ref=e2099]
+              - row "Blue Terracotta 539 8×64+27 8×64+27" [ref=e2100]:
+                - cell "Blue Terracotta" [ref=e2101]
+                - cell "539" [ref=e2106]
+                - cell "8×64+27" [ref=e2107]
+                - cell "8×64+27" [ref=e2108]
+              - row "Sand 249 3×64+57 3×64+57" [ref=e2109]:
+                - cell "Sand" [ref=e2110]
+                - cell "249" [ref=e2115]
+                - cell "3×64+57" [ref=e2116]
+                - cell "3×64+57" [ref=e2117]
+              - row "Ice 151 2×64+23 2×64+23" [ref=e2118]:
+                - cell "Ice" [ref=e2119]
+                - cell "151" [ref=e2124]
+                - cell "2×64+23" [ref=e2125]
+                - cell "2×64+23" [ref=e2126]
+              - row "Gray Wool 132 2×64+4 2×64+4" [ref=e2127]:
+                - cell "Gray Wool" [ref=e2128]
+                - cell "132" [ref=e2133]
+                - cell "2×64+4" [ref=e2134]
+                - cell "2×64+4" [ref=e2135]
+              - row "Gray Terracotta 76 1×64+12 1×64+12" [ref=e2136]:
+                - cell "Gray Terracotta" [ref=e2137]
+                - cell "76" [ref=e2142]
+                - cell "1×64+12" [ref=e2143]
+                - cell "1×64+12" [ref=e2144]
+              - row "Black Terracotta 75 1×64+11 1×64+11" [ref=e2145]:
+                - cell "Black Terracotta" [ref=e2146]
+                - cell "75" [ref=e2151]
+                - cell "1×64+11" [ref=e2152]
+                - cell "1×64+11" [ref=e2153]
+              - row "Green Terracotta 71 1×64+7 1×64+7" [ref=e2154]:
+                - cell "Green Terracotta" [ref=e2155]
+                - cell "71" [ref=e2160]
+                - cell "1×64+7" [ref=e2161]
+                - cell "1×64+7" [ref=e2162]
+              - row "Light Blue Terracotta 70 1×64+6 1×64+6" [ref=e2163]:
+                - cell "Light Blue Terracotta" [ref=e2164]
+                - cell "70" [ref=e2169]
+                - cell "1×64+6" [ref=e2170]
+                - cell "1×64+6" [ref=e2171]
+              - row "Birch Log (horizontal) 62 62 62" [ref=e2172]:
+                - cell "Birch Log (horizontal)" [ref=e2173]
+                - cell "62" [ref=e2178]
+                - cell "62" [ref=e2179]
+                - cell "62" [ref=e2180]
+              - row "Clay 57 57 57" [ref=e2181]:
+                - cell "Clay" [ref=e2182]
+                - cell "57" [ref=e2187]
+                - cell "57" [ref=e2188]
+                - cell "57" [ref=e2189]
+              - row "Cobweb 53 53 53" [ref=e2190]:
+                - cell "Cobweb" [ref=e2191]
+                - cell "53" [ref=e2196]
+                - cell "53" [ref=e2197]
+                - cell "53" [ref=e2198]
+              - row "Brown Terracotta 46 46 46" [ref=e2199]:
+                - cell "Brown Terracotta" [ref=e2200]
+                - cell "46" [ref=e2205]
+                - cell "46" [ref=e2206]
+                - cell "46" [ref=e2207]
+              - row "Warped Wart Block 44 44 44" [ref=e2208]:
+                - cell "Warped Wart Block" [ref=e2209]
+                - cell "44" [ref=e2214]
+                - cell "44" [ref=e2215]
+                - cell "44" [ref=e2216]
+              - row "Cyan Terracotta 39 39 39" [ref=e2217]:
+                - cell "Cyan Terracotta" [ref=e2218]
+                - cell "39" [ref=e2223]
+                - cell "39" [ref=e2224]
+                - cell "39" [ref=e2225]
+              - row "Block of Diamond 38 38 38" [ref=e2226]:
+                - cell "Block of Diamond" [ref=e2227]
+                - cell "38" [ref=e2232]
+                - cell "38" [ref=e2233]
+                - cell "38" [ref=e2234]
+              - row "White Wool 32 32 32" [ref=e2235]:
+                - cell "White Wool" [ref=e2236]
+                - cell "32" [ref=e2241]
+                - cell "32" [ref=e2242]
+                - cell "32" [ref=e2243]
+              - row "Block of Emerald 31 31 31" [ref=e2244]:
+                - cell "Block of Emerald" [ref=e2245]
+                - cell "31" [ref=e2250]
+                - cell "31" [ref=e2251]
+                - cell "31" [ref=e2252]
+              - row "Crimson Nylium 25 25 25" [ref=e2253]:
+                - cell "Crimson Nylium" [ref=e2254]
+                - cell "25" [ref=e2259]
+                - cell "25" [ref=e2260]
+                - cell "25" [ref=e2261]
+              - row "Light Blue Wool 24 24 24" [ref=e2262]:
+                - cell "Light Blue Wool" [ref=e2263]
+                - cell "24" [ref=e2268]
+                - cell "24" [ref=e2269]
+                - cell "24" [ref=e2270]
+              - row "Block of Gold 23 23 23" [ref=e2271]:
+                - cell "Block of Gold" [ref=e2272]
+                - cell "23" [ref=e2277]
+                - cell "23" [ref=e2278]
+                - cell "23" [ref=e2279]
+              - row "Leaves (Oak) 22 22 22" [ref=e2280]:
+                - cell "Leaves (Oak)" [ref=e2281]
+                - cell "22" [ref=e2286]
+                - cell "22" [ref=e2287]
+                - cell "22" [ref=e2288]
+              - row "Grass Block 22 22 22" [ref=e2289]:
+                - cell "Grass Block" [ref=e2290]
+                - cell "22" [ref=e2295]
+                - cell "22" [ref=e2296]
+                - cell "22" [ref=e2297]
+              - row "Glow Lichen 21 21 21" [ref=e2298]:
+                - cell "Glow Lichen" [ref=e2299]
+                - cell "21" [ref=e2304]
+                - cell "21" [ref=e2305]
+                - cell "21" [ref=e2306]
+              - row "Block Of Raw Iron 20 20 20" [ref=e2307]:
+                - cell "Block Of Raw Iron" [ref=e2308]
+                - cell "20" [ref=e2313]
+                - cell "20" [ref=e2314]
+                - cell "20" [ref=e2315]
+              - row "Warped Hyphae 17 17 17" [ref=e2316]:
+                - cell "Warped Hyphae" [ref=e2317]
+                - cell "17" [ref=e2322]
+                - cell "17" [ref=e2323]
+                - cell "17" [ref=e2324]
+              - row "Yellow Wool 16 16 16" [ref=e2325]:
+                - cell "Yellow Wool" [ref=e2326]
+                - cell "16" [ref=e2331]
+                - cell "16" [ref=e2332]
+                - cell "16" [ref=e2333]
+              - row "Yellow Terracotta 16 16 16" [ref=e2334]:
+                - cell "Yellow Terracotta" [ref=e2335]
+                - cell "16" [ref=e2340]
+                - cell "16" [ref=e2341]
+                - cell "16" [ref=e2342]
+              - row "Warped Nylium 15 15 15" [ref=e2343]:
+                - cell "Warped Nylium" [ref=e2344]
+                - cell "15" [ref=e2349]
+                - cell "15" [ref=e2350]
+                - cell "15" [ref=e2351]
+              - row "Light Gray Wool 15 15 15" [ref=e2352]:
+                - cell "Light Gray Wool" [ref=e2353]
+                - cell "15" [ref=e2358]
+                - cell "15" [ref=e2359]
+                - cell "15" [ref=e2360]
+              - row "Oak Log (vertical) 15 15 15" [ref=e2361]:
+                - cell "Oak Log (vertical)" [ref=e2362]
+                - cell "15" [ref=e2367]
+                - cell "15" [ref=e2368]
+                - cell "15" [ref=e2369]
+              - row "TNT 15 15 15" [ref=e2370]:
+                - cell "TNT" [ref=e2371]
+                - cell "15" [ref=e2376]
+                - cell "15" [ref=e2377]
+                - cell "15" [ref=e2378]
+              - row "Green Wool 12 12 12" [ref=e2379]:
+                - cell "Green Wool" [ref=e2380]
+                - cell "12" [ref=e2385]
+                - cell "12" [ref=e2386]
+                - cell "12" [ref=e2387]
+              - row "Lapis Lazuli Block 11 11 11" [ref=e2388]:
+                - cell "Lapis Lazuli Block" [ref=e2389]
+                - cell "11" [ref=e2394]
+                - cell "11" [ref=e2395]
+                - cell "11" [ref=e2396]
+              - row "Cyan Wool 11 11 11" [ref=e2397]:
+                - cell "Cyan Wool" [ref=e2398]
+                - cell "11" [ref=e2403]
+                - cell "11" [ref=e2404]
+                - cell "11" [ref=e2405]
+              - row "Orange Terracotta 10 10 10" [ref=e2406]:
+                - cell "Orange Terracotta" [ref=e2407]
+                - cell "10" [ref=e2412]
+                - cell "10" [ref=e2413]
+                - cell "10" [ref=e2414]
+              - row "White Terracotta 9 9 9" [ref=e2415]:
+                - cell "White Terracotta" [ref=e2416]
+                - cell "9" [ref=e2421]
+                - cell "9" [ref=e2422]
+                - cell "9" [ref=e2423]
+              - row "Warped Stem 8 8 8" [ref=e2424]:
+                - cell "Warped Stem" [ref=e2425]
+                - cell "8" [ref=e2430]
+                - cell "8" [ref=e2431]
+                - cell "8" [ref=e2432]
+              - row "Lime Wool 8 8 8" [ref=e2433]:
+                - cell "Lime Wool" [ref=e2434]
+                - cell "8" [ref=e2439]
+                - cell "8" [ref=e2440]
+                - cell "8" [ref=e2441]
+              - row "Crimson Hyphae 8 8 8" [ref=e2442]:
+                - cell "Crimson Hyphae" [ref=e2443]
+                - cell "8" [ref=e2448]
+                - cell "8" [ref=e2449]
+                - cell "8" [ref=e2450]
+              - row "Spruce Log (vertical) 8 8 8" [ref=e2451]:
+                - cell "Spruce Log (vertical)" [ref=e2452]
+                - cell "8" [ref=e2457]
+                - cell "8" [ref=e2458]
+                - cell "8" [ref=e2459]
+              - row "Purple Wool 8 8 8" [ref=e2460]:
+                - cell "Purple Wool" [ref=e2461]
+                - cell "8" [ref=e2466]
+                - cell "8" [ref=e2467]
+                - cell "8" [ref=e2468]
+              - row "Jungle Log (vertical) 5 5 5" [ref=e2469]:
+                - cell "Jungle Log (vertical)" [ref=e2470]
+                - cell "5" [ref=e2475]
+                - cell "5" [ref=e2476]
+                - cell "5" [ref=e2477]
+              - row "Lime Terracotta 4 4 4" [ref=e2478]:
+                - cell "Lime Terracotta" [ref=e2479]
+                - cell "4" [ref=e2484]
+                - cell "4" [ref=e2485]
+                - cell "4" [ref=e2486]
+              - row "Red Terracotta 3 3 3" [ref=e2487]:
+                - cell "Red Terracotta" [ref=e2488]
+                - cell "3" [ref=e2493]
+                - cell "3" [ref=e2494]
+                - cell "3" [ref=e2495]
+              - row "Orange Wool 3 3 3" [ref=e2496]:
+                - cell "Orange Wool" [ref=e2497]
+                - cell "3" [ref=e2502]
+                - cell "3" [ref=e2503]
+                - cell "3" [ref=e2504]
+              - row "Block of Iron 3 3 3" [ref=e2505]:
+                - cell "Block of Iron" [ref=e2506]
+                - cell "3" [ref=e2511]
+                - cell "3" [ref=e2512]
+                - cell "3" [ref=e2513]
+              - row "Brown Wool 2 2 2" [ref=e2514]:
+                - cell "Brown Wool" [ref=e2515]
+                - cell "2" [ref=e2520]
+                - cell "2" [ref=e2521]
+                - cell "2" [ref=e2522]
+              - row "Netherrack 2 2 2" [ref=e2523]:
+                - cell "Netherrack" [ref=e2524]
+                - cell "2" [ref=e2529]
+                - cell "2" [ref=e2530]
+                - cell "2" [ref=e2531]
+              - row "Deepslate 1 1 1" [ref=e2532]:
+                - cell "Deepslate" [ref=e2533]
+                - cell "1" [ref=e2538]
+                - cell "1" [ref=e2539]
+                - cell "1" [ref=e2540]
+              - row "Light Gray Terracotta 1 1 1" [ref=e2541]:
+                - cell "Light Gray Terracotta" [ref=e2542]
+                - cell "1" [ref=e2547]
+                - cell "1" [ref=e2548]
+                - cell "1" [ref=e2549]
+              - row "Red Wool 1 1 1" [ref=e2550]:
+                - cell "Red Wool" [ref=e2551]
+                - cell "1" [ref=e2556]
+                - cell "1" [ref=e2557]
+                - cell "1" [ref=e2558]
+              - row "Purple Terracotta 1 1 1" [ref=e2559]:
+                - cell "Purple Terracotta" [ref=e2560]
+                - cell "1" [ref=e2565]
+                - cell "1" [ref=e2566]
+                - cell "1" [ref=e2567]
+            - rowgroup [ref=e2568]:
+              - row "Опорные блоки (stone) 15,740 245×64+60 9sh+2×64+60" [ref=e2569]:
+                - cell "Опорные блоки (stone)" [ref=e2570]
+                - cell "15,740" [ref=e2573]
+                - cell "245×64+60" [ref=e2574]
+                - cell "9sh+2×64+60" [ref=e2575]
+            - rowgroup [ref=e2576]:
+              - row "ИТОГО 16,384 256×64 9sh+13×64" [ref=e2577]:
+                - cell "ИТОГО" [ref=e2578]
+                - cell "16,384" [ref=e2579]
+                - cell "256×64" [ref=e2580]
+                - cell "9sh+13×64" [ref=e2581]
+          - button "⎘ КОПИРОВАТЬ" [ref=e2583] [cursor=pointer]
+      - generic [ref=e1695]:
+        - heading "▼ Экспорт" [level=3] [ref=e1696]
+        - generic [ref=e2584]:
+          - button "↓ PNG" [ref=e2611] [cursor=pointer]
+          - button "↓ MAP.DAT" [ref=e2586] [cursor=pointer]
+          - button "↓ LITEMATIC 3D" [ref=e2587] [cursor=pointer]
+        - button "🔗 ПОЛУЧИТЬ ССЫЛКУ" [ref=e1702] [cursor=pointer]
+  - generic [ref=e1703]:
+    - generic [ref=e1704]: █ FLOYD–STEINBERG
+    - generic [ref=e1705]: █ 1×1 MAPS
+    - generic [ref=e1706]: █ 183 COLORS
+    - generic [ref=e1707]: █ 3D
+    - generic [ref=e1708]: █ 100%
+    - generic [ref=e1709]: █ 128×128px
+    - generic [ref=e1710]: Made by SmetankaKluss
+    - link "@SmetankaKluss" [ref=e1711] [cursor=pointer]:
+      - /url: https://t.me/SmetankaKluss
+      - img [ref=e1712]
+      - text: "@SmetankaKluss"

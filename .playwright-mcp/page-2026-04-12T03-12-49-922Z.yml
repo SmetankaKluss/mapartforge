@@ -1,0 +1,1272 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img "MapKluss" [ref=e6]
+      - generic [ref=e7]:
+        - heading "MAPKLUSS" [level=1] [ref=e8]
+        - generic [ref=e9]: MINECRAFT MAP ART GENERATOR
+      - button "🎨 Художник" [ref=e10] [cursor=pointer]
+      - button "? Гид" [ref=e11] [cursor=pointer]
+      - button "📖 Wiki" [ref=e12] [cursor=pointer]
+      - link "❤ Поддержать" [ref=e13] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+      - button "EN" [ref=e14] [cursor=pointer]
+      - link "v1.5.0" [ref=e15] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+  - generic [ref=e16]:
+    - complementary [ref=e17]:
+      - generic [ref=e18]:
+        - generic "Нажми Ctrl+V чтобы вставить изображение из буфера" [active] [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: ⛏
+          - paragraph [ref=e21]: Перетащи изображение сюда
+          - paragraph [ref=e22]: или нажми для выбора файла
+          - paragraph [ref=e23]: Ctrl+V — вставить из буфера
+        - button "+ Новый холст" [ref=e25] [cursor=pointer]
+        - generic [ref=e1291]:
+          - button "✂ Обрезать" [ref=e1292] [cursor=pointer]
+          - generic [ref=e1293]: 1:1
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - heading "▼ Размер" [level=3] [ref=e29]:
+                - generic [ref=e30] [cursor=pointer]: ▼
+                - text: Размер
+              - generic [ref=e31]:
+                - generic [ref=e32]:
+                  - button "1×1" [ref=e33] [cursor=pointer]:
+                    - img [ref=e34]
+                    - generic [ref=e36]: 1×1
+                  - button "2×1" [ref=e37] [cursor=pointer]:
+                    - img [ref=e38]
+                    - generic [ref=e41]: 2×1
+                  - button "1×2" [ref=e42] [cursor=pointer]:
+                    - img [ref=e43]
+                    - generic [ref=e46]: 1×2
+                  - button "2×2" [ref=e47] [cursor=pointer]:
+                    - img [ref=e48]
+                    - generic [ref=e53]: 2×2
+                  - button "3×2" [ref=e54] [cursor=pointer]:
+                    - img [ref=e55]
+                    - generic [ref=e62]: 3×2
+                  - button "2×3" [ref=e63] [cursor=pointer]:
+                    - img [ref=e64]
+                    - generic [ref=e71]: 2×3
+                  - button "3×3" [ref=e72] [cursor=pointer]:
+                    - img [ref=e73]
+                    - generic [ref=e83]: 3×3
+                  - button "Свой" [ref=e84] [cursor=pointer]:
+                    - img [ref=e85]
+                    - generic [ref=e92]: Свой
+                - paragraph [ref=e93]:
+                  - text: 1×1 карт —
+                  - strong [ref=e94]: 128×128
+                  - text: блоков
+            - generic [ref=e95]:
+              - heading "▼ Режим" [level=3] [ref=e96]:
+                - generic [ref=e97] [cursor=pointer]: ▼
+                - text: Режим
+              - generic [ref=e99]:
+                - button "2D Flat" [ref=e100] [cursor=pointer]
+                - button "3D Stair" [ref=e101] [cursor=pointer]
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - heading "▼ Дизеринг" [level=3] [ref=e104]:
+                - generic [ref=e105] [cursor=pointer]: ▼
+                - text: Дизеринг
+              - generic [ref=e107]:
+                - generic [ref=e108] [cursor=pointer]:
+                  - generic [ref=e109]: None
+                  - generic [ref=e110]: Ближайший цвет OKLAB
+                - generic [ref=e111] [cursor=pointer]:
+                  - text: ▶
+                  - generic [ref=e112]: Floyd–Steinberg
+                  - generic [ref=e113]: Классическая змейковая диффузия
+                - generic [ref=e114] [cursor=pointer]:
+                  - generic [ref=e115]: Stucki
+                  - generic [ref=e116]: Плавная диффузия на 12 соседей
+                - generic [ref=e117] [cursor=pointer]:
+                  - generic [ref=e118]: JJN
+                  - generic [ref=e119]: Jarvis–Judice–Ninke
+                - generic [ref=e120] [cursor=pointer]:
+                  - generic [ref=e121]: Atkinson
+                  - generic [ref=e122]: Стиль Apple HyperCard
+                - generic [ref=e123] [cursor=pointer]:
+                  - generic [ref=e124]: Blue Noise
+                  - generic [ref=e125]: Апериодический (IGN)
+                - generic [ref=e126] [cursor=pointer]:
+                  - generic [ref=e127]: "Yliluoma #2"
+                  - generic [ref=e128]: Паттерновый дизеринг для пиксель-арта
+                - generic [ref=e129] [cursor=pointer]:
+                  - generic [ref=e130]: KlussDither
+                  - generic [ref=e131]: IGN-дизеринг для аниме-арта
+            - generic [ref=e132]:
+              - heading "▼ Интенсивность 100 %" [level=3] [ref=e133]:
+                - generic [ref=e134] [cursor=pointer]: ▼
+                - text: Интенсивность
+                - generic [ref=e135]:
+                  - spinbutton [ref=e136]: "100"
+                  - generic [ref=e137]: "%"
+              - generic [ref=e138]:
+                - slider [ref=e139]: "100"
+                - generic [ref=e140]:
+                  - generic [ref=e141]: Слабо
+                  - generic [ref=e142]: Полная
+                - paragraph [ref=e143]: Сила распространения ошибки.
+            - paragraph [ref=e145]: ✓ Подбор цвета OKLAB
+        - generic [ref=e147]:
+          - heading "▼ ☀ Коррекция" [level=3] [ref=e148]:
+            - generic [ref=e149] [cursor=pointer]: ▼
+            - button "☀" [ref=e150] [cursor=pointer]
+            - generic [ref=e151]: Коррекция
+          - generic [ref=e152]:
+            - generic [ref=e1296]: Предпросмотр
+            - generic [ref=e153]:
+              - generic [ref=e154]:
+                - generic [ref=e155]:
+                  - generic [ref=e156]: Яркость
+                  - spinbutton [ref=e157]: "0"
+                - slider [ref=e158]: "0"
+              - generic [ref=e159]:
+                - generic [ref=e160]:
+                  - generic [ref=e161]: Контраст
+                  - spinbutton [ref=e162]: "0"
+                - slider [ref=e163]: "0"
+              - generic [ref=e164]:
+                - generic [ref=e165]:
+                  - generic [ref=e166]: Насыщенность
+                  - spinbutton [ref=e167]: "0"
+                - slider [ref=e168]: "0"
+      - button "↺ Сбросить всё" [ref=e170] [cursor=pointer]:
+        - generic [ref=e171]: ↺
+        - text: Сбросить всё
+    - main [ref=e172]:
+      - generic [ref=e173]:
+        - generic [ref=e174]:
+          - button "" [disabled] [ref=e175]:
+            - generic [ref=e176]: 
+          - button "" [disabled] [ref=e177]:
+            - generic [ref=e178]: 
+        - generic [ref=e1297]:
+          - generic [ref=e1298]:
+            - button "" [ref=e1299] [cursor=pointer]:
+              - generic [ref=e1300]: 
+            - button "" [ref=e1301] [cursor=pointer]:
+              - generic [ref=e1302]: 
+            - button "" [ref=e1303] [cursor=pointer]:
+              - generic [ref=e1304]: 
+            - button "" [ref=e1305] [cursor=pointer]:
+              - generic [ref=e1306]: 
+            - button "" [ref=e1307] [cursor=pointer]:
+              - generic [ref=e1308]: 
+          - generic [ref=e1309]:
+            - generic [ref=e1311]: нет блока
+            - button "▾" [ref=e1312] [cursor=pointer]
+        - generic [ref=e1314]:
+          - slider "Zoom (Ctrl+scroll)" [ref=e1315] [cursor=pointer]: "25"
+          - spinbutton [ref=e1316]: "100"
+          - generic [ref=e1317]: "%"
+        - generic [ref=e1319]:
+          - button "⌖" [ref=e1320] [cursor=pointer]
+          - button "╎" [ref=e1321] [cursor=pointer]
+          - button "⟺" [ref=e1322] [cursor=pointer]
+          - button "Блоки" [ref=e1323] [cursor=pointer]
+          - button "Сравнить" [ref=e1324] [cursor=pointer]
+          - button "Сетка" [ref=e1325] [cursor=pointer]
+        - button "⌨" [ref=e182] [cursor=pointer]
+      - generic [ref=e1326]:
+        - generic [ref=e1331]: ◀▶
+        - generic: ORIGINAL
+        - generic: PROCESSED
+    - complementary [ref=e188]:
+      - generic [ref=e189]:
+        - generic [ref=e191]:
+          - heading "> Палитра 61 цветов · 61 блоков" [level=3] [ref=e192]:
+            - text: "> Палитра"
+            - generic [ref=e193]: 61 цветов · 61 блоков
+          - combobox [ref=e195] [cursor=pointer]:
+            - option "— выбрать пресет —"
+            - option "All Blocks" [selected]
+            - option "Carpet Only"
+          - generic [ref=e196]:
+            - textbox "Поиск блоков…" [ref=e198]
+            - button "Сохранить" [ref=e199] [cursor=pointer]
+            - button "Сброс" [ref=e200] [cursor=pointer]
+          - button "⬡ Поделиться палитрой" [ref=e202] [cursor=pointer]
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205] [cursor=pointer]:
+                - generic "#7fb238" [ref=e206]
+                - generic [ref=e207]: Grass
+                - button "◑" [ref=e208]
+              - generic [ref=e209]:
+                - generic "Grass Block minecraft:grass_block" [ref=e210] [cursor=pointer]
+                - generic "Slime Block minecraft:slime_block" [ref=e212] [cursor=pointer]
+            - generic [ref=e214]:
+              - generic [ref=e215] [cursor=pointer]:
+                - generic "#f7e9a3" [ref=e216]
+                - generic [ref=e217]: Sand
+                - button "◑" [ref=e218]
+              - generic [ref=e219]:
+                - generic "Sand minecraft:sand" [ref=e220] [cursor=pointer]
+                - generic "Sandstone minecraft:sandstone" [ref=e222] [cursor=pointer]
+                - generic "Sandstone Slab minecraft:sandstone_slab" [ref=e224] [cursor=pointer]
+                - generic "Birch Log (vertical) minecraft:birch_log" [ref=e226] [cursor=pointer]
+                - generic "Birch Planks minecraft:birch_planks" [ref=e228] [cursor=pointer]
+                - generic "Birch Slab minecraft:birch_slab" [ref=e230] [cursor=pointer]
+                - generic "Glowstone minecraft:glowstone" [ref=e232] [cursor=pointer]
+                - generic "End Stone minecraft:end_stone" [ref=e234] [cursor=pointer]
+                - generic "End Stone Bricks minecraft:end_stone_bricks" [ref=e236] [cursor=pointer]
+                - generic "End Stone Brick Slab minecraft:end_stone_brick_slab" [ref=e238] [cursor=pointer]
+                - generic "Bone Block minecraft:bone_block" [ref=e240] [cursor=pointer]
+                - generic "Birch Pressure Plate minecraft:birch_pressure_plate" [ref=e242] [cursor=pointer]
+                - generic "Ochre Froglight minecraft:ochre_froglight" [ref=e244] [cursor=pointer]
+                - generic "Smooth Sandstone minecraft:smooth_sandstone" [ref=e246] [cursor=pointer]
+                - generic "Cut Sandstone minecraft:cut_sandstone" [ref=e248] [cursor=pointer]
+                - generic "Chiseled Sandstone minecraft:chiseled_sandstone" [ref=e250] [cursor=pointer]
+            - generic [ref=e252]:
+              - generic [ref=e253] [cursor=pointer]:
+                - generic "#c7c7c7" [ref=e254]
+                - generic [ref=e255]: Cobweb
+                - button "◑" [ref=e256]
+              - generic [ref=e257]:
+                - generic "Cobweb minecraft:cobweb" [ref=e258] [cursor=pointer]
+                - generic "Mushroom Stem minecraft:mushroom_stem" [ref=e260] [cursor=pointer]
+                - generic "White Candle minecraft:white_candle" [ref=e262] [cursor=pointer]
+            - generic [ref=e264]:
+              - generic [ref=e265] [cursor=pointer]:
+                - generic "#ff0000" [ref=e266]
+                - generic [ref=e267]: TNT
+                - button "◑" [ref=e268]
+              - generic [ref=e269]:
+                - generic "TNT minecraft:tnt" [ref=e270] [cursor=pointer]
+                - generic "Block of Redstone minecraft:redstone_block" [ref=e272] [cursor=pointer]
+            - generic [ref=e274]:
+              - generic [ref=e275] [cursor=pointer]:
+                - generic "#a0a0ff" [ref=e276]
+                - generic [ref=e277]: Ice
+                - button "◑" [ref=e278]
+              - generic [ref=e279]:
+                - generic "Ice minecraft:ice" [ref=e280] [cursor=pointer]
+                - generic "Packed Ice minecraft:packed_ice" [ref=e282] [cursor=pointer]
+                - generic "Blue Ice minecraft:blue_ice" [ref=e284] [cursor=pointer]
+            - generic [ref=e286]:
+              - generic [ref=e287] [cursor=pointer]:
+                - generic "#a7a7a7" [ref=e288]
+                - generic [ref=e289]: Iron
+                - button "◑" [ref=e290]
+              - generic [ref=e291]:
+                - generic "Block of Iron minecraft:iron_block" [ref=e292] [cursor=pointer]
+                - generic "Iron Trapdoor minecraft:iron_trapdoor" [ref=e294] [cursor=pointer]
+                - generic "Iron Bars minecraft:unknown" [ref=e296] [cursor=pointer]
+                - generic "Weighted Pressure Plate (Heavy) minecraft:heavy_weighted_pressure_plate" [ref=e298] [cursor=pointer]
+                - generic "Brewing Stand minecraft:brewing_stand" [ref=e300] [cursor=pointer]
+            - generic [ref=e302]:
+              - generic [ref=e303] [cursor=pointer]:
+                - generic "#007c00" [ref=e304]
+                - generic [ref=e305]: Leaves
+                - button "◑" [ref=e306]
+              - generic [ref=e307]:
+                - generic "Leaves (Oak) minecraft:oak_leaves" [ref=e308] [cursor=pointer]
+                - generic "Leaves (Spruce) minecraft:spruce_leaves" [ref=e310] [cursor=pointer]
+                - generic "Leaves (Birch) minecraft:birch_leaves" [ref=e312] [cursor=pointer]
+                - generic "Leaves (Jungle) minecraft:jungle_leaves" [ref=e314] [cursor=pointer]
+                - generic "Leaves (Acacia) minecraft:acacia_leaves" [ref=e316] [cursor=pointer]
+                - generic "Leaves (Dark Oak) minecraft:dark_oak_leaves" [ref=e318] [cursor=pointer]
+                - generic "Leaves (Azalea) minecraft:azalea_leaves" [ref=e320] [cursor=pointer]
+                - generic "Block of Bamboo (horizontal) minecraft:bamboo_block" [ref=e322] [cursor=pointer]
+            - generic [ref=e324]:
+              - generic [ref=e325] [cursor=pointer]:
+                - generic "#a4a8b8" [ref=e326]
+                - generic [ref=e327]: Clay
+                - button "●" [ref=e328]
+              - generic "Clay minecraft:clay" [ref=e330] [cursor=pointer]
+            - generic [ref=e332]:
+              - generic [ref=e333] [cursor=pointer]:
+                - generic "#976d4d" [ref=e334]
+                - generic [ref=e335]: Dirt
+                - button "◑" [ref=e336]
+              - generic [ref=e337]:
+                - generic "Jungle Log (vertical) minecraft:jungle_log" [ref=e338] [cursor=pointer]
+                - generic "Jungle Planks minecraft:jungle_planks" [ref=e340] [cursor=pointer]
+                - generic "Jungle Slab minecraft:jungle_slab" [ref=e342] [cursor=pointer]
+                - generic "Dirt minecraft:dirt" [ref=e344] [cursor=pointer]
+                - generic "Coarse Dirt minecraft:coarse_dirt" [ref=e346] [cursor=pointer]
+                - generic "Rooted Dirt minecraft:rooted_dirt" [ref=e348] [cursor=pointer]
+                - generic "Jukebox minecraft:jukebox" [ref=e350] [cursor=pointer]
+                - generic "Granite minecraft:granite" [ref=e352] [cursor=pointer]
+                - generic "Granite Slab minecraft:granite_slab" [ref=e354] [cursor=pointer]
+                - generic "Jungle Pressure Plate minecraft:jungle_pressure_plate" [ref=e356] [cursor=pointer]
+                - generic "Packed Mud minecraft:packed_mud" [ref=e358] [cursor=pointer]
+                - generic "Dirt Path minecraft:dirt_path" [ref=e360] [cursor=pointer]
+                - generic "Polished Granite minecraft:polished_granite" [ref=e362] [cursor=pointer]
+            - generic [ref=e364]:
+              - generic [ref=e365] [cursor=pointer]:
+                - generic "#707070" [ref=e366]
+                - generic [ref=e367]: Stone
+                - button "◑" [ref=e368]
+              - generic [ref=e369]:
+                - generic "Cobblestone minecraft:cobblestone" [ref=e370] [cursor=pointer]
+                - generic "Cobblestone Slab minecraft:cobblestone_slab" [ref=e372] [cursor=pointer]
+                - generic "Mossy Cobblestone minecraft:mossy_cobblestone" [ref=e374] [cursor=pointer]
+                - generic "Mossy Cobblestone Slab minecraft:mossy_cobblestone_slab" [ref=e376] [cursor=pointer]
+                - generic "Stone minecraft:stone" [ref=e378] [cursor=pointer]
+                - generic "Stone Slab minecraft:stone_slab" [ref=e380] [cursor=pointer]
+                - generic "Smooth Stone Slab minecraft:smooth_stone_slab" [ref=e382] [cursor=pointer]
+                - generic "Stone Bricks minecraft:stone_bricks" [ref=e384] [cursor=pointer]
+                - generic "Stone Brick Slab minecraft:stone_brick_slab" [ref=e386] [cursor=pointer]
+                - generic "Andesite minecraft:andesite" [ref=e388] [cursor=pointer]
+                - generic "Andesite Slab minecraft:andesite_slab" [ref=e390] [cursor=pointer]
+                - generic "Bedrock minecraft:bedrock" [ref=e392] [cursor=pointer]
+                - generic "Acacia Log (horizontal) minecraft:acacia_log" [ref=e394] [cursor=pointer]
+                - generic "Gravel minecraft:gravel" [ref=e396] [cursor=pointer]
+                - generic "Stone Pressure Plate minecraft:stone_pressure_plate" [ref=e398] [cursor=pointer]
+                - generic "Mossy Stone Bricks minecraft:mossy_stone_bricks" [ref=e400] [cursor=pointer]
+                - generic "Cracked Stone Bricks minecraft:cracked_stone_bricks" [ref=e402] [cursor=pointer]
+                - generic "Chiseled Stone Bricks minecraft:chiseled_stone_bricks" [ref=e404] [cursor=pointer]
+                - generic "Smooth Stone minecraft:smooth_stone" [ref=e406] [cursor=pointer]
+                - generic "Polished Andesite minecraft:polished_andesite" [ref=e408] [cursor=pointer]
+            - generic [ref=e410]:
+              - generic [ref=e411] [cursor=pointer]:
+                - generic "#4040ff" [ref=e412]
+                - generic [ref=e413]: Water
+                - button "●" [ref=e414]
+              - generic "Water (Unsupported!) minecraft:water" [ref=e416] [cursor=pointer]
+            - generic [ref=e418]:
+              - generic [ref=e419] [cursor=pointer]:
+                - generic "#8f7748" [ref=e420]
+                - generic [ref=e421]: Oak
+                - button "◑" [ref=e422]
+              - generic [ref=e423]:
+                - generic "Oak Log (vertical) minecraft:oak_log" [ref=e424] [cursor=pointer]
+                - generic "Oak Planks minecraft:oak_planks" [ref=e426] [cursor=pointer]
+                - generic "Oak Slab minecraft:oak_slab" [ref=e428] [cursor=pointer]
+                - generic "Crafting Table minecraft:crafting_table" [ref=e430] [cursor=pointer]
+                - generic "Oak Pressure Plate minecraft:oak_pressure_plate" [ref=e432] [cursor=pointer]
+            - generic [ref=e434]:
+              - generic [ref=e435] [cursor=pointer]:
+                - generic "#fffcf5" [ref=e436]
+                - generic [ref=e437]: Birch
+                - button "◑" [ref=e438]
+              - generic [ref=e439]:
+                - generic "Birch Log (horizontal) minecraft:birch_log" [ref=e440] [cursor=pointer]
+                - generic "Diorite minecraft:diorite" [ref=e442] [cursor=pointer]
+                - generic "Diorite Slab minecraft:diorite_slab" [ref=e444] [cursor=pointer]
+                - generic "Quartz Block minecraft:quartz_block" [ref=e446] [cursor=pointer]
+                - generic "Quartz Slab minecraft:quartz_slab" [ref=e448] [cursor=pointer]
+                - generic "Sea Lantern minecraft:sea_lantern" [ref=e450] [cursor=pointer]
+                - generic "Polished Diorite minecraft:polished_diorite" [ref=e452] [cursor=pointer]
+            - generic [ref=e454]:
+              - generic [ref=e455] [cursor=pointer]:
+                - generic "#ffffff" [ref=e456]
+                - generic [ref=e457]: White Wool
+                - button "◑" [ref=e458]
+              - generic [ref=e459]:
+                - generic "White Wool minecraft:white_wool" [ref=e460] [cursor=pointer]
+                - generic "White Carpet minecraft:white_carpet" [ref=e462] [cursor=pointer]
+                - generic "White Stained Glass minecraft:white_stained_glass" [ref=e464] [cursor=pointer]
+                - generic "White Concrete minecraft:white_concrete" [ref=e466] [cursor=pointer]
+                - generic "White Concrete Powder minecraft:white_concrete_powder" [ref=e468] [cursor=pointer]
+                - generic "White Glazed Terracotta minecraft:white_glazed_terracotta" [ref=e470] [cursor=pointer]
+                - generic "Snow Block minecraft:snow_block" [ref=e472] [cursor=pointer]
+                - generic "Snow Layer minecraft:snow" [ref=e474] [cursor=pointer]
+            - generic [ref=e476]:
+              - generic [ref=e477] [cursor=pointer]:
+                - generic "#d87f33" [ref=e478]
+                - generic [ref=e479]: Orange Wool
+                - button "◑" [ref=e480]
+              - generic [ref=e481]:
+                - generic "Orange Wool minecraft:orange_wool" [ref=e482] [cursor=pointer]
+                - generic "Orange Carpet minecraft:orange_carpet" [ref=e484] [cursor=pointer]
+                - generic "Orange Stained Glass minecraft:orange_stained_glass" [ref=e486] [cursor=pointer]
+                - generic "Orange Concrete minecraft:orange_concrete" [ref=e488] [cursor=pointer]
+                - generic "Orange Concrete Powder minecraft:orange_concrete_powder" [ref=e490] [cursor=pointer]
+                - generic "Orange Glazed Terracotta minecraft:orange_glazed_terracotta" [ref=e492] [cursor=pointer]
+                - generic "Pumpkin minecraft:pumpkin" [ref=e494] [cursor=pointer]
+                - generic "Acacia Log (vertical) minecraft:acacia_log" [ref=e496] [cursor=pointer]
+                - generic "Acacia Planks minecraft:acacia_planks" [ref=e498] [cursor=pointer]
+                - generic "Acacia Slab minecraft:acacia_slab" [ref=e500] [cursor=pointer]
+                - generic "Red Sand minecraft:red_sand" [ref=e502] [cursor=pointer]
+                - generic "Red Sandstone minecraft:red_sandstone" [ref=e504] [cursor=pointer]
+                - generic "Red Sandstone Slab minecraft:red_sandstone_slab" [ref=e506] [cursor=pointer]
+                - generic "Terracotta minecraft:terracotta" [ref=e508] [cursor=pointer]
+                - generic "Honey Block minecraft:honey_block" [ref=e510] [cursor=pointer]
+                - generic "Honeycomb Block minecraft:honeycomb_block" [ref=e512] [cursor=pointer]
+                - generic "Block Of Raw Copper minecraft:raw_copper_block" [ref=e514] [cursor=pointer]
+                - generic "Waxed Block Of Copper minecraft:waxed_copper_block" [ref=e516] [cursor=pointer]
+                - generic "Waxed Cut Copper Slab minecraft:waxed_cut_copper_slab" [ref=e518] [cursor=pointer]
+                - generic "Acacia Pressure Plate minecraft:acacia_pressure_plate" [ref=e520] [cursor=pointer]
+                - generic "Copper Block minecraft:copper_block" [ref=e522] [cursor=pointer]
+                - generic "Cut Copper minecraft:cut_copper" [ref=e524] [cursor=pointer]
+                - generic "Waxed Cut Copper minecraft:waxed_cut_copper" [ref=e526] [cursor=pointer]
+            - generic [ref=e528]:
+              - generic [ref=e529] [cursor=pointer]:
+                - generic "#b24cd8" [ref=e530]
+                - generic [ref=e531]: Magenta Wool
+                - button "◑" [ref=e532]
+              - generic [ref=e533]:
+                - generic "Magenta Wool minecraft:magenta_wool" [ref=e534] [cursor=pointer]
+                - generic "Magenta Carpet minecraft:magenta_carpet" [ref=e536] [cursor=pointer]
+                - generic "Magenta Stained Glass minecraft:magenta_stained_glass" [ref=e538] [cursor=pointer]
+                - generic "Magenta Concrete minecraft:magenta_concrete" [ref=e540] [cursor=pointer]
+                - generic "Magenta Concrete Powder minecraft:magenta_concrete_powder" [ref=e542] [cursor=pointer]
+                - generic "Magenta Glazed Terracotta minecraft:magenta_glazed_terracotta" [ref=e544] [cursor=pointer]
+                - generic "Purpur Block minecraft:purpur_block" [ref=e546] [cursor=pointer]
+                - generic "Purpur Slab minecraft:purpur_slab" [ref=e548] [cursor=pointer]
+                - generic "Purpur Pillar minecraft:purpur_pillar" [ref=e550] [cursor=pointer]
+            - generic [ref=e552]:
+              - generic [ref=e553] [cursor=pointer]:
+                - generic "#6699d8" [ref=e554]
+                - generic [ref=e555]: Light Blue Wool
+                - button "◑" [ref=e556]
+              - generic [ref=e557]:
+                - generic "Light Blue Wool minecraft:light_blue_wool" [ref=e558] [cursor=pointer]
+                - generic "Light Blue Carpet minecraft:light_blue_carpet" [ref=e560] [cursor=pointer]
+                - generic "Light Blue Stained Glass minecraft:light_blue_stained_glass" [ref=e562] [cursor=pointer]
+                - generic "Light Blue Concrete minecraft:light_blue_concrete" [ref=e564] [cursor=pointer]
+                - generic "Light Blue Concrete Powder minecraft:light_blue_concrete_powder" [ref=e566] [cursor=pointer]
+                - generic "Light Blue Glazed Terracotta minecraft:light_blue_glazed_terracotta" [ref=e568] [cursor=pointer]
+            - generic [ref=e570]:
+              - generic [ref=e571] [cursor=pointer]:
+                - generic "#e5e533" [ref=e572]
+                - generic [ref=e573]: Yellow Wool
+                - button "◑" [ref=e574]
+              - generic [ref=e575]:
+                - generic "Yellow Wool minecraft:yellow_wool" [ref=e576] [cursor=pointer]
+                - generic "Yellow Carpet minecraft:yellow_carpet" [ref=e578] [cursor=pointer]
+                - generic "Yellow Stained Glass minecraft:yellow_stained_glass" [ref=e580] [cursor=pointer]
+                - generic "Yellow Concrete minecraft:yellow_concrete" [ref=e582] [cursor=pointer]
+                - generic "Yellow Concrete Powder minecraft:yellow_concrete_powder" [ref=e584] [cursor=pointer]
+                - generic "Yellow Glazed Terracotta minecraft:yellow_glazed_terracotta" [ref=e586] [cursor=pointer]
+                - generic "Hay Bale minecraft:hay_block" [ref=e588] [cursor=pointer]
+                - generic "Sponge (any) minecraft:sponge" [ref=e590] [cursor=pointer]
+                - generic "Block of Bamboo (vertical) minecraft:bamboo_block" [ref=e592] [cursor=pointer]
+                - generic "Bamboo Planks minecraft:bamboo_planks" [ref=e594] [cursor=pointer]
+                - generic "Bamboo Slab minecraft:bamboo_slab" [ref=e596] [cursor=pointer]
+                - generic "Bamboo Mosaic minecraft:bamboo_mosaic" [ref=e598] [cursor=pointer]
+                - generic "Bamboo Mosaic Slab minecraft:bamboo_mosaic_slab" [ref=e600] [cursor=pointer]
+                - generic "Bamboo Pressure Plate minecraft:bamboo_pressure_plate" [ref=e602] [cursor=pointer]
+            - generic [ref=e604]:
+              - generic [ref=e605] [cursor=pointer]:
+                - generic "#7fcc19" [ref=e606]
+                - generic [ref=e607]: Lime Wool
+                - button "◑" [ref=e608]
+              - generic [ref=e609]:
+                - generic "Lime Wool minecraft:lime_wool" [ref=e610] [cursor=pointer]
+                - generic "Lime Carpet minecraft:lime_carpet" [ref=e612] [cursor=pointer]
+                - generic "Lime Stained Glass minecraft:lime_stained_glass" [ref=e614] [cursor=pointer]
+                - generic "Lime Concrete minecraft:lime_concrete" [ref=e616] [cursor=pointer]
+                - generic "Lime Concrete Powder minecraft:lime_concrete_powder" [ref=e618] [cursor=pointer]
+                - generic "Lime Glazed Terracotta minecraft:lime_glazed_terracotta" [ref=e620] [cursor=pointer]
+                - generic "Melon minecraft:melon" [ref=e622] [cursor=pointer]
+            - generic [ref=e624]:
+              - generic [ref=e625] [cursor=pointer]:
+                - generic "#f27fa5" [ref=e626]
+                - generic [ref=e627]: Pink Wool
+                - button "◑" [ref=e628]
+              - generic [ref=e629]:
+                - generic "Pink Wool minecraft:pink_wool" [ref=e630] [cursor=pointer]
+                - generic "Pink Carpet minecraft:pink_carpet" [ref=e632] [cursor=pointer]
+                - generic "Pink Stained Glass minecraft:pink_stained_glass" [ref=e634] [cursor=pointer]
+                - generic "Pink Concrete minecraft:pink_concrete" [ref=e636] [cursor=pointer]
+                - generic "Pink Concrete Powder minecraft:pink_concrete_powder" [ref=e638] [cursor=pointer]
+                - generic "Pink Glazed Terracotta minecraft:pink_glazed_terracotta" [ref=e640] [cursor=pointer]
+                - generic "Pearlescent Froglight minecraft:pearlescent_froglight" [ref=e642] [cursor=pointer]
+                - generic "Cherry Leaves minecraft:cherry_leaves" [ref=e644] [cursor=pointer]
+            - generic [ref=e646]:
+              - generic [ref=e647] [cursor=pointer]:
+                - generic "#4c4c4c" [ref=e648]
+                - generic [ref=e649]: Gray Wool
+                - button "◑" [ref=e650]
+              - generic [ref=e651]:
+                - generic "Gray Wool minecraft:gray_wool" [ref=e652] [cursor=pointer]
+                - generic "Gray Carpet minecraft:gray_carpet" [ref=e654] [cursor=pointer]
+                - generic "Gray Stained Glass minecraft:gray_stained_glass" [ref=e656] [cursor=pointer]
+                - generic "Gray Concrete minecraft:gray_concrete" [ref=e658] [cursor=pointer]
+                - generic "Gray Concrete Powder minecraft:gray_concrete_powder" [ref=e660] [cursor=pointer]
+                - generic "Gray Glazed Terracotta minecraft:gray_glazed_terracotta" [ref=e662] [cursor=pointer]
+                - generic "Dead Tube Coral Block minecraft:dead_tube_coral_block" [ref=e664] [cursor=pointer]
+                - generic "Dead Brain Coral Block minecraft:dead_brain_coral_block" [ref=e666] [cursor=pointer]
+                - generic "Dead Bubble Coral Block minecraft:dead_bubble_coral_block" [ref=e668] [cursor=pointer]
+                - generic "Dead Fire Coral Block minecraft:dead_fire_coral_block" [ref=e670] [cursor=pointer]
+                - generic "Dead Horn Coral Block minecraft:dead_horn_coral_block" [ref=e672] [cursor=pointer]
+                - generic "Tinted Glass minecraft:tinted_glass" [ref=e674] [cursor=pointer]
+            - generic [ref=e676]:
+              - generic [ref=e677] [cursor=pointer]:
+                - generic "#999999" [ref=e678]
+                - generic [ref=e679]: Light Gray Wool
+                - button "◑" [ref=e680]
+              - generic [ref=e681]:
+                - generic "Light Gray Wool minecraft:light_gray_wool" [ref=e682] [cursor=pointer]
+                - generic "Light Gray Carpet minecraft:light_gray_carpet" [ref=e684] [cursor=pointer]
+                - generic "Light Gray Stained Glass minecraft:light_gray_stained_glass" [ref=e686] [cursor=pointer]
+                - generic "Light Gray Concrete minecraft:light_gray_concrete" [ref=e688] [cursor=pointer]
+                - generic "Light Gray Concrete Powder minecraft:light_gray_concrete_powder" [ref=e690] [cursor=pointer]
+                - generic "Light Gray Glazed Terracotta minecraft:light_gray_glazed_terracotta" [ref=e692] [cursor=pointer]
+            - generic [ref=e694]:
+              - generic [ref=e695] [cursor=pointer]:
+                - generic "#4c7f99" [ref=e696]
+                - generic [ref=e697]: Cyan Wool
+                - button "◑" [ref=e698]
+              - generic [ref=e699]:
+                - generic "Cyan Wool minecraft:cyan_wool" [ref=e700] [cursor=pointer]
+                - generic "Cyan Carpet minecraft:cyan_carpet" [ref=e702] [cursor=pointer]
+                - generic "Cyan Stained Glass minecraft:cyan_stained_glass" [ref=e704] [cursor=pointer]
+                - generic "Cyan Concrete minecraft:cyan_concrete" [ref=e706] [cursor=pointer]
+                - generic "Cyan Concrete Powder minecraft:cyan_concrete_powder" [ref=e708] [cursor=pointer]
+                - generic "Cyan Glazed Terracotta minecraft:cyan_glazed_terracotta" [ref=e710] [cursor=pointer]
+                - generic "Prismarine minecraft:prismarine" [ref=e712] [cursor=pointer]
+                - generic "Prismarine Slab minecraft:prismarine_slab" [ref=e714] [cursor=pointer]
+            - generic [ref=e716]:
+              - generic [ref=e717] [cursor=pointer]:
+                - generic "#7f3fb2" [ref=e718]
+                - generic [ref=e719]: Purple Wool
+                - button "◑" [ref=e720]
+              - generic [ref=e721]:
+                - generic "Purple Wool minecraft:purple_wool" [ref=e722] [cursor=pointer]
+                - generic "Purple Carpet minecraft:purple_carpet" [ref=e724] [cursor=pointer]
+                - generic "Purple Stained Glass minecraft:purple_stained_glass" [ref=e726] [cursor=pointer]
+                - generic "Purple Concrete minecraft:purple_concrete" [ref=e728] [cursor=pointer]
+                - generic "Purple Concrete Powder minecraft:purple_concrete_powder" [ref=e730] [cursor=pointer]
+                - generic "Purple Glazed Terracotta minecraft:purple_glazed_terracotta" [ref=e732] [cursor=pointer]
+                - generic "Mycelium minecraft:mycelium" [ref=e734] [cursor=pointer]
+                - generic "Amethyst Block minecraft:amethyst_block" [ref=e736] [cursor=pointer]
+                - generic "Budding Amethyst minecraft:budding_amethyst" [ref=e738] [cursor=pointer]
+            - generic [ref=e740]:
+              - generic [ref=e741] [cursor=pointer]:
+                - generic "#334cb2" [ref=e742]
+                - generic [ref=e743]: Blue Wool
+                - button "◑" [ref=e744]
+              - generic [ref=e745]:
+                - generic "Blue Wool minecraft:blue_wool" [ref=e746] [cursor=pointer]
+                - generic "Blue Carpet minecraft:blue_carpet" [ref=e748] [cursor=pointer]
+                - generic "Blue Stained Glass minecraft:blue_stained_glass" [ref=e750] [cursor=pointer]
+                - generic "Blue Concrete minecraft:blue_concrete" [ref=e752] [cursor=pointer]
+                - generic "Blue Concrete Powder minecraft:blue_concrete_powder" [ref=e754] [cursor=pointer]
+                - generic "Blue Glazed Terracotta minecraft:blue_glazed_terracotta" [ref=e756] [cursor=pointer]
+            - generic [ref=e758]:
+              - generic [ref=e759] [cursor=pointer]:
+                - generic "#664c33" [ref=e760]
+                - generic [ref=e761]: Brown Wool
+                - button "◑" [ref=e762]
+              - generic [ref=e763]:
+                - generic "Brown Wool minecraft:brown_wool" [ref=e764] [cursor=pointer]
+                - generic "Brown Carpet minecraft:brown_carpet" [ref=e766] [cursor=pointer]
+                - generic "Brown Stained Glass minecraft:brown_stained_glass" [ref=e768] [cursor=pointer]
+                - generic "Brown Concrete minecraft:brown_concrete" [ref=e770] [cursor=pointer]
+                - generic "Brown Concrete Powder minecraft:brown_concrete_powder" [ref=e772] [cursor=pointer]
+                - generic "Brown Glazed Terracotta minecraft:brown_glazed_terracotta" [ref=e774] [cursor=pointer]
+                - generic "Dark Oak Log (any direction) minecraft:dark_oak_log" [ref=e776] [cursor=pointer]
+                - generic "Dark Oak Planks minecraft:dark_oak_planks" [ref=e778] [cursor=pointer]
+                - generic "Dark Oak Slab minecraft:dark_oak_slab" [ref=e780] [cursor=pointer]
+                - generic "Spruce Log (horizontal) minecraft:spruce_log" [ref=e782] [cursor=pointer]
+                - generic "Soul Sand minecraft:soul_sand" [ref=e784] [cursor=pointer]
+                - generic "Soul Soil minecraft:soul_soil" [ref=e786] [cursor=pointer]
+                - generic "Dark Oak Pressure Plate minecraft:dark_oak_pressure_plate" [ref=e788] [cursor=pointer]
+            - generic [ref=e790]:
+              - generic [ref=e791] [cursor=pointer]:
+                - generic "#667f33" [ref=e792]
+                - generic [ref=e793]: Green Wool
+                - button "◑" [ref=e794]
+              - generic [ref=e795]:
+                - generic "Green Wool minecraft:green_wool" [ref=e796] [cursor=pointer]
+                - generic "Green Carpet minecraft:green_carpet" [ref=e798] [cursor=pointer]
+                - generic "Green Stained Glass minecraft:green_stained_glass" [ref=e800] [cursor=pointer]
+                - generic "Green Concrete minecraft:green_concrete" [ref=e802] [cursor=pointer]
+                - generic "Green Concrete Powder minecraft:green_concrete_powder" [ref=e804] [cursor=pointer]
+                - generic "Green Glazed Terracotta minecraft:green_glazed_terracotta" [ref=e806] [cursor=pointer]
+                - generic "Dried Kelp Block minecraft:dried_kelp_block" [ref=e808] [cursor=pointer]
+            - generic [ref=e810]:
+              - generic [ref=e811] [cursor=pointer]:
+                - generic "#993333" [ref=e812]
+                - generic [ref=e813]: Red Wool
+                - button "◑" [ref=e814]
+              - generic [ref=e815]:
+                - generic "Red Wool minecraft:red_wool" [ref=e816] [cursor=pointer]
+                - generic "Red Carpet minecraft:red_carpet" [ref=e818] [cursor=pointer]
+                - generic "Red Stained Glass minecraft:red_stained_glass" [ref=e820] [cursor=pointer]
+                - generic "Red Concrete minecraft:red_concrete" [ref=e822] [cursor=pointer]
+                - generic "Red Concrete Powder minecraft:red_concrete_powder" [ref=e824] [cursor=pointer]
+                - generic "Red Glazed Terracotta minecraft:red_glazed_terracotta" [ref=e826] [cursor=pointer]
+                - generic "Bricks minecraft:bricks" [ref=e828] [cursor=pointer]
+                - generic "Bricks Slab minecraft:brick_slab" [ref=e830] [cursor=pointer]
+                - generic "Nether Wart Block minecraft:nether_wart_block" [ref=e832] [cursor=pointer]
+                - generic "Shroomlight minecraft:shroomlight" [ref=e834] [cursor=pointer]
+                - generic "Mangrove Log (vertical) minecraft:mangrove_log" [ref=e836] [cursor=pointer]
+                - generic "Mangrove Planks minecraft:mangrove_planks" [ref=e838] [cursor=pointer]
+                - generic "Mangrove Slab minecraft:mangrove_slab" [ref=e840] [cursor=pointer]
+                - generic "Mangrove Pressure Plate minecraft:mangrove_pressure_plate" [ref=e842] [cursor=pointer]
+            - generic [ref=e844]:
+              - generic [ref=e845] [cursor=pointer]:
+                - generic "#191919" [ref=e846]
+                - generic [ref=e847]: Black Wool
+                - button "◑" [ref=e848]
+              - generic [ref=e849]:
+                - generic "Black Wool minecraft:black_wool" [ref=e850] [cursor=pointer]
+                - generic "Black Carpet minecraft:black_carpet" [ref=e852] [cursor=pointer]
+                - generic "Black Stained Glass minecraft:black_stained_glass" [ref=e854] [cursor=pointer]
+                - generic "Black Concrete minecraft:black_concrete" [ref=e856] [cursor=pointer]
+                - generic "Black Concrete Powder minecraft:black_concrete_powder" [ref=e858] [cursor=pointer]
+                - generic "Black Glazed Terracotta minecraft:black_glazed_terracotta" [ref=e860] [cursor=pointer]
+                - generic "Block of Coal minecraft:coal_block" [ref=e862] [cursor=pointer]
+                - generic "Obsidian minecraft:obsidian" [ref=e864] [cursor=pointer]
+                - generic "Crying Obsidian minecraft:crying_obsidian" [ref=e866] [cursor=pointer]
+                - generic "Blackstone minecraft:blackstone" [ref=e868] [cursor=pointer]
+                - generic "Blackstone Slab minecraft:blackstone_slab" [ref=e870] [cursor=pointer]
+                - generic "Basalt minecraft:basalt" [ref=e872] [cursor=pointer]
+                - generic "Block Of Netherite minecraft:netherite_block" [ref=e874] [cursor=pointer]
+                - generic "Polished Blackstone Pressure Plate minecraft:polished_blackstone_pressure_plate" [ref=e876] [cursor=pointer]
+                - generic "Sculk minecraft:sculk" [ref=e878] [cursor=pointer]
+                - generic "Sculk Catalyst minecraft:sculk_catalyst" [ref=e880] [cursor=pointer]
+                - generic "Sculk Shrieker minecraft:sculk_shrieker" [ref=e882] [cursor=pointer]
+            - generic [ref=e884]:
+              - generic [ref=e885] [cursor=pointer]:
+                - generic "#faee4d" [ref=e886]
+                - generic [ref=e887]: Gold
+                - button "◑" [ref=e888]
+              - generic [ref=e889]:
+                - generic "Block of Gold minecraft:gold_block" [ref=e890] [cursor=pointer]
+                - generic "Weighted Pressure Plate (Light) minecraft:light_weighted_pressure_plate" [ref=e892] [cursor=pointer]
+                - generic "Block Of Raw Gold minecraft:raw_gold_block" [ref=e894] [cursor=pointer]
+            - generic [ref=e896]:
+              - generic [ref=e897] [cursor=pointer]:
+                - generic "#5cdbd5" [ref=e898]
+                - generic [ref=e899]: Diamond
+                - button "◑" [ref=e900]
+              - generic [ref=e901]:
+                - generic "Block of Diamond minecraft:diamond_block" [ref=e902] [cursor=pointer]
+                - generic "Prismarine Bricks minecraft:prismarine_bricks" [ref=e904] [cursor=pointer]
+                - generic "Prismarine Brick Slab minecraft:prismarine_brick_slab" [ref=e906] [cursor=pointer]
+                - generic "Dark Prismarine minecraft:dark_prismarine" [ref=e908] [cursor=pointer]
+                - generic "Dark Prismarine Slab minecraft:dark_prismarine_slab" [ref=e910] [cursor=pointer]
+                - generic "Beacon minecraft:beacon" [ref=e912] [cursor=pointer]
+            - generic [ref=e914]:
+              - generic [ref=e915] [cursor=pointer]:
+                - generic "#4a80ff" [ref=e916]
+                - generic [ref=e917]: Lapis
+                - button "●" [ref=e918]
+              - generic "Lapis Lazuli Block minecraft:lapis_block" [ref=e920] [cursor=pointer]
+            - generic [ref=e922]:
+              - generic [ref=e923] [cursor=pointer]:
+                - generic "#00d93a" [ref=e924]
+                - generic [ref=e925]: Emerald
+                - button "●" [ref=e926]
+              - generic "Block of Emerald minecraft:emerald_block" [ref=e928] [cursor=pointer]
+            - generic [ref=e930]:
+              - generic [ref=e931] [cursor=pointer]:
+                - generic "#815631" [ref=e932]
+                - generic [ref=e933]: Spruce
+                - button "◑" [ref=e934]
+              - generic [ref=e935]:
+                - generic "Spruce Log (vertical) minecraft:spruce_log" [ref=e936] [cursor=pointer]
+                - generic "Spruce Planks minecraft:spruce_planks" [ref=e938] [cursor=pointer]
+                - generic "Spruce Slab minecraft:spruce_slab" [ref=e940] [cursor=pointer]
+                - generic "Oak Log (horizontal) minecraft:oak_log" [ref=e942] [cursor=pointer]
+                - generic "Jungle Log (horizontal) minecraft:jungle_log" [ref=e944] [cursor=pointer]
+                - generic "Podzol minecraft:podzol" [ref=e946] [cursor=pointer]
+                - generic "Spruce Pressure Plate minecraft:spruce_pressure_plate" [ref=e948] [cursor=pointer]
+                - generic "Mangrove Log (horizontal) minecraft:mangrove_log" [ref=e950] [cursor=pointer]
+                - generic "Mangrove Roots minecraft:mangrove_roots" [ref=e952] [cursor=pointer]
+            - generic [ref=e954]:
+              - generic [ref=e955] [cursor=pointer]:
+                - generic "#700200" [ref=e956]
+                - generic [ref=e957]: Nether
+                - button "◑" [ref=e958]
+              - generic [ref=e959]:
+                - generic "Netherrack minecraft:netherrack" [ref=e960] [cursor=pointer]
+                - generic "Nether Brick minecraft:nether_bricks" [ref=e962] [cursor=pointer]
+                - generic "Nether Brick Slab minecraft:nether_brick_slab" [ref=e964] [cursor=pointer]
+                - generic "Magma Block minecraft:magma_block" [ref=e966] [cursor=pointer]
+                - generic "Red Nether Bricks minecraft:red_nether_bricks" [ref=e968] [cursor=pointer]
+                - generic "Red Nether Brick Slab minecraft:red_nether_brick_slab" [ref=e970] [cursor=pointer]
+            - generic [ref=e972]:
+              - generic [ref=e973] [cursor=pointer]:
+                - generic "#d1b1a1" [ref=e974]
+                - generic [ref=e975]: White Terracotta
+                - button "◑" [ref=e976]
+              - generic [ref=e977]:
+                - generic "White Terracotta minecraft:white_terracotta" [ref=e978] [cursor=pointer]
+                - generic "Calcite minecraft:calcite" [ref=e980] [cursor=pointer]
+                - generic "Cherry Planks minecraft:cherry_planks" [ref=e982] [cursor=pointer]
+                - generic "Cherry Slab minecraft:cherry_slab" [ref=e984] [cursor=pointer]
+                - generic "Cherry Log (vertical) minecraft:cherry_log" [ref=e986] [cursor=pointer]
+                - generic "Stripped Cherry Log (vertical) minecraft:stripped_cherry_log" [ref=e988] [cursor=pointer]
+                - generic "Cherry Pressure Plate minecraft:cherry_pressure_plate" [ref=e990] [cursor=pointer]
+            - generic [ref=e992]:
+              - generic [ref=e993] [cursor=pointer]:
+                - generic "#9f5224" [ref=e994]
+                - generic [ref=e995]: Orange Terracotta
+                - button "●" [ref=e996]
+              - generic "Orange Terracotta minecraft:orange_terracotta" [ref=e998] [cursor=pointer]
+            - generic [ref=e1000]:
+              - generic [ref=e1001] [cursor=pointer]:
+                - generic "#95576c" [ref=e1002]
+                - generic [ref=e1003]: Magenta Terracotta
+                - button "●" [ref=e1004]
+              - generic "Magenta Terracotta minecraft:magenta_terracotta" [ref=e1006] [cursor=pointer]
+            - generic [ref=e1008]:
+              - generic [ref=e1009] [cursor=pointer]:
+                - generic "#706c8a" [ref=e1010]
+                - generic [ref=e1011]: Light Blue Terracotta
+                - button "●" [ref=e1012]
+              - generic "Light Blue Terracotta minecraft:light_blue_terracotta" [ref=e1014] [cursor=pointer]
+            - generic [ref=e1016]:
+              - generic [ref=e1017] [cursor=pointer]:
+                - generic "#ba8524" [ref=e1018]
+                - generic [ref=e1019]: Yellow Terracotta
+                - button "●" [ref=e1020]
+              - generic "Yellow Terracotta minecraft:yellow_terracotta" [ref=e1022] [cursor=pointer]
+            - generic [ref=e1024]:
+              - generic [ref=e1025] [cursor=pointer]:
+                - generic "#677535" [ref=e1026]
+                - generic [ref=e1027]: Lime Terracotta
+                - button "●" [ref=e1028]
+              - generic "Lime Terracotta minecraft:lime_terracotta" [ref=e1030] [cursor=pointer]
+            - generic [ref=e1032]:
+              - generic [ref=e1033] [cursor=pointer]:
+                - generic "#a04d4e" [ref=e1034]
+                - generic [ref=e1035]: Pink Terracotta
+                - button "◑" [ref=e1036]
+              - generic [ref=e1037]:
+                - generic "Pink Terracotta minecraft:pink_terracotta" [ref=e1038] [cursor=pointer]
+                - generic "Stripped Cherry Log (horizontal) minecraft:stripped_cherry_log" [ref=e1040] [cursor=pointer]
+                - generic "Stripped Cherry Wood minecraft:stripped_cherry_wood" [ref=e1042] [cursor=pointer]
+            - generic [ref=e1044]:
+              - generic [ref=e1045] [cursor=pointer]:
+                - generic "#392923" [ref=e1046]
+                - generic [ref=e1047]: Gray Terracotta
+                - button "◑" [ref=e1048]
+              - generic [ref=e1049]:
+                - generic "Gray Terracotta minecraft:gray_terracotta" [ref=e1050] [cursor=pointer]
+                - generic "Tuff minecraft:tuff" [ref=e1052] [cursor=pointer]
+                - generic "Cherry Log (horizontal) minecraft:cherry_log" [ref=e1054] [cursor=pointer]
+                - generic "Cherry Wood minecraft:cherry_wood" [ref=e1056] [cursor=pointer]
+            - generic [ref=e1058]:
+              - generic [ref=e1059] [cursor=pointer]:
+                - generic "#876b62" [ref=e1060]
+                - generic [ref=e1061]: Light Gray Terracotta
+                - button "◑" [ref=e1062]
+              - generic [ref=e1063]:
+                - generic "Light Gray Terracotta minecraft:light_gray_terracotta" [ref=e1064] [cursor=pointer]
+                - generic "Waxed Exposed Copper minecraft:waxed_exposed_copper" [ref=e1066] [cursor=pointer]
+                - generic "Waxed Exposed Cut Copper Slab minecraft:waxed_exposed_cut_copper_slab" [ref=e1068] [cursor=pointer]
+                - generic "Mud Bricks minecraft:mud_bricks" [ref=e1070] [cursor=pointer]
+                - generic "Mud Brick Slab minecraft:mud_brick_slab" [ref=e1072] [cursor=pointer]
+                - generic "Exposed Copper minecraft:exposed_copper" [ref=e1074] [cursor=pointer]
+                - generic "Exposed Cut Copper minecraft:exposed_cut_copper" [ref=e1076] [cursor=pointer]
+                - generic "Waxed Exposed Cut Copper minecraft:waxed_exposed_cut_copper" [ref=e1078] [cursor=pointer]
+            - generic [ref=e1080]:
+              - generic [ref=e1081] [cursor=pointer]:
+                - generic "#575c5c" [ref=e1082]
+                - generic [ref=e1083]: Cyan Terracotta
+                - button "◑" [ref=e1084]
+              - generic [ref=e1085]:
+                - generic "Cyan Terracotta minecraft:cyan_terracotta" [ref=e1086] [cursor=pointer]
+                - generic "Mud minecraft:mud" [ref=e1088] [cursor=pointer]
+            - generic [ref=e1090]:
+              - generic [ref=e1091] [cursor=pointer]:
+                - generic "#7a4958" [ref=e1092]
+                - generic [ref=e1093]: Purple Terracotta
+                - button "●" [ref=e1094]
+              - generic "Purple Terracotta minecraft:purple_terracotta" [ref=e1096] [cursor=pointer]
+            - generic [ref=e1098]:
+              - generic [ref=e1099] [cursor=pointer]:
+                - generic "#4c3e5c" [ref=e1100]
+                - generic [ref=e1101]: Blue Terracotta
+                - button "●" [ref=e1102]
+              - generic "Blue Terracotta minecraft:blue_terracotta" [ref=e1104] [cursor=pointer]
+            - generic [ref=e1106]:
+              - generic [ref=e1107] [cursor=pointer]:
+                - generic "#4c3223" [ref=e1108]
+                - generic [ref=e1109]: Brown Terracotta
+                - button "◑" [ref=e1110]
+              - generic [ref=e1111]:
+                - generic "Brown Terracotta minecraft:brown_terracotta" [ref=e1112] [cursor=pointer]
+                - generic "Dripstone Block minecraft:dripstone_block" [ref=e1114] [cursor=pointer]
+                - generic "Pointed Dripstone minecraft:pointed_dripstone" [ref=e1116] [cursor=pointer]
+            - generic [ref=e1118]:
+              - generic [ref=e1119] [cursor=pointer]:
+                - generic "#4c522a" [ref=e1120]
+                - generic [ref=e1121]: Green Terracotta
+                - button "●" [ref=e1122]
+              - generic "Green Terracotta minecraft:green_terracotta" [ref=e1124] [cursor=pointer]
+            - generic [ref=e1126]:
+              - generic [ref=e1127] [cursor=pointer]:
+                - generic "#8e3c2e" [ref=e1128]
+                - generic [ref=e1129]: Red Terracotta
+                - button "●" [ref=e1130]
+              - generic "Red Terracotta minecraft:red_terracotta" [ref=e1132] [cursor=pointer]
+            - generic [ref=e1134]:
+              - generic [ref=e1135] [cursor=pointer]:
+                - generic "#251610" [ref=e1136]
+                - generic [ref=e1137]: Black Terracotta
+                - button "●" [ref=e1138]
+              - generic "Black Terracotta minecraft:black_terracotta" [ref=e1140] [cursor=pointer]
+            - generic [ref=e1142]:
+              - generic [ref=e1143] [cursor=pointer]:
+                - generic "#bd3031" [ref=e1144]
+                - generic [ref=e1145]: Crimson Nylium
+                - button "●" [ref=e1146]
+              - generic "Crimson Nylium minecraft:crimson_nylium" [ref=e1148] [cursor=pointer]
+            - generic [ref=e1150]:
+              - generic [ref=e1151] [cursor=pointer]:
+                - generic "#943f61" [ref=e1152]
+                - generic [ref=e1153]: Crimson Stem
+                - button "◑" [ref=e1154]
+              - generic [ref=e1155]:
+                - generic "Crimson Stem minecraft:crimson_stem" [ref=e1156] [cursor=pointer]
+                - generic "Stripped Crimson Stem minecraft:stripped_crimson_stem" [ref=e1158] [cursor=pointer]
+                - generic "Crimson Planks minecraft:crimson_planks" [ref=e1160] [cursor=pointer]
+                - generic "Crimson Slab minecraft:crimson_slab" [ref=e1162] [cursor=pointer]
+                - generic "Crimson Pressure Plate minecraft:crimson_pressure_plate" [ref=e1164] [cursor=pointer]
+            - generic [ref=e1166]:
+              - generic [ref=e1167] [cursor=pointer]:
+                - generic "#5c191d" [ref=e1168]
+                - generic [ref=e1169]: Crimson Hyphae
+                - button "◑" [ref=e1170]
+              - generic [ref=e1171]:
+                - generic "Crimson Hyphae minecraft:crimson_hyphae" [ref=e1172] [cursor=pointer]
+                - generic "Stripped Crimson Hyphae minecraft:stripped_crimson_hyphae" [ref=e1174] [cursor=pointer]
+            - generic [ref=e1176]:
+              - generic [ref=e1177] [cursor=pointer]:
+                - generic "#167e86" [ref=e1178]
+                - generic [ref=e1179]: Warped Nylium
+                - button "◑" [ref=e1180]
+              - generic [ref=e1181]:
+                - generic "Warped Nylium minecraft:warped_nylium" [ref=e1182] [cursor=pointer]
+                - generic "Waxed Oxidized Copper minecraft:waxed_oxidized_copper" [ref=e1184] [cursor=pointer]
+                - generic "Waxed Oxidized Cut Copper Slab minecraft:waxed_oxidized_cut_copper_slab" [ref=e1186] [cursor=pointer]
+                - generic "Oxidized Copper minecraft:oxidized_copper" [ref=e1188] [cursor=pointer]
+                - generic "Oxidized Cut Copper minecraft:oxidized_cut_copper" [ref=e1190] [cursor=pointer]
+                - generic "Waxed Oxidized Cut Copper minecraft:waxed_oxidized_cut_copper" [ref=e1192] [cursor=pointer]
+            - generic [ref=e1194]:
+              - generic [ref=e1195] [cursor=pointer]:
+                - generic "#3a8e8c" [ref=e1196]
+                - generic [ref=e1197]: Warped Stem
+                - button "◑" [ref=e1198]
+              - generic [ref=e1199]:
+                - generic "Warped Stem minecraft:warped_stem" [ref=e1200] [cursor=pointer]
+                - generic "Stripped Warped Stem minecraft:stripped_warped_stem" [ref=e1202] [cursor=pointer]
+                - generic "Warped Planks minecraft:warped_planks" [ref=e1204] [cursor=pointer]
+                - generic "Warped Slab minecraft:warped_slab" [ref=e1206] [cursor=pointer]
+                - generic "Waxed Weathered Copper minecraft:waxed_weathered_copper" [ref=e1208] [cursor=pointer]
+                - generic "Waxed Weathered Cut Copper Slab minecraft:waxed_weathered_cut_copper_slab" [ref=e1210] [cursor=pointer]
+                - generic "Warped Pressure Plate minecraft:warped_pressure_plate" [ref=e1212] [cursor=pointer]
+                - generic "Weathered Copper minecraft:weathered_copper" [ref=e1214] [cursor=pointer]
+                - generic "Weathered Cut Copper minecraft:weathered_cut_copper" [ref=e1216] [cursor=pointer]
+                - generic "Waxed Weathered Cut Copper minecraft:waxed_weathered_cut_copper" [ref=e1218] [cursor=pointer]
+            - generic [ref=e1220]:
+              - generic [ref=e1221] [cursor=pointer]:
+                - generic "#562c3e" [ref=e1222]
+                - generic [ref=e1223]: Warped Hyphae
+                - button "◑" [ref=e1224]
+              - generic [ref=e1225]:
+                - generic "Warped Hyphae minecraft:warped_hyphae" [ref=e1226] [cursor=pointer]
+                - generic "Stripped Warped Hyphae minecraft:stripped_warped_hyphae" [ref=e1228] [cursor=pointer]
+            - generic [ref=e1230]:
+              - generic [ref=e1231] [cursor=pointer]:
+                - generic "#14b485" [ref=e1232]
+                - generic [ref=e1233]: Warped Wart
+                - button "●" [ref=e1234]
+              - generic "Warped Wart Block minecraft:warped_wart_block" [ref=e1236] [cursor=pointer]
+            - generic [ref=e1238]:
+              - generic [ref=e1239] [cursor=pointer]:
+                - generic "#646464" [ref=e1240]
+                - generic [ref=e1241]: Deepslate
+                - button "◑" [ref=e1242]
+              - generic [ref=e1243]:
+                - generic "Deepslate minecraft:deepslate" [ref=e1244] [cursor=pointer]
+                - generic "Cobbled Deepslate minecraft:cobbled_deepslate" [ref=e1246] [cursor=pointer]
+                - generic "Cobbled Deepslate Slab minecraft:cobbled_deepslate_slab" [ref=e1248] [cursor=pointer]
+                - generic "Deepslate Bricks minecraft:deepslate_bricks" [ref=e1250] [cursor=pointer]
+                - generic "Deepslate Tiles minecraft:deepslate_tiles" [ref=e1252] [cursor=pointer]
+                - generic "Polished Deepslate minecraft:polished_deepslate" [ref=e1254] [cursor=pointer]
+            - generic [ref=e1256]:
+              - generic [ref=e1257] [cursor=pointer]:
+                - generic "#d8af93" [ref=e1258]
+                - generic [ref=e1259]: Raw Iron
+                - button "●" [ref=e1260]
+              - generic "Block Of Raw Iron minecraft:raw_iron_block" [ref=e1262] [cursor=pointer]
+            - generic [ref=e1264]:
+              - generic [ref=e1265] [cursor=pointer]:
+                - generic "#7fa796" [ref=e1266]
+                - generic [ref=e1267]: Glow Lichen
+                - button "◑" [ref=e1268]
+              - generic [ref=e1269]:
+                - generic "Glow Lichen minecraft:glow_lichen" [ref=e1270] [cursor=pointer]
+                - generic "Verdant Froglight minecraft:verdant_froglight" [ref=e1272] [cursor=pointer]
+        - generic [ref=e1333]:
+          - generic [ref=e1334]:
+            - heading "> Материалы" [level=3] [ref=e1335]
+            - generic "Показать максимальное количество каждого блока в любой из 1 секций — удобно для расчёта что взять с собой" [ref=e1336] [cursor=pointer]:
+              - checkbox "Макс / карта" [ref=e1337]
+              - generic [ref=e1338]: Макс / карта
+          - table [ref=e1340]:
+            - rowgroup [ref=e1341]:
+              - row "БЛОК ВСЕГО СТАКИ ШАЛКЕРЫ" [ref=e1342]:
+                - columnheader "БЛОК" [ref=e1343]
+                - columnheader "ВСЕГО" [ref=e1344]
+                - columnheader "СТАКИ" [ref=e1345]
+                - columnheader "ШАЛКЕРЫ" [ref=e1346]
+            - rowgroup [ref=e1347]:
+              - row "Black Wool 12,516 195×64+36 7sh+6×64+36" [ref=e1348]:
+                - cell "Black Wool" [ref=e1349]:
+                  - generic [ref=e1353]: Black Wool
+                - cell "12,516" [ref=e1354]
+                - cell "195×64+36" [ref=e1355]
+                - cell "7sh+6×64+36" [ref=e1356]
+              - row "Blue Wool 1,546 24×64+10 24×64+10" [ref=e1357]:
+                - cell "Blue Wool" [ref=e1358]:
+                  - generic [ref=e1362]: Blue Wool
+                - cell "1,546" [ref=e1363]
+                - cell "24×64+10" [ref=e1364]
+                - cell "24×64+10" [ref=e1365]
+              - row "Blue Terracotta 635 9×64+59 9×64+59" [ref=e1366]:
+                - cell "Blue Terracotta" [ref=e1367]:
+                  - generic [ref=e1371]: Blue Terracotta
+                - cell "635" [ref=e1372]
+                - cell "9×64+59" [ref=e1373]
+                - cell "9×64+59" [ref=e1374]
+              - row "Gray Terracotta 285 4×64+29 4×64+29" [ref=e1375]:
+                - cell "Gray Terracotta" [ref=e1376]:
+                  - generic [ref=e1380]: Gray Terracotta
+                - cell "285" [ref=e1381]
+                - cell "4×64+29" [ref=e1382]
+                - cell "4×64+29" [ref=e1383]
+              - row "Sand 167 2×64+39 2×64+39" [ref=e1384]:
+                - cell "Sand" [ref=e1385]:
+                  - generic [ref=e1389]: Sand
+                - cell "167" [ref=e1390]
+                - cell "2×64+39" [ref=e1391]
+                - cell "2×64+39" [ref=e1392]
+              - row "White Wool 102 1×64+38 1×64+38" [ref=e1393]:
+                - cell "White Wool" [ref=e1394]:
+                  - generic [ref=e1398]: White Wool
+                - cell "102" [ref=e1399]
+                - cell "1×64+38" [ref=e1400]
+                - cell "1×64+38" [ref=e1401]
+              - row "Gray Wool 86 1×64+22 1×64+22" [ref=e1402]:
+                - cell "Gray Wool" [ref=e1403]:
+                  - generic [ref=e1407]: Gray Wool
+                - cell "86" [ref=e1408]
+                - cell "1×64+22" [ref=e1409]
+                - cell "1×64+22" [ref=e1410]
+              - row "Ice 79 1×64+15 1×64+15" [ref=e1411]:
+                - cell "Ice" [ref=e1412]:
+                  - generic [ref=e1416]: Ice
+                - cell "79" [ref=e1417]
+                - cell "1×64+15" [ref=e1418]
+                - cell "1×64+15" [ref=e1419]
+              - row "Birch Log (horizontal) 75 1×64+11 1×64+11" [ref=e1420]:
+                - cell "Birch Log (horizontal)" [ref=e1421]:
+                  - generic [ref=e1425]: Birch Log (horizontal)
+                - cell "75" [ref=e1426]
+                - cell "1×64+11" [ref=e1427]
+                - cell "1×64+11" [ref=e1428]
+              - row "Light Blue Wool 74 1×64+10 1×64+10" [ref=e1429]:
+                - cell "Light Blue Wool" [ref=e1430]:
+                  - generic [ref=e1434]: Light Blue Wool
+                - cell "74" [ref=e1435]
+                - cell "1×64+10" [ref=e1436]
+                - cell "1×64+10" [ref=e1437]
+              - row "Black Terracotta 64 1×64 1×64" [ref=e1438]:
+                - cell "Black Terracotta" [ref=e1439]:
+                  - generic [ref=e1443]: Black Terracotta
+                - cell "64" [ref=e1444]
+                - cell "1×64" [ref=e1445]
+                - cell "1×64" [ref=e1446]
+              - row "Light Blue Terracotta 57 57 57" [ref=e1447]:
+                - cell "Light Blue Terracotta" [ref=e1448]:
+                  - generic [ref=e1452]: Light Blue Terracotta
+                - cell "57" [ref=e1453]
+                - cell "57" [ref=e1454]
+                - cell "57" [ref=e1455]
+              - row "Block of Gold 54 54 54" [ref=e1456]:
+                - cell "Block of Gold" [ref=e1457]:
+                  - generic [ref=e1461]: Block of Gold
+                - cell "54" [ref=e1462]
+                - cell "54" [ref=e1463]
+                - cell "54" [ref=e1464]
+              - row "Brown Terracotta 49 49 49" [ref=e1465]:
+                - cell "Brown Terracotta" [ref=e1466]:
+                  - generic [ref=e1470]: Brown Terracotta
+                - cell "49" [ref=e1471]
+                - cell "49" [ref=e1472]
+                - cell "49" [ref=e1473]
+              - row "Cobweb 48 48 48" [ref=e1474]:
+                - cell "Cobweb" [ref=e1475]:
+                  - generic [ref=e1479]: Cobweb
+                - cell "48" [ref=e1480]
+                - cell "48" [ref=e1481]
+                - cell "48" [ref=e1482]
+              - row "Green Terracotta 45 45 45" [ref=e1483]:
+                - cell "Green Terracotta" [ref=e1484]:
+                  - generic [ref=e1488]: Green Terracotta
+                - cell "45" [ref=e1489]
+                - cell "45" [ref=e1490]
+                - cell "45" [ref=e1491]
+              - row "Block Of Raw Iron 36 36 36" [ref=e1492]:
+                - cell "Block Of Raw Iron" [ref=e1493]:
+                  - generic [ref=e1497]: Block Of Raw Iron
+                - cell "36" [ref=e1498]
+                - cell "36" [ref=e1499]
+                - cell "36" [ref=e1500]
+              - row "Lapis Lazuli Block 34 34 34" [ref=e1501]:
+                - cell "Lapis Lazuli Block" [ref=e1502]:
+                  - generic [ref=e1506]: Lapis Lazuli Block
+                - cell "34" [ref=e1507]
+                - cell "34" [ref=e1508]
+                - cell "34" [ref=e1509]
+              - row "Warped Wart Block 32 32 32" [ref=e1510]:
+                - cell "Warped Wart Block" [ref=e1511]:
+                  - generic [ref=e1515]: Warped Wart Block
+                - cell "32" [ref=e1516]
+                - cell "32" [ref=e1517]
+                - cell "32" [ref=e1518]
+              - row "Block of Diamond 29 29 29" [ref=e1519]:
+                - cell "Block of Diamond" [ref=e1520]:
+                  - generic [ref=e1524]: Block of Diamond
+                - cell "29" [ref=e1525]
+                - cell "29" [ref=e1526]
+                - cell "29" [ref=e1527]
+              - row "Warped Hyphae 28 28 28" [ref=e1528]:
+                - cell "Warped Hyphae" [ref=e1529]:
+                  - generic [ref=e1533]: Warped Hyphae
+                - cell "28" [ref=e1534]
+                - cell "28" [ref=e1535]
+                - cell "28" [ref=e1536]
+              - row "Clay 25 25 25" [ref=e1537]:
+                - cell "Clay" [ref=e1538]:
+                  - generic [ref=e1542]: Clay
+                - cell "25" [ref=e1543]
+                - cell "25" [ref=e1544]
+                - cell "25" [ref=e1545]
+              - row "Glow Lichen 25 25 25" [ref=e1546]:
+                - cell "Glow Lichen" [ref=e1547]:
+                  - generic [ref=e1551]: Glow Lichen
+                - cell "25" [ref=e1552]
+                - cell "25" [ref=e1553]
+                - cell "25" [ref=e1554]
+              - row "Grass Block 23 23 23" [ref=e1555]:
+                - cell "Grass Block" [ref=e1556]:
+                  - generic [ref=e1560]: Grass Block
+                - cell "23" [ref=e1561]
+                - cell "23" [ref=e1562]
+                - cell "23" [ref=e1563]
+              - row "Light Gray Wool 23 23 23" [ref=e1564]:
+                - cell "Light Gray Wool" [ref=e1565]:
+                  - generic [ref=e1569]: Light Gray Wool
+                - cell "23" [ref=e1570]
+                - cell "23" [ref=e1571]
+                - cell "23" [ref=e1572]
+              - row "Crimson Nylium 21 21 21" [ref=e1573]:
+                - cell "Crimson Nylium" [ref=e1574]:
+                  - generic [ref=e1578]: Crimson Nylium
+                - cell "21" [ref=e1579]
+                - cell "21" [ref=e1580]
+                - cell "21" [ref=e1581]
+              - row "Yellow Wool 20 20 20" [ref=e1582]:
+                - cell "Yellow Wool" [ref=e1583]:
+                  - generic [ref=e1587]: Yellow Wool
+                - cell "20" [ref=e1588]
+                - cell "20" [ref=e1589]
+                - cell "20" [ref=e1590]
+              - row "Yellow Terracotta 19 19 19" [ref=e1591]:
+                - cell "Yellow Terracotta" [ref=e1592]:
+                  - generic [ref=e1596]: Yellow Terracotta
+                - cell "19" [ref=e1597]
+                - cell "19" [ref=e1598]
+                - cell "19" [ref=e1599]
+              - row "Block of Emerald 17 17 17" [ref=e1600]:
+                - cell "Block of Emerald" [ref=e1601]:
+                  - generic [ref=e1605]: Block of Emerald
+                - cell "17" [ref=e1606]
+                - cell "17" [ref=e1607]
+                - cell "17" [ref=e1608]
+              - row "Leaves (Oak) 14 14 14" [ref=e1609]:
+                - cell "Leaves (Oak)" [ref=e1610]:
+                  - generic [ref=e1614]: Leaves (Oak)
+                - cell "14" [ref=e1615]
+                - cell "14" [ref=e1616]
+                - cell "14" [ref=e1617]
+              - row "Cyan Wool 14 14 14" [ref=e1618]:
+                - cell "Cyan Wool" [ref=e1619]:
+                  - generic [ref=e1623]: Cyan Wool
+                - cell "14" [ref=e1624]
+                - cell "14" [ref=e1625]
+                - cell "14" [ref=e1626]
+              - row "TNT 14 14 14" [ref=e1627]:
+                - cell "TNT" [ref=e1628]:
+                  - generic [ref=e1632]: TNT
+                - cell "14" [ref=e1633]
+                - cell "14" [ref=e1634]
+                - cell "14" [ref=e1635]
+              - row "Warped Stem 13 13 13" [ref=e1636]:
+                - cell "Warped Stem" [ref=e1637]:
+                  - generic [ref=e1641]: Warped Stem
+                - cell "13" [ref=e1642]
+                - cell "13" [ref=e1643]
+                - cell "13" [ref=e1644]
+              - row "Block of Iron 12 12 12" [ref=e1645]:
+                - cell "Block of Iron" [ref=e1646]:
+                  - generic [ref=e1650]: Block of Iron
+                - cell "12" [ref=e1651]
+                - cell "12" [ref=e1652]
+                - cell "12" [ref=e1653]
+              - row "Oak Log (vertical) 12 12 12" [ref=e1654]:
+                - cell "Oak Log (vertical)" [ref=e1655]:
+                  - generic [ref=e1659]: Oak Log (vertical)
+                - cell "12" [ref=e1660]
+                - cell "12" [ref=e1661]
+                - cell "12" [ref=e1662]
+              - row "Warped Nylium 10 10 10" [ref=e1663]:
+                - cell "Warped Nylium" [ref=e1664]:
+                  - generic [ref=e1668]: Warped Nylium
+                - cell "10" [ref=e1669]
+                - cell "10" [ref=e1670]
+                - cell "10" [ref=e1671]
+              - row "Red Wool 10 10 10" [ref=e1672]:
+                - cell "Red Wool" [ref=e1673]:
+                  - generic [ref=e1677]: Red Wool
+                - cell "10" [ref=e1678]
+                - cell "10" [ref=e1679]
+                - cell "10" [ref=e1680]
+              - row "Purple Wool 9 9 9" [ref=e1681]:
+                - cell "Purple Wool" [ref=e1682]:
+                  - generic [ref=e1686]: Purple Wool
+                - cell "9" [ref=e1687]
+                - cell "9" [ref=e1688]
+                - cell "9" [ref=e1689]
+              - row "Lime Wool 7 7 7" [ref=e1690]:
+                - cell "Lime Wool" [ref=e1691]:
+                  - generic [ref=e1695]: Lime Wool
+                - cell "7" [ref=e1696]
+                - cell "7" [ref=e1697]
+                - cell "7" [ref=e1698]
+              - row "Green Wool 6 6 6" [ref=e1699]:
+                - cell "Green Wool" [ref=e1700]:
+                  - generic [ref=e1704]: Green Wool
+                - cell "6" [ref=e1705]
+                - cell "6" [ref=e1706]
+                - cell "6" [ref=e1707]
+              - row "Crimson Hyphae 6 6 6" [ref=e1708]:
+                - cell "Crimson Hyphae" [ref=e1709]:
+                  - generic [ref=e1713]: Crimson Hyphae
+                - cell "6" [ref=e1714]
+                - cell "6" [ref=e1715]
+                - cell "6" [ref=e1716]
+              - row "Orange Terracotta 6 6 6" [ref=e1717]:
+                - cell "Orange Terracotta" [ref=e1718]:
+                  - generic [ref=e1722]: Orange Terracotta
+                - cell "6" [ref=e1723]
+                - cell "6" [ref=e1724]
+                - cell "6" [ref=e1725]
+              - row "Orange Wool 5 5 5" [ref=e1726]:
+                - cell "Orange Wool" [ref=e1727]:
+                  - generic [ref=e1731]: Orange Wool
+                - cell "5" [ref=e1732]
+                - cell "5" [ref=e1733]
+                - cell "5" [ref=e1734]
+              - row "Purple Terracotta 5 5 5" [ref=e1735]:
+                - cell "Purple Terracotta" [ref=e1736]:
+                  - generic [ref=e1740]: Purple Terracotta
+                - cell "5" [ref=e1741]
+                - cell "5" [ref=e1742]
+                - cell "5" [ref=e1743]
+              - row "Cyan Terracotta 4 4 4" [ref=e1744]:
+                - cell "Cyan Terracotta" [ref=e1745]:
+                  - generic [ref=e1749]: Cyan Terracotta
+                - cell "4" [ref=e1750]
+                - cell "4" [ref=e1751]
+                - cell "4" [ref=e1752]
+              - row "Jungle Log (vertical) 4 4 4" [ref=e1753]:
+                - cell "Jungle Log (vertical)" [ref=e1754]:
+                  - generic [ref=e1758]: Jungle Log (vertical)
+                - cell "4" [ref=e1759]
+                - cell "4" [ref=e1760]
+                - cell "4" [ref=e1761]
+              - row "Red Terracotta 3 3 3" [ref=e1762]:
+                - cell "Red Terracotta" [ref=e1763]:
+                  - generic [ref=e1767]: Red Terracotta
+                - cell "3" [ref=e1768]
+                - cell "3" [ref=e1769]
+                - cell "3" [ref=e1770]
+              - row "Brown Wool 3 3 3" [ref=e1771]:
+                - cell "Brown Wool" [ref=e1772]:
+                  - generic [ref=e1776]: Brown Wool
+                - cell "3" [ref=e1777]
+                - cell "3" [ref=e1778]
+                - cell "3" [ref=e1779]
+              - row "White Terracotta 3 3 3" [ref=e1780]:
+                - cell "White Terracotta" [ref=e1781]:
+                  - generic [ref=e1785]: White Terracotta
+                - cell "3" [ref=e1786]
+                - cell "3" [ref=e1787]
+                - cell "3" [ref=e1788]
+              - row "Spruce Log (vertical) 3 3 3" [ref=e1789]:
+                - cell "Spruce Log (vertical)" [ref=e1790]:
+                  - generic [ref=e1794]: Spruce Log (vertical)
+                - cell "3" [ref=e1795]
+                - cell "3" [ref=e1796]
+                - cell "3" [ref=e1797]
+              - row "Light Gray Terracotta 2 2 2" [ref=e1798]:
+                - cell "Light Gray Terracotta" [ref=e1799]:
+                  - generic [ref=e1803]: Light Gray Terracotta
+                - cell "2" [ref=e1804]
+                - cell "2" [ref=e1805]
+                - cell "2" [ref=e1806]
+              - row "Deepslate 1 1 1" [ref=e1807]:
+                - cell "Deepslate" [ref=e1808]:
+                  - generic [ref=e1812]: Deepslate
+                - cell "1" [ref=e1813]
+                - cell "1" [ref=e1814]
+                - cell "1" [ref=e1815]
+              - row "Lime Terracotta 1 1 1" [ref=e1816]:
+                - cell "Lime Terracotta" [ref=e1817]:
+                  - generic [ref=e1821]: Lime Terracotta
+                - cell "1" [ref=e1822]
+                - cell "1" [ref=e1823]
+                - cell "1" [ref=e1824]
+              - row "Magenta Terracotta 1 1 1" [ref=e1825]:
+                - cell "Magenta Terracotta" [ref=e1826]:
+                  - generic [ref=e1830]: Magenta Terracotta
+                - cell "1" [ref=e1831]
+                - cell "1" [ref=e1832]
+                - cell "1" [ref=e1833]
+              - row "Magenta Wool 1 1 1" [ref=e1834]:
+                - cell "Magenta Wool" [ref=e1835]:
+                  - generic [ref=e1839]: Magenta Wool
+                - cell "1" [ref=e1840]
+                - cell "1" [ref=e1841]
+                - cell "1" [ref=e1842]
+              - row "Pink Wool 1 1 1" [ref=e1843]:
+                - cell "Pink Wool" [ref=e1844]:
+                  - generic [ref=e1848]: Pink Wool
+                - cell "1" [ref=e1849]
+                - cell "1" [ref=e1850]
+                - cell "1" [ref=e1851]
+            - rowgroup [ref=e1852]:
+              - row "ИТОГО 16,384 256×64 9sh+13×64" [ref=e1853]:
+                - cell "ИТОГО" [ref=e1854]
+                - cell "16,384" [ref=e1855]
+                - cell "256×64" [ref=e1856]
+                - cell "9sh+13×64" [ref=e1857]
+          - button "⎘ КОПИРОВАТЬ" [ref=e1859] [cursor=pointer]
+      - generic [ref=e1276]:
+        - heading "> Экспорт" [level=3] [ref=e1277]
+        - generic [ref=e1860]:
+          - button "↓ PNG" [ref=e1861] [cursor=pointer]
+          - button "↓ MAP.DAT" [ref=e1862] [cursor=pointer]
+          - button "↓ LITEMATIC 2D" [ref=e1863] [cursor=pointer]
+        - button "🔗 ПОЛУЧИТЬ ССЫЛКУ" [ref=e1280] [cursor=pointer]
+  - generic [ref=e1281]:
+    - generic [ref=e1282]: █ FLOYD–STEINBERG
+    - generic [ref=e1283]: █ 1×1 MAPS
+    - generic [ref=e1284]: █ 61 COLORS
+    - generic [ref=e1285]: █ 2D
+    - generic [ref=e1286]: █ 100%
+    - generic [ref=e1864]: █ 128×128px
+    - generic [ref=e1287]: Made by SmetankaKluss
+    - link "@SmetankaKluss" [ref=e1288] [cursor=pointer]:
+      - /url: https://t.me/SmetankaKluss
+      - img [ref=e1289]
+      - text: "@SmetankaKluss"

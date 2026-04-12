@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useLocale } from '../lib/locale';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
@@ -73,6 +74,7 @@ function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { cs
 }
 
 export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale }: Props) {
+  const { t } = useLocale();
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const [sprite,      setSprite]      = useState<HTMLImageElement | null>(null);
   const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
@@ -220,12 +222,12 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
     <div className="canvas-wrapper">
       {(!spriteReady || rendering) && (
         <div className="block-mode-overlay">
-          {!spriteReady ? 'Loading block textures…' : 'Rendering textures…'}
+          {!spriteReady ? t('Загрузка текстур блоков…', 'Loading block textures…') : t('Рендеринг текстур…', 'Rendering textures…')}
         </div>
       )}
       {isLarge && spriteReady && !rendering && (
         <div className="block-mode-warning">
-          ⚠ Block texture mode renders {width.toLocaleString()}×{height.toLocaleString()} sprites — large grids may be slow.
+          ⚠ {t(`Режим текстур блоков отображает ${width.toLocaleString()}×${height.toLocaleString()} спрайтов — большие сетки могут быть медленными.`, `Block texture mode renders ${width.toLocaleString()}×${height.toLocaleString()} sprites — large grids may be slow.`)}
         </div>
       )}
       <canvas ref={canvasRef} className="map-canvas" style={{ imageRendering: 'pixelated' }} />

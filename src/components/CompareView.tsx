@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { drawImageData } from './MapCanvas';
+import { useLocale } from '../lib/locale';
 
 interface CompareViewProps {
   leftData:  ImageData | null;
@@ -18,6 +19,7 @@ export function CompareView({
   leftData, rightData, leftLabel, rightLabel,
   width, height, scale, showGrid, splitPos, onSplitPosChange,
 }: CompareViewProps) {
+  const { t } = useLocale();
   const leftRef      = useRef<HTMLCanvasElement>(null);
   const rightRef     = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,8 +109,8 @@ export function CompareView({
           <rect x="12" y="38" width="6" height="6" fill="#555" opacity="0.32"/><rect x="18" y="38" width="6" height="6" fill="#555" opacity="0.28"/><rect x="24" y="38" width="6" height="6" fill="#555" opacity="0.32"/><rect x="30" y="38" width="6" height="6" fill="#555" opacity="0.28"/><rect x="36" y="38" width="6" height="6" fill="#555" opacity="0.32"/><rect x="42" y="38" width="6" height="6" fill="#555" opacity="0.28"/><rect x="48" y="38" width="6" height="6" fill="#555" opacity="0.32"/><rect x="54" y="38" width="6" height="6" fill="#555" opacity="0.28"/>
           <rect x="33" y="50" width="6" height="8" fill="#57FF6E" opacity="0.35"/><rect x="27" y="54" width="18" height="4" fill="#57FF6E" opacity="0.3"/><rect x="30" y="58" width="12" height="4" fill="#57FF6E" opacity="0.25"/><rect x="33" y="62" width="6" height="3" fill="#57FF6E" opacity="0.2"/>
         </svg>
-        <p className="ph-title">Перетащи изображение сюда</p>
-        <p className="ph-hint">или нажми для выбора файла · Ctrl+V</p>
+        <p className="ph-title">{t('Перетащи изображение сюда', 'Drag image here')}</p>
+        <p className="ph-hint">{t('или нажми для выбора файла · Ctrl+V', 'or click to select file · Ctrl+V')}</p>
       </div>
     );
   }

@@ -1,0 +1,115 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - img "MapKluss" [ref=e6]
+      - generic [ref=e7]:
+        - heading "MAPKLUSS" [level=1] [ref=e8]
+        - generic [ref=e9]: MINECRAFT MAP ART GENERATOR
+      - button "🎨 Художник" [ref=e10] [cursor=pointer]
+      - button "? Гид" [ref=e11] [cursor=pointer]
+      - button "📖 Wiki" [ref=e12] [cursor=pointer]
+      - link "❤ Поддержать" [ref=e13] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+      - button "EN" [ref=e14] [cursor=pointer]
+      - link "v1.5.0" [ref=e15] [cursor=pointer]:
+        - /url: https://boosty.to/klussforge
+  - generic [ref=e16]:
+    - complementary [ref=e17]:
+      - generic [ref=e18]:
+        - generic "Нажми Ctrl+V чтобы вставить изображение из буфера" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: ⛏
+          - paragraph [ref=e21]: нажми или перетащи
+          - paragraph [ref=e22]: Ctrl+V
+        - button "+ Новый холст" [ref=e24] [cursor=pointer]
+        - generic [ref=e25]:
+          - button "✂ Обрезать" [ref=e26] [cursor=pointer]
+          - generic [ref=e27]: 1:1
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]
+            - generic [ref=e97]
+          - generic [ref=e107]:
+            - generic [ref=e108]
+            - generic [ref=e137]
+            - paragraph [ref=e150]: ✓ Подбор цвета OKLAB
+        - generic [ref=e152]:
+          - heading "▼ ☀ Коррекция" [level=3] [ref=e153]:
+            - generic [ref=e154] [cursor=pointer]: ▼
+            - button "☀" [ref=e155] [cursor=pointer]
+            - generic [ref=e156]: Коррекция
+          - generic [ref=e157]:
+            - generic [ref=e160]: Предпросмотр
+            - generic [ref=e161]
+      - button "↺ Сбросить всё" [ref=e178] [cursor=pointer]:
+        - generic [ref=e179]: ↺
+        - text: Сбросить всё
+    - main [ref=e180]:
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - button "" [disabled] [ref=e183]:
+            - generic [ref=e184]: 
+          - button "" [disabled] [ref=e185]:
+            - generic [ref=e186]: 
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - button "" [ref=e190] [cursor=pointer]
+            - button "" [ref=e192] [cursor=pointer]
+            - button "" [ref=e194] [cursor=pointer]
+            - button "" [ref=e196] [cursor=pointer]
+            - button "" [ref=e198] [cursor=pointer]
+          - generic [ref=e200]:
+            - generic [ref=e202]: нет блока
+            - button "▾" [ref=e203] [cursor=pointer]
+        - generic [ref=e205]:
+          - slider "Zoom (Ctrl+scroll)" [ref=e206] [cursor=pointer]: "25"
+          - spinbutton [ref=e207]: "100"
+          - generic [ref=e208]: "%"
+        - generic [ref=e210]:
+          - button "⌖" [ref=e211] [cursor=pointer]
+          - button "╎" [ref=e212] [cursor=pointer]
+          - button "⟺" [ref=e213] [cursor=pointer]
+          - button "Блоки" [ref=e214] [cursor=pointer]
+          - button "Сравнить" [ref=e215] [cursor=pointer]
+          - button "Сетка" [ref=e216] [cursor=pointer]
+        - button "⌨" [ref=e219] [cursor=pointer]
+    - complementary [ref=e225]:
+      - generic [ref=e226]:
+        - generic [ref=e227]:
+          - generic [ref=e228]:
+            - heading "▼ Палитра 183 цветов · 61 блоков" [level=3] [ref=e229]
+            - combobox [ref=e232] [cursor=pointer]
+            - generic [ref=e233]
+            - button "⬡ Поделиться палитрой" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]
+          - generic [ref=e1312]:
+            - generic [ref=e1313]: Опорный блок (3D)
+            - generic [ref=e1314]
+        - generic [ref=e1357]:
+          - generic [ref=e1358]:
+            - heading "▼ Материалы" [level=3] [ref=e1359]
+            - generic "Показать максимальное количество каждого блока в любой из 1 секций — удобно для расчёта что взять с собой" [ref=e1360] [cursor=pointer]
+          - table [ref=e1364]:
+            - rowgroup [ref=e1365]
+            - rowgroup [ref=e1371]
+            - rowgroup [ref=e1678]
+            - rowgroup [ref=e1686]
+          - button "⎘ КОПИРОВАТЬ" [ref=e1693] [cursor=pointer]
+      - generic [ref=e1695]:
+        - heading "▼ Экспорт" [level=3] [ref=e1696]
+        - generic [ref=e1697]:
+          - button "↓ PNG" [ref=e1698] [cursor=pointer]
+          - button "↓ MAP.DAT" [ref=e1699] [cursor=pointer]
+          - button "↓ LITEMATIC 3D" [ref=e1700] [cursor=pointer]
+        - button "🔗 ПОЛУЧИТЬ ССЫЛКУ" [ref=e1702] [cursor=pointer]
+  - generic [ref=e1703]:
+    - generic [ref=e1704]: █ FLOYD–STEINBERG
+    - generic [ref=e1705]: █ 1×1 MAPS
+    - generic [ref=e1706]: █ 183 COLORS
+    - generic [ref=e1707]: █ 3D
+    - generic [ref=e1708]: █ 100%
+    - generic [ref=e1709]: █ 128×128px
+    - generic [ref=e1710]: Made by SmetankaKluss
+    - link "@SmetankaKluss" [ref=e1711] [cursor=pointer]:
+      - /url: https://t.me/SmetankaKluss
+      - img [ref=e1712]
+      - text: "@SmetankaKluss"
