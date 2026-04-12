@@ -89,6 +89,86 @@ export function deserializeProject(json: string): {
   }
 }
 
+export interface FullProjectSettings {
+  dithering: string;
+  intensity: number;
+  blockSelection: Record<string, number[]>;
+  adjustments: Record<string, unknown>;
+  mapMode: '2d' | '3d';
+  staircaseMode: 'classic' | 'optimized';
+  bnScale: number;
+}
+
+interface FullProjectData {
+  version: 2;
+  project: ProjectFile;
+  settings: FullProjectSettings;
+}
+
+export function serializeFullProject(
+  layers: Layer[],
+  activeLayerId: string,
+  grid: MapGrid,
+  settings: FullProjectSettings,
+): string {
+  const serialized: SerializedLayer[] = layers.map(l => ({
+    id: l.id,
+    name: l.name,
+    visible: l.visible,
+    locked: l.locked,
+    groupId: l.groupId,
+    imageDataB64: l.imageData ? imageDataToBase64(l.imageData) : null,
+    width: l.imageData?.width ?? 0,
+    height: l.imageData?.height ?? 0,
+  }));
+
+  const project: ProjectFile = {
+    version: 1,
+    grid,
+    activeLayerId,
+    layers: serialized,
+  };
+
+  const full: FullProjectData = { version: 2, project, settings };
+  return JSON.stringify(full);
+}
+
+export function deserializeFullProject(json: string): {
+  layers: Layer[];
+  activeLayerId: string;
+  grid: MapGrid;
+  settings: FullProjectSettings;
+} | null {
+  try {
+    const full = JSON.parse(json) as FullProjectData;
+    if (full.version !== 2) return null;
+    const { project, settings } = full;
+
+    const layers: Layer[] = project.layers.map(sl => ({
+      id: sl.id,
+      name: sl.name,
+      visible: sl.visible,
+      locked: sl.locked,
+      opacity: (sl as { opacity?: number }).opacity ?? 100,
+      buildMode: (sl as { buildMode?: string }).buildMode as import('./layers').LayerBuildMode ?? '2d',
+      groupId: sl.groupId,
+      imageData: sl.imageDataB64 && sl.width > 0 && sl.height > 0
+        ? base64ToImageData(sl.imageDataB64, sl.width, sl.height)
+        : null,
+      isDirty: true,
+    }));
+
+    return {
+      layers,
+      activeLayerId: project.activeLayerId,
+      grid: project.grid,
+      settings,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function downloadProject(json: string, filename = 'project.mapkluss'): void {
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

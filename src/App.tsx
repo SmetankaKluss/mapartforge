@@ -35,7 +35,11 @@ import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
 import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
-import { serializeProject, deserializeProject, downloadProject } from './lib/projectFile';
+import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject } from './lib/projectFile';
+import type { FullProjectSettings } from './lib/projectFile';
+import { saveProject, loadProject } from './lib/projectStorage';
+import { SaveProjectModal } from './components/SaveProjectModal';
+import { ProjectsPanel } from './components/ProjectsPanel';
 import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
 import type { PatternDefinition } from './lib/patternTool';
@@ -187,6 +191,9 @@ export default function App() {
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
@@ -1171,6 +1178,85 @@ export default function App() {
 
   const hasContent = compositeImageData !== null || compareData !== null;
 
+  // ── Project history (IndexedDB) ──────────────────────────────────────────────
+  // Declared after compositeImageData to avoid TDZ in the thumbnail handler.
+
+  const handleOpenSaveModal = useCallback(() => {
+    if (!compositeImageData) {
+      setSaveThumbnail(null);
+      setShowSaveModal(true);
+      return;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = compositeImageData.width;
+        tmpCanvas.height = compositeImageData.height;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        if (tmpCtx) {
+          tmpCtx.putImageData(compositeImageData, 0, 0);
+          ctx.drawImage(tmpCanvas, 0, 0, 128, 128);
+        }
+      }
+      setSaveThumbnail(canvas.toDataURL('image/png'));
+    } catch (err) {
+      console.error('Thumbnail generation failed', err);
+      setSaveThumbnail(null);
+    }
+    setShowSaveModal(true);
+  }, [compositeImageData]);
+
+  const handleSaveProjectToHistory = useCallback(async (name: string) => {
+    try {
+      const settings: FullProjectSettings = {
+        dithering,
+        intensity,
+        blockSelection: blockSelection as Record<string, number[]>,
+        adjustments: adjustments as Record<string, unknown>,
+        mapMode,
+        staircaseMode,
+        bnScale,
+      };
+      const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
+      const id = Date.now().toString();
+      await saveProject({ id, name, timestamp: Date.now(), thumbnail: saveThumbnail ?? '', data });
+    } catch (err) {
+      console.error('Failed to save project to history', err);
+    }
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, saveThumbnail]);
+
+  const handleLoadProjectFromHistory = useCallback(async (id: string) => {
+    try {
+      const stored = await loadProject(id);
+      if (!stored) { console.error('Project not found:', id); return; }
+      const result = deserializeFullProject(stored.data);
+      if (!result) { console.error('Failed to deserialize project', id); return; }
+      setMapGrid(result.grid);
+      // Mark all layers dirty so runProcess never overwrites restored content
+      const restoredLayers = result.layers.map(l => ({ ...l, isDirty: true }));
+      setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: [] });
+      setDithering(result.settings.dithering as import('./lib/dithering').DitheringMode);
+      setIntensity(result.settings.intensity);
+      setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
+      setAdjustments(result.settings.adjustments as import('./lib/adjustments').ImageAdjustments);
+      setMapMode(result.settings.mapMode);
+      setStaircaseMode(result.settings.staircaseMode);
+      setBnScale(result.settings.bnScale);
+      setSourceImage(null);
+      setOriginalData(null);
+      setCompareData(null);
+      setUndoStack([]);
+      setRedoStack([]);
+      setShowProjectsPanel(false);
+    } catch (err) {
+      console.error('Failed to load project from history', err);
+    }
+  }, []);
+
   return (
     <>
     <div className="app">
@@ -1189,6 +1275,8 @@ export default function App() {
           >🎨 {t('Художник', 'Artist')}</button>
           <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
+          <button className="tour-btn save-project-btn" onClick={handleOpenSaveModal} title={t('Сохранить проект', 'Save project')}>💾 {t('Сохранить', 'Save')}</button>
+          <button className="tour-btn projects-btn" onClick={() => setShowProjectsPanel(true)} title={t('Мои проекты', 'My projects')}>📁 {t('Проекты', 'Projects')}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
@@ -1992,6 +2080,24 @@ export default function App() {
 
     {/* ── Wiki modal ── */}
     {showWiki && <Suspense fallback={null}><WikiModal onClose={() => setShowWiki(false)} /></Suspense>}
+
+    {/* ── Save project modal ── */}
+    {showSaveModal && (
+      <SaveProjectModal
+        thumbnail={saveThumbnail}
+        defaultName={`${mapGrid.wide}×${mapGrid.tall} — ${new Date().toLocaleDateString()}`}
+        onSave={(name) => { handleSaveProjectToHistory(name); setShowSaveModal(false); }}
+        onClose={() => setShowSaveModal(false)}
+      />
+    )}
+
+    {/* ── Projects panel ── */}
+    {showProjectsPanel && (
+      <ProjectsPanel
+        onLoad={(id) => handleLoadProjectFromHistory(id)}
+        onClose={() => setShowProjectsPanel(false)}
+      />
+    )}
     </>
   );
 }
