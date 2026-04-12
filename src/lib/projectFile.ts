@@ -19,7 +19,7 @@ export interface ProjectFile {
   layers: SerializedLayer[];
 }
 
-function imageDataToBase64(data: ImageData): string {
+export function imageDataToBase64(data: ImageData): string {
   // Chunked encoding — spread operator overflows the stack for large canvases
   const bytes = new Uint8Array(data.data.buffer);
   let binary = '';
@@ -30,7 +30,7 @@ function imageDataToBase64(data: ImageData): string {
   return btoa(binary);
 }
 
-function base64ToImageData(b64: string, width: number, height: number): ImageData {
+export function base64ToImageData(b64: string, width: number, height: number): ImageData {
   const binary = atob(b64);
   const bytes = new Uint8ClampedArray(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -103,6 +103,7 @@ export interface FullProjectSettings {
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;
+  originalDataB64?: string; // base64-encoded pre-dithering image data for reprocessing
 }
 
 interface FullProjectData {

@@ -35,7 +35,7 @@ import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
 import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
-import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject } from './lib/projectFile';
+import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
 import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
 import { SaveProjectModal } from './components/SaveProjectModal';
@@ -122,6 +122,21 @@ function activeLayerHasContent(ref: React.MutableRefObject<{ imageData: ImageDat
 
 // Predefined brush sizes — all odd → half-integer radius → perfect circles, no protrusions
 const BRUSH_SIZES = [1, 3, 5, 7, 9, 11, 13, 17, 21, 25, 31, 37, 43];
+
+/** Convert ImageData to an HTMLImageElement for processing. Used to restore source from saved originalData. */
+function imageDataToSourceImage(data: ImageData): Promise<HTMLImageElement> {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = data.width;
+    canvas.height = data.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(data, 0, 0);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img); // fallback: resolve even if load fails
+    img.src = canvas.toDataURL('image/png');
+  });
+}
 
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
@@ -1220,6 +1235,7 @@ export default function App() {
         mapMode,
         staircaseMode,
         bnScale,
+        originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
       };
       const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
       const id = Date.now().toString();
@@ -1254,8 +1270,21 @@ export default function App() {
       setMapMode(result.settings.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
-      setSourceImage(null);
-      setOriginalData(null);
+
+      // Restore originalData (pre-dithering image) if it was saved, and create virtual sourceImage for reprocessing
+      if (result.settings.originalDataB64) {
+        const w = result.grid.wide * 128;
+        const h = result.grid.tall * 128;
+        const restoredOriginalData = base64ToImageData(result.settings.originalDataB64, w, h);
+        setOriginalData(restoredOriginalData);
+        // Create virtual source image for reprocessing when settings change
+        const sourceImg = await imageDataToSourceImage(restoredOriginalData);
+        setSourceImage(sourceImg);
+      } else {
+        setSourceImage(null);
+        setOriginalData(null);
+      }
+
       setCompareData(null);
       setUndoStack([]);
       setRedoStack([]);
