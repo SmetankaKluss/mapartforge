@@ -1255,9 +1255,12 @@ export default function App() {
       // Mark all layers dirty so runProcess never overwrites restored content.
       // Also stamp per-layer mapMode/staircaseMode/dithering so the useEffect([activeLayerId])
       // that syncs these fields from the active layer reads the correct saved values.
+      // If originalDataB64 was saved, we can allow reprocessing (isDirty=false)
+      // Otherwise mark dirty to prevent accidental overwrites during load
+      const canReprocess = !!result.settings.originalDataB64;
       const restoredLayers = result.layers.map(l => ({
         ...l,
-        isDirty: true,
+        isDirty: !canReprocess,  // false if we can reprocess, true if we can't
         mapMode: result.settings.mapMode,
         staircaseMode: result.settings.staircaseMode,
         dithering: result.settings.dithering as import('./lib/dithering').DitheringMode,
