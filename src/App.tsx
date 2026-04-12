@@ -1275,8 +1275,6 @@ export default function App() {
           >🎨 {t('Художник', 'Artist')}</button>
           <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
-          <button className="tour-btn save-project-btn" onClick={handleOpenSaveModal} title={t('Сохранить проект', 'Save project')}>💾 {t('Сохранить', 'Save')}</button>
-          <button className="tour-btn projects-btn" onClick={() => setShowProjectsPanel(true)} title={t('Мои проекты', 'My projects')}>📁 {t('Проекты', 'Projects')}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
@@ -1309,6 +1307,16 @@ export default function App() {
                 disabled={processing}
                 title={t('Создать пустой холст для рисования с нуля', 'Create blank canvas to draw from scratch')}
               >+ {t('Новый холст', 'New canvas')}</button>
+              <button
+                className="canvas-icon-btn"
+                onClick={handleOpenSaveModal}
+                title={t('Сохранить проект', 'Save project')}
+              >💾</button>
+              <button
+                className="canvas-icon-btn"
+                onClick={() => setShowProjectsPanel(true)}
+                title={t('Мои проекты', 'My projects')}
+              >📁</button>
             </div>
             {sourceHasAlpha && (
               <div className="alpha-controls">

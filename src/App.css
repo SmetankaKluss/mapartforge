@@ -1271,7 +1271,23 @@ input, select, textarea { outline: none; }
 .crop-ratio-hint { font-family: var(--font-pixel); font-size: 7px; color: var(--text-dim); white-space: nowrap; }
 
 /* ── New Canvas Button ──────────────────────────────────────────────────── */
-.new-canvas-row { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.new-canvas-row { padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; align-items: center; }
+.new-canvas-row .new-canvas-btn { flex: 1; }
+.canvas-icon-btn {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.canvas-icon-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
 .new-canvas-btn {
   width: 100%; padding: 5px 10px;
   background: transparent; border: 1px dashed rgba(87, 255, 110, 0.25);

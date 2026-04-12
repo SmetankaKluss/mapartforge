@@ -20,8 +20,14 @@ export interface ProjectFile {
 }
 
 function imageDataToBase64(data: ImageData): string {
-  // Encode raw RGBA bytes as base64
-  return btoa(String.fromCharCode(...new Uint8Array(data.data.buffer)));
+  // Chunked encoding — spread operator overflows the stack for large canvases
+  const bytes = new Uint8Array(data.data.buffer);
+  let binary = '';
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 function base64ToImageData(b64: string, width: number, height: number): ImageData {
