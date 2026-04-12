@@ -93,7 +93,7 @@ export interface FullProjectSettings {
   dithering: string;
   intensity: number;
   blockSelection: Record<string, number[]>;
-  adjustments: Record<string, unknown>;
+  adjustments: { brightness: number; contrast: number; saturation: number };
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;

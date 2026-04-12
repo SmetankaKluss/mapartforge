@@ -1216,7 +1216,7 @@ export default function App() {
         dithering,
         intensity,
         blockSelection: blockSelection as Record<string, number[]>,
-        adjustments: adjustments as Record<string, unknown>,
+        adjustments,
         mapMode,
         staircaseMode,
         bnScale,
@@ -1242,7 +1242,7 @@ export default function App() {
       setDithering(result.settings.dithering as import('./lib/dithering').DitheringMode);
       setIntensity(result.settings.intensity);
       setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
-      setAdjustments(result.settings.adjustments as import('./lib/adjustments').ImageAdjustments);
+      setAdjustments(result.settings.adjustments);
       setMapMode(result.settings.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
