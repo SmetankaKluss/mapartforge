@@ -537,10 +537,11 @@ export function PreviewCanvas({
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
 
-  // Brush cursor overlay state
-  const [brushCursorPos, setBrushCursorPos] = useState<{ clientX: number; clientY: number } | null>(null);
-  const setBrushCursorPosRef = useRef(setBrushCursorPos);
-  setBrushCursorPosRef.current = setBrushCursorPos;
+  // Brush cursor — positioned imperatively (no setState → no re-render per mousemove)
+  const brushCursorWrapperRef = useRef<HTMLDivElement>(null);
+  const stampCursorWrapperRef = useRef<HTMLDivElement>(null);
+  // Last known mouse client position (used for stamp cursor imperative positioning)
+  const lastMouseClientRef = useRef<{ clientX: number; clientY: number } | null>(null);
 
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
@@ -788,9 +789,43 @@ export function PreviewCanvas({
       }
       const { activeTool, paintBlock, patternBlocks, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
 
-      // Update brush cursor
+      // Update brush/stamp cursor position directly in DOM — no React re-render
       if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile') {
-        setBrushCursorPosRef.current({ clientX: e.clientX, clientY: e.clientY });
+        lastMouseClientRef.current = { clientX: e.clientX, clientY: e.clientY };
+        const { scale: s, brushSize: bs, patternAnchorMode: pam, activePattern: ap } = propsRef.current;
+        const cvs = canvasZoneRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
+        if (cvs) {
+          const cr = cvs.getBoundingClientRect();
+          const isStamp = activeTool === 'pattern-tile' && pam === 'brush';
+          // Brush cursor
+          const wrapper = brushCursorWrapperRef.current;
+          if (wrapper && !isStamp) {
+            if (activeTool === 'fill') {
+              wrapper.style.left = `${e.clientX}px`;
+              wrapper.style.top  = `${e.clientY}px`;
+              wrapper.style.transform = 'translate(-50%,-50%)';
+            } else {
+              const px = Math.floor((e.clientX - cr.left) / s);
+              const py = Math.floor((e.clientY - cr.top)  / s);
+              const ri = Math.floor(bs / 2);
+              wrapper.style.left = `${cr.left + (px - ri) * s}px`;
+              wrapper.style.top  = `${cr.top  + (py - ri) * s}px`;
+              wrapper.style.transform = '';
+            }
+            wrapper.style.visibility = 'visible';
+          }
+          // Stamp cursor
+          const stampWrapper = stampCursorWrapperRef.current;
+          if (stampWrapper && isStamp && ap) {
+            const px = Math.floor((e.clientX - cr.left) / s);
+            const py = Math.floor((e.clientY - cr.top)  / s);
+            const ox = px - Math.floor(ap.width  / 2);
+            const oy = py - Math.floor(ap.height / 2);
+            stampWrapper.style.left = `${cr.left + ox * s}px`;
+            stampWrapper.style.top  = `${cr.top  + oy * s}px`;
+            stampWrapper.style.visibility = 'visible';
+          }
+        }
       }
 
       // Gradient drag: update current endpoint and draw preview line on overlay
@@ -1283,7 +1318,26 @@ export function PreviewCanvas({
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill') {
-      setBrushCursorPos({ clientX: e.clientX, clientY: e.clientY });
+      const wrapper = brushCursorWrapperRef.current;
+      if (wrapper) {
+        const cvs = canvasZoneRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
+        if (cvs) {
+          const cr = cvs.getBoundingClientRect();
+          if (activeTool === 'fill') {
+            wrapper.style.left = `${e.clientX}px`;
+            wrapper.style.top  = `${e.clientY}px`;
+            wrapper.style.transform = 'translate(-50%,-50%)';
+          } else {
+            const px = Math.floor((e.clientX - cr.left) / scale);
+            const py = Math.floor((e.clientY - cr.top)  / scale);
+            const ri = Math.floor(brushSize / 2);
+            wrapper.style.left = `${cr.left + (px - ri) * scale}px`;
+            wrapper.style.top  = `${cr.top  + (py - ri) * scale}px`;
+            wrapper.style.transform = '';
+          }
+          wrapper.style.visibility = 'visible';
+        }
+      }
     }
     if (isDraggingRef.current) { cancelHide(); return; }
 
@@ -1340,7 +1394,7 @@ export function PreviewCanvas({
     }
   }
 
-  function handleZoneLeave() { if (!isPinned && !activeTool) scheduleHide(); setBrushCursorPos(null); if (activeTool === 'text') setTextCursor(null); }
+  function handleZoneLeave() { if (!isPinned && !activeTool) scheduleHide(); if (brushCursorWrapperRef.current) brushCursorWrapperRef.current.style.visibility = 'hidden'; if (stampCursorWrapperRef.current) stampCursorWrapperRef.current.style.visibility = 'hidden'; if (activeTool === 'text') setTextCursor(null); }
   function handleTooltipEnter() { cancelHide(); }
   function handleTooltipLeave() { if (!isPinned) scheduleHide(); }
 
@@ -1394,23 +1448,35 @@ export function PreviewCanvas({
 
   const isStampMode = activeTool === 'pattern-tile' && patternAnchorMode === 'brush';
 
-  const brushCircle = (() => {
-    if (!brushCursorPos || !hasBrushCursor) return null;
-    if (isStampMode) return null; // stamp mode uses pattern preview cursor instead
-    const canvas = canvasZoneRef.current?.querySelector('canvas');
-    if (!canvas) return null;
-    const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
-    const px = Math.floor((brushCursorPos.clientX - rect.left) / scale);
-    const py = Math.floor((brushCursorPos.clientY - rect.top) / scale);
-    const isPoint = activeTool === 'fill';
-    const toolSize = isPoint ? 1 : brushSize;
-    const r = toolSize / 2;
+  // Cursor SVG content — recomputed only when brushSize/scale/activeTool changes (not per mousemove)
+  const brushCursorContent = (() => {
+    if (!hasBrushCursor || isStampMode) return null;
+    if (activeTool === 'fill') {
+      const s = Math.max(scale * 2, 16);
+      return (
+        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} style={{ display: 'block' }}>
+          <line x1={s/2} y1={0} x2={s/2} y2={s} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
+          <line x1={0} y1={s/2} x2={s} y2={s/2} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
+        </svg>
+      );
+    }
+    const r = brushSize / 2;
     const ri = Math.floor(r);
-    return {
-      screenX: rect.left + (px + 0.5) * scale,
-      screenY: rect.top  + (py + 0.5) * scale,
-      r, ri, isPoint,
-    };
+    const rects: React.ReactNode[] = [];
+    for (let dy = -ri; dy <= ri; dy++) {
+      for (let dx = -ri; dx <= ri; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        rects.push(
+          <rect key={`${dx},${dy}`}
+            x={(dx + ri) * scale} y={(dy + ri) * scale}
+            width={scale} height={scale}
+            fill="rgba(255,60,60,0.25)" stroke="rgba(255,60,60,0.75)" strokeWidth="0.5"
+          />,
+        );
+      }
+    }
+    const span = 2 * ri + 1;
+    return <svg width={span * scale} height={span * scale} style={{ display: 'block' }}>{rects}</svg>;
   })();
 
   // ── Canvas child ────────────────────────────────────────────────────────────
@@ -1482,50 +1548,21 @@ export function PreviewCanvas({
     >
       {inner}
 
-      {brushCircle && (() => {
-        const { screenX, screenY, r, ri, isPoint } = brushCircle;
-        if (isPoint) {
-          const s = Math.max(scale * 2, 16);
-          return (
-            <svg style={{ position: 'fixed', left: screenX, top: screenY, transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 9999, overflow: 'visible' }} width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-              <line x1={s/2} y1={0} x2={s/2} y2={s} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
-              <line x1={0} y1={s/2} x2={s} y2={s/2} stroke="rgba(255,60,60,0.85)" strokeWidth="1"/>
-            </svg>
-          );
-        }
-        // Pixel-accurate cursor: draw each pixel that would be painted
-        const span = 2 * ri + 1;
-        const w = span * scale;
-        const rects: React.ReactNode[] = [];
-        for (let dy = -ri; dy <= ri; dy++) {
-          for (let dx = -ri; dx <= ri; dx++) {
-            if (dx * dx + dy * dy > r * r) continue;
-            rects.push(
-              <rect key={`${dx},${dy}`}
-                x={(dx + ri) * scale} y={(dy + ri) * scale}
-                width={scale} height={scale}
-                fill="rgba(255,60,60,0.25)" stroke="rgba(255,60,60,0.75)" strokeWidth="0.5"
-              />,
-            );
-          }
-        }
-        return (
-          <svg style={{ position: 'fixed', left: screenX - (ri + 0.5) * scale, top: screenY - (ri + 0.5) * scale, width: w, height: w, pointerEvents: 'none', zIndex: 9999 }}>
-            {rects}
-          </svg>
-        );
-      })()}
+      {/* Brush cursor — position set imperatively, content re-renders only on tool/size/scale change */}
+      <div
+        ref={brushCursorWrapperRef}
+        style={{
+          position: 'fixed', left: 0, top: 0,
+          visibility: 'hidden', pointerEvents: 'none', zIndex: 9999,
+          display: hasBrushCursor && !isStampMode ? 'block' : 'none',
+        }}
+      >
+        {brushCursorContent}
+      </div>
 
-      {/* ── Pattern stamp cursor (anchor-off / stamp mode) ── */}
-      {isStampMode && brushCursorPos && activePattern && (() => {
-        const canvas = canvasZoneRef.current?.querySelector('canvas');
-        if (!canvas) return null;
-        const rect = (canvas as HTMLCanvasElement).getBoundingClientRect();
-        const px = Math.floor((brushCursorPos.clientX - rect.left) / scale);
-        const py = Math.floor((brushCursorPos.clientY - rect.top) / scale);
+      {/* ── Pattern stamp cursor — wrapper positioned imperatively, cells re-render on pattern/scale change ── */}
+      {isStampMode && activePattern && (() => {
         const pw = activePattern.width, ph = activePattern.height;
-        const ox = px - Math.floor(pw / 2);
-        const oy = py - Math.floor(ph / 2);
         const cells: React.ReactNode[] = [];
         for (let ty = 0; ty < ph; ty++) {
           for (let tx = 0; tx < pw; tx++) {
@@ -1540,9 +1577,11 @@ export function PreviewCanvas({
           }
         }
         return (
-          <svg style={{ position: 'fixed', left: rect.left + ox * scale, top: rect.top + oy * scale, width: pw * scale, height: ph * scale, pointerEvents: 'none', zIndex: 9999, imageRendering: 'pixelated' }}>
-            {cells}
-          </svg>
+          <div ref={stampCursorWrapperRef} style={{ position: 'fixed', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: 9999 }}>
+            <svg width={pw * scale} height={ph * scale} style={{ display: 'block', imageRendering: 'pixelated' }}>
+              {cells}
+            </svg>
+          </div>
         );
       })()}
 
