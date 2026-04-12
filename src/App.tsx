@@ -1236,8 +1236,16 @@ export default function App() {
       const result = deserializeFullProject(stored.data);
       if (!result) { console.error('Failed to deserialize project', id); return; }
       setMapGrid(result.grid);
-      // Mark all layers dirty so runProcess never overwrites restored content
-      const restoredLayers = result.layers.map(l => ({ ...l, isDirty: true }));
+      // Mark all layers dirty so runProcess never overwrites restored content.
+      // Also stamp per-layer mapMode/staircaseMode/dithering so the useEffect([activeLayerId])
+      // that syncs these fields from the active layer reads the correct saved values.
+      const restoredLayers = result.layers.map(l => ({
+        ...l,
+        isDirty: true,
+        mapMode: result.settings.mapMode,
+        staircaseMode: result.settings.staircaseMode,
+        dithering: result.settings.dithering as import('./lib/dithering').DitheringMode,
+      }));
       setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: [] });
       setDithering(result.settings.dithering as import('./lib/dithering').DitheringMode);
       setIntensity(result.settings.intensity);
