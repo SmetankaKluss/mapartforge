@@ -494,6 +494,8 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
   const lastBrushPosRef  = useRef<{ px: number; py: number } | null>(null);
+  // Last pixel painted during a drag — used to interpolate gaps between mousemove events
+  const lastDragPixelRef = useRef<{ px: number; py: number } | null>(null);
   const patternAnchorRef = useRef<{ x: number; y: number } | null>(null);
 
   // Selection state
@@ -886,21 +888,32 @@ export function PreviewCanvas({
       const cx = Math.floor((e.clientX - rect.left) / scale);
       const cy = Math.floor((e.clientY - rect.top)  / scale);
       if (cx < 0 || cx >= width || cy < 0 || cy >= height) return;
-      const centerKey = cy * width + cx;
-      if (paintedSetRef.current.has(centerKey)) return;
-      paintedSetRef.current.add(centerKey);
       const { selectionMask: sMask, activePattern: aPattern, patternAnchorMode: pam } = propsRef.current;
-      if (activeTool === 'pattern-tile' && aPattern) {
-        if (pam === 'brush') {
-          paintWithPatternStamp(paintBufferRef.current!, cx, cy, aPattern, cp, sMask ?? undefined);
-        } else {
-          paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
-        }
-      } else if (activeTool === 'pattern') {
-        paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
-      } else {
+
+      if (activeTool === 'brush' || activeTool === 'eraser') {
         const erase = activeTool === 'eraser' || paintBlock?.baseId === -1;
-        paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, sMask ?? undefined);
+        const last = lastDragPixelRef.current;
+        if (last && (last.px !== cx || last.py !== cy)) {
+          // Interpolate from previous position to fill gaps on fast movement
+          drawBrushLine(paintBufferRef.current!, last.px, last.py, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, sMask ?? undefined);
+        } else {
+          paintBrushCircle(paintBufferRef.current!, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, sMask ?? undefined);
+        }
+        lastDragPixelRef.current = { px: cx, py: cy };
+      } else {
+        // Pattern tools: paint only new center positions (no line interpolation)
+        const centerKey = cy * width + cx;
+        if (paintedSetRef.current.has(centerKey)) return;
+        paintedSetRef.current.add(centerKey);
+        if (activeTool === 'pattern-tile' && aPattern) {
+          if (pam === 'brush') {
+            paintWithPatternStamp(paintBufferRef.current!, cx, cy, aPattern, cp, sMask ?? undefined);
+          } else {
+            paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
+          }
+        } else if (activeTool === 'pattern') {
+          paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
+        }
       }
       {
         const { otherLayersData: oLD } = propsRef.current;
@@ -951,6 +964,7 @@ export function PreviewCanvas({
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
       patternAnchorRef.current = null;
+      lastDragPixelRef.current = null;
       if (paintBufferRef.current) {
         onImageUpdateRef.current(paintBufferRef.current);
         paintBufferRef.current = null;
@@ -1272,6 +1286,7 @@ export function PreviewCanvas({
 
       isDraggingRef.current = true;
       paintedSetRef.current = new Set();
+      lastDragPixelRef.current = { px: cx, py: cy };
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(cy * width + cx);
       paintBrushCircle(paintBufferRef.current, cx, cy, brushSize, erase, paintBlock?.baseId ?? -1, paintBlock?.shade ?? 1, cp, selectionMask ?? undefined);
