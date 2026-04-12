@@ -1372,7 +1372,7 @@ export default function App() {
               staircaseMode={staircaseMode}
               onStaircaseModeChange={handleStaircaseModeChange}
               processing={processing}
-              isBlankCanvas={sourceImage === null && imageData !== null}
+              isBlankCanvas={false}
               collapsedSections={collapsedSections}
               onToggleSection={handleToggleSection}
               t={t}

@@ -236,7 +236,7 @@ export function Controls({
                 key={`${g.wide}x${g.tall}`}
                 className={`grid-btn ${active ? 'active' : ''}`}
                 onClick={() => { onMapGridChange(g); setShowCustom(false); }}
-                disabled={processing || isBlankCanvas}
+                disabled={processing}
                 title={`${g.wide}×${g.tall} maps`}
               >
                 <GridIcon wide={g.wide} tall={g.tall} />
@@ -253,7 +253,7 @@ export function Controls({
               setCustomH(mapGrid.tall);
               setShowCustom(v => !v);
             }}
-            disabled={processing || isBlankCanvas}
+            disabled={processing}
             title={t('Произвольный размер', 'Custom size')}
           >
             <svg width="22" height="15" viewBox="0 0 22 15" aria-hidden fill="currentColor" opacity="0.8">
