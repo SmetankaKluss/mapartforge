@@ -285,7 +285,7 @@ async function buildLitematicBytes(
   let sizeY: number;
   let yGrid: Int32Array | null = null;
   // Staircase: add 1 extra Z row at z=0 for the noobline (north shading reference)
-  const exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
+  let exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
 
   if (structure === 'staircase') {
     const sc = staircaseMode === 'optimized'
@@ -336,6 +336,11 @@ async function buildLitematicBytes(
     }
   }
 
+  // Flat mode needs +1 Z row for noobline
+  if (structure === 'flat') {
+    exportSizeZ = sizeZ + 1;
+  }
+
   // ── 3. Fill volume (Y×exportSizeZ×X, y outer) ────────────────────────
   const volume  = sizeX * sizeY * exportSizeZ;
   const indices = new Uint32Array(volume);
@@ -377,14 +382,18 @@ async function buildLitematicBytes(
       }
     }
   } else {
+    // Flat mode: art at y=0 or y=1 (with support), noobline at z=0
     const artY = sizeY - 1; // 0 normally, 1 when support layer added below
+
+    // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        const vi = artY * exportSizeZ * sizeX + z * sizeX + x;
+        const vi = artY * exportSizeZ * sizeX + (z + 1) * sizeX + x;
         indices[vi] = pixelBlock[pi];
       }
     }
+
     // Support layer (y=0) under floating blocks in flat mode
     if (sizeY === 2 && supportBlockNbt && supportBlockNbt !== 'air') {
       const supId = `minecraft:${supportBlockNbt}`;
@@ -399,10 +408,27 @@ async function buildLitematicBytes(
           const pi = z * sizeX + x;
           if (pixelBaseId[pi] < 0) continue; // transparent pixel
           if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
-          const vi = 0 * exportSizeZ * sizeX + z * sizeX + x;
+          const vi = 0 * exportSizeZ * sizeX + (z + 1) * sizeX + x;
           indices[vi] = supIdx;
         }
       }
+    }
+
+    // Noobline (z=0) — reference block for north-face shading
+    const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
+    const noobId = `minecraft:${supportNbt}`;
+    let noobIdx = blockToIdx.get(noobId);
+    if (noobIdx === undefined) {
+      noobIdx = blockPalette.length;
+      blockToIdx.set(noobId, noobIdx);
+      blockPalette.push(noobId);
+    }
+    for (let x = 0; x < sizeX; x++) {
+      const pi = 0 * sizeX + x; // First row (z=0)
+      if (pixelBlock[pi] === 0) continue; // transparent
+      const nooblineY = artY; // Flat mode: noobline at same Y as art
+      const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+      if (vi < volume) indices[vi] = noobIdx;
     }
   }
 
@@ -555,11 +581,12 @@ export interface LayerExportInfo {
  * 3D-mode pixels are placed using the staircase algorithm; 2D-mode pixels are flat (Y=0).
  */
 async function buildHybridBytes(
-  layers: LayerExportInfo[],
-  cp: ComputedPalette,
-  groups: BlockSelection,
-  name: string,
+  layers:          LayerExportInfo[],
+  cp:              ComputedPalette,
+  groups:          BlockSelection,
+  name:            string,
   supportBlockNbt?: string,
+  supportMode:     SupportMode = 1,
 ): Promise<Uint8Array> {
   const { width: sizeX, height: sizeZ } = layers[0].imageData;
   const n = sizeX * sizeZ;
@@ -657,6 +684,7 @@ async function buildHybridBytes(
   }
 
   // 7. Noobline (z=0) — reference block for north-face shading of first art row
+  // For each column, use the first non-transparent pixel (z=0) to determine noobline position
   const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
   const noobId = `minecraft:${supportNbt}`;
   let noobIdx = blockToIdx.get(noobId);
@@ -665,18 +693,16 @@ async function buildHybridBytes(
     blockToIdx.set(noobId, noobIdx);
     blockPalette.push(noobId);
   }
-  // Place noobline for ALL columns (not just z=0)
-  for (let z = 0; z < sizeZ; z++) {
-    for (let x = 0; x < sizeX; x++) {
-      const pi = z * sizeX + x;
-      if (pixelLayerIdx[pi] < 0) continue;
-      const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
-      const shade    = pixelShade[pi];
-      const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
-      if (nooblineY >= 0 && nooblineY < sizeY) {
-        const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
-        if (vi < volume) indices[vi] = noobIdx;
-      }
+  // Place noobline only for z=0 row (first art row from north)
+  for (let x = 0; x < sizeX; x++) {
+    const pi = 0 * sizeX + x; // First row (z=0)
+    if (pixelLayerIdx[pi] < 0) continue; // transparent
+    const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
+    const shade    = pixelShade[pi];
+    const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
+    if (nooblineY >= 0 && nooblineY < sizeY) {
+      const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+      if (vi < volume) indices[vi] = noobIdx;
     }
   }
 
@@ -689,9 +715,6 @@ async function buildHybridBytes(
       blockPalette.push(supId);
       blockToIdx.set(supId, supIdx);
     }
-
-    // Default support mode for hybrid: mode 1 (1 block under floating-only)
-    const supportMode: SupportMode = 1;
 
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
@@ -870,11 +893,12 @@ export async function exportLitematicHybrid(
   groups:          BlockSelection,
   name:            string = 'MapartForge',
   supportBlockNbt?: string,
+  supportMode:     SupportMode = 1,
 ): Promise<void> {
   if (layers.length === 0) return;
   const has3D = layers.some(l => l.mapMode === '3d');
   const suffix = has3D ? '_3d' : '_2d';
-  const bytes = await buildHybridBytes(layers, cp, groups, name, supportBlockNbt);
+  const bytes = await buildHybridBytes(layers, cp, groups, name, supportBlockNbt, supportMode);
   triggerDownload(bytes, `${name}${suffix}.litematic`);
 }
 
