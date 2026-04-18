@@ -133,7 +133,9 @@ export function ExportPanel({
     if (!hybridLayers || hybridLayers.length === 0) return;
     setBusyHybrid(true);
     try {
-      await exportLitematicHybrid(hybridLayers, activePalette, blockSelection, 'MapartForge');
+      const has3D = hybridLayers.some(l => l.mapMode === '3d');
+      await exportLitematicHybrid(hybridLayers, activePalette, blockSelection, 'MapartForge',
+        has3D ? supportBlock : undefined);
     } finally {
       setBusyHybrid(false);
     }
