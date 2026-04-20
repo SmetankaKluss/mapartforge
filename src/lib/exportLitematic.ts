@@ -329,12 +329,9 @@ async function buildLitematicBytes(
     }
   }
 
-  // ── 2b. Flat mode: expand to 2 layers when mandatory-support blocks present ─
-  if (structure === 'flat' && supportBlockNbt && supportBlockNbt !== 'air') {
-    if (pixelBaseId.some(bid => isMandatorySupport(bid, groups))) {
-      sizeY = 2;
-    }
-  }
+  // ── 2b. Flat mode: always keep art at ground level (y=0) ─
+  // Support blocks are not added in flat mode - user should place on solid surface
+  // (Removed automatic support layer to prevent floating schematics)
 
   // Flat mode needs +1 Z row for noobline
   if (structure === 'flat') {
@@ -393,8 +390,8 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art at y=0 or y=1 (with support), noobline at z=0
-    const artY = sizeY - 1; // 0 normally, 1 when support layer added below
+    // Flat mode: art always at y=0 (ground level), noobline at z=0
+    const artY = 0;
 
     // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
@@ -402,26 +399,6 @@ async function buildLitematicBytes(
         const pi = z * sizeX + x;
         const vi = artY * exportSizeZ * sizeX + (z + 1) * sizeX + x;
         indices[vi] = pixelBlock[pi];
-      }
-    }
-
-    // Support layer (y=0) under floating blocks in flat mode
-    if (sizeY === 2 && supportBlockNbt && supportBlockNbt !== 'air') {
-      const supId = `minecraft:${supportBlockNbt}`;
-      let supIdx = blockToIdx.get(supId);
-      if (supIdx === undefined) {
-        supIdx = blockPalette.length;
-        blockPalette.push(supId);
-        blockToIdx.set(supId, supIdx);
-      }
-      for (let z = 0; z < sizeZ; z++) {
-        for (let x = 0; x < sizeX; x++) {
-          const pi = z * sizeX + x;
-          if (pixelBaseId[pi] < 0) continue; // transparent pixel
-          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
-          const vi = 0 * exportSizeZ * sizeX + (z + 1) * sizeX + x;
-          indices[vi] = supIdx;
-        }
       }
     }
 
@@ -616,7 +593,7 @@ async function buildHybridBytes(
   const pixelLayerIdx = new Int32Array(n).fill(-1);
   const pixelIs3D     = new Uint8Array(n);           // 1 = 3D, 0 = 2D
 
-  for (let li = layers.length - 1; li >= 0; li--) {
+  for (let li = 0; li < layers.length; li++) {
     const { imageData, mapMode } = layers[li];
     const is3D = mapMode === '3d' ? 1 : 0;
     const src  = imageData.data;
