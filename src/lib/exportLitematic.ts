@@ -329,13 +329,7 @@ async function buildLitematicBytes(
     }
   }
 
-  // ── 2b. Flat mode: expand to 2 layers when mandatory-support blocks present ─
-  if (structure === 'flat' && supportBlockNbt && supportBlockNbt !== 'air') {
-    if (pixelBaseId.some(bid => isMandatorySupport(bid, groups))) {
-      sizeY = 2;
-    }
-  }
-
+  // ── 2b. Flat mode: no support layer (user places on solid surface) ─
   // Flat mode needs +1 Z row for noobline
   if (structure === 'flat') {
     exportSizeZ = sizeZ + 1;
@@ -393,8 +387,8 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art at y=1 if sizeY=2 (mandatory support), else y=0
-    const artY = sizeY === 2 ? 1 : 0;
+    // Flat mode: art at y=0 (ground level), noobline at z=0
+    const artY = 0;
 
     // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
@@ -533,7 +527,7 @@ async function buildLitematicBytes(
 
         w.tagCompoundStart('Position');
           w.tagInt('x', 0);
-          w.tagInt('y', structure === 'flat' && sizeY === 2 ? -1 : 0);
+          w.tagInt('y', 0);
           w.tagInt('z', 0);
         w.tagCompoundEnd();
 
