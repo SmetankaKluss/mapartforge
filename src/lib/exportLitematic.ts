@@ -529,7 +529,11 @@ async function buildLitematicBytes(
       w.tagCompoundStart(name);
 
         w.tagCompoundStart('Position');
-          w.tagInt('x', 0); w.tagInt('y', 0); w.tagInt('z', 0);
+          w.tagInt('x', 0);
+          // Flat mode: Position.y = -1 to place art at world y=0 (ground level)
+          // Staircase mode: Position.y = 0 (standard placement)
+          w.tagInt('y', structure === 'flat' ? -1 : 0);
+          w.tagInt('z', 0);
         w.tagCompoundEnd();
 
         w.tagCompoundStart('Size');
