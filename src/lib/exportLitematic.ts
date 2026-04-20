@@ -294,7 +294,7 @@ async function buildLitematicBytes(
     yGrid = sc.yGrid;
     sizeY = Math.max(1, sc.maxY + 2); // +1 for max, +1 headroom for noobline if needed
   } else {
-    // Flat mode: sizeY=2 with art at y=1, Position.y=-1 → art at world y=0
+    // Flat mode: sizeY=2, art at y=0 (matching hybrid 2D behavior)
     sizeY = 2;
   }
 
@@ -391,8 +391,8 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art at y=1 (with Position.y=-1 → world y=0), noobline at z=0
-    const artY = 1;
+    // Flat mode: art at y=0 (matching hybrid 2D behavior), noobline at z=0
+    const artY = 0;
 
     // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
@@ -531,9 +531,7 @@ async function buildLitematicBytes(
 
         w.tagCompoundStart('Position');
           w.tagInt('x', 0);
-          // Flat mode: Position.y = -1 to place art at world y=0 (ground level)
-          // Staircase mode: Position.y = 0 (standard placement)
-          w.tagInt('y', structure === 'flat' ? -1 : 0);
+          w.tagInt('y', 0);
           w.tagInt('z', 0);
         w.tagCompoundEnd();
 
