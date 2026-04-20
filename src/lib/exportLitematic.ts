@@ -294,8 +294,7 @@ async function buildLitematicBytes(
     yGrid = sc.yGrid;
     sizeY = Math.max(1, sc.maxY + 2); // +1 for max, +1 headroom for noobline if needed
   } else {
-    // Flat mode: sizeY=2, art at y=0 (matching hybrid 2D behavior)
-    sizeY = 2;
+    sizeY = 1;
   }
 
   // ── 2. Block palette ──────────────────────────────────────────────────
@@ -330,9 +329,12 @@ async function buildLitematicBytes(
     }
   }
 
-  // ── 2b. Flat mode: always keep art at ground level (y=0) ─
-  // Support blocks are not added in flat mode - user should place on solid surface
-  // (Removed automatic support layer to prevent floating schematics)
+  // ── 2b. Flat mode: expand to 2 layers when mandatory-support blocks present ─
+  if (structure === 'flat' && supportBlockNbt && supportBlockNbt !== 'air') {
+    if (pixelBaseId.some(bid => isMandatorySupport(bid, groups))) {
+      sizeY = 2;
+    }
+  }
 
   // Flat mode needs +1 Z row for noobline
   if (structure === 'flat') {
@@ -391,8 +393,8 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art at y=0 (matching hybrid 2D behavior), noobline at z=0
-    const artY = 0;
+    // Flat mode: art at y=1 if sizeY=2 (mandatory support), else y=0
+    const artY = sizeY === 2 ? 1 : 0;
 
     // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {
@@ -531,7 +533,7 @@ async function buildLitematicBytes(
 
         w.tagCompoundStart('Position');
           w.tagInt('x', 0);
-          w.tagInt('y', 0);
+          w.tagInt('y', structure === 'flat' && sizeY === 2 ? -1 : 0);
           w.tagInt('z', 0);
         w.tagCompoundEnd();
 
