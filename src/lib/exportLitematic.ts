@@ -358,6 +358,7 @@ async function buildLitematicBytes(
 
     // ── Noobline: 1 block per column at z=0 (north shading reference) ──
     // Block type matches user's support block selection; Y is shade-dependent.
+    // Place noobline for ALL columns that have at least one non-transparent pixel.
     {
       const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
       const noobId = `minecraft:${supportNbt}`;
@@ -368,8 +369,18 @@ async function buildLitematicBytes(
         blockPalette.push(noobId);
       }
       for (let x = 0; x < sizeX; x++) {
-        const pi = 0 * sizeX + x;
-        if (pixelBlock[pi] === 0) continue; // skip transparent columns
+        // Find first non-transparent pixel in this column
+        let firstZ = -1;
+        for (let z = 0; z < sizeZ; z++) {
+          const pi = z * sizeX + x;
+          if (pixelBlock[pi] !== 0) {
+            firstZ = z;
+            break;
+          }
+        }
+        if (firstZ < 0) continue; // entire column is transparent
+
+        const pi = firstZ * sizeX + x;
         const artY = yGrid![pi];
         const firstShade = pixelShade[pi];
         // Position noobline to create the correct height difference for map shading:
@@ -415,6 +426,7 @@ async function buildLitematicBytes(
     }
 
     // Noobline (z=0) — reference block for north-face shading
+    // Place noobline for ALL columns that have at least one non-transparent pixel.
     const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
     const noobId = `minecraft:${supportNbt}`;
     let noobIdx = blockToIdx.get(noobId);
@@ -424,8 +436,17 @@ async function buildLitematicBytes(
       blockPalette.push(noobId);
     }
     for (let x = 0; x < sizeX; x++) {
-      const pi = 0 * sizeX + x; // First row (z=0)
-      if (pixelBlock[pi] === 0) continue; // transparent
+      // Find first non-transparent pixel in this column
+      let hasArt = false;
+      for (let z = 0; z < sizeZ; z++) {
+        const pi = z * sizeX + x;
+        if (pixelBlock[pi] !== 0) {
+          hasArt = true;
+          break;
+        }
+      }
+      if (!hasArt) continue; // entire column is transparent
+
       const nooblineY = artY; // Flat mode: noobline at same Y as art
       const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
       if (vi < volume) indices[vi] = noobIdx;
@@ -684,7 +705,7 @@ async function buildHybridBytes(
   }
 
   // 7. Noobline (z=0) — reference block for north-face shading of first art row
-  // For each column, use the first non-transparent pixel (z=0) to determine noobline position
+  // Place noobline for ALL columns that have at least one non-transparent pixel.
   const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
   const noobId = `minecraft:${supportNbt}`;
   let noobIdx = blockToIdx.get(noobId);
@@ -693,10 +714,20 @@ async function buildHybridBytes(
     blockToIdx.set(noobId, noobIdx);
     blockPalette.push(noobId);
   }
-  // Place noobline only for z=0 row (first art row from north)
+  // Place noobline only for columns that have at least one non-transparent pixel
   for (let x = 0; x < sizeX; x++) {
-    const pi = 0 * sizeX + x; // First row (z=0)
-    if (pixelLayerIdx[pi] < 0) continue; // transparent
+    // Find first non-transparent pixel in this column
+    let firstZ = -1;
+    for (let z = 0; z < sizeZ; z++) {
+      const pi = z * sizeX + x;
+      if (pixelLayerIdx[pi] >= 0) {
+        firstZ = z;
+        break;
+      }
+    }
+    if (firstZ < 0) continue; // entire column is transparent
+
+    const pi = firstZ * sizeX + x;
     const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
     const shade    = pixelShade[pi];
     const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
@@ -768,72 +799,7 @@ async function buildHybridBytes(
     }
   }
 
-  // 8. Support blocks (staircase only) — for 3D layers
-  if (has3D && supportNbt !== 'air') {
-    const supId = `minecraft:${supportNbt}`;
-    let supIdx = blockToIdx.get(supId);
-    if (supIdx === undefined) {
-      supIdx = blockPalette.length;
-      blockPalette.push(supId);
-      blockToIdx.set(supId, supIdx);
-    }
-
-    // Default support mode for hybrid: mode 1 (1 block under floating-only)
-    const supportMode: SupportMode = 1;
-
-    for (let z = 0; z < sizeZ; z++) {
-      for (let x = 0; x < sizeX; x++) {
-        const pi = z * sizeX + x;
-        if (pixelBlock[pi] === 0) continue; // transparent pixel
-        if (!pixelIs3D[pi]) continue; // 2D layers don't need support in hybrid
-        const pixelY = yGrid![pi];
-        const artZ   = z + 1; // art shifted by 1 due to noobline
-
-        if (supportMode === 1) {
-          // Mode 1: 1 block under gravity-affected blocks only
-          if (!isMandatorySupport(pixelBaseId[pi], groups)) continue;
-          const sy = pixelY - 1;
-          if (sy < 0) continue;
-          const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
-          if (indices[vi] === 0) indices[vi] = supIdx;
-        } else if (supportMode === 2) {
-          // Mode 2: shade-dependent support
-          let numSup: number;
-          if (pixelShade[pi] === 1) {
-            numSup = 1;
-          } else if (pixelShade[pi] === 2) {
-            numSup = 2;
-          } else {
-            // shade 0 (dark): check if this Y level was seen before
-            const seenYPerCol = new Set<number>();
-            for (let zz = 0; zz < sizeZ; zz++) {
-              const ppi = zz * sizeX + x;
-              if (ppi !== pi && pixelBlock[ppi] !== 0 && pixelIs3D[ppi]) {
-                seenYPerCol.add(yGrid![ppi]);
-              }
-            }
-            numSup = seenYPerCol.has(yGrid![pi]) ? 1 : 2;
-          }
-          for (let k = 1; k <= numSup; k++) {
-            const sy = pixelY - k;
-            if (sy < 0) break;
-            const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
-            if (indices[vi] === 0) indices[vi] = supIdx;
-          }
-        } else if (supportMode === 3) {
-          // Mode 3: 2 blocks under every art block
-          for (let k = 1; k <= 2; k++) {
-            const sy = pixelY - k;
-            if (sy < 0) break;
-            const vi = sy * exportSizeZ * sizeX + artZ * sizeX + x;
-            if (indices[vi] === 0) indices[vi] = supIdx;
-          }
-        }
-      }
-    }
-  }
-
-  // 8. Write NBT (same structure as buildLitematicBytes)
+  // 9. Write NBT (same structure as buildLitematicBytes)
   const packedStates = packBlockStates(indices, blockPalette.length);
   const now = BigInt(Date.now());
   const w   = new NbtWriter();
