@@ -644,7 +644,9 @@ async function buildHybridBytes(
   }
 
   const exportSizeZ = sizeZ + 1;                        // z=0 reserved for noobline
-  const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 2;
+  // sizeY = 1 for pure 2D (art at y=0, noobline also at y=0, no empty levels).
+  // For 3D: +2 for maxY + headroom for noobline above/below art when shade=0/2.
+  const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 1;
 
   // 5. Block palette
   const blockPalette: string[] = ['minecraft:air'];
