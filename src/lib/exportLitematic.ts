@@ -294,7 +294,8 @@ async function buildLitematicBytes(
     yGrid = sc.yGrid;
     sizeY = Math.max(1, sc.maxY + 2); // +1 for max, +1 headroom for noobline if needed
   } else {
-    sizeY = 1; // may be updated to 2 after pixelBaseId is populated (step 2b)
+    // Flat mode: sizeY=2 with art at y=1, Position.y=-1 → art at world y=0
+    sizeY = 2;
   }
 
   // ── 2. Block palette ──────────────────────────────────────────────────
@@ -390,8 +391,8 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art always at y=0 (ground level), noobline at z=0
-    const artY = 0;
+    // Flat mode: art at y=1 (with Position.y=-1 → world y=0), noobline at z=0
+    const artY = 1;
 
     // Art blocks at z+1 (z=0 reserved for noobline)
     for (let z = 0; z < sizeZ; z++) {

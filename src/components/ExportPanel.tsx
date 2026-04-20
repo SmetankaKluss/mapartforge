@@ -148,10 +148,10 @@ export function ExportPanel({
     try {
       if (mapGrid.wide * mapGrid.tall > 1) {
         await exportLitematicZip(activeLayerExport.imageData, activePalette, blockSelection, mapGrid,
-          structure, 'MapartForge_layer', structure === 'staircase' ? supportBlock : (structure === 'flat' ? supportBlock : undefined), supportMode, activeLayerExport.staircaseMode);
+          structure, 'MapartForge_layer', structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
       } else {
         await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
-          structure, structure === 'staircase' ? supportBlock : (structure === 'flat' ? supportBlock : undefined), supportMode, activeLayerExport.staircaseMode);
+          structure, structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
       }
     } finally {
       setBusyLayer(false);
