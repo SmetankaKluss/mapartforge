@@ -614,8 +614,8 @@ async function buildHybridBytes(
     maxY3D = sc.maxY;
   }
 
-  const exportSizeZ = sizeZ + 1;                        // z=0 reserved for noobline
-  const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 2;
+  const exportSizeZ = sizeZ;  // no noobline row for 2D
+  const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 1;
 
   // 5. Block palette
   const blockPalette: string[] = ['minecraft:air'];

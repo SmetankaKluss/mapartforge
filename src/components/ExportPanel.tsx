@@ -105,9 +105,10 @@ export function ExportPanel({
     const structure = mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLiteFlat(true);
     try {
+      // For 2D flat mode, use 'air' as support block to disable support layer
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematic(src, activePalette, blockSelection, 'MapartForge', structure,
-        structure === 'staircase' ? supportBlock : undefined,
-        supportMode, staircaseMode);
+        supportForExport, supportMode, staircaseMode);
     } finally {
       setBusyLiteFlat(false);
     }
@@ -121,9 +122,9 @@ export function ExportPanel({
     const zipFilename   = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
     setBusyZip(true);
     try {
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename,
-        structure === 'staircase' ? supportBlock : undefined,
-        supportMode, staircaseMode);
+        supportForExport, supportMode, staircaseMode);
     } finally {
       setBusyZip(false);
     }
@@ -134,8 +135,10 @@ export function ExportPanel({
     setBusyHybrid(true);
     try {
       const has3D = hybridLayers.some(l => l.mapMode === '3d');
+      // For 2D-only hybrid, use 'air' as support block to disable support layer
+      const supportForExport = has3D ? supportBlock : 'air';
       await exportLitematicHybrid(hybridLayers, activePalette, blockSelection, 'MapartForge',
-        has3D ? supportBlock : undefined, supportMode);
+        supportForExport, supportMode);
     } finally {
       setBusyHybrid(false);
     }
@@ -146,12 +149,14 @@ export function ExportPanel({
     const structure = activeLayerExport.mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLayer(true);
     try {
+      // For 2D flat mode, use 'air' as support block to disable support layer
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       if (mapGrid.wide * mapGrid.tall > 1) {
         await exportLitematicZip(activeLayerExport.imageData, activePalette, blockSelection, mapGrid,
-          structure, 'MapartForge_layer', structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+          structure, 'MapartForge_layer', supportForExport, supportMode, activeLayerExport.staircaseMode);
       } else {
         await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
-          structure, structure === 'staircase' ? supportBlock : undefined, supportMode, activeLayerExport.staircaseMode);
+          structure, supportForExport, supportMode, activeLayerExport.staircaseMode);
       }
     } finally {
       setBusyLayer(false);
