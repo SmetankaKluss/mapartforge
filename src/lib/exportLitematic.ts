@@ -652,42 +652,43 @@ async function buildHybridBytes(
     }
   }
 
-  // 7. Noobline (z=0) — reference block for north-face shading of first art row
-  // Place noobline for ALL columns that have at least one non-transparent pixel.
-  const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
-  const noobId = `minecraft:${supportNbt}`;
-  let noobIdx = blockToIdx.get(noobId);
-  if (noobIdx === undefined) {
-    noobIdx = blockPalette.length;
-    blockToIdx.set(noobId, noobIdx);
-    blockPalette.push(noobId);
-  }
-  // Place noobline only for columns that have at least one non-transparent pixel
-  for (let x = 0; x < sizeX; x++) {
-    // Find first non-transparent pixel in this column
-    let firstZ = -1;
-    for (let z = 0; z < sizeZ; z++) {
-      const pi = z * sizeX + x;
-      if (pixelLayerIdx[pi] >= 0) {
-        firstZ = z;
-        break;
-      }
+  // 7. Noobline — only if 3D layers exist
+  if (has3D) {
+    const noobNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
+    const noobId = `minecraft:${noobNbt}`;
+    let noobIdx = blockToIdx.get(noobId);
+    if (noobIdx === undefined) {
+      noobIdx = blockPalette.length;
+      blockToIdx.set(noobId, noobIdx);
+      blockPalette.push(noobId);
     }
-    if (firstZ < 0) continue; // entire column is transparent
+    // Place noobline only for columns that have at least one non-transparent pixel
+    for (let x = 0; x < sizeX; x++) {
+      // Find first non-transparent pixel in this column
+      let firstZ = -1;
+      for (let z = 0; z < sizeZ; z++) {
+        const pi = z * sizeX + x;
+        if (pixelLayerIdx[pi] >= 0) {
+          firstZ = z;
+          break;
+        }
+      }
+      if (firstZ < 0) continue; // entire column is transparent
 
-    const pi = firstZ * sizeX + x;
-    const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
-    const shade    = pixelShade[pi];
-    const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
-    if (nooblineY >= 0 && nooblineY < sizeY) {
-      const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
-      if (vi < volume) indices[vi] = noobIdx;
+      const pi = firstZ * sizeX + x;
+      const artY     = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
+      const shade    = pixelShade[pi];
+      const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
+      if (nooblineY >= 0 && nooblineY < sizeY) {
+        const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+        if (vi < volume) indices[vi] = noobIdx;
+      }
     }
   }
 
   // 8. Support blocks (for 3D layers only)
-  if (has3D && supportNbt !== 'air') {
-    const supId = `minecraft:${supportNbt}`;
+  if (has3D && supportBlockNbt && supportBlockNbt !== 'air') {
+    const supId = `minecraft:${supportBlockNbt}`;
     let supIdx = blockToIdx.get(supId);
     if (supIdx === undefined) {
       supIdx = blockPalette.length;
