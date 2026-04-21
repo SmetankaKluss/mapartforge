@@ -329,10 +329,9 @@ async function buildLitematicBytes(
     }
   }
 
-  // ── 2b. Flat mode: no support layer (user places on solid surface) ─
-  // Flat mode needs +1 Z row for noobline
+  // ── 2b. Flat mode: no extra Z row (art directly on ground) ─
   if (structure === 'flat') {
-    exportSizeZ = sizeZ + 1;
+    exportSizeZ = sizeZ;
   }
 
   // ── 3. Fill volume (Y×exportSizeZ×X, y outer) ────────────────────────
@@ -387,43 +386,16 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art at y=0 (ground level), noobline at z=0
+    // Flat mode: art directly on ground (Z=0), no noobline
     const artY = 0;
 
-    // Art blocks at z+1 (z=0 reserved for noobline)
+    // Art blocks at Z=0 (direct placement on solid surface)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        const vi = artY * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+        const vi = artY * sizeZ * sizeX + z * sizeX + x;
         indices[vi] = pixelBlock[pi];
       }
-    }
-
-    // Noobline (z=0) — reference block for north-face shading
-    // Place noobline for ALL columns that have at least one non-transparent pixel.
-    const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
-    const noobId = `minecraft:${supportNbt}`;
-    let noobIdx = blockToIdx.get(noobId);
-    if (noobIdx === undefined) {
-      noobIdx = blockPalette.length;
-      blockToIdx.set(noobId, noobIdx);
-      blockPalette.push(noobId);
-    }
-    for (let x = 0; x < sizeX; x++) {
-      // Find first non-transparent pixel in this column
-      let hasArt = false;
-      for (let z = 0; z < sizeZ; z++) {
-        const pi = z * sizeX + x;
-        if (pixelBlock[pi] !== 0) {
-          hasArt = true;
-          break;
-        }
-      }
-      if (!hasArt) continue; // entire column is transparent
-
-      const nooblineY = artY; // Flat mode: noobline at same Y as art
-      const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
-      if (vi < volume) indices[vi] = noobIdx;
     }
   }
 
