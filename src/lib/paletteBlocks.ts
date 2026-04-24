@@ -609,6 +609,12 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Oak Pressure Plate",
         "nbtName": "oak_pressure_plate",
         "supportBlockMandatory": true
+      },
+      {
+        "blockId": 5,
+        "displayName": "Pale Oak Pressure Plate",
+        "nbtName": "pale_oak_pressure_plate",
+        "supportBlockMandatory": true
       }
     ]
   },
@@ -2107,6 +2113,12 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Orange Terracotta",
         "nbtName": "orange_terracotta",
         "supportBlockMandatory": false
+      },
+      {
+        "blockId": 1,
+        "displayName": "Big Dripleaf",
+        "nbtName": "big_dripleaf",
+        "supportBlockMandatory": true
       }
     ]
   },
