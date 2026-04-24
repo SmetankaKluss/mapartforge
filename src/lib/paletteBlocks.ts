@@ -2761,14 +2761,33 @@ export type BlockSelection = Record<number, number[]>;
 export function buildPaletteFromSelection(
   sel: BlockSelection,
   shades: number[] = [0, 1, 2, 3],
+  mcVersion?: import('./versionPresets').MinecraftVersion,
 ): PaletteColor[] {
+  const { filterBlocksForVersion } = require('./versionPresets');
   const activeBaseIds = new Set<number>();
+
   for (const [csIdStr, blockIds] of Object.entries(sel)) {
-    if (blockIds.length > 0) {
-      const row = COLOUR_ROWS[Number(csIdStr)];
-      if (row) activeBaseIds.add(row.baseId);
+    const csId = Number(csIdStr);
+    const row = COLOUR_ROWS[csId];
+    if (!row || blockIds.length === 0) continue;
+
+    let validBlockIds = blockIds;
+    if (mcVersion) {
+      const validNbtNames = filterBlocksForVersion(
+        row.blocks.map(b => b.nbtName),
+        mcVersion
+      );
+      validBlockIds = blockIds.filter(bid => {
+        const block = row.blocks.find(b => b.blockId === bid);
+        return block && validNbtNames.includes(block.nbtName);
+      });
+    }
+
+    if (validBlockIds.length > 0) {
+      activeBaseIds.add(row.baseId);
     }
   }
+
   const shadeSet = new Set(shades);
   return PALETTE.filter(c => activeBaseIds.has(c.baseId) && shadeSet.has(c.shade));
 }

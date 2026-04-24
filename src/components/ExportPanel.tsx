@@ -12,6 +12,20 @@ import { uploadPermalink } from '../lib/share';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
 
+// Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
+function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = data.width;
+    canvas.height = data.height;
+    canvas.getContext('2d')!.putImageData(data, 0, 0);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img);
+    img.src = canvas.toDataURL('image/png');
+  });
+}
+
 interface Props {
   imageData:   ImageData | null;
   compareData: { left: ImageData; right: ImageData } | null;
@@ -165,10 +179,16 @@ export function ExportPanel({
 
   async function handleGetLink() {
     const src = compareMode ? compareData?.left ?? null : imageData;
-    if (!src || !sourceImage) return;
+    if (!src) return;
     setLinkState('uploading');
     try {
-      const url = await uploadPermalink(sourceImage, src, {
+      // Use sourceImage if available; otherwise use imageData as fallback for blank canvas projects
+      let imgToShare = sourceImage;
+      if (!imgToShare && src) {
+        imgToShare = await imageDataToHtmlImage(src);
+      }
+      if (!imgToShare) return;
+      const url = await uploadPermalink(imgToShare, src, {
         dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, staircaseMode, bnScale,
       });
       setLinkUrl(url);
@@ -256,7 +276,7 @@ export function ExportPanel({
         <button
           className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
           onClick={handleGetLink}
-          disabled={base || linkState === 'uploading' || !sourceImage}
+          disabled={base || linkState === 'uploading'}
           title={!hasContent ? t('Сначала обработай изображение', 'Process image first') : t('Создать постоянную ссылку на этот мап-арт с текущими настройками', 'Create permanent link to this map art with current settings')}
         >
           {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}

@@ -13,6 +13,7 @@ export interface SavedSettings {
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;
+  minecraftVersion?: 'pre-1.12' | '1.12' | '1.13+';
 }
 
 const STORAGE_KEY = 'mapartforge-v4';

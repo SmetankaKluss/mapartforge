@@ -19,6 +19,8 @@ import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
 import type { MapGrid } from './lib/types';
 import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
 import type { BlockSelection } from './lib/paletteBlocks';
+import type { MinecraftVersion } from './lib/versionPresets';
+import { getVersionLabel } from './lib/versionPresets';
 import { DEFAULT_ADJUSTMENTS } from './lib/adjustments';
 import type { ImageAdjustments } from './lib/adjustments';
 import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
@@ -200,6 +202,7 @@ export default function App() {
   const [zoom, setZoom]                 = useState(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleCanvasWheel = React.useCallback(makeZoomWheelHandler(setZoom), []);
+  const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(saved.minecraftVersion ?? '1.13+');
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -323,6 +326,7 @@ export default function App() {
   useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
   useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
+  useEffect(() => { saveSettings({ minecraftVersion }); }, [minecraftVersion]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
 
   // Per-layer settings: restore mapMode/staircaseMode/dithering when active layer changes
@@ -426,9 +430,9 @@ export default function App() {
   const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
 
   const activePalette = useMemo<ComputedPalette>(
-    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades)),
+    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blockSelection, mapMode],
+    [blockSelection, mapMode, minecraftVersion],
   );
 
 
@@ -702,9 +706,9 @@ export default function App() {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion));
     if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     setMapMode(mode);
@@ -713,7 +717,7 @@ export default function App() {
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
     }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion));
     if (sourceImage && activeLayerHasContent(activeLayerRef)) {
       if (activeLayerRef.current?.isDirty) {
         const img = activeLayerRef.current.imageData;
@@ -1248,6 +1252,7 @@ export default function App() {
         staircaseMode,
         bnScale,
         originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
+        minecraftVersion,
       };
       const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
       const id = Date.now().toString();
@@ -1255,7 +1260,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to save project to history', err);
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, saveThumbnail]);
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, minecraftVersion, saveThumbnail]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -1285,6 +1290,9 @@ export default function App() {
       setMapMode(result.settings.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
+      if (result.settings.minecraftVersion) {
+        setMinecraftVersion(result.settings.minecraftVersion);
+      }
 
       // Restore originalData (pre-dithering image) if it was saved, and create virtual sourceImage for reprocessing
       if (result.settings.originalDataB64) {
@@ -1986,6 +1994,23 @@ export default function App() {
                 paletteSize={activePalette.colors.length}
                 disabled={processing}
               />
+              <div className="panel-divider"></div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
+                <label style={{ display: 'block', marginBottom: 6 }}>{t('Версия Minecraft', 'Minecraft Version')}:</label>
+                <select
+                  value={minecraftVersion}
+                  onChange={e => setMinecraftVersion(e.target.value as MinecraftVersion)}
+                  style={{
+                    width: '100%', padding: '6px 8px', fontSize: 12, background: '#080810',
+                    color: '#57FF6E', border: '1px solid rgba(87,255,110,0.3)',
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  <option value="pre-1.12">{getVersionLabel('pre-1.12')}</option>
+                  <option value="1.12">{getVersionLabel('1.12')}</option>
+                  <option value="1.13+">{getVersionLabel('1.13+')}</option>
+                </select>
+              </div>
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
                 <div className="support-block-section">
