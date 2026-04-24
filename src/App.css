@@ -367,6 +367,39 @@ input, select, textarea { outline: none; }
 .upload-sub   { font-size: 10px; color: var(--text-muted); }
 .upload-hint  { font-size: 9px; color: var(--accent); font-family: var(--font-mono); margin-top: 4px; opacity: 0.8; }
 
+/* ── Global drag-and-drop overlay ── */
+.global-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(8, 8, 16, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: fadeIn 0.1s ease;
+}
+.global-drop-inner {
+  border: 2px dashed var(--accent);
+  box-shadow: 0 0 40px var(--accent-glow), inset 0 0 40px rgba(87, 255, 110, 0.04);
+  padding: 60px 100px;
+  text-align: center;
+  background: rgba(87, 255, 110, 0.04);
+  animation: scaleIn 0.12s ease;
+}
+.global-drop-icon { font-size: 48px; margin-bottom: 16px; }
+.global-drop-text {
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+  letter-spacing: 0.05em;
+}
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
 /* ── Controls Component ────────────────────────────────────────────────── */
 .controls { display: flex; flex-direction: column; }
 .control-group { padding: 0; }
