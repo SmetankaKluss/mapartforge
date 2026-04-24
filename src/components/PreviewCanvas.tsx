@@ -121,6 +121,7 @@ interface Props {
   gradientStops?: GradientStop[];
   gradientDithering?: 'none' | 'ordered';
   overlayRef?: React.RefObject<HTMLCanvasElement | null>;
+  onZoomWheel?: (e: WheelEvent) => void;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -479,6 +480,7 @@ export function PreviewCanvas({
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
   activePattern, patternAnchorMode, gradientStops, gradientDithering,
+  onZoomWheel,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -559,6 +561,8 @@ export function PreviewCanvas({
   const onTextCommitRef = useRef(onTextCommit);
   onTextCommitRef.current = onTextCommit;
   const canvasZoneRef = useRef<HTMLDivElement>(null);
+  const onZoomWheelRef = useRef(onZoomWheel);
+  onZoomWheelRef.current = onZoomWheel;
   const imageDataRef  = useRef<ImageData | null>(null);
   imageDataRef.current = imageData;
   const propsRef = useRef<{
@@ -744,6 +748,20 @@ export function PreviewCanvas({
     return () => clearTimeout(labelTimerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [splitPos != null]);
+
+  // ── Ctrl/Shift+scroll zoom ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    const el = canvasZoneRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.shiftKey) return;
+      e.preventDefault();
+      onZoomWheelRef.current?.(e);
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   // ── Close tooltip when a paint tool activates ───────────────────────────────
 

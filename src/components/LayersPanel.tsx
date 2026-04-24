@@ -1,5 +1,15 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Layer, LayerGroup } from '../lib/layers';
+import { useLocale } from '../lib/locale';
+
+function getDisplayName(name: string, lang: string): string {
+  if (lang === 'en') {
+    return name
+      .replace(/^Слой (\d+)$/, 'Layer $1')
+      .replace(/^Слитые слои$/, 'Merged layers');
+  }
+  return name;
+}
 
 interface Props {
   layers: Layer[];
@@ -82,6 +92,7 @@ export function LayersPanel({
   onDeleteGroup,
   onToggleGroupCollapse,
 }: Props) {
+  const { lang } = useLocale();
   const editingRef = useRef<HTMLInputElement | null>(null);
   const dragIndexRef = useRef<number | null>(null);
   const sliderActiveRef = useRef(false);
@@ -224,7 +235,7 @@ export function LayersPanel({
                       });
                     }}
                   >
-                    {layer.name}
+                    {getDisplayName(layer.name, lang)}
                   </span>
 
                   {/* Eye / lock / delete */}

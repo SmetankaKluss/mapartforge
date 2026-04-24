@@ -29,14 +29,35 @@ async function scaleSource(
   bgMode: 'color' | 'transparent' = 'color',
   bgColor: string = '#ffffff',
 ): Promise<Uint8ClampedArray> {
+  // Multi-step downscaling: halve dimensions repeatedly until within 2× of target.
+  // This preserves more detail than a single nearest-neighbor jump.
+  const srcW = (source as HTMLImageElement).naturalWidth  ?? (source as ImageBitmap).width;
+  const srcH = (source as HTMLImageElement).naturalHeight ?? (source as ImageBitmap).height;
+
+  let current: CanvasImageSource = source;
+  let curW = srcW;
+  let curH = srcH;
+
+  while (curW > width * 2 || curH > height * 2) {
+    curW = Math.max(Math.floor(curW / 2), width);
+    curH = Math.max(Math.floor(curH / 2), height);
+    const step = new OffscreenCanvas(curW, curH);
+    const sc = step.getContext('2d')!;
+    sc.imageSmoothingEnabled = true;
+    sc.imageSmoothingQuality = 'high';
+    sc.drawImage(current, 0, 0, curW, curH);
+    current = step;
+  }
+
   const offscreen = new OffscreenCanvas(width, height);
   const ctx = offscreen.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
   if (bgMode === 'color') {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
   }
-  ctx.drawImage(source, 0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(current, 0, 0, width, height);
   return ctx.getImageData(0, 0, width, height).data;
 }
 

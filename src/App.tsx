@@ -52,6 +52,16 @@ import './App.css';
 // Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
 function sliderToZoom(s: number): number { return Math.round(50 * Math.pow(16, s / 100)); }
 function zoomToSlider(z: number): number { return Math.round(Math.log(z / 50) / Math.log(16) * 100); }
+function makeZoomWheelHandler(setZoom: React.Dispatch<React.SetStateAction<number>>) {
+  return (e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -3 : 3;
+    setZoom(prev => {
+      const s = zoomToSlider(prev);
+      return sliderToZoom(Math.max(0, Math.min(100, s + delta)));
+    });
+  };
+}
 
 // Support blocks for 3D staircase (nbt name → sprite coords + label)
 const SUPPORT_BLOCKS_PALETTE = [
@@ -188,6 +198,8 @@ export default function App() {
   const [showSplitLine, setShowSplitLine] = useState(true);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleCanvasWheel = React.useCallback(makeZoomWheelHandler(setZoom), []);
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -1896,6 +1908,7 @@ export default function App() {
                   patternAnchorMode={patternAnchorMode}
                   gradientStops={gradientStops}
                   gradientDithering={gradientDithering}
+                  onZoomWheel={handleCanvasWheel}
                 />
               </div>
             )}
