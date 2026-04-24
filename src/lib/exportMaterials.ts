@@ -10,7 +10,7 @@ export interface MaterialCount {
   shulkerBoxes: number;
 }
 
-function getBlockDisplayName(nbtName: string, blockSelection: BlockSelection): string {
+function getBlockDisplayName(nbtName: string): string {
   for (const row of COLOUR_ROWS) {
     const block = row.blocks.find(b => b.nbtName === nbtName);
     if (block) return block.displayName;
@@ -44,7 +44,7 @@ export function countMaterials(
 
   const result: MaterialCount[] = Array.from(counts, ([nbtName, count]) => ({
     nbtName,
-    displayName: getBlockDisplayName(nbtName, blockSelection),
+    displayName: getBlockDisplayName(nbtName),
     count,
     stacks: Math.ceil(count / 64),
     shulkerBoxes: Math.ceil(count / 1728),
