@@ -1988,29 +1988,24 @@ export default function App() {
               </>
             )}
             <div className="mobile-palette-content">
-              <PaletteEditor
-                blockSelection={blockSelection}
-                onSelectionChange={handleSelectionChange}
-                paletteSize={activePalette.colors.length}
-                disabled={processing}
-              />
-              <div className="panel-divider"></div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
-                <label style={{ display: 'block', marginBottom: 6 }}>{t('Версия Minecraft', 'Minecraft Version')}:</label>
+              <div className="version-selector-row">
+                <span className="version-selector-label">{t('Версия', 'Version')}</span>
                 <select
+                  className="version-selector-select"
                   value={minecraftVersion}
-                  onChange={e => setMinecraftVersion(e.target.value as MinecraftVersion)}
-                  style={{
-                    width: '100%', padding: '6px 8px', fontSize: 12, background: '#080810',
-                    color: '#57FF6E', border: '1px solid rgba(87,255,110,0.3)',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
+                  onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(DEFAULT_SELECTION); }}
                 >
                   <option value="pre-1.12">{getVersionLabel('pre-1.12')}</option>
                   <option value="1.12">{getVersionLabel('1.12')}</option>
                   <option value="1.13+">{getVersionLabel('1.13+')}</option>
                 </select>
               </div>
+              <PaletteEditor
+                blockSelection={blockSelection}
+                onSelectionChange={handleSelectionChange}
+                paletteSize={activePalette.colors.length}
+                disabled={processing}
+              />
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
                 <div className="support-block-section">

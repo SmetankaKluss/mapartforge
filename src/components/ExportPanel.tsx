@@ -11,7 +11,6 @@ import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
-import { countMaterials, formatMaterialsAsText, formatMaterialsAsCSV, downloadFile } from '../lib/exportMaterials';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
 function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
@@ -78,6 +77,7 @@ export function ExportPanel({
   sourceImage, intensity, adjustments, bnScale,
 }: Props) {
   const { t } = useLocale();
+  const [collapsed, setCollapsed]         = useState(false);
   const [busyPng]                         = useState(false);
   const [busyMapdat,   setBusyMapdat]     = useState(false);
   const [busyLiteFlat, setBusyLiteFlat]   = useState(false);
@@ -200,29 +200,20 @@ export function ExportPanel({
     }
   }
 
-  function handleMaterialsExport() {
-    const src = compareMode ? compareData?.left ?? null : imageData;
-    if (!src) return;
-
-    const materials = countMaterials(src, activePalette, blockSelection);
-    const text = formatMaterialsAsText(materials, mapGrid);
-    const csv = formatMaterialsAsCSV(materials, mapGrid);
-
-    downloadFile('materials.txt', text, 'text/plain');
-    downloadFile('materials.csv', csv, 'text/csv');
-  }
-
   const base        = disabled || !hasContent;
   const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
 
   return (
     <section className="sidebar-section" id="tour-export">
-      <h3 className="section-title">{t('Экспорт', 'Export')}</h3>
-      {!hasContent && (
+      <h3 className="section-title section-title-collapsible" onClick={() => setCollapsed(c => !c)}>
+        {t('Экспорт', 'Export')}
+        <span className="section-collapse-arrow">{collapsed ? '▶' : '▼'}</span>
+      </h3>
+      {!collapsed && !hasContent && (
         <p className="export-empty">{t('Загрузи изображение — экспорт появится здесь.', 'Upload an image to enable export.')}</p>
       )}
-      {hasContent && (
+      {!collapsed && hasContent && (
         <div className="export-buttons">
           <button
             className="export-btn"
@@ -281,32 +272,26 @@ export function ExportPanel({
             </button>
           )}
 
-          <button
-            className="export-btn"
-            onClick={handleMaterialsExport}
-            disabled={base}
-            title={t('Скачать список блоков и их количество как текст и CSV', 'Download materials list as text and CSV')}
-          >
-            {t('📋 МАТЕРИАЛЫ', '📋 MATERIALS')}
-          </button>
         </div>
       )}
-      {compareMode && hasContent && (
+      {!collapsed && compareMode && hasContent && (
         <p className="export-note">{t('Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.', 'Compare mode: PNG exports both panels; other formats use left panel.')}</p>
       )}
-      <div className="link-row">
-        <button
-          className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
-          onClick={handleGetLink}
-          disabled={base || linkState === 'uploading'}
-          title={!hasContent ? t('Сначала обработай изображение', 'Process image first') : t('Создать постоянную ссылку на этот мап-арт с текущими настройками', 'Create permanent link to this map art with current settings')}
-        >
-          {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}
-        </button>
-      </div>
-      {linkUrl && (
-        <LinkModal url={linkUrl} onClose={() => setLinkUrl(null)} />
-      )}
+      {!collapsed && <>
+        <div className="link-row">
+          <button
+            className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
+            onClick={handleGetLink}
+            disabled={base || linkState === 'uploading'}
+            title={!hasContent ? t('Сначала обработай изображение', 'Process image first') : t('Создать постоянную ссылку на этот мап-арт с текущими настройками', 'Create permanent link to this map art with current settings')}
+          >
+            {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}
+          </button>
+        </div>
+        {linkUrl && (
+          <LinkModal url={linkUrl} onClose={() => setLinkUrl(null)} />
+        )}
+      </>}
     </section>
   );
 }

@@ -610,12 +610,6 @@ export const COLOUR_ROWS: ColourRow[] = [
         "nbtName": "oak_pressure_plate",
         "supportBlockMandatory": true
       },
-      {
-        "blockId": 5,
-        "displayName": "Pale Oak Pressure Plate",
-        "nbtName": "pale_oak_pressure_plate",
-        "supportBlockMandatory": true
-      }
     ]
   },
   {
@@ -667,6 +661,12 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Polished Diorite",
         "nbtName": "polished_diorite",
         "supportBlockMandatory": false
+      },
+      {
+        "blockId": 7,
+        "displayName": "Pale Oak Pressure Plate",
+        "nbtName": "pale_oak_pressure_plate",
+        "supportBlockMandatory": true
       }
     ]
   },
@@ -2116,9 +2116,9 @@ export const COLOUR_ROWS: ColourRow[] = [
       },
       {
         "blockId": 1,
-        "displayName": "Big Dripleaf",
-        "nbtName": "big_dripleaf",
-        "supportBlockMandatory": true
+        "displayName": "Resin Clump",
+        "nbtName": "resin_clump",
+        "supportBlockMandatory": false
       }
     ]
   },

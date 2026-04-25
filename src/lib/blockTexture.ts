@@ -9,6 +9,7 @@ const SPRITESHEET_ROW_MAX: Partial<Record<number, number>> = {
   15:  7,   // Magenta — new blocks start at 8
   23:  7,   // Purple — new blocks start at 8
   43:  4,   // Light Gray Terracotta — new blocks start at 5
+  36:  0,   // Orange Terracotta — Resin Clump at blockId 1 needs wiki texture
   54:  2,   // Warped Nylium — new blocks start at 3
   55:  6,   // Warped Stem — new blocks start at 7
   58:  2,   // Deepslate — new blocks start at 3

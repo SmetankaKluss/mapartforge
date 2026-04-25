@@ -8,6 +8,7 @@ import { BlockIcon } from './BlockIcon';
 import { useLocale } from '../lib/locale';
 import { countSupportBlocks } from '../lib/exportLitematic';
 import type { SupportMode } from '../lib/exportLitematic';
+import { downloadFile } from '../lib/exportMaterials';
 
 interface Props {
   imageData: ImageData | null;
@@ -195,6 +196,20 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
     });
   }
 
+  function handleDownload() {
+    const mode = maxPerMap ? `max_per_map` : 'total';
+    const text = buildCopyText(materials, total, maxPerMap, mapGrid);
+    const csv = [
+      `Block Name,${maxPerMap ? 'MAX/MAP' : 'Total'},Stacks,Shulkers`,
+      ...materials.map(e => `"${e.displayName}",${e.count},${fmtStacks(e.count)},${fmtShulkers(e.count)}`),
+      ``,
+      `${maxPerMap ? 'SUM OF MAX' : 'TOTAL'},${total},${fmtStacks(total)},${fmtShulkers(total)}`,
+      `Map size,${mapGrid.wide}x${mapGrid.tall}`,
+    ].join('\n');
+    downloadFile(`materials_${mode}.txt`, text, 'text/plain');
+    downloadFile(`materials_${mode}.csv`, csv, 'text/csv');
+  }
+
   return (
     <section className="sidebar-section">
       <div className="mat-header">
@@ -283,6 +298,9 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
       <div className="mat-copy-row">
         <button className="mat-copy-btn" onClick={handleCopy}>
           {copied ? t('✓ СКОПИРОВАНО!', '✓ COPIED!') : t('⎘ КОПИРОВАТЬ', '⎘ COPY')}
+        </button>
+        <button className="mat-copy-btn" onClick={handleDownload} title={t('Скачать как .txt и .csv с учётом режима Макс/карта', 'Download as .txt and .csv respecting Max/map mode')}>
+          {t('↓ СКАЧАТЬ', '↓ DOWNLOAD')}
         </button>
       </div>
     </section>
