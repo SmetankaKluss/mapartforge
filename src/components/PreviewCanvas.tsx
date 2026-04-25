@@ -945,7 +945,7 @@ export function PreviewCanvas({
         md.dy = Math.round((e.clientY - md.startClientY) / scale);
         if (cvs) {
           const shifted = shiftImageData(md.original, md.dx, md.dy);
-          // NOTE: Don't update paintBufferRef — show original image, let shifted preview draw to canvas
+          paintBufferRef.current = shifted;  // Update buffer so React renders also use shifted preview
           const { otherLayersData: oLD } = propsRef.current;
           const bufToDraw = oLD ? compositeTwo(oLD, shifted, width, height) : shifted;
           drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
@@ -1395,12 +1395,19 @@ export function PreviewCanvas({
           floatPixels.data[si+3] = paintData.data[si+3];
           erased.data[si+3] = 0;
         }
-        // NOTE: Don't erase main canvas — show original image, let float pixels on overlay "cover" it
+        paintBufferRef.current = erased;  // Set buffer so React renders also show erased version
         floatingSelRef.current = {
           pixels: floatPixels, mask: selectionMask,
           dx: 0, dy: 0,
           startClientX: e.clientX, startClientY: e.clientY,
         };
+        // Draw erased canvas immediately
+        const cvs = getMainCanvas();
+        if (cvs) {
+          const oLD = otherLayersData ?? null;
+          const bufToDraw = oLD ? compositeTwo(oLD, erased, width, height) : erased;
+          drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
+        }
         isDraggingRef.current = true;  // Mark as dragging to prevent other operations
         return;
       }
