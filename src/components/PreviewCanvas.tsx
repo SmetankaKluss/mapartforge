@@ -945,6 +945,7 @@ export function PreviewCanvas({
         md.dy = Math.round((e.clientY - md.startClientY) / scale);
         if (cvs) {
           const shifted = shiftImageData(md.original, md.dx, md.dy);
+          paintBufferRef.current = shifted;  // Update buffer so React renders also use shifted preview
           const { otherLayersData: oLD } = propsRef.current;
           const bufToDraw = oLD ? compositeTwo(oLD, shifted, width, height) : shifted;
           drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
@@ -1132,6 +1133,7 @@ export function PreviewCanvas({
         const md = moveDragRef.current;
         moveDragRef.current = null;
         const shifted = shiftImageData(md.original, md.dx, md.dy);
+        paintBufferRef.current = null;  // Clear buffer
         onImageUpdateRef.current(shifted);
         return;
       }
@@ -1393,7 +1395,7 @@ export function PreviewCanvas({
           floatPixels.data[si+3] = paintData.data[si+3];
           erased.data[si+3] = 0;
         }
-        paintBufferRef.current = erased;
+        paintBufferRef.current = erased;  // Set buffer so React renders also show erased version
         floatingSelRef.current = {
           pixels: floatPixels, mask: selectionMask,
           dx: 0, dy: 0,
@@ -1406,6 +1408,7 @@ export function PreviewCanvas({
           const bufToDraw = oLD ? compositeTwo(oLD, erased, width, height) : erased;
           drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
         }
+        isDraggingRef.current = true;  // Mark as dragging to prevent other operations
         return;
       }
 
