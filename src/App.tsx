@@ -342,6 +342,7 @@ export default function App() {
     setStaircaseMode(layer.staircaseMode ?? 'classic');
     if (layer.dithering !== undefined) setDithering(layer.dithering);
     setSelectionMask(null);
+    if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
 
@@ -574,6 +575,10 @@ export default function App() {
     setOriginalData(null);
     setCompareData(null);
     setSourceImage(img);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img } : l),
+    }));
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
@@ -587,6 +592,10 @@ export default function App() {
     setOriginalData(null);
     setCompareData(null);
     setSourceImage(croppedImg);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: croppedImg } : l),
+    }));
     setSplitPos(50);
     setUndoStack([]);
     setRedoStack([]);
@@ -639,6 +648,7 @@ export default function App() {
           pendingAlphaMaskRef.current = mask;
         }
       }
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
     }
   }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
@@ -677,31 +687,49 @@ export default function App() {
 
   const handleIntensityCommit = useCallback((v: number) => {
     setIntensity(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleBnScaleChange = useCallback((v: number) => {
     setBnScale(v);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, v, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, v, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, klussParams]);
 
   const handleKlussParamsChange = useCallback((kp: KlussParams) => {
     setKlussParams(kp);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, kp);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, kp);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale]);
 
   const handleCompareModeChange = useCallback((enabled: boolean) => {
     setCompareMode(enabled);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
   const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
     if (side === 'left') {
       setCompareLeft(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      if (sourceImage) {
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+        runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
     } else {
       setCompareRight(mode);
-      if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, effectiveAdjustments, bnScale, klussParams);
+      if (sourceImage) {
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+        runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
     }
   }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
 
@@ -710,7 +738,10 @@ export default function App() {
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
@@ -730,6 +761,7 @@ export default function App() {
           pendingAlphaMaskRef.current = mask;
         }
       }
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
@@ -748,7 +780,10 @@ export default function App() {
 
   const handleAdjCommit = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+    }
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams]);
 
   const handleToggleSection = useCallback((key: string) => {
@@ -760,6 +795,7 @@ export default function App() {
       const next = !prev;
       if (sourceImage) {
         const adj = next ? adjustments : DEFAULT_ADJUSTMENTS;
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
         runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
       }
       return next;
@@ -768,7 +804,10 @@ export default function App() {
 
   // Reprocess when background mode or color changes
   useEffect(() => {
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgMode, bgColor]);
 
@@ -778,7 +817,10 @@ export default function App() {
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
     const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
-    if (sourceImage) runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
   }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {

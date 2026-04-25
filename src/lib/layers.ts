@@ -11,6 +11,7 @@ export interface Layer {
   isText?: boolean;      // true for text layers
   groupId: string | null;
   imageData: ImageData | null;
+  sourceImage?: HTMLImageElement;
   // Optional: attached source image with dithering settings (processed layers)
   sourceDataUrl?: string;
   dithering?: DitheringMode;
