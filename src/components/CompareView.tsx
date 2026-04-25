@@ -23,7 +23,10 @@ export function CompareView({
   const leftRef      = useRef<HTMLCanvasElement>(null);
   const rightRef     = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dividerRef   = useRef<HTMLDivElement>(null);
+  const clipLayerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
+  const localPosRef  = useRef(splitPos);
   const [labelsVisible, setLabelsVisible] = useState(true);
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onSplitPosChangeRef = useRef(onSplitPosChange);
@@ -54,9 +57,11 @@ export function CompareView({
       if (!isDraggingRef.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const pos = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-      onSplitPosChangeRef.current(pos);
+      localPosRef.current = pos;
+      if (dividerRef.current) dividerRef.current.style.left = `${pos}%`;
+      if (clipLayerRef.current) clipLayerRef.current.style.clipPath = `inset(0 0 0 ${pos}%)`;
     }
-    function onMouseUp() { isDraggingRef.current = false; }
+    function onMouseUp() { isDraggingRef.current = false; onSplitPosChangeRef.current(localPosRef.current); }
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return () => {
@@ -72,9 +77,11 @@ export function CompareView({
       e.preventDefault();
       const rect = containerRef.current.getBoundingClientRect();
       const pos = Math.max(0, Math.min(100, ((e.touches[0].clientX - rect.left) / rect.width) * 100));
-      onSplitPosChangeRef.current(pos);
+      localPosRef.current = pos;
+      if (dividerRef.current) dividerRef.current.style.left = `${pos}%`;
+      if (clipLayerRef.current) clipLayerRef.current.style.clipPath = `inset(0 0 0 ${pos}%)`;
     }
-    function onTouchEnd() { isDraggingRef.current = false; }
+    function onTouchEnd() { isDraggingRef.current = false; onSplitPosChangeRef.current(localPosRef.current); }
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd);
     return () => {
@@ -123,6 +130,7 @@ export function CompareView({
       {/* Top: right dithering, clipped to right side of divider */}
       {rightData && (
         <div
+          ref={clipLayerRef}
           className="split-original-layer"
           style={{ clipPath: `inset(0 0 0 ${splitPos}%)` }}
         >
@@ -132,6 +140,7 @@ export function CompareView({
 
       {/* Draggable divider */}
       <div
+        ref={dividerRef}
         className="split-divider"
         style={{ left: `${splitPos}%` }}
         onMouseDown={handleDividerMouseDown}

@@ -536,6 +536,9 @@ export function PreviewCanvas({
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
   const splitContainerRef    = useRef<HTMLDivElement>(null);
+  const splitDividerRef      = useRef<HTMLDivElement>(null);
+  const splitOrigLayerRef    = useRef<HTMLDivElement>(null);
+  const localSplitPosRef     = useRef(splitPos ?? 50);
   const onSplitPosChangeRef  = useRef(onSplitPosChange);
   const [labelsVisible, setLabelsVisible] = useState(true);
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -808,11 +811,13 @@ export function PreviewCanvas({
         return;
       }
 
-      // Split drag takes priority
+      // Split drag takes priority — update DOM directly to avoid React re-renders per mousemove
       if (isDraggingSplitRef.current && splitContainerRef.current) {
         const rect = splitContainerRef.current.getBoundingClientRect();
         const pos = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-        onSplitPosChangeRef.current?.(pos);
+        localSplitPosRef.current = pos;
+        if (splitDividerRef.current) splitDividerRef.current.style.left = `${pos}%`;
+        if (splitOrigLayerRef.current) splitOrigLayerRef.current.style.clipPath = `inset(0 ${100 - pos}% 0 0)`;
         return;
       }
       const { activeTool, paintBlock, patternBlocks, scale, width, height, cp, brushSize, showGrid } = propsRef.current;
@@ -864,7 +869,7 @@ export function PreviewCanvas({
         return;
       }
 
-      // Selection drag update
+      // Selection drag update — update ref then draw immediately to avoid rAF 1-frame delay
       if (selectionDragRef.current) {
         const drag = selectionDragRef.current;
         if (cr) {
@@ -877,13 +882,53 @@ export function PreviewCanvas({
             const last = drag.points[drag.points.length - 1];
             if (last.x !== cx || last.y !== cy) drag.points.push({ x: cx, y: cy });
           } else if (drag.type === 'pixel') {
-            // Add pixel to selection on drag
             const { selectionMask: sMask } = propsRef.current;
             const flat = cy * ww + cx;
             const newMask = new Uint8Array(sMask ?? new Uint8Array(ww * hh));
             if (drag.addMode === 'sub') newMask[flat] = 0;
             else newMask[flat] = 1;
             onSelectionChangeRef.current?.(newMask);
+          }
+          // Draw selection preview immediately (skip rAF delay)
+          const overlay = overlayCanvasRef.current;
+          if (overlay && (drag.type === 'rect' || drag.type === 'lasso')) {
+            const cw = ww * sc, ch = hh * sc;
+            if (overlay.width !== cw) overlay.width = cw;
+            if (overlay.height !== ch) overlay.height = ch;
+            const octx = overlay.getContext('2d');
+            if (octx) {
+              octx.clearRect(0, 0, cw, ch);
+              const phase = antsPhaseRef.current;
+              if (drag.type === 'rect') {
+                const x = Math.min(drag.startPx, cx) * sc;
+                const y = Math.min(drag.startPy, cy) * sc;
+                const rw = (Math.abs(cx - drag.startPx) + 1) * sc;
+                const rh = (Math.abs(cy - drag.startPy) + 1) * sc;
+                octx.save();
+                octx.strokeStyle = '#fff'; octx.lineWidth = 1; octx.setLineDash([4, 4]);
+                octx.lineDashOffset = -phase; octx.strokeRect(x, y, rw, rh);
+                octx.strokeStyle = '#000'; octx.lineDashOffset = -phase + 4; octx.strokeRect(x, y, rw, rh);
+                octx.restore();
+              } else if (drag.points.length > 1) {
+                octx.save();
+                octx.strokeStyle = '#fff'; octx.lineWidth = 1; octx.setLineDash([4, 4]);
+                octx.lineDashOffset = -phase;
+                octx.beginPath();
+                octx.moveTo(drag.points[0].x * sc + sc / 2, drag.points[0].y * sc + sc / 2);
+                for (let i = 1; i < drag.points.length; i++) {
+                  octx.lineTo(drag.points[i].x * sc + sc / 2, drag.points[i].y * sc + sc / 2);
+                }
+                octx.stroke();
+                octx.strokeStyle = '#000'; octx.lineDashOffset = -phase + 4;
+                octx.beginPath();
+                octx.moveTo(drag.points[0].x * sc + sc / 2, drag.points[0].y * sc + sc / 2);
+                for (let i = 1; i < drag.points.length; i++) {
+                  octx.lineTo(drag.points[i].x * sc + sc / 2, drag.points[i].y * sc + sc / 2);
+                }
+                octx.stroke();
+                octx.restore();
+              }
+            }
           }
         }
         return;
@@ -957,7 +1002,7 @@ export function PreviewCanvas({
         return;
       }
 
-      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); return; }
+      if (isDraggingSplitRef.current) { isDraggingSplitRef.current = false; setIsDraggingSplit(false); onSplitPosChangeRef.current?.(localSplitPosRef.current); return; }
 
       // Finalize selection drag
       if (selectionDragRef.current) {
@@ -1106,11 +1151,14 @@ export function PreviewCanvas({
     const touch = e.touches[0];
     if (touch) {
       const rect = splitContainerRef.current.getBoundingClientRect();
-      onSplitPosChangeRef.current?.(Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100)));
+      const pos = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100));
+      localSplitPosRef.current = pos;
+      if (splitDividerRef.current) splitDividerRef.current.style.left = `${pos}%`;
+      if (splitOrigLayerRef.current) splitOrigLayerRef.current.style.clipPath = `inset(0 ${100 - pos}% 0 0)`;
     }
   }
 
-  function handleContainerTouchEnd() { isDraggingSplitRef.current = false; setIsDraggingSplit(false); }
+  function handleContainerTouchEnd() { isDraggingSplitRef.current = false; setIsDraggingSplit(false); onSplitPosChangeRef.current?.(localSplitPosRef.current); }
 
   function handleContainerMouseEnter() { if (splitPos != null) showSplitLabels(); }
 
@@ -1541,8 +1589,9 @@ export function PreviewCanvas({
       </div>
       {originalData && (
         <div
+          ref={splitOrigLayerRef}
           className="split-original-layer"
-          style={{ clipPath: `inset(0 ${100 - splitPos}% 0 0)`, pointerEvents: 'none' }}
+          style={{ clipPath: `inset(0 ${100 - (splitPos ?? 50)}% 0 0)`, pointerEvents: 'none' }}
         >
           <MapCanvas
             imageData={originalData} originalData={null}
@@ -1552,8 +1601,9 @@ export function PreviewCanvas({
         </div>
       )}
       <div
+        ref={splitDividerRef}
         className="split-divider"
-        style={{ left: `${splitPos}%` }}
+        style={{ left: `${splitPos ?? 50}%` }}
         onMouseDown={handleDividerMouseDown}
         onClick={e => e.stopPropagation()}
         onTouchStart={handleDividerTouchStart}
