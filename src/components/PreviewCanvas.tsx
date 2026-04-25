@@ -19,7 +19,7 @@ import { rgbToOklab, oklabDistance } from '../lib/oklab';
 
 export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text'
   | 'select-rect' | 'select-lasso' | 'select-magic' | 'select-pixel'
-  | 'pattern-tile' | 'gradient';
+  | 'pattern-tile' | 'gradient' | 'move';
 
 export interface PaintBlock {
   csId: number;
@@ -452,6 +452,50 @@ function compositeTwo(bottom: ImageData, top: ImageData, w: number, h: number): 
   return result;
 }
 
+/** Shift all pixels in src by (dx, dy). Pixels that move out of bounds are discarded. */
+function shiftImageData(src: ImageData, dx: number, dy: number): ImageData {
+  const dst = new ImageData(src.width, src.height);
+  for (let ny = 0; ny < src.height; ny++) {
+    for (let nx = 0; nx < src.width; nx++) {
+      const sx = nx - dx, sy = ny - dy;
+      if (sx < 0 || sx >= src.width || sy < 0 || sy >= src.height) continue;
+      const si = (sy * src.width + sx) * 4;
+      const di = (ny * src.width + nx) * 4;
+      dst.data[di] = src.data[si]; dst.data[di+1] = src.data[si+1];
+      dst.data[di+2] = src.data[si+2]; dst.data[di+3] = src.data[si+3];
+    }
+  }
+  return dst;
+}
+
+/** Shift a SelectionMask by (dx, dy). */
+function shiftMask(mask: SelectionMask, dx: number, dy: number, w: number, h: number): SelectionMask {
+  const newMask = new Uint8Array(w * h);
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const x = i % w, y = Math.floor(i / w);
+    const nx = x + dx, ny = y + dy;
+    if (nx >= 0 && nx < w && ny >= 0 && ny < h) newMask[ny * w + nx] = 1;
+  }
+  return newMask;
+}
+
+/** Stamp floatingPixels (at original positions) offset by (dx, dy) onto base. */
+function stampFloating(base: ImageData, floatPixels: ImageData, mask: SelectionMask, dx: number, dy: number): ImageData {
+  const dst = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+  const w = base.width, h = base.height;
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    const ox = i % w, oy = Math.floor(i / w);
+    const nx = ox + dx, ny = oy + dy;
+    if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+    const si = i * 4, di = (ny * w + nx) * 4;
+    dst.data[di] = floatPixels.data[si]; dst.data[di+1] = floatPixels.data[si+1];
+    dst.data[di+2] = floatPixels.data[si+2]; dst.data[di+3] = floatPixels.data[si+3];
+  }
+  return dst;
+}
+
 /** Bresenham line: call paintBrushCircle for every pixel between (x0,y0) and (x1,y1). */
 function drawBrushLine(
   buf: ImageData, x0: number, y0: number, x1: number, y1: number,
@@ -513,6 +557,20 @@ export function PreviewCanvas({
   } | null>(null);
   const selectionMaskRef = useRef<SelectionMask | null>(null);
   const antsPhaseRef = useRef(0);
+
+  // Floating selection drag (move selection content)
+  const floatingSelRef = useRef<{
+    pixels: ImageData; mask: SelectionMask;
+    dx: number; dy: number;
+    startClientX: number; startClientY: number;
+  } | null>(null);
+
+  // Move tool drag (translate whole layer)
+  const moveDragRef = useRef<{
+    original: ImageData;
+    dx: number; dy: number;
+    startClientX: number; startClientY: number;
+  } | null>(null);
   const antsRafRef = useRef<number>(0);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -737,6 +795,23 @@ export function PreviewCanvas({
         }
         return;
       }
+      // Draw floating selection overlay
+      const floatSel = floatingSelRef.current;
+      if (floatSel) {
+        ctx.clearRect(0, 0, cw, ch);
+        // Draw floating pixels at offset
+        const fc = new OffscreenCanvas(w, h);
+        fc.getContext('2d')!.putImageData(floatSel.pixels, 0, 0);
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(fc, floatSel.dx * s, floatSel.dy * s, w * s, h * s);
+        ctx.restore();
+        // Draw shifted marching ants border
+        const shifted = shiftMask(floatSel.mask, floatSel.dx, floatSel.dy, w, h);
+        drawMarchingAnts(ctx, shifted, w, h, s, antsPhaseRef.current);
+        return;
+      }
+
       if (!mask) { ctx.clearRect(0, 0, cw, ch); return; }
       drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
     }
@@ -780,6 +855,27 @@ export function PreviewCanvas({
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         if (textStateRef.current) { cancelText(); return; }
+        // Cancel floating selection — restore original canvas display (paintData unchanged since no onImageUpdate was called)
+        if (floatingSelRef.current) {
+          floatingSelRef.current = null;
+          paintBufferRef.current = null;
+          const cvs = getMainCanvas();
+          if (cvs && imageDataRef.current) {
+            const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+            drawImageData(cvs, imageDataRef.current, w, h, s, sg);
+          }
+          return;
+        }
+        // Cancel move tool drag
+        if (moveDragRef.current) {
+          moveDragRef.current = null;
+          const cvs = getMainCanvas();
+          if (cvs && imageDataRef.current) {
+            const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+            drawImageData(cvs, imageDataRef.current, w, h, s, sg);
+          }
+          return;
+        }
         setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
       }
     }
@@ -827,6 +923,34 @@ export function PreviewCanvas({
       // Get canvas + rect once for the entire handler — no repeated querySelector / getBoundingClientRect
       const cvs = getMainCanvas();
       const cr  = cvs ? cvs.getBoundingClientRect() : null;
+
+      // Floating selection drag
+      if (floatingSelRef.current) {
+        const fs = floatingSelRef.current;
+        fs.dx = Math.round((e.clientX - fs.startClientX) / scale);
+        fs.dy = Math.round((e.clientY - fs.startClientY) / scale);
+        // Redraw main canvas (erased layer from paintBuffer)
+        if (cvs && paintBufferRef.current) {
+          const { otherLayersData: oLD } = propsRef.current;
+          const bufToDraw = oLD ? compositeTwo(oLD, paintBufferRef.current, width, height) : paintBufferRef.current;
+          drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
+        }
+        return;
+      }
+
+      // Move tool drag
+      if (moveDragRef.current) {
+        const md = moveDragRef.current;
+        md.dx = Math.round((e.clientX - md.startClientX) / scale);
+        md.dy = Math.round((e.clientY - md.startClientY) / scale);
+        if (cvs) {
+          const shifted = shiftImageData(md.original, md.dx, md.dy);
+          const { otherLayersData: oLD } = propsRef.current;
+          const bufToDraw = oLD ? compositeTwo(oLD, shifted, width, height) : shifted;
+          drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
+        }
+        return;
+      }
 
       // Update brush/stamp cursor position directly in DOM — no React re-render
       if (activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile') {
@@ -989,6 +1113,28 @@ export function PreviewCanvas({
 
     function onGlobalMouseUp(e: MouseEvent) {
       if (canvasDragRef.current) { canvasDragRef.current = null; return; }
+
+      // Commit floating selection
+      if (floatingSelRef.current) {
+        const fs = floatingSelRef.current;
+        const { width: w, height: h } = propsRef.current;
+        const base = paintBufferRef.current!;
+        const stamped = stampFloating(base, fs.pixels, fs.mask, fs.dx, fs.dy);
+        paintBufferRef.current = null;
+        floatingSelRef.current = null;
+        onImageUpdateRef.current(stamped);
+        onSelectionChangeRef.current?.(shiftMask(fs.mask, fs.dx, fs.dy, w, h));
+        return;
+      }
+
+      // Commit move tool drag
+      if (moveDragRef.current) {
+        const md = moveDragRef.current;
+        moveDragRef.current = null;
+        const shifted = shiftImageData(md.original, md.dx, md.dy);
+        onImageUpdateRef.current(shifted);
+        return;
+      }
 
       // Apply gradient on drag end
       if (gradientDragRef.current) {
@@ -1211,13 +1357,57 @@ export function PreviewCanvas({
       return;
     }
 
-    // Selection tools
+    // Move tool
+    if (activeTool === 'move') {
+      e.preventDefault();
+      if (!paintData) return;
+      moveDragRef.current = {
+        original: new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height),
+        dx: 0, dy: 0,
+        startClientX: e.clientX, startClientY: e.clientY,
+      };
+      isDraggingRef.current = true;
+      return;
+    }
+
+    // Selection tools — if clicking inside existing selection, start a floating drag
     if (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel') {
       e.preventDefault();
       const pos = getPixelCoords(e);
       if (!pos) return;
       const { px, py } = pos;
       const addMode: 'replace' | 'add' | 'sub' = e.shiftKey ? 'add' : e.altKey ? 'sub' : 'replace';
+
+      // Click inside selection (no modifier) → start floating selection drag
+      if (selectionMask && addMode === 'replace' && selectionMask[py * width + px] && paintData) {
+        e.preventDefault();
+        // Cut selected pixels from layer
+        const floatPixels = new ImageData(width, height);
+        const erased = new ImageData(new Uint8ClampedArray(paintData.data), width, height);
+        for (let i = 0; i < selectionMask.length; i++) {
+          if (!selectionMask[i]) continue;
+          const si = i * 4;
+          floatPixels.data[si] = paintData.data[si];
+          floatPixels.data[si+1] = paintData.data[si+1];
+          floatPixels.data[si+2] = paintData.data[si+2];
+          floatPixels.data[si+3] = paintData.data[si+3];
+          erased.data[si+3] = 0;
+        }
+        paintBufferRef.current = erased;
+        floatingSelRef.current = {
+          pixels: floatPixels, mask: selectionMask,
+          dx: 0, dy: 0,
+          startClientX: e.clientX, startClientY: e.clientY,
+        };
+        // Draw erased canvas immediately
+        const cvs = getMainCanvas();
+        if (cvs) {
+          const oLD = otherLayersData ?? null;
+          const bufToDraw = oLD ? compositeTwo(oLD, erased, width, height) : erased;
+          drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
+        }
+        return;
+      }
 
       if (activeTool === 'select-magic') {
         if (!paintData) return;
@@ -1543,6 +1733,8 @@ export function PreviewCanvas({
     ? 'crosshair'
     : (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel')
     ? 'crosshair'
+    : activeTool === 'move'
+    ? (moveDragRef.current ? 'grabbing' : 'grab')
     : undefined;
 
   const isStampMode = activeTool === 'pattern-tile' && patternAnchorMode === 'brush';

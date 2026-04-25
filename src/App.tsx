@@ -415,6 +415,7 @@ export default function App() {
         case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
         case 'KeyP': if (editorMode === 'artist') setActiveTool(t => t === 'pattern-tile' ? null : 'pattern-tile'); break;
         case 'KeyG': if (editorMode === 'artist') setActiveTool(t => t === 'gradient' ? null : 'gradient'); break;
+        case 'KeyV': if (editorMode === 'artist') setActiveTool(t => t === 'move' ? null : 'move'); break;
         case 'Delete':
         case 'Backspace': if (editorMode === 'artist' && selectionMask) { handleDeleteSelectionRef.current?.(); } break;
         case 'Escape':
@@ -1642,6 +1643,11 @@ export default function App() {
                   <>
                     <div className="toolbar-sep" />
                     <div className="toolbar-group">
+                      <button
+                        className={`tool-btn${activeTool === 'move' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'move' ? null : 'move')}
+                        title={t('Переместить слой (V)', 'Move layer (V)')}
+                      ><i className="ph-bold ph-arrows-out-cardinal" /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
