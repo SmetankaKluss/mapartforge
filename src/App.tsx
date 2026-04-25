@@ -343,6 +343,7 @@ export default function App() {
     if (layer.dithering !== undefined) setDithering(layer.dithering);
     setSelectionMask(null);
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
+    if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
 
@@ -577,7 +578,7 @@ export default function App() {
     setSourceImage(img);
     setLayerState(prev => ({
       ...prev,
-      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img } : l),
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: file ?? null } : l),
     }));
     setSplitPos(50);
     setUndoStack([]);

@@ -12,6 +12,7 @@ export interface Layer {
   groupId: string | null;
   imageData: ImageData | null;
   sourceImage?: HTMLImageElement;
+  sourceFile?: File | null;
   // Optional: attached source image with dithering settings (processed layers)
   sourceDataUrl?: string;
   dithering?: DitheringMode;
