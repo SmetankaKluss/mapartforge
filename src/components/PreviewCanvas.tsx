@@ -561,6 +561,7 @@ export function PreviewCanvas({
   // Floating selection drag (move selection content)
   const floatingSelRef = useRef<{
     pixels: ImageData; mask: SelectionMask;
+    erased: ImageData;
     dx: number; dy: number;
     startClientX: number; startClientY: number;
   } | null>(null);
@@ -929,10 +930,12 @@ export function PreviewCanvas({
         const fs = floatingSelRef.current;
         fs.dx = Math.round((e.clientX - fs.startClientX) / scale);
         fs.dy = Math.round((e.clientY - fs.startClientY) / scale);
-        // Redraw main canvas (erased layer from paintBuffer)
-        if (cvs && paintBufferRef.current) {
+        if (cvs) {
           const { otherLayersData: oLD } = propsRef.current;
-          const bufToDraw = oLD ? compositeTwo(oLD, paintBufferRef.current, width, height) : paintBufferRef.current;
+          // Composite erased base + floating pixels at current offset for correct preview in all modes
+          const stamped = stampFloating(fs.erased, fs.pixels, fs.mask, fs.dx, fs.dy);
+          paintBufferRef.current = stamped;
+          const bufToDraw = oLD ? compositeTwo(oLD, stamped, width, height) : stamped;
           drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
         }
         return;
@@ -1119,7 +1122,7 @@ export function PreviewCanvas({
       if (floatingSelRef.current) {
         const fs = floatingSelRef.current;
         const { width: w, height: h } = propsRef.current;
-        const base = paintBufferRef.current!;
+        const base = fs.erased;
         const stamped = stampFloating(base, fs.pixels, fs.mask, fs.dx, fs.dy);
         paintBufferRef.current = null;
         floatingSelRef.current = null;
@@ -1395,9 +1398,10 @@ export function PreviewCanvas({
           floatPixels.data[si+3] = paintData.data[si+3];
           erased.data[si+3] = 0;
         }
-        paintBufferRef.current = erased;  // Set buffer so React renders also show erased version
+        paintBufferRef.current = erased;
         floatingSelRef.current = {
           pixels: floatPixels, mask: selectionMask,
+          erased,
           dx: 0, dy: 0,
           startClientX: e.clientX, startClientY: e.clientY,
         };
