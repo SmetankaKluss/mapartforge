@@ -2,11 +2,11 @@
 
 export type MinecraftVersion =
   | '1.12.2' | '1.13.2' | '1.14.4' | '1.15.2'
-  | '1.16.5' | '1.17.1' | '1.18.2' | '1.19' | '1.20';
+  | '1.16.5' | '1.17.1' | '1.18.2' | '1.19' | '1.20' | '1.21.4';
 
 const VERSION_ORDER: MinecraftVersion[] = [
   '1.12.2', '1.13.2', '1.14.4', '1.15.2',
-  '1.16.5', '1.17.1', '1.18.2', '1.19', '1.20',
+  '1.16.5', '1.17.1', '1.18.2', '1.19', '1.20', '1.21.4',
 ];
 
 // Minimum version required to use a block in map art (by nbt name).
@@ -148,9 +148,19 @@ const BLOCK_MIN_VERSION: Record<string, MinecraftVersion | 'future'> = {
   'stripped_cherry_wood':             '1.20',
   'cherry_pressure_plate':            '1.20',
 
-  // ── 1.21+ — beyond supported range (never shown) ─────────────────────────
-  'pale_oak_pressure_plate':          'future',
-  'resin_clump':                      'future',
+  // ── 1.21.4 — latest stable (Tricky Trials + Bundles of Bravery + Garden Awakens) ──
+  'pale_oak_pressure_plate':          '1.21.4',
+  'pale_oak_planks':                  '1.21.4',
+  'pale_oak_slab':                    '1.21.4',
+  'pale_oak_log':                     '1.21.4',
+  'stripped_pale_oak_log':            '1.21.4',
+  'resin_clump':                      '1.21.4',
+  'resin_block':                      '1.21.4',
+  'tuff_bricks':                      '1.21.4',
+  'tuff_brick_slab':                  '1.21.4',
+  'polished_tuff':                    '1.21.4',
+  'polished_tuff_slab':               '1.21.4',
+  'chiseled_tuff':                    '1.21.4',
 };
 
 /** True if the block is available in the given MC version. */
@@ -181,6 +191,7 @@ export function getVersionLabel(version: MinecraftVersion): string {
     '1.18.2': 'Java 1.18.2',
     '1.19':   'Java 1.19',
     '1.20':   'Java 1.20',
+    '1.21.4': 'Java 1.21.4',
   };
   return labels[version] ?? version;
 }

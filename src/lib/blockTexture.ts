@@ -4,7 +4,8 @@ const SPRITESHEET_ROW_MAX: Partial<Record<number, number>> = {
    1: 12,   // Sand — new blocks start at 13
    8: 10,   // Dirt — new blocks start at 11
    9: 14,   // Stone — new blocks start at 15
-  12:  5,   // Birch — new blocks start at 6
+  12:  5,   // Birch — new blocks start at 6 (pale oak and others need wiki)
+  42:  1,   // Gray Terracotta — tuff=1 is in sprite; cherry_log+ and tuff variants need wiki
   14: 19,   // Orange — new blocks start at 20
   15:  7,   // Magenta — new blocks start at 8
   23:  7,   // Purple — new blocks start at 8

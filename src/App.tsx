@@ -202,9 +202,9 @@ export default function App() {
   const [zoom, setZoom]                 = useState(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleCanvasWheel = React.useCallback(makeZoomWheelHandler(setZoom), []);
-  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20'];
+  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20','1.21.4'];
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
-    VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.20'
+    VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.21.4'
   );
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');

@@ -667,6 +667,30 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Pale Oak Pressure Plate",
         "nbtName": "pale_oak_pressure_plate",
         "supportBlockMandatory": true
+      },
+      {
+        "blockId": 8,
+        "displayName": "Pale Oak Planks",
+        "nbtName": "pale_oak_planks",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 9,
+        "displayName": "Pale Oak Slab",
+        "nbtName": "pale_oak_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 10,
+        "displayName": "Pale Oak Log",
+        "nbtName": "pale_oak_log",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 11,
+        "displayName": "Stripped Pale Oak Log",
+        "nbtName": "stripped_pale_oak_log",
+        "supportBlockMandatory": false
       }
     ]
   },
@@ -2119,6 +2143,12 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Resin Clump",
         "nbtName": "resin_clump",
         "supportBlockMandatory": false
+      },
+      {
+        "blockId": 2,
+        "displayName": "Resin Block",
+        "nbtName": "resin_block",
+        "supportBlockMandatory": false
       }
     ]
   },
@@ -2244,6 +2274,36 @@ export const COLOUR_ROWS: ColourRow[] = [
         "blockId": 3,
         "displayName": "Cherry Wood",
         "nbtName": "cherry_wood",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 4,
+        "displayName": "Tuff Bricks",
+        "nbtName": "tuff_bricks",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 5,
+        "displayName": "Tuff Brick Slab",
+        "nbtName": "tuff_brick_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 6,
+        "displayName": "Polished Tuff",
+        "nbtName": "polished_tuff",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 7,
+        "displayName": "Polished Tuff Slab",
+        "nbtName": "polished_tuff_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 8,
+        "displayName": "Chiseled Tuff",
+        "nbtName": "chiseled_tuff",
         "supportBlockMandatory": false
       }
     ]
