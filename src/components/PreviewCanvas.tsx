@@ -485,6 +485,8 @@ export function PreviewCanvas({
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
   const [mousePos, setMousePos]       = useState({ x: 0, y: 0 });
+  const tooltipRef                    = useRef<HTMLDivElement>(null);
+  const prevHoverKeyRef               = useRef<string>('');
   const [showRepaint, setShowRepaint]       = useState(false);
   const [repaintTarget, setRepaintTarget]   = useState<RepaintEntry | null>(null);
   const [isPinned, setIsPinned]             = useState(false);
@@ -1070,6 +1072,7 @@ export function PreviewCanvas({
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
       setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); setIsPinned(false);
+      prevHoverKeyRef.current = '';
     }, HIDE_DELAY);
   }
 
@@ -1079,6 +1082,7 @@ export function PreviewCanvas({
 
   function closeTooltip() {
     cancelHide(); setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null);
+    prevHoverKeyRef.current = '';
   }
 
   // ── Pixel coordinate helpers ────────────────────────────────────────────────
@@ -1455,8 +1459,23 @@ export function PreviewCanvas({
     const info = lookupAtEvent(e);
     if (!info) { scheduleHide(); return; }
     cancelHide();
-    setMousePos({ x: e.clientX, y: e.clientY });
-    setHoverInfo(info);
+    // Update tooltip position directly — no React re-render per pixel
+    if (tooltipRef.current) {
+      const TOOLTIP_W = 220;
+      const RIGHT_PANEL_W = 260;
+      const spaceOnRight = window.innerWidth - RIGHT_PANEL_W - (e.clientX + 12);
+      const ttL = spaceOnRight >= TOOLTIP_W ? e.clientX + 12 : Math.max(8, e.clientX - TOOLTIP_W - 12);
+      const ttT = Math.min(e.clientY + 12, window.innerHeight - 160);
+      tooltipRef.current.style.left = `${ttL}px`;
+      tooltipRef.current.style.top  = `${ttT}px`;
+    }
+    // Only re-render when hovered block actually changes
+    const key = `${info.csId}:${info.blockId}:${info.shade}`;
+    if (key !== prevHoverKeyRef.current) {
+      prevHoverKeyRef.current = key;
+      setMousePos({ x: e.clientX, y: e.clientY });
+      setHoverInfo(info);
+    }
   }
 
   function handleZoneClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -1730,6 +1749,7 @@ export function PreviewCanvas({
 
       {hoverInfo && !activeTool && (
         <div
+          ref={tooltipRef}
           className={`hover-tooltip${isPinned ? ' hover-tooltip-pinned' : ''}`}
           style={{ left: ttLeft, top: ttTop }}
           onMouseEnter={handleTooltipEnter}
