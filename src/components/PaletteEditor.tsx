@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { buildPaletteUrl } from '../lib/paletteShare';
 import { PaletteShareModal } from './PaletteShareModal';
 import { useLocale } from '../lib/locale';
+import { isBlockAvailable } from '../lib/versionPresets';
+import type { MinecraftVersion } from '../lib/versionPresets';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
@@ -18,9 +20,10 @@ interface Props {
   onSelectionChange: (sel: BlockSelection) => void;
   paletteSize: number;
   disabled: boolean;
+  minecraftVersion?: MinecraftVersion;
 }
 
-export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled }: Props) {
+export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion }: Props) {
   const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
   const [selectedPreset,  setSelectedPreset]  = useState('');
@@ -139,18 +142,30 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
 
+  // ── Version filtering ────────────────────────────────────────────────────
+
+  const versionRows = useMemo(() => {
+    if (!minecraftVersion) return COLOUR_ROWS;
+    return COLOUR_ROWS
+      .map(row => ({
+        ...row,
+        blocks: row.blocks.filter(b => isBlockAvailable(b.nbtName, minecraftVersion)),
+      }))
+      .filter(row => row.blocks.length > 0);
+  }, [minecraftVersion]);
+
   // ── Search filtering ─────────────────────────────────────────────────────
 
   const q = searchQuery.trim().toLowerCase();
   const filteredRows = q
-    ? COLOUR_ROWS.filter(row =>
+    ? versionRows.filter(row =>
         row.colourName.toLowerCase().includes(q) ||
         row.blocks.some(b =>
           b.displayName.toLowerCase().includes(q) ||
           b.nbtName.toLowerCase().includes(q),
         ),
       )
-    : COLOUR_ROWS;
+    : versionRows;
 
   // ── Derived counts ───────────────────────────────────────────────────────
 

@@ -104,7 +104,7 @@ export interface FullProjectSettings {
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;
   originalDataB64?: string; // base64-encoded pre-dithering image data for reprocessing
-  minecraftVersion?: 'pre-1.12' | '1.12' | '1.13+';
+  minecraftVersion?: import('./versionPresets').MinecraftVersion;
 }
 
 interface FullProjectData {

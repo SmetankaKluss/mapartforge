@@ -202,7 +202,10 @@ export default function App() {
   const [zoom, setZoom]                 = useState(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleCanvasWheel = React.useCallback(makeZoomWheelHandler(setZoom), []);
-  const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(saved.minecraftVersion ?? '1.13+');
+  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20'];
+  const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
+    VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.20'
+  );
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -1995,9 +1998,9 @@ export default function App() {
                   value={minecraftVersion}
                   onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(DEFAULT_SELECTION); }}
                 >
-                  <option value="pre-1.12">{getVersionLabel('pre-1.12')}</option>
-                  <option value="1.12">{getVersionLabel('1.12')}</option>
-                  <option value="1.13+">{getVersionLabel('1.13+')}</option>
+                  {VALID_VERSIONS.map(v => (
+                    <option key={v} value={v}>{getVersionLabel(v)}</option>
+                  ))}
                 </select>
               </div>
               <PaletteEditor
@@ -2005,6 +2008,7 @@ export default function App() {
                 onSelectionChange={handleSelectionChange}
                 paletteSize={activePalette.colors.length}
                 disabled={processing}
+                minecraftVersion={minecraftVersion}
               />
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
