@@ -344,6 +344,7 @@ export default function App() {
     setSelectionMask(null);
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
     if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
+    if ('sourceUploadedImage' in layer) uploadedImageRef.current = layer.sourceUploadedImage ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
 
@@ -578,7 +579,7 @@ export default function App() {
     setSourceImage(img);
     setLayerState(prev => ({
       ...prev,
-      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: file ?? null } : l),
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: file ?? null, sourceUploadedImage: img } : l),
     }));
     setSplitPos(50);
     setUndoStack([]);
@@ -595,7 +596,7 @@ export default function App() {
     setSourceImage(croppedImg);
     setLayerState(prev => ({
       ...prev,
-      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: croppedImg } : l),
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: croppedImg, sourceFile: null, sourceUploadedImage: croppedImg } : l),
     }));
     setSplitPos(50);
     setUndoStack([]);
