@@ -455,12 +455,13 @@ function compositeTwo(bottom: ImageData, top: ImageData, w: number, h: number): 
 /** Shift all pixels in src by (dx, dy). Pixels that move out of bounds are discarded. */
 function shiftImageData(src: ImageData, dx: number, dy: number): ImageData {
   const dst = new ImageData(src.width, src.height);
-  for (let ny = 0; ny < src.height; ny++) {
-    for (let nx = 0; nx < src.width; nx++) {
-      const sx = nx - dx, sy = ny - dy;
-      if (sx < 0 || sx >= src.width || sy < 0 || sy >= src.height) continue;
-      const si = (sy * src.width + sx) * 4;
-      const di = (ny * src.width + nx) * 4;
+  const w = src.width, h = src.height;
+  for (let ny = 0; ny < h; ny++) {
+    for (let nx = 0; nx < w; nx++) {
+      const sx = ((nx - dx) % w + w) % w;
+      const sy = ((ny - dy) % h + h) % h;
+      const si = (sy * w + sx) * 4;
+      const di = (ny * w + nx) * 4;
       dst.data[di] = src.data[si]; dst.data[di+1] = src.data[si+1];
       dst.data[di+2] = src.data[si+2]; dst.data[di+3] = src.data[si+3];
     }
@@ -561,7 +562,6 @@ export function PreviewCanvas({
   // Floating selection drag (move selection content)
   const floatingSelRef = useRef<{
     pixels: ImageData; mask: SelectionMask;
-    erased: ImageData;
     dx: number; dy: number;
     startClientX: number; startClientY: number;
   } | null>(null);
@@ -930,10 +930,10 @@ export function PreviewCanvas({
         const fs = floatingSelRef.current;
         fs.dx = Math.round((e.clientX - fs.startClientX) / scale);
         fs.dy = Math.round((e.clientY - fs.startClientY) / scale);
-        if (cvs) {
+        if (cvs && imageDataRef.current) {
           const { otherLayersData: oLD } = propsRef.current;
-          // Composite erased base + floating pixels at current offset for correct preview in all modes
-          const stamped = stampFloating(fs.erased, fs.pixels, fs.mask, fs.dx, fs.dy);
+          // Stamp copy onto original — no hole at source, no destructive cut
+          const stamped = stampFloating(imageDataRef.current, fs.pixels, fs.mask, fs.dx, fs.dy);
           paintBufferRef.current = stamped;
           const bufToDraw = oLD ? compositeTwo(oLD, stamped, width, height) : stamped;
           drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
@@ -1122,7 +1122,7 @@ export function PreviewCanvas({
       if (floatingSelRef.current) {
         const fs = floatingSelRef.current;
         const { width: w, height: h } = propsRef.current;
-        const base = fs.erased;
+        const base = imageDataRef.current!;
         const stamped = stampFloating(base, fs.pixels, fs.mask, fs.dx, fs.dy);
         paintBufferRef.current = null;
         floatingSelRef.current = null;
@@ -1386,32 +1386,21 @@ export function PreviewCanvas({
       // Click inside selection (no modifier) → start floating selection drag
       if (selectionMask && addMode === 'replace' && selectionMask[py * width + px] && paintData) {
         e.preventDefault();
-        // Cut selected pixels from layer
+        // Copy selected pixels — source stays intact, paste copy at destination on release
         const floatPixels = new ImageData(width, height);
-        const erased = new ImageData(new Uint8ClampedArray(paintData.data), width, height);
         for (let i = 0; i < selectionMask.length; i++) {
           if (!selectionMask[i]) continue;
           const si = i * 4;
-          floatPixels.data[si] = paintData.data[si];
+          floatPixels.data[si]   = paintData.data[si];
           floatPixels.data[si+1] = paintData.data[si+1];
           floatPixels.data[si+2] = paintData.data[si+2];
           floatPixels.data[si+3] = paintData.data[si+3];
-          erased.data[si+3] = 0;
         }
-        paintBufferRef.current = erased;
         floatingSelRef.current = {
           pixels: floatPixels, mask: selectionMask,
-          erased,
           dx: 0, dy: 0,
           startClientX: e.clientX, startClientY: e.clientY,
         };
-        // Draw erased canvas immediately
-        const cvs = getMainCanvas();
-        if (cvs) {
-          const oLD = otherLayersData ?? null;
-          const bufToDraw = oLD ? compositeTwo(oLD, erased, width, height) : erased;
-          drawImageData(cvs, bufToDraw, width, height, scale, showGrid);
-        }
         isDraggingRef.current = true;  // Mark as dragging to prevent other operations
         return;
       }
