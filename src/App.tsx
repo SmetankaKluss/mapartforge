@@ -15,7 +15,7 @@ import { ExportPanel } from './components/ExportPanel';
 import type { DitheringMode, KlussParams } from './lib/dithering';
 import { buildComputedPalette, DEFAULT_KLUSS_PARAMS } from './lib/dithering';
 import type { ComputedPalette } from './lib/dithering';
-import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
+import { gridPixelWidth, gridPixelHeight, gridScale, WORKSPACE_PAD } from './lib/types';
 import type { MapGrid } from './lib/types';
 import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
 import type { BlockSelection } from './lib/paletteBlocks';
@@ -36,7 +36,7 @@ const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ defau
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
-import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
+import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData, padToWorkspace, cropFromWorkspace } from './lib/layers';
 import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
 import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
@@ -517,14 +517,19 @@ export default function App() {
         }
         const alphaMask = pendingAlphaMaskRef.current;
         pendingAlphaMaskRef.current = null;
+        const paddedProcessed = padToWorkspace(processed, w, h, WORKSPACE_PAD);
         if (alphaMask) {
-          // Re-apply the alpha channel from before re-processing (preserves deleted background)
-          for (let i = 0; i < alphaMask.length; i++) {
-            processed.data[i * 4 + 3] = alphaMask[i];
+          // Re-apply alpha from before re-processing. alphaMask is map-sized; apply at workspace offset.
+          for (let my = 0; my < h; my++) {
+            for (let mx = 0; mx < w; mx++) {
+              const mi = my * w + mx;
+              const wi = ((my + WORKSPACE_PAD) * (w + 2 * WORKSPACE_PAD) + (mx + WORKSPACE_PAD)) * 4;
+              paddedProcessed.data[wi + 3] = alphaMask[mi];
+            }
           }
-          setImageData(processed, true, true);  // keep dirty — manual edits still present
+          setImageData(paddedProcessed, true, true);
         } else {
-          setImageData(processed, false, true);  // fresh process, not dirty
+          setImageData(paddedProcessed, false, true);
         }
         setOriginalData(mk(msg.originalData));
         done();
@@ -660,18 +665,20 @@ export default function App() {
     setMapGrid(grid);
     const newW = gridPixelWidth(grid);
     const newH = gridPixelHeight(grid);
-    // Scale all layers to new dimensions before re-processing
+    const newWW = newW + 2 * WORKSPACE_PAD;
+    const newWH = newH + 2 * WORKSPACE_PAD;
+    // Scale all layers to new workspace dimensions before re-processing
     setLayerState(prev => ({
       ...prev,
       layers: prev.layers.map(l => {
-        if (!l.imageData) return l; // empty layers stay empty
-        return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
+        if (!l.imageData) return l;
+        return { ...l, imageData: scaleImageData(l.imageData, newWW, newWH) };
       }),
     }));
     // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
     setUndoStack([]);
     setRedoStack([]);
-    // Scale originalData (compare preview) to new dimensions
+    // Scale originalData (compare preview) to new map dimensions (not workspace)
     if (originalDataRef.current) {
       setOriginalData(scaleImageData(originalDataRef.current, newW, newH));
     }
@@ -1036,20 +1043,23 @@ export default function App() {
   const handleExportPng = useCallback(() => {
     const { imageData: img, dithering: d, mapGrid: g } = exportRef.current;
     if (!img) return;
-    downloadPng(img, `MapartForge_${g.wide}x${g.tall}_${d}.png`);
+    const mapW = gridPixelWidth(g), mapH = gridPixelHeight(g);
+    const cropped = img.width > mapW ? cropFromWorkspace(img, mapW, mapH, WORKSPACE_PAD) : img;
+    downloadPng(cropped, `MapartForge_${g.wide}x${g.tall}_${d}.png`);
   }, []);
 
   const handleExportLitematic = useCallback(() => {
-    const { activePalette: ap, blockSelection: sel, layers: exportLayers } = exportRef.current;
+    const { activePalette: ap, blockSelection: sel, layers: exportLayers, mapGrid: g } = exportRef.current;
     const visLayers = exportLayers.filter(l => l.visible && l.imageData);
     if (visLayers.length === 0) return;
+    const mapW = gridPixelWidth(g), mapH = gridPixelHeight(g);
     const groups: Record<number, number[]> = {};
     for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
-    exportLitematicHybrid(visLayers.map(l => ({
-      imageData: l.imageData!,
-      mapMode: l.mapMode ?? '2d',
-      staircaseMode: l.staircaseMode ?? 'classic',
-    })), ap, groups, 'MapartForge');
+    exportLitematicHybrid(visLayers.map(l => {
+      const id = l.imageData!;
+      const cropped = id.width > mapW ? cropFromWorkspace(id, mapW, mapH, WORKSPACE_PAD) : id;
+      return { imageData: cropped, mapMode: l.mapMode ?? '2d', staircaseMode: l.staircaseMode ?? 'classic' };
+    }), ap, groups, 'MapartForge');
   }, []);
 
   // ── Project save / load ──────────────────────────────────────────────────────
@@ -1237,20 +1247,24 @@ export default function App() {
   const displayScale = Math.max(1, Math.round(baseScale * zoomFactor));
   const pw = gridPixelWidth(mapGrid);
   const ph = gridPixelHeight(mapGrid);
+  const ww = pw + 2 * WORKSPACE_PAD; // workspace width
+  const wh = ph + 2 * WORKSPACE_PAD; // workspace height
 
   // Composite of all visible layers — used for export and MaterialsList
   const compositeImageData: ImageData | null = useMemo(() => {
     const hasAny = layers.some(l => l.visible && l.imageData);
     if (!hasAny) return null;
-    return compositeLayersToImageData(layers, pw, ph);
-  }, [layers, pw, ph]);
+    return compositeLayersToImageData(layers, ww, wh);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, ww, wh]);
 
   // Composite of all visible layers EXCEPT the active one — shown as backdrop during painting
   const otherLayersData: ImageData | null = useMemo(() => {
     const others = layers.filter(l => l.id !== activeLayerId && l.visible && l.imageData);
     if (others.length === 0) return null;
-    return compositeLayersToImageData(others, pw, ph);
-  }, [layers, activeLayerId, pw, ph]);
+    return compositeLayersToImageData(others, ww, wh);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, activeLayerId, ww, wh]);
 
   // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
   exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
@@ -1272,12 +1286,15 @@ export default function App() {
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        const mapCropped = compositeImageData.width > pw
+          ? cropFromWorkspace(compositeImageData, pw, ph, WORKSPACE_PAD)
+          : compositeImageData;
         const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width = compositeImageData.width;
-        tmpCanvas.height = compositeImageData.height;
+        tmpCanvas.width = mapCropped.width;
+        tmpCanvas.height = mapCropped.height;
         const tmpCtx = tmpCanvas.getContext('2d');
         if (tmpCtx) {
-          tmpCtx.putImageData(compositeImageData, 0, 0);
+          tmpCtx.putImageData(mapCropped, 0, 0);
           ctx.drawImage(tmpCanvas, 0, 0, 128, 128);
         }
       }
@@ -1948,7 +1965,8 @@ export default function App() {
                   mode={textureMode}
                   imageData={compositeImageData ?? imageData} paintData={imageData} originalData={originalData}
                   showOriginal={false} showGrid={showGrid}
-                  width={pw} height={ph} scale={displayScale}
+                  width={ww} height={wh} scale={displayScale}
+                  mapWidth={pw} mapHeight={ph}
                   cp={activePalette} blockSelection={blockSelection}
                   activeTool={activeTool}
                   paintBlock={paintBlock}

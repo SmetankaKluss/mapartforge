@@ -52,6 +52,35 @@ export function createLayer(name: string, imageData: ImageData | null = null, is
   };
 }
 
+/** Paste src ImageData centered in a (mapW + 2*pad) × (mapH + 2*pad) transparent workspace. */
+export function padToWorkspace(src: ImageData, mapW: number, mapH: number, pad: number): ImageData {
+  const ws = new ImageData(mapW + 2 * pad, mapH + 2 * pad);
+  const dst = ws.data, s = src.data;
+  const ww = ws.width;
+  for (let sy = 0; sy < src.height; sy++) {
+    for (let sx = 0; sx < src.width; sx++) {
+      const si = (sy * src.width + sx) * 4;
+      const di = ((sy + pad) * ww + (sx + pad)) * 4;
+      dst[di] = s[si]; dst[di+1] = s[si+1]; dst[di+2] = s[si+2]; dst[di+3] = s[si+3];
+    }
+  }
+  return ws;
+}
+
+/** Extract the map area (center region) from a workspace-sized ImageData. */
+export function cropFromWorkspace(src: ImageData, mapW: number, mapH: number, pad: number): ImageData {
+  const out = new ImageData(mapW, mapH);
+  const dst = out.data, s = src.data;
+  for (let dy = 0; dy < mapH; dy++) {
+    for (let dx = 0; dx < mapW; dx++) {
+      const si = ((dy + pad) * src.width + (dx + pad)) * 4;
+      const di = (dy * mapW + dx) * 4;
+      dst[di] = s[si]; dst[di+1] = s[si+1]; dst[di+2] = s[si+2]; dst[di+3] = s[si+3];
+    }
+  }
+  return out;
+}
+
 /**
  * Scale an ImageData to newW×newH using nearest-neighbor (pixel-perfect, no blurring).
  * Returns a new ImageData at the target size.

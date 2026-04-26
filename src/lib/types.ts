@@ -1,4 +1,5 @@
 export const MAP_BLOCK_SIZE = 128 as const;
+export const WORKSPACE_PAD  = 128 as const; // scratch area around map on each side
 
 export interface MapGrid {
   wide: number;
