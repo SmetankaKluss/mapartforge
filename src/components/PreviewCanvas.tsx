@@ -122,8 +122,6 @@ interface Props {
   gradientDithering?: 'none' | 'ordered';
   overlayRef?: React.RefObject<HTMLCanvasElement | null>;
   onZoomWheel?: (e: WheelEvent) => void;
-  mapWidth?: number;
-  mapHeight?: number;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -526,7 +524,7 @@ export function PreviewCanvas({
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
   activePattern, patternAnchorMode, gradientStops, gradientDithering,
-  onZoomWheel, mapWidth, mapHeight,
+  onZoomWheel,
 }: Props) {
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
@@ -1835,22 +1833,6 @@ export function PreviewCanvas({
       onClick={handleZoneClick}
     >
       {inner}
-
-      {/* Map boundary — shows the 128×128 export area within the larger workspace */}
-      {mapWidth && mapHeight && (
-        <div
-          style={{
-            position: 'absolute',
-            pointerEvents: 'none',
-            left:   Math.round((width  - mapWidth)  / 2) * scale,
-            top:    Math.round((height - mapHeight) / 2) * scale,
-            width:  mapWidth  * scale,
-            height: mapHeight * scale,
-            boxShadow: '0 0 0 1px rgba(87,255,110,0.5)',
-            outline: '1px dashed rgba(87,255,110,0.3)',
-          }}
-        />
-      )}
 
       {/* Brush cursor — position set imperatively via transform (no layout reflow) */}
       <div
