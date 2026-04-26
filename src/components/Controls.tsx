@@ -124,10 +124,11 @@ function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOp
 
 const ERROR_DIFFUSION: DitheringMode[] = ['floyd-steinberg', 'stucki', 'jjn', 'atkinson'];
 
-const MAX_CUSTOM = 10;
+const MAX_CUSTOM = 100;
+const MAX_PX = 8192;
 
 function isPreset(g: MapGrid): boolean {
-  return MAP_GRID_OPTIONS.some(o => o.wide === g.wide && o.tall === g.tall);
+  return MAP_GRID_OPTIONS.some(o => o.wide === g.wide && o.tall === g.tall) && !g.pixelW && !g.pixelH;
 }
 
 function GridIcon({ wide, tall }: { wide: number; tall: number }) {
@@ -197,15 +198,29 @@ export function Controls({
 
   // Custom grid state
   const [showCustom, setShowCustom] = useState(false);
+  const [customMode, setCustomMode] = useState<'grid' | 'pixels'>('grid');
   const [customW, setCustomW] = useState(mapGrid.wide);
   const [customH, setCustomH] = useState(mapGrid.tall);
+  const [customPxW, setCustomPxW] = useState(mapGrid.pixelW ?? mapGrid.wide * MAP_BLOCK_SIZE);
+  const [customPxH, setCustomPxH] = useState(mapGrid.pixelH ?? mapGrid.tall * MAP_BLOCK_SIZE);
 
   const customIsActive = !isPreset(mapGrid);
 
   function applyCustom() {
-    const w = Math.max(1, Math.min(MAX_CUSTOM, customW));
-    const h = Math.max(1, Math.min(MAX_CUSTOM, customH));
-    onMapGridChange({ wide: w, tall: h });
+    if (customMode === 'pixels') {
+      const pw = Math.max(1, Math.min(MAX_PX, customPxW));
+      const ph = Math.max(1, Math.min(MAX_PX, customPxH));
+      onMapGridChange({
+        wide: Math.max(1, Math.ceil(pw / MAP_BLOCK_SIZE)),
+        tall: Math.max(1, Math.ceil(ph / MAP_BLOCK_SIZE)),
+        pixelW: pw,
+        pixelH: ph,
+      });
+    } else {
+      const w = Math.max(1, Math.min(MAX_CUSTOM, customW));
+      const h = Math.max(1, Math.min(MAX_CUSTOM, customH));
+      onMapGridChange({ wide: w, tall: h });
+    }
     setShowCustom(false);
   }
 
@@ -271,38 +286,87 @@ export function Controls({
         {/* Custom grid inputs */}
         {showCustom && (
           <div className="custom-grid-inputs">
-            <div className="custom-grid-row">
-              <label className="custom-grid-label">W</label>
-              <input
-                type="number"
-                className="custom-grid-input"
-                min={1} max={MAX_CUSTOM}
-                value={customW}
-                onChange={e => setCustomW(Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))))}
-                onKeyDown={handleCustomKeyDown}
-              />
-              <span className="custom-grid-sep">×</span>
-              <label className="custom-grid-label">H</label>
-              <input
-                type="number"
-                className="custom-grid-input"
-                min={1} max={MAX_CUSTOM}
-                value={customH}
-                onChange={e => setCustomH(Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))))}
-                onKeyDown={handleCustomKeyDown}
-              />
+            <div className="custom-grid-mode-tabs">
               <button
-                className="custom-grid-apply"
-                onClick={applyCustom}
-                disabled={processing}
-              >{t('Применить', 'Apply')}</button>
+                className={`custom-grid-mode-tab${customMode === 'grid' ? ' active' : ''}`}
+                onClick={() => setCustomMode('grid')}
+              >{t('Карты', 'Maps')}</button>
+              <button
+                className={`custom-grid-mode-tab${customMode === 'pixels' ? ' active' : ''}`}
+                onClick={() => setCustomMode('pixels')}
+              >{t('Пиксели', 'Pixels')}</button>
             </div>
-            <p className="custom-grid-info">
-              {customW}×{customH} {t('карт', 'maps')} — <strong>{customW * MAP_BLOCK_SIZE}×{customH * MAP_BLOCK_SIZE}</strong> {t('блоков', 'blocks')}
-              {(customW > 5 || customH > 5) && (
-                <span className="custom-grid-warn"> ⚠ {t('Большая сетка может быть медленной', 'Large grid may be slow')}</span>
-              )}
-            </p>
+            {customMode === 'grid' ? (
+              <>
+                <div className="custom-grid-row">
+                  <label className="custom-grid-label">W</label>
+                  <input
+                    type="number"
+                    className="custom-grid-input"
+                    min={1} max={MAX_CUSTOM}
+                    value={customW}
+                    onChange={e => setCustomW(Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))))}
+                    onKeyDown={handleCustomKeyDown}
+                  />
+                  <span className="custom-grid-sep">×</span>
+                  <label className="custom-grid-label">H</label>
+                  <input
+                    type="number"
+                    className="custom-grid-input"
+                    min={1} max={MAX_CUSTOM}
+                    value={customH}
+                    onChange={e => setCustomH(Math.max(1, Math.min(MAX_CUSTOM, Number(e.target.value))))}
+                    onKeyDown={handleCustomKeyDown}
+                  />
+                  <button
+                    className="custom-grid-apply"
+                    onClick={applyCustom}
+                    disabled={processing}
+                  >{t('Применить', 'Apply')}</button>
+                </div>
+                <p className="custom-grid-info">
+                  {customW}×{customH} {t('карт', 'maps')} — <strong>{customW * MAP_BLOCK_SIZE}×{customH * MAP_BLOCK_SIZE}</strong> {t('блоков', 'blocks')}
+                  {(customW > 5 || customH > 5) && (
+                    <span className="custom-grid-warn"> ⚠ {t('Большая сетка может быть медленной', 'Large grid may be slow')}</span>
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="custom-grid-row">
+                  <label className="custom-grid-label">W</label>
+                  <input
+                    type="number"
+                    className="custom-grid-input"
+                    min={1} max={MAX_PX}
+                    value={customPxW}
+                    onChange={e => setCustomPxW(Math.max(1, Math.min(MAX_PX, Number(e.target.value))))}
+                    onKeyDown={handleCustomKeyDown}
+                  />
+                  <span className="custom-grid-sep">×</span>
+                  <label className="custom-grid-label">H</label>
+                  <input
+                    type="number"
+                    className="custom-grid-input"
+                    min={1} max={MAX_PX}
+                    value={customPxH}
+                    onChange={e => setCustomPxH(Math.max(1, Math.min(MAX_PX, Number(e.target.value))))}
+                    onKeyDown={handleCustomKeyDown}
+                  />
+                  <button
+                    className="custom-grid-apply"
+                    onClick={applyCustom}
+                    disabled={processing}
+                  >{t('Применить', 'Apply')}</button>
+                </div>
+                <p className="custom-grid-info">
+                  <strong>{customPxW}×{customPxH}</strong> px
+                  {(customPxW > 2048 || customPxH > 2048) && (
+                    <span className="custom-grid-warn"> ⚠ {t('Большой холст может быть медленным', 'Large canvas may be slow')}</span>
+                  )}
+                </p>
+              </>
+            )}
           </div>
         )}
 

@@ -3,6 +3,9 @@ export const MAP_BLOCK_SIZE = 128 as const;
 export interface MapGrid {
   wide: number;
   tall: number;
+  /** Override canvas size in pixels (when not strictly map-grid-aligned) */
+  pixelW?: number;
+  pixelH?: number;
 }
 
 export const MAP_GRID_OPTIONS: MapGrid[] = [
@@ -16,11 +19,11 @@ export const MAP_GRID_OPTIONS: MapGrid[] = [
 ];
 
 export function gridPixelWidth(g: MapGrid): number {
-  return g.wide * MAP_BLOCK_SIZE;
+  return g.pixelW ?? g.wide * MAP_BLOCK_SIZE;
 }
 
 export function gridPixelHeight(g: MapGrid): number {
-  return g.tall * MAP_BLOCK_SIZE;
+  return g.pixelH ?? g.tall * MAP_BLOCK_SIZE;
 }
 
 /** Visual scale factor so the longest axis fits inside ~420 px */

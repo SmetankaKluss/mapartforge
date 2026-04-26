@@ -436,6 +436,14 @@ input, select, textarea { outline: none; }
 .grid-info strong { color: var(--text); }
 
 .custom-grid-inputs { padding: 8px 12px; background: var(--bg-input); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.custom-grid-mode-tabs { display: flex; gap: 3px; margin-bottom: 7px; }
+.custom-grid-mode-tab {
+  padding: 2px 8px; font-family: var(--font-mono); font-size: 9px;
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.custom-grid-mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+.custom-grid-mode-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(87,255,110,0.07); }
 .custom-grid-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .custom-grid-label { font-family: var(--font-ui); font-size: var(--text-xs); font-weight: 600; color: var(--text-muted); min-width: 12px; }
 .custom-grid-input { width: 44px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 3px 6px; font-family: var(--font-mono); font-size: 11px; }
@@ -1354,6 +1362,16 @@ input, select, textarea { outline: none; }
   font-family: var(--font-pixel); font-size: 7px; color: var(--accent);
   letter-spacing: 0.1em; margin-bottom: 8px;
 }
+.nc-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.nc-label-row .nc-label { margin-bottom: 0; }
+.nc-size-mode-tabs { display: flex; gap: 3px; }
+.nc-mode-tab {
+  padding: 2px 8px; font-family: var(--font-mono); font-size: 9px;
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.nc-mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+.nc-mode-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(87,255,110,0.07); }
 .nc-grid-options { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 .nc-size-btn {
   padding: 4px 10px; background: transparent;
@@ -1366,6 +1384,7 @@ input, select, textarea { outline: none; }
 .nc-size-hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
 .nc-custom-row { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
 .nc-custom-input { width: 46px; padding: 3px 5px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); font-family: var(--font-mono); font-size: 11px; text-align: center; }
+.nc-px-input { width: 58px; }
 .nc-custom-input:focus { outline: none; border-color: var(--accent); }
 .nc-custom-sep { color: var(--text-muted); font-size: 12px; }
 .nc-custom-unit { color: var(--text-muted); font-size: 9px; font-family: var(--font-mono); }
