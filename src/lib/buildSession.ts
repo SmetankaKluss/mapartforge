@@ -6,6 +6,13 @@ export interface SessionMaterial {
   count: number;
 }
 
+export interface SessionInfo {
+  title?: string;
+  server?: string;
+  coords?: string;
+  description?: string;
+}
+
 export interface BuildSession {
   id: string;
   created_at: string;
@@ -15,6 +22,7 @@ export interface BuildSession {
   gathered: Record<string, number>; // nbtName → amount
   placed: Record<string, number>;   // nbtName → amount
   mode: 'gathering' | 'building';
+  info: SessionInfo;
 }
 
 /** Create a new session, return its id */
@@ -22,6 +30,7 @@ export async function createBuildSession(
   mapGrid: { wide: number; tall: number },
   imagePreview: string,
   materials: SessionMaterial[],
+  info: SessionInfo = {},
 ): Promise<string> {
   const { data, error } = await supabase
     .from('build_sessions')
@@ -32,6 +41,7 @@ export async function createBuildSession(
       gathered: {},
       placed: {},
       mode: 'gathering',
+      info,
     })
     .select('id')
     .single();
