@@ -145,6 +145,26 @@ input, select, textarea { outline: none; }
 .header-spacer { flex: 1; }
 .tour-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--accent); background: none; border: 1px solid var(--accent); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; transition: background 0.12s, box-shadow 0.12s; }
 .tour-btn:hover { background: var(--accent-dim); box-shadow: 0 0 6px var(--accent-glow); }
+
+/* ── Tour Selector Modal ────────────────────────────────────────────────── */
+.tour-selector-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s var(--ease-out); }
+.tour-selector-modal { position: relative; background: var(--bg-panel); border: 1px solid var(--border); padding: 28px 32px 32px; min-width: 340px; max-width: 480px; width: 90vw; animation: slideUp 0.2s var(--ease-out); }
+.tour-selector-close { position: absolute; top: 10px; right: 14px; background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0; transition: color 0.12s; }
+.tour-selector-close:hover { color: var(--text); }
+.tour-selector-title { font-family: var(--font-ui); font-size: var(--text-base); font-weight: 700; color: var(--accent); letter-spacing: 0.06em; margin-bottom: 8px; }
+.tour-selector-desc { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+.tour-selector-btns { display: flex; flex-direction: column; gap: 10px; }
+.tour-selector-btn { display: flex; align-items: center; gap: 14px; background: none; border: 1px solid rgba(87,255,110,0.2); padding: 14px 16px; cursor: pointer; text-align: left; transition: background 0.12s, border-color 0.12s, box-shadow 0.12s; }
+.tour-selector-btn:hover { background: var(--accent-dim); border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.tour-selector-btn:active { transform: scale(0.98); }
+.tour-selector-btn-icon { font-size: 1.2rem; color: var(--accent); flex-shrink: 0; width: 20px; text-align: center; }
+.tour-selector-btn--advanced .tour-selector-btn-icon { color: var(--gold); }
+.tour-selector-btn-body { display: flex; flex-direction: column; gap: 3px; }
+.tour-selector-btn-title { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 700; color: var(--text); letter-spacing: 0.05em; }
+.tour-selector-btn-sub { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); line-height: 1.4; }
+.tour-selector-btn--advanced:hover { border-color: var(--gold); box-shadow: 0 0 8px var(--gold-glow); background: var(--gold-dim); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 .wiki-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--cyan); background: none; border: 1px solid var(--cyan); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; transition: background 0.12s, box-shadow 0.12s; }
 .wiki-btn:hover { background: rgba(96,200,240,0.12); box-shadow: 0 0 6px rgba(96,200,240,0.3); }
 .support-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: #ff6b9d; background: none; border: 1px solid #ff6b9d; padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; text-decoration: none; display: inline-block; transition: background 0.12s, box-shadow 0.12s; }
