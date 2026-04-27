@@ -49,6 +49,7 @@ import type { PatternDefinition } from './lib/patternTool';
 import { createDefaultPattern } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
+import { PerspectiveModal } from './components/PerspectiveModal';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -227,6 +228,7 @@ export default function App() {
   const [showWiki, setShowWiki] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTourSelector, setShowTourSelector] = useState(false);
+  const [showPerspective, setShowPerspective] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
@@ -1864,6 +1866,7 @@ export default function App() {
                   )}
                   <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
                   <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}>{t('Сетка', 'Grid')}</button>
+                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр на стене', 'Wall preview')}>🖼</button>
                 </div>
               </>
             )}
@@ -2234,6 +2237,14 @@ export default function App() {
       <ProjectsPanel
         onLoad={(id) => handleLoadProjectFromHistory(id)}
         onClose={() => setShowProjectsPanel(false)}
+      />
+    )}
+
+    {/* ── Perspective preview modal ── */}
+    {showPerspective && (
+      <PerspectiveModal
+        imageData={compareMode ? (compareData?.left ?? compositeImageData) : compositeImageData}
+        onClose={() => setShowPerspective(false)}
       />
     )}
 

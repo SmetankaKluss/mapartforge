@@ -165,6 +165,41 @@ input, select, textarea { outline: none; }
 .tour-selector-btn--advanced:hover { border-color: var(--gold); box-shadow: 0 0 8px var(--gold-glow); background: var(--gold-dim); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ── Perspective Preview Modal ──────────────────────────────────────────── */
+.persp-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s var(--ease-out); }
+.persp-modal { display: flex; flex-direction: column; width: min(92vw, 900px); max-height: 92vh; background: var(--bg-panel); border: 1px solid var(--border); animation: slideUp 0.2s var(--ease-out); overflow: hidden; }
+.persp-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.persp-title { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 700; color: var(--accent); letter-spacing: 0.06em; }
+.persp-close { background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 0; transition: color 0.12s; }
+.persp-close:hover { color: var(--text); }
+
+/* Scene */
+.persp-scene-wrap { position: relative; flex: 1; min-height: 260px; max-height: 420px; display: flex; align-items: center; justify-content: center; overflow: hidden; transition: background 0.3s; }
+.persp-floor { position: absolute; bottom: 0; left: 0; right: 0; height: 35%; transition: background 0.3s; }
+.persp-map-3d { position: relative; z-index: 1; transition: transform 0.15s ease-out; transform-style: preserve-3d; }
+.persp-frame { background: #4a2800; box-shadow: inset 0 0 0 2px #6b3a00, 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5); }
+.persp-canvas { display: block; image-rendering: pixelated; max-width: min(55vw, 480px); max-height: min(50vh, 360px); width: auto; height: auto; }
+
+/* Controls */
+.persp-controls { flex-shrink: 0; padding: 12px 16px 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.persp-bg-row { display: flex; align-items: center; gap: 10px; }
+.persp-control-label { font-family: var(--font-ui); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.06em; white-space: nowrap; min-width: 70px; }
+.persp-bg-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.persp-bg-btn { position: relative; width: 52px; height: 32px; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; overflow: hidden; transition: border-color 0.12s, transform 0.1s; }
+.persp-bg-btn:hover { border-color: var(--accent); transform: scale(1.05); }
+.persp-bg-btn.active { border: 2px solid var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+.persp-bg-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-ui); font-size: 0.45rem; color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.9); text-align: center; line-height: 1.2; padding: 2px; pointer-events: none; }
+.persp-sliders { display: flex; gap: 16px; flex-wrap: wrap; }
+.persp-slider-row { display: flex; align-items: center; gap: 8px; }
+.persp-slider { width: 120px; accent-color: var(--accent); }
+.persp-slider-val { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); min-width: 28px; text-align: right; }
+.persp-actions { display: flex; gap: 8px; }
+.persp-reset-btn { font-family: var(--font-ui); font-size: var(--text-xs); background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-muted); padding: 5px 12px; cursor: pointer; letter-spacing: 0.04em; transition: border-color 0.12s, color 0.12s; }
+.persp-reset-btn:hover { border-color: var(--text-muted); color: var(--text); }
+.persp-download-btn { font-family: var(--font-ui); font-size: var(--text-xs); background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 5px 14px; cursor: pointer; letter-spacing: 0.04em; font-weight: 700; transition: background 0.12s, box-shadow 0.12s; }
+.persp-download-btn:hover:not(:disabled) { background: rgba(87,255,110,0.2); box-shadow: 0 0 8px var(--accent-glow); }
+.persp-download-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .wiki-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--cyan); background: none; border: 1px solid var(--cyan); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; transition: background 0.12s, box-shadow 0.12s; }
 .wiki-btn:hover { background: rgba(96,200,240,0.12); box-shadow: 0 0 6px rgba(96,200,240,0.3); }
 .support-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: #ff6b9d; background: none; border: 1px solid #ff6b9d; padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; text-decoration: none; display: inline-block; transition: background 0.12s, box-shadow 0.12s; }
