@@ -458,11 +458,6 @@ export default function App() {
 
   const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
 
-  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
-    if (!compositeImageData) return [];
-    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
-  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
-
   // exportRef is updated below, after compositeImageData is computed
 
   function handleCancelProcessing() {
@@ -1302,6 +1297,11 @@ export default function App() {
     if (others.length === 0) return null;
     return compositeLayersToImageData(others, pw, ph);
   }, [layers, activeLayerId, pw, ph]);
+
+  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
+    if (!compositeImageData) return [];
+    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
+  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
 
   // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
   exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
