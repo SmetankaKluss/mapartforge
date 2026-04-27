@@ -380,7 +380,7 @@ async function buildLitematicBytes(
         // shade 0 (dark): noobline above art by 1; shade 2 (bright): noobline below by 1
         const nooblineY = firstShade === 0 ? artY + 1 : firstShade === 2 ? artY - 1 : artY;
         if (nooblineY >= 0 && nooblineY < sizeY) {
-          const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+          const vi = nooblineY * exportSizeZ * sizeX + firstZ * sizeX + x;
           indices[vi] = noobIdx;
         }
       }
@@ -564,12 +564,12 @@ async function buildHybridBytes(
   const pixelLayerIdx = new Int32Array(n).fill(-1);
   const pixelIs3D     = new Uint8Array(n);           // 1 = 3D, 0 = 2D
 
-  for (let li = 0; li < layers.length; li++) {
+  for (let li = layers.length - 1; li >= 0; li--) {
     const { imageData, mapMode } = layers[li];
     const is3D = mapMode === '3d' ? 1 : 0;
     const src  = imageData.data;
     for (let pi = 0; pi < n; pi++) {
-      if (pixelLayerIdx[pi] !== -1) continue;      // already covered
+      if (pixelLayerIdx[pi] !== -1) continue;      // already covered by higher layer
       if (src[pi * 4 + 3] < 128)   continue;      // transparent
       pixelLayerIdx[pi] = li;
       pixelIs3D[pi]     = is3D;
@@ -614,7 +614,7 @@ async function buildHybridBytes(
     maxY3D = sc.maxY;
   }
 
-  const exportSizeZ = sizeZ;  // no noobline row for 2D
+  const exportSizeZ = has3D ? sizeZ + 1 : sizeZ;
   const sizeY       = has3D ? Math.max(1, maxY3D + 2) : 1;
 
   // 5. Block palette
@@ -647,7 +647,8 @@ async function buildHybridBytes(
       const pi = z * sizeX + x;
       if (pixelBlock[pi] === 0 && pixelLayerIdx[pi] < 0) continue;
       const y  = (pixelIs3D[pi] && yGrid) ? yGrid[pi] : 0;
-      const vi = y * exportSizeZ * sizeX + (z + 1) * sizeX + x;
+      const artZ = has3D ? z + 1 : z;
+      const vi = y * exportSizeZ * sizeX + artZ * sizeX + x;
       if (vi >= 0 && vi < volume) indices[vi] = pixelBlock[pi];
     }
   }
@@ -680,7 +681,7 @@ async function buildHybridBytes(
       const shade    = pixelShade[pi];
       const nooblineY = shade === 0 ? artY + 1 : shade === 2 ? artY - 1 : artY;
       if (nooblineY >= 0 && nooblineY < sizeY) {
-        const vi = nooblineY * exportSizeZ * sizeX + 0 * sizeX + x;
+        const vi = nooblineY * exportSizeZ * sizeX + firstZ * sizeX + x;
         if (vi < volume) indices[vi] = noobIdx;
       }
     }

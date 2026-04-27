@@ -508,9 +508,8 @@ export default function App() {
         // Guard: never overwrite a manually-edited (dirty) layer with processed results
         const targetId = processTargetLayerIdRef.current ?? latestRef.current.activeLayerId;
         const targetLayer = latestRef.current.layers.find(l => l.id === targetId);
-        if (targetLayer?.isDirty) {
+        if (targetLayer?.isDirty && !pendingAlphaMaskRef.current) {
           processTargetLayerIdRef.current = null;
-          pendingAlphaMaskRef.current = null;
           setOriginalData(mk(msg.originalData));
           done();
           return;
