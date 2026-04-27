@@ -34,18 +34,20 @@ export async function createBuildSession(
   info: SessionInfo = {},
   litematicB64?: string,
 ): Promise<string> {
+  const row: Record<string, unknown> = {
+    map_grid: mapGrid,
+    image_preview: imagePreview,
+    materials,
+    gathered: {},
+    placed: {},
+    mode: 'gathering',
+    info,
+  };
+  if (litematicB64) row.litematic_b64 = litematicB64;
+
   const { data, error } = await supabase
     .from('build_sessions')
-    .insert({
-      map_grid: mapGrid,
-      image_preview: imagePreview,
-      litematic_b64: litematicB64 ?? null,
-      materials,
-      gathered: {},
-      placed: {},
-      mode: 'gathering',
-      info,
-    })
+    .insert(row)
     .select('id')
     .single();
 
