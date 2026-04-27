@@ -284,8 +284,8 @@ async function buildLitematicBytes(
   // ── 1. Determine Y dimensions ─────────────────────────────────────────
   let sizeY: number;
   let yGrid: Int32Array | null = null;
-  // Staircase: add 1 extra Z row at z=0 for the noobline (north shading reference)
-  let exportSizeZ = structure === 'staircase' ? sizeZ + 1 : sizeZ;
+  // Both flat and staircase add 1 extra Z row at z=0 for the noobline (north shading reference)
+  let exportSizeZ = sizeZ + 1;
 
   if (structure === 'staircase') {
     const sc = staircaseMode === 'optimized'
@@ -327,11 +327,6 @@ async function buildLitematicBytes(
       pixelBaseId[z * sizeX + x] = entry?.baseId ?? 0;
       pixelShade[z * sizeX + x]  = entry?.shade ?? 1;
     }
-  }
-
-  // ── 2b. Flat mode: no extra Z row (art directly on ground) ─
-  if (structure === 'flat') {
-    exportSizeZ = sizeZ;
   }
 
   // ── 3. Fill volume (Y×exportSizeZ×X, y outer) ────────────────────────
@@ -386,15 +381,33 @@ async function buildLitematicBytes(
       }
     }
   } else {
-    // Flat mode: art directly on ground (Z=0), no noobline
-    const artY = 0;
-
-    // Art blocks at Z=0 (direct placement on solid surface)
+    // Flat mode: art at z+1 (z=0 reserved for noobline, same as staircase)
     for (let z = 0; z < sizeZ; z++) {
       for (let x = 0; x < sizeX; x++) {
         const pi = z * sizeX + x;
-        const vi = artY * sizeZ * sizeX + z * sizeX + x;
+        const vi = 0 * exportSizeZ * sizeX + (z + 1) * sizeX + x;
         indices[vi] = pixelBlock[pi];
+      }
+    }
+
+    // ── Noobline for flat mode: 1 block per column at z=firstZ, y=0 ──
+    {
+      const supportNbt = (!supportBlockNbt || supportBlockNbt === 'air') ? 'cobblestone' : supportBlockNbt;
+      const noobId = `minecraft:${supportNbt}`;
+      let noobIdx = blockToIdx.get(noobId);
+      if (noobIdx === undefined) {
+        noobIdx = blockPalette.length;
+        blockToIdx.set(noobId, noobIdx);
+        blockPalette.push(noobId);
+      }
+      for (let x = 0; x < sizeX; x++) {
+        let firstZ = -1;
+        for (let z = 0; z < sizeZ; z++) {
+          if (pixelBlock[z * sizeX + x] !== 0) { firstZ = z; break; }
+        }
+        if (firstZ < 0) continue;
+        const vi = 0 * exportSizeZ * sizeX + firstZ * sizeX + x;
+        indices[vi] = noobIdx;
       }
     }
   }
