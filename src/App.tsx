@@ -42,7 +42,7 @@ import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
 import { SaveProjectModal } from './components/SaveProjectModal';
 import { ProjectsPanel } from './components/ProjectsPanel';
-import { createTour, shouldAutoStart, markTourDone, type TourType } from './lib/tour';
+import { createTour, shouldAutoStart } from './lib/tour';
 import { useLocale } from './lib/locale';
 import type { PatternDefinition } from './lib/patternTool';
 import { createDefaultPattern } from './lib/patternTool';
@@ -226,7 +226,6 @@ export default function App() {
   const [showWiki, setShowWiki] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
-  const [showTourSelector, setShowTourSelector] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
@@ -1222,15 +1221,11 @@ export default function App() {
   }, []);
 
   // ── Onboarding tour ───────────────────────────────────────────────────────
-  const startTour = useCallback((tourType: TourType = 'basic') => {
-    markTourDone(tourType);
-    createTour(tourType, setMobileTab, lang).drive();
-  }, [lang]);
-
+  const startTour = useCallback(() => { createTour(setMobileTab, lang).drive(); }, [lang]);
   useEffect(() => {
     if (shouldAutoStart()) {
       // Slight delay so the DOM is fully painted
-      const timer = setTimeout(() => startTour('basic'), 600);
+      const timer = setTimeout(() => createTour(setMobileTab, lang).drive(), 600);
       return () => clearTimeout(timer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1385,7 +1380,7 @@ export default function App() {
             onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
           >🎨 {t('Художник', 'Artist')}</button>
-          <button className="tour-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
+          <button className="tour-btn" onClick={startTour} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
@@ -2236,64 +2231,6 @@ export default function App() {
         onLoad={(id) => handleLoadProjectFromHistory(id)}
         onClose={() => setShowProjectsPanel(false)}
       />
-    )}
-
-    {/* ── Tour selector modal ── */}
-    {showTourSelector && (
-      <div className="tour-selector-overlay" onClick={() => setShowTourSelector(false)}>
-        <div className="tour-selector-modal" onClick={e => e.stopPropagation()}>
-          <div className="tour-selector-title">
-            {t('ВЫБЕРИ ТУР', 'CHOOSE A GUIDE')}
-          </div>
-          <div className="tour-selector-description">
-            {t(
-              'Есть два вида гида: для новичков и для опытных пользователей.',
-              'There are two guides: one for beginners and one for advanced users.'
-            )}
-          </div>
-          <div className="tour-selector-buttons">
-            <button
-              className="tour-selector-btn tour-selector-btn-basic"
-              onClick={() => {
-                setShowTourSelector(false);
-                startTour('basic');
-              }}
-            >
-              <div className="tour-selector-btn-title">
-                {t('🎯 БАЗОВЫЙ ТУР', '🎯 BASIC GUIDE')}
-              </div>
-              <div className="tour-selector-btn-desc">
-                {t(
-                  'Для новичков. Охватывает основы: загрузка, дизеринг, экспорт.',
-                  'For beginners. Covers essentials: upload, dithering, export.'
-                )}
-              </div>
-            </button>
-            <button
-              className="tour-selector-btn tour-selector-btn-advanced"
-              onClick={() => {
-                setShowTourSelector(false);
-                startTour('advanced');
-              }}
-            >
-              <div className="tour-selector-btn-title">
-                {t('⚡ ПРОДВИНУТЫЙ ТУР', '⚡ ADVANCED GUIDE')}
-              </div>
-              <div className="tour-selector-btn-desc">
-                {t(
-                  'Для опытных. Слои, паттерны, градиент, текст и другие крутые инструменты.',
-                  'For experienced users. Layers, patterns, gradients, text & cool tools.'
-                )}
-              </div>
-            </button>
-          </div>
-          <button
-            className="tour-selector-close"
-            onClick={() => setShowTourSelector(false)}
-            title={t('Закрыть', 'Close')}
-          >✕</button>
-        </div>
-      </div>
     )}
     </>
   );

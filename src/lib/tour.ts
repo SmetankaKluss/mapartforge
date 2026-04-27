@@ -1,20 +1,13 @@
 import { driver } from 'driver.js';
 import { flushSync } from 'react-dom';
 
-const BASIC_TOUR_KEY = 'mapkluss_basic_tour_done';
-const ADVANCED_TOUR_KEY = 'mapkluss_advanced_tour_done';
+const TOUR_KEY = 'mapkluss_tour_done';
 
 const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
 
 type Tab = 'settings' | 'palette' | 'export';
 
-export type TourType = 'basic' | 'advanced';
-
-/**
- * Basic tour: Essential features for newcomers
- * Covers: upload, grid, mode, dithering, adjustments, preview, toolbar basics, export
- */
-function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru') {
+export function createTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru') {
   const ru = (r: string, e: string) => lang === 'ru' ? r : e;
   const switchSync = (tab: Tab) => {
     if (!isMobile() || !switchTab) return;
@@ -34,7 +27,7 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
     prevBtnText: ru('‹ НАЗАД', '‹ BACK'),
     doneBtnText: ru('ГОТОВО ✓', 'DONE ✓'),
     onDestroyStarted: () => {
-      localStorage.setItem(BASIC_TOUR_KEY, 'true');
+      localStorage.setItem(TOUR_KEY, 'true');
       d.destroy();
     },
     steps: [
@@ -100,11 +93,11 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
           title: ru('4. ДИЗЕРИНГ', '4. DITHERING'),
           description: ru(
             'Дизеринг смешивает соседние пиксели для имитации цветов, которых нет в палитре блоков. ' +
-            '<b>None</b> = только ближайший цвет. <b>KlussDither</b> = кастомный алгоритм, лучший для иллюстраций. ' +
-            '<b>Floyd-Steinberg</b> = классика, универсален. Поэкспериментируй, чтобы найти лучший для твоего изображения.',
-            'Dithering blends nearby pixels to simulate colors not in the block palette. ' +
-            '<b>None</b> = flat nearest-color only. <b>KlussDither</b> = custom algorithm, great for illustrations. ' +
-            '<b>Floyd-Steinberg</b> = classic, versatile. Experiment to find the best for your image.',
+            '<b>None</b> = только ближайший цвет без смешения. <b>KlussDither</b> = наш кастомный алгоритм, лучший для аниме и иллюстраций. ' +
+            '<b>Floyd-Steinberg</b> = классика, хорошо подходит для большинства изображений.',
+            'Dithering blends nearby pixels to simulate colors that don\'t exist in the block palette. ' +
+            '<b>None</b> = flat nearest-color only. <b>KlussDither</b> = our custom algorithm, best for anime and illustrations. ' +
+            '<b>Floyd-Steinberg</b> = classic, good general purpose choice.',
           ),
           side: 'bottom',
           align: 'center',
@@ -118,12 +111,12 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
         popover: {
           title: ru('5. КОРРЕКЦИЯ ИЗОБРАЖЕНИЯ', '5. IMAGE ADJUSTMENTS'),
           description: ru(
-            'Твой исходный образ перед конвертацией. ' +
+            'Настрой исходное изображение перед конвертацией. ' +
             'Увеличение <b>контраста</b> и небольшое повышение <b>насыщенности</b> часто значительно улучшают результат — ' +
-            'палитра Minecraft менее яркая, чем большинство фотографий.',
-            'Tweak the source image before conversion. ' +
-            'Bumping <b>contrast</b> and slightly increasing <b>saturation</b> often improves results — ' +
-            'Minecraft\'s palette is less vibrant than most photos.',
+            'палитра Minecraft менее яркая, чем большинство фотографий и иллюстраций.',
+            'Tweak the source image before it\'s converted. ' +
+            'Bumping <b>contrast</b> and slightly increasing <b>saturation</b> often improves results significantly — ' +
+            'Minecraft\'s palette is less vibrant than most photos and illustrations.',
           ),
           side: 'bottom',
           align: 'center',
@@ -137,13 +130,13 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
         popover: {
           title: ru('6. ПРЕДПРОСМОТР', '6. PREVIEW'),
           description: ru(
-            'Обработанный мап-арт появляется здесь. ' +
+            'Обработанный мап-арт появляется здесь после загрузки изображения. ' +
             '<b>Перетащи разделитель</b> влево/вправо для сравнения оригинала с результатом. ' +
-            '<b>Наведи на пиксель</b> чтобы увидеть название блока. ' +
+            '<b>Наведи на пиксель</b> для просмотра названия блока, цветового ID и оттенка. ' +
             'Скролл для масштабирования, перетащи для перемещения.',
-            'The processed map art appears here. ' +
-            '<b>Drag the split slider</b> left/right to compare original with result. ' +
-            '<b>Hover any pixel</b> to see the block name. ' +
+            'The processed map art appears here after the image is loaded. ' +
+            '<b>Drag the split slider</b> left/right to compare the original with the result. ' +
+            '<b>Hover any pixel</b> to see the block name, color ID and exact shade. ' +
             'Scroll to zoom, drag to pan.',
           ),
           side: 'left',
@@ -152,20 +145,75 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
         onHighlightStarted: () => switchSync('settings'),
       },
 
-      // ── 7. Export ──────────────────────────────────────────────────────────
+      // ── 8. Toolbar / paint tools ──────────────────────────────────────────
       {
-        element: '#tour-export',
+        element: '.toolbar',
         popover: {
-          title: ru('7. ЭКСПОРТ', '7. EXPORT'),
+          title: ru('7. ПАНЕЛЬ ИНСТРУМЕНТОВ', '7. TOOLBAR'),
           description: ru(
-            '<b>PNG</b> — скачать изображение. ' +
-            '<b>MAP.DAT</b> — готовые файлы карт для Minecraft. ' +
-            '<b>LITEMATIC</b> — схема для <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">мода Litematica</a>. ' +
-            '<b>LINK</b> — поделись настройками с другими через облако.',
-            '<b>PNG</b> — download as image. ' +
-            '<b>MAP.DAT</b> — ready-made Minecraft map files. ' +
-            '<b>LITEMATIC</b> — schematic for <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a>. ' +
-            '<b>LINK</b> — share settings with others via cloud.',
+            '<b>↩↪</b> Отменить / Повторить (Ctrl+Z / Ctrl+Y). ' +
+            'После обработки появляются инструменты рисования: <b>курсор</b> (инспекция), <b>пипетка</b> (E — выбрать блок), ' +
+            '<b>кисть</b> (B — рисовать пиксели), <b>заливка</b> (F — заливка области). ' +
+            'Также: переключение <b>текстур блоков</b>, <b>сетки</b> и <b>режима сравнения</b>.',
+            '<b>↩↪</b> Undo / Redo (Ctrl+Z / Ctrl+Y). ' +
+            'After processing, paint tools appear: <b>cursor</b> (inspect), <b>eyedropper</b> (E — pick block), ' +
+            '<b>brush</b> (B — paint pixels), <b>fill</b> (F — flood fill). ' +
+            'Also: toggle <b>block textures</b>, <b>grid overlay</b>, and <b>compare mode</b>.',
+          ),
+          side: 'bottom',
+          align: 'start',
+        },
+        onHighlightStarted: () => switchSync('settings'),
+      },
+
+      // ── 9. Block palette ──────────────────────────────────────────────────
+      {
+        element: '.panel-right',
+        popover: {
+          title: ru('8. ПАЛИТРА БЛОКОВ', '8. BLOCK PALETTE'),
+          description: ru(
+            'Включай или отключай отдельные ряды цветов блоков. <b>Больше блоков = больше цветов = лучше качество.</b> ' +
+            'Нажми на точку рядом с цветом для переключения; нажми на иконку блока для выбора варианта. ' +
+            'Используй <b>поиск</b> для поиска блоков, <b>пресеты</b> для быстрой настройки и <b>поделиться палитрой</b> для отправки выбора другим.',
+            'Enable or disable individual block color rows. <b>More blocks = more colors available = better quality.</b> ' +
+            'Click the dot next to a color to toggle it; click a block icon to pick which variant to use. ' +
+            'Use <b>Search</b> to find specific blocks, <b>Presets</b> for quick setups, and <b>Share palette</b> to send your selection to others.',
+          ),
+          side: 'left',
+          align: 'start',
+        },
+        onHighlightStarted: () => switchSync('palette'),
+      },
+
+      // ── 10. Support block ─────────────────────────────────────────────────
+      {
+        element: '.support-block-section',
+        popover: {
+          title: ru('9. ОПОРНЫЕ БЛОКИ (3D)', '9. SUPPORT BLOCKS (3D)'),
+          description: ru(
+            'В режиме 3D-лестницы некоторые блоки (песок, гравий, лишайник…) не могут висеть в воздухе. ' +
+            'Выбери твёрдый блок для автоматической подстановки под них в экспортированной схеме. ' +
+            '<b>Глубина 1</b> = только под плавающими · <b>2</b> = под каждым блоком арта · <b>3</b> = два блока под каждым.',
+            'In 3D staircase mode some blocks (sand, gravel, lichen…) can\'t float in mid-air. ' +
+            'Choose a solid block to place underneath them automatically in the exported schematic. ' +
+            '<b>Depth 1</b> = under floating blocks only · <b>2</b> = one block under every art block · <b>3</b> = two blocks under every art block.',
+          ),
+          side: 'left',
+          align: 'start',
+        },
+        onHighlightStarted: () => switchSync('palette'),
+      },
+
+      // ── 11. Materials list ────────────────────────────────────────────────
+      {
+        element: '.mat-header',
+        popover: {
+          title: ru('10. СПИСОК МАТЕРИАЛОВ', '10. MATERIALS LIST'),
+          description: ru(
+            'Показывает все типы блоков в твоём мап-арте с точным количеством в <b>стаках</b> (64) и <b>шалкерах</b> (1728). ' +
+            'Переключи <b>Макс/карта</b> для просмотра максимума на один тайл 128×128 — удобно знать, что брать за сессию.',
+            'Shows every block type used in your map art with exact counts in <b>stacks</b> (64) and <b>shulker boxes</b> (1728). ' +
+            'Toggle <b>Max/map</b> to see the maximum needed for a single 128×128 tile — useful for knowing what to bring per session.',
           ),
           side: 'left',
           align: 'start',
@@ -173,245 +221,53 @@ function createBasicTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru
         onHighlightStarted: () => switchSync('export'),
       },
 
-      // ── 8. Next steps ──────────────────────────────────────────────────────
+      // ── 12. Export ────────────────────────────────────────────────────────
       {
-        element: '.tour-btn',
+        element: '#tour-export',
         popover: {
-          title: ru('ВСЁ ГОТОВО! 🎉', 'ALL SET! 🎉'),
+          title: ru('11. ЭКСПОРТ', '11. EXPORT'),
           description: ru(
-            'Это основные функции. Ты готов создавать мап-арт! ' +
-            'Когда почувствуешь себя увереннее, используй <b>ГИД (продвинутый)</b> чтобы узнать о многослойности, паттернах, градиентах и других крутых инструментах. ' +
-            'Удачи! 🚀',
-            'That\'s the essentials. You\'re ready to create map art! ' +
-            'When you feel more comfortable, use <b>GUIDE (advanced)</b> to learn about layers, patterns, gradients, and other cool tools. ' +
-            'Good luck! 🚀',
+            '<b>↓ PNG</b> — скачать обработанное изображение как картинку. ' +
+            '<b>↓ MAP.DAT</b> — готовые файлы карт Minecraft; положи в папку сохранений. ' +
+            '<b>↓ LITEMATIC</b> — схема постройки для <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">мода Litematica</a>. ' +
+            '<b>↓ ZIP</b> — по одному .litematic файлу на каждый тайл 128×128, архивом (для многокарточных сеток).',
+            '<b>↓ PNG</b> — download the processed image as a picture. ' +
+            '<b>↓ MAP.DAT</b> — ready-to-use Minecraft map files; place in your saves folder. ' +
+            '<b>↓ LITEMATIC</b> — building schematic for the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a>. ' +
+            '<b>↓ ZIP</b> — one .litematic file per 128×128 tile, zipped (multi-map grids).',
           ),
           side: 'left',
+          align: 'start',
+        },
+        onHighlightStarted: () => switchSync('export'),
+      },
+
+      // ── 13. Get Link ──────────────────────────────────────────────────────
+      {
+        element: '.link-export-btn',
+        popover: {
+          title: ru('12. ССЫЛКА ДЛЯ SHARE', '12. SHARE LINK'),
+          description: ru(
+            'Генерирует <b>постоянную ссылку</b>, которая кодирует твоё изображение и все текущие настройки (сетка, дизеринг, палитра, коррекция). ' +
+            'Поделись ею с другими строителями или добавь в закладки для продолжения проекта позже — аккаунт не нужен.',
+            'Generates a <b>permanent link</b> that encodes your image and all current settings (grid, dithering, palette, adjustments). ' +
+            'Share it with other builders or bookmark it to continue your project later — no account needed.',
+          ),
+          side: 'top',
           align: 'center',
         },
-        onHighlightStarted: () => switchSync('settings'),
+        onHighlightStarted: () => switchSync('export'),
       },
     ],
   });
 
   return d;
-}
-
-/**
- * Advanced tour: For users who want to master the tool
- * Covers: layers, selections, patterns, gradient, text, project save/load, palette editor, keyboard shortcuts
- */
-function createAdvancedTour(switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru') {
-  const ru = (r: string, e: string) => lang === 'ru' ? r : e;
-  const switchSync = (tab: Tab) => {
-    if (!isMobile() || !switchTab) return;
-    flushSync(() => switchTab(tab));
-  };
-
-  const d = driver({
-    animate: true,
-    smoothScroll: true,
-    allowClose: true,
-    overlayOpacity: 0.7,
-    stagePadding: 6,
-    stageRadius: 2,
-    showProgress: true,
-    progressText: '{{current}} / {{total}}',
-    nextBtnText: ru('ДАЛЕЕ ›', 'NEXT ›'),
-    prevBtnText: ru('‹ НАЗАД', '‹ BACK'),
-    doneBtnText: ru('ГОТОВО ✓', 'DONE ✓'),
-    onDestroyStarted: () => {
-      localStorage.setItem(ADVANCED_TOUR_KEY, 'true');
-      d.destroy();
-    },
-    steps: [
-      // ── 1. Layers ──────────────────────────────────────────────────────────
-      {
-        element: '.panel-right',
-        popover: {
-          title: ru('1. СЛОИ', '1. LAYERS'),
-          description: ru(
-            'Работай с несколькими слоями одновременно! Создавай слои для разных частей твоего арта, ' +
-            'обрезай их независимо, применяй разные дизеринг/режимы к каждому. ' +
-            'Переименуй, блокируй, управляй видимостью. <b>Экспорт гибрид</b> собирает все видимые слои в одну схему.',
-            'Work with multiple layers at once! Create separate layers for different parts of your art, ' +
-            'crop them independently, apply different dithering/modes to each. ' +
-            'Rename, lock, control visibility. <b>Hybrid export</b> combines all visible layers into one schematic.',
-          ),
-          side: 'left',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('palette'),
-      },
-
-      // ── 2. Selection tools ─────────────────────────────────────────────────
-      {
-        element: '.toolbar',
-        popover: {
-          title: ru('2. ИНСТРУМЕНТЫ ВЫДЕЛЕНИЯ', '2. SELECTION TOOLS'),
-          description: ru(
-            '<b>Rect</b> (R) — прямоугольное выделение. ' +
-            '<b>Lasso</b> (L) — рисуй произвольную форму. ' +
-            '<b>Magic</b> (M) — выдели область одного цвета (flood fill). ' +
-            '<b>Pixel</b> — выдели конкретный пиксель. ' +
-            'Все инструменты поддерживают <b>объединение</b> (Shift + клик) и <b>вычитание</b> (Ctrl + клик).',
-            '<b>Rect</b> (R) — rectangular selection. ' +
-            '<b>Lasso</b> (L) — draw freeform shape. ' +
-            '<b>Magic</b> (M) — select contiguous color (flood fill). ' +
-            '<b>Pixel</b> — select individual pixel. ' +
-            'All support <b>union</b> (Shift+click) and <b>subtract</b> (Ctrl+click).',
-          ),
-          side: 'bottom',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-
-      // ── 3. Pattern tool ───────────────────────────────────────────────────
-      {
-        element: '.toolbar',
-        popover: {
-          title: ru('3. ПАТТЕРНЫ', '3. PATTERNS'),
-          description: ru(
-            'Создавай и рисуй повторяющиеся паттерны! Нажми <b>Паттерн</b> (P) и редактируй (кнопка редактирования). ' +
-            '<b>Tile</b> — заливает область паттерном по сетке (идеально для фонов). ' +
-            '<b>Stamp</b> — штампует паттерн один раз в позицию. ' +
-            'Импортируй/экспортируй паттерны как JSON для обмена с друзьями.',
-            'Create and paint repeating patterns! Press <b>Pattern</b> (P) and edit (edit button). ' +
-            '<b>Tile</b> — fills area with pattern grid (perfect for backgrounds). ' +
-            '<b>Stamp</b> — stamps pattern once at position. ' +
-            'Import/export patterns as JSON to share with friends.',
-          ),
-          side: 'bottom',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-
-      // ── 4. Gradient ────────────────────────────────────────────────────────
-      {
-        element: '.toolbar',
-        popover: {
-          title: ru('4. ГРАДИЕНТ', '4. GRADIENT'),
-          description: ru(
-            'Рисуй плавные переходы между блоками! Нажми <b>Градиент</b> (G), выбери 2+ цвета-остановки. ' +
-            'Система интерполирует цвета в OKLab пространстве для максимально точных переходов. ' +
-            'Используй <b>упорядоченный дизеринг (Байер)</b> для сглаживания границ между остановками.',
-            'Paint smooth transitions between blocks! Press <b>Gradient</b> (G), choose 2+ color stops. ' +
-            'System interpolates in OKLab color space for smooth transitions. ' +
-            'Use <b>ordered dithering (Bayer)</b> to smooth stop boundaries.',
-          ),
-          side: 'bottom',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-
-      // ── 5. Text tool ──────────────────────────────────────────────────────
-      {
-        element: '.toolbar',
-        popover: {
-          title: ru('5. ТЕКСТ', '5. TEXT'),
-          description: ru(
-            'Добавляй текст на свой мап-арт! Нажми <b>Текст</b> (T), нажми на холст, введи текст. ' +
-            'Выбери шрифт (моноширинный, sans-serif и т.д.) и размер. ' +
-            'Текст преобразуется в блоки используя выбранный дизеринг.',
-            'Add text to your map art! Press <b>Text</b> (T), click on canvas, type. ' +
-            'Choose font (monospace, sans-serif, etc) and size. ' +
-            'Text is rasterized to blocks using your current dithering.',
-          ),
-          side: 'bottom',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-
-      // ── 6. Project save/load ───────────────────────────────────────────────
-      {
-        element: '.panel-right',
-        popover: {
-          title: ru('6. СОХРАНИТЬ ПРОЕКТ', '6. SAVE PROJECT'),
-          description: ru(
-            'Сохраняй свои проекты локально! <b>↓ Сохранить проект</b> сохраняет все слои, настройки, историю в файл. ' +
-            '<b>↑ Загрузить проект</b> загружает сохранённый файл. ' +
-            'Это позволяет продолжить работу позже. Или используй <b>облачные проекты</b> в панели слоёв (Artist Mode).',
-            'Save your projects locally! <b>↓ Save project</b> saves all layers, settings, history to file. ' +
-            '<b>↑ Load project</b> restores a saved file. ' +
-            'Continue your work later. Or use <b>cloud projects</b> in layers panel (Artist Mode).',
-          ),
-          side: 'left',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('palette'),
-      },
-
-      // ── 7. Palette editor & blocks ─────────────────────────────────────────
-      {
-        element: '.panel-right',
-        popover: {
-          title: ru('7. РАСШИРЕННАЯ ПАЛИТРА', '7. ADVANCED PALETTE'),
-          description: ru(
-            'Версионирование: выбери версию Minecraft и автоматически получишь доступные блоки. ' +
-            'Поиск по названию, пресеты для быстрой настройки. ' +
-            'Нажми на иконку блока, чтобы выбрать конкретный вариант. ' +
-            'Поделись палитрой через <b>ПОДЕЛИТЬСЯ</b> — кодируется в URL.',
-            'Version support: choose Minecraft version to get available blocks. ' +
-            'Search by name, presets for quick setup. ' +
-            'Click block icon to pick specific variant. ' +
-            'Share palette via <b>SHARE</b> — encoded in URL.',
-          ),
-          side: 'left',
-          align: 'start',
-        },
-        onHighlightStarted: () => switchSync('palette'),
-      },
-
-      // ── 8. Materials & keyboard shortcuts ───────────────────────────────────
-      {
-        element: '.toolbar',
-        popover: {
-          title: ru('8. ФИНАЛЬНЫЕ СОВЕТЫ', '8. FINAL TIPS'),
-          description: ru(
-            'Используй <b>материалы</b> (export tab) для плана закупок. ' +
-            'Открой <b>горячие клавиши</b> (клавиатурный значок) для полного списка сочетаний. ' +
-            'Вступи на Discord сервер сообщества для советов и шеринга своего арта! ' +
-            'Ты готов к мастерству! 🎨',
-            'Use <b>materials list</b> (export tab) to plan your shopping. ' +
-            'Open <b>keyboard shortcuts</b> (keyboard icon) for full list of bindings. ' +
-            'Join the community Discord for tips and to share your art! ' +
-            'You\'re ready to master the tool! 🎨',
-          ),
-          side: 'left',
-          align: 'center',
-        },
-        onHighlightStarted: () => switchSync('settings'),
-      },
-    ],
-  });
-
-  return d;
-}
-
-/**
- * Create appropriate tour based on type
- */
-export function createTour(tourType: TourType = 'basic', switchTab?: (tab: Tab) => void, lang: 'ru' | 'en' = 'ru') {
-  return tourType === 'advanced' ? createAdvancedTour(switchTab, lang) : createBasicTour(switchTab, lang);
 }
 
 export function shouldAutoStart(): boolean {
-  return !localStorage.getItem(BASIC_TOUR_KEY);
+  return !localStorage.getItem(TOUR_KEY);
 }
 
-export function isBasicTourDone(): boolean {
-  return !!localStorage.getItem(BASIC_TOUR_KEY);
-}
-
-export function isAdvancedTourDone(): boolean {
-  return !!localStorage.getItem(ADVANCED_TOUR_KEY);
-}
-
-export function markTourDone(tourType: TourType = 'basic'): void {
-  const key = tourType === 'advanced' ? ADVANCED_TOUR_KEY : BASIC_TOUR_KEY;
-  localStorage.setItem(key, 'true');
+export function markTourDone(): void {
+  localStorage.setItem(TOUR_KEY, 'true');
 }
