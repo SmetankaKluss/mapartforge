@@ -74,7 +74,7 @@ export function BuildTrackerModal({ materials, imageData, mapGrid, cp, blockGrou
             <p className="bt-desc">
               {t(
                 'Создайте общую ссылку для команды строителей. Каждый может отмечать сколько блоков собрал и поставил — прогресс виден в реальном времени.',
-                'Create a shared link for your build team. Everyone can track how many blocks they've gathered and placed — progress is visible in real time.',
+                "Create a shared link for your build team. Everyone can track how many blocks they've gathered and placed — progress is visible in real time.",
               )}
             </p>
 
