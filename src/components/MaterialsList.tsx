@@ -169,7 +169,7 @@ function buildCopyText(entries: MaterialEntry[], total: number, maxPerMap: boole
   return lines.join('\n');
 }
 
-export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode, onCreateTracker }: Props) {
+export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode }: Props) {
   const { t } = useLocale();
   const [copied,     setCopied]     = useState(false);
   const [maxPerMap,  setMaxPerMap]  = useState(false);

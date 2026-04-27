@@ -238,11 +238,6 @@ export default function App() {
   const [showPerspective, setShowPerspective] = useState(false);
   const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
   const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
-  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
-    if (!compositeImageData) return [];
-    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
@@ -462,6 +457,11 @@ export default function App() {
 
 
   const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
+
+  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
+    if (!compositeImageData) return [];
+    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
+  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
 
   // exportRef is updated below, after compositeImageData is computed
 
