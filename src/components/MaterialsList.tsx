@@ -3,6 +3,7 @@ import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { MapGrid } from '../lib/types';
 import { MAP_BLOCK_SIZE } from '../lib/types';
+import type { SessionMaterial } from '../lib/buildSession';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { useLocale } from '../lib/locale';
@@ -19,7 +20,6 @@ interface Props {
   staircaseMode?: 'classic' | 'optimized';
   supportBlock?: string;
   supportMode?: SupportMode;
-  onCreateTracker?: (materials: { nbtName: string; displayName: string; count: number }[]) => void;
 }
 
 interface MaterialEntry {
@@ -102,6 +102,20 @@ function computeRawMaterials(
     }))
     .filter(e => e.total > 0)
     .sort((a, b) => b.total - a.total);
+}
+
+/** Exported helper — compute session materials from current render state */
+export function computeSessionMaterials(
+  imageData: ImageData,
+  cp: ComputedPalette,
+  sel: BlockSelection,
+  mapGrid: MapGrid,
+): SessionMaterial[] {
+  return computeRawMaterials(imageData, cp, sel, mapGrid).map(e => ({
+    nbtName: e.nbtName,
+    displayName: e.displayName,
+    count: e.total,
+  }));
 }
 
 function fmtN(n: number): string {
@@ -303,15 +317,6 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
         <button className="mat-copy-btn" onClick={handleDownload} title={t('Скачать как .txt и .csv с учётом режима Макс/карта', 'Download as .txt and .csv respecting Max/map mode')}>
           {t('↓ СКАЧАТЬ', '↓ DOWNLOAD')}
         </button>
-        {onCreateTracker && imageData && (
-          <button
-            className="mat-copy-btn mat-tracker-btn"
-            onClick={() => onCreateTracker(materials.map(e => ({ nbtName: e.nbtName, displayName: e.displayName, count: e.count })))}
-            title={t('Создать общий трекер сбора ресурсов для команды строителей', 'Create a shared resource tracker for your build team')}
-          >
-            {t('⛏ ТРЕКЕР', '⛏ TRACKER')}
-          </button>
-        )}
       </div>
     </section>
   );

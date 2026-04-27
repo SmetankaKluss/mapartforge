@@ -50,6 +50,8 @@ interface Props {
   intensity:   number;
   adjustments: ImageAdjustments;
   bnScale:     number;
+  // Tracker
+  onCreateTracker?: () => void;
 }
 
 
@@ -75,6 +77,7 @@ export function ExportPanel({
   supportBlock, supportMode,
   artistMode, hybridLayers, activeLayerExport,
   sourceImage, intensity, adjustments, bnScale,
+  onCreateTracker,
 }: Props) {
   const { t } = useLocale();
   const [collapsed, setCollapsed]         = useState(false);
@@ -288,6 +291,18 @@ export function ExportPanel({
             {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}
           </button>
         </div>
+        {onCreateTracker && (
+          <div className="link-row">
+            <button
+              className="link-export-btn tracker-export-btn"
+              onClick={onCreateTracker}
+              disabled={base}
+              title={t('Создать общий трекер сбора и постройки для команды', 'Create a shared gathering & building tracker for your team')}
+            >
+              {t('⛏ ТРЕКЕР ПОСТРОЙКИ', '⛏ BUILD TRACKER')}
+            </button>
+          </div>
+        )}
         {linkUrl && (
           <LinkModal url={linkUrl} onClose={() => setLinkUrl(null)} />
         )}

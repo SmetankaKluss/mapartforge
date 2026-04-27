@@ -1,0 +1,526 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - generic [ref=e10]:
+        - link "PeepoProjects" [ref=e11] [cursor=pointer]:
+          - /url: /
+          - heading "PeepoProjects" [level=1] [ref=e12]
+        - button "Toggle Sidebar" [ref=e13] [cursor=pointer]:
+          - img
+          - generic [ref=e14]: Toggle Sidebar
+      - generic [ref=e16]:
+        - generic [ref=e17]: Навигация
+        - list [ref=e19]:
+          - listitem [ref=e20]:
+            - link "Главная" [ref=e21] [cursor=pointer]:
+              - /url: /
+              - img [ref=e22]
+              - generic [ref=e25]: Главная
+      - list [ref=e27]:
+        - listitem [ref=e28]:
+          - link "Войти" [ref=e29] [cursor=pointer]:
+            - /url: /login
+            - img [ref=e30]
+            - generic [ref=e33]: Войти
+    - main [ref=e34]:
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e53]:
+            - generic [ref=e54]:
+              - generic [ref=e55] [cursor=pointer]:
+                - img "Project preview" [ref=e56]
+                - img [ref=e58]
+              - generic [ref=e62]:
+                - heading "Граффити Кловиграм" [level=1] [ref=e65]
+                - generic [ref=e66]:
+                  - generic [ref=e67]: Арты
+                  - generic [ref=e68]: Завершен
+            - generic [ref=e69]: "Мап арт (А именно граффити) одного арта по Кловиграму. Склад ресурсов: МП2 Мир Граффити 2872 187 Все ресурсы уже собраны Плейсмент: БЕЗ ПОВОРОТОВ 2368 2 -193"
+            - generic [ref=e70]:
+              - generic [ref=e71]:
+                - img [ref=e72]
+                - generic [ref=e75]:
+                  - paragraph [ref=e76]: Автор
+                  - paragraph [ref=e77]: Ceymeo
+              - generic [ref=e78]:
+                - img [ref=e79]
+                - generic [ref=e81]:
+                  - paragraph [ref=e82]: Обновлен
+                  - paragraph [ref=e83]: 2 недели назад
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - heading "Статистика сбора" [level=3] [ref=e87]
+              - button [ref=e88] [cursor=pointer]:
+                - img
+            - generic [ref=e89]:
+              - generic [ref=e90]:
+                - generic [ref=e91]:
+                  - img [ref=e92]
+                  - generic [ref=e96]: Всего предметов
+                - generic [ref=e97]: 510 579
+                - generic [ref=e98]: "Собрано: 290 490 (57%)"
+              - generic [ref=e99]:
+                - generic [ref=e100]:
+                  - img [ref=e101]
+                  - generic [ref=e104]: Завершено
+                - generic [ref=e105]: "0"
+                - generic [ref=e106]: из 26 материалов
+              - generic [ref=e107]:
+                - generic [ref=e108]:
+                  - img [ref=e109]
+                  - generic [ref=e112]: В процессе
+                - generic [ref=e113]: "25"
+                - generic [ref=e114]: "Не начато: 1"
+            - generic [ref=e116]:
+              - generic [ref=e117]: Прогресс завершения
+              - generic [ref=e118]: 57%
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - tablist [ref=e123]:
+              - tab "Материалы" [selected] [ref=e124] [cursor=pointer]
+              - tab "Умная таблица" [ref=e125] [cursor=pointer]
+              - tab "Схематика" [ref=e126] [cursor=pointer]
+            - button "RU" [ref=e127] [cursor=pointer]:
+              - img
+              - generic [ref=e128]: RU
+          - tabpanel "Материалы" [ref=e129]:
+            - generic [ref=e131]:
+              - generic [ref=e133]:
+                - button "Открыть в Picture-in-Picture" [ref=e134] [cursor=pointer]:
+                  - img
+                - generic [ref=e135]:
+                  - img [ref=e136]
+                  - textbox "Поиск..." [ref=e139]
+                - generic [ref=e140]:
+                  - button "Общий" [ref=e141] [cursor=pointer]:
+                    - img
+                    - text: Общий
+                  - button "По схемам" [ref=e142] [cursor=pointer]:
+                    - img
+                    - text: По схемам
+                - button "Отменить (Ctrl+Z)" [disabled]:
+                  - img
+                - button "Повторить (Ctrl+Y)" [disabled]:
+                  - img
+              - table [ref=e147]:
+                - rowgroup [ref=e148]:
+                  - row "Материал Собрать Собрано Ответ. Действия" [ref=e149]:
+                    - columnheader "Материал" [ref=e150]:
+                      - button "Материал" [ref=e151] [cursor=pointer]:
+                        - text: Материал
+                        - img
+                    - columnheader "Собрать" [ref=e152]:
+                      - button "Собрать" [ref=e153] [cursor=pointer]:
+                        - text: Собрать
+                        - img
+                    - columnheader "Собрано" [ref=e154]:
+                      - button "Собрано" [ref=e155] [cursor=pointer]:
+                        - text: Собрано
+                        - img
+                    - columnheader "Ответ." [ref=e156]:
+                      - button "Ответ." [ref=e157] [cursor=pointer]:
+                        - text: Ответ.
+                        - img
+                    - columnheader "Действия" [ref=e158]
+                - rowgroup [ref=e159]:
+                  - row "Булыжник 96шб + 25ст + 56 48шб + 12ст + 60 Ceymeo" [ref=e160]:
+                    - cell "Булыжник" [ref=e161]:
+                      - generic [ref=e162]:
+                        - generic "minecraft:cobblestone" [ref=e163]
+                        - generic [ref=e165]: Булыжник
+                    - cell "96шб + 25ст + 56" [ref=e166]
+                    - cell "48шб + 12ст + 60" [ref=e167]:
+                      - generic [ref=e169]:
+                        - textbox "0" [disabled] [ref=e170]: 48шб + 12ст + 60
+                        - button "Присоединиться к задаче" [ref=e171] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e174]:
+                      - generic "Ceymeo" [ref=e176]
+                    - cell [ref=e177]:
+                      - checkbox [disabled] [ref=e179]
+                  - row "Малахитовая квампа 68шб + 19ст + 47 45шб + 22ст + 10 Ceymeo" [ref=e180]:
+                    - cell "Малахитовая квампа" [ref=e181]:
+                      - generic [ref=e182]:
+                        - generic "minecraft:verdant:froglight" [ref=e183]
+                        - generic [ref=e185]: Малахитовая квампа
+                    - cell "68шб + 19ст + 47" [ref=e186]
+                    - cell "45шб + 22ст + 10" [ref=e187]:
+                      - generic [ref=e189]:
+                        - textbox "0" [disabled] [ref=e190]: 45шб + 22ст + 10
+                        - button "Присоединиться к задаче" [ref=e191] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e194]:
+                      - generic "Ceymeo" [ref=e196]
+                    - cell [ref=e197]:
+                      - checkbox [disabled] [ref=e199]
+                  - row "Блок искажённого нароста 36шб + 14ст + 52 24шб + 9ст + 56 Ceymeo" [ref=e200]:
+                    - cell "Блок искажённого нароста" [ref=e201]:
+                      - generic [ref=e202]:
+                        - generic "minecraft:warped:wart:block" [ref=e203]
+                        - generic [ref=e205]: Блок искажённого нароста
+                    - cell "36шб + 14ст + 52" [ref=e206]
+                    - cell "24шб + 9ст + 56" [ref=e207]:
+                      - generic [ref=e209]:
+                        - textbox "0" [disabled] [ref=e210]: 24шб + 9ст + 56
+                        - button "Присоединиться к задаче" [ref=e211] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e214]:
+                      - generic "Ceymeo" [ref=e216]
+                    - cell [ref=e217]:
+                      - checkbox [disabled] [ref=e219]
+                  - row "Базальт 23шб + 24ст + 63 15шб + 25ст + 42 Ceymeo" [ref=e220]:
+                    - cell "Базальт" [ref=e221]:
+                      - generic [ref=e222]:
+                        - generic "minecraft:basalt" [ref=e223]
+                        - generic [ref=e225]: Базальт
+                    - cell "23шб + 24ст + 63" [ref=e226]
+                    - cell "15шб + 25ст + 42" [ref=e227]:
+                      - generic [ref=e229]:
+                        - textbox "0" [disabled] [ref=e230]: 15шб + 25ст + 42
+                        - button "Присоединиться к задаче" [ref=e231] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e234]:
+                      - generic "Ceymeo" [ref=e236]
+                    - cell [ref=e237]:
+                      - checkbox [disabled] [ref=e239]
+                  - row "Колотый глубинный сланец 19шб + 22ст + 41 13шб + 6ст + 6 Ceymeo" [ref=e240]:
+                    - cell "Колотый глубинный сланец" [ref=e241]:
+                      - generic [ref=e242]:
+                        - generic "minecraft:cobbled:deepslate" [ref=e243]
+                        - generic [ref=e245]: Колотый глубинный сланец
+                    - cell "19шб + 22ст + 41" [ref=e246]
+                    - cell "13шб + 6ст + 6" [ref=e247]:
+                      - generic [ref=e249]:
+                        - textbox "0" [disabled] [ref=e250]: 13шб + 6ст + 6
+                        - button "Присоединиться к задаче" [ref=e251] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e254]:
+                      - generic "Ceymeo" [ref=e256]
+                    - cell [ref=e257]:
+                      - checkbox [disabled] [ref=e259]
+                  - row "Чёрная керамика 12шб + 26ст + 7 8шб + 17ст + 26 Ceymeo" [ref=e260]:
+                    - cell "Чёрная керамика" [ref=e261]:
+                      - generic [ref=e262]:
+                        - generic "minecraft:black:terracotta" [ref=e263]
+                        - generic [ref=e265]: Чёрная керамика
+                    - cell "12шб + 26ст + 7" [ref=e266]
+                    - cell "8шб + 17ст + 26" [ref=e267]:
+                      - generic [ref=e269]:
+                        - textbox "0" [disabled] [ref=e270]: 8шб + 17ст + 26
+                        - button "Присоединиться к задаче" [ref=e271] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e274]:
+                      - generic "Ceymeo" [ref=e276]
+                    - cell [ref=e277]:
+                      - checkbox [disabled] [ref=e279]
+                  - row "Искажённые доски 7шб + 18ст + 33 2шб + 15ст + 11 ink_visit_or" [ref=e280]:
+                    - cell "Искажённые доски" [ref=e281]:
+                      - generic [ref=e282]:
+                        - generic "minecraft:warped:planks" [ref=e283]
+                        - generic [ref=e285]: Искажённые доски
+                    - cell "7шб + 18ст + 33" [ref=e286]
+                    - cell "2шб + 15ст + 11" [ref=e287]:
+                      - generic [ref=e289]:
+                        - textbox "0" [disabled] [ref=e290]: 2шб + 15ст + 11
+                        - button "Присоединиться к задаче" [ref=e291] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e294]:
+                      - generic "ink_visit_or" [ref=e296]
+                    - cell [ref=e297]:
+                      - checkbox [disabled] [ref=e299]
+                  - row "Большегрузная весовая пластина 7шб + 2ст + 55 2шб + 9ст + 61 ink_visit_or" [ref=e300]:
+                    - cell "Большегрузная весовая пластина" [ref=e301]:
+                      - generic [ref=e302]:
+                        - generic "minecraft:heavy:weighted:pressure:plate" [ref=e303]
+                        - generic [ref=e305]: Большегрузная весовая пластина
+                    - cell "7шб + 2ст + 55" [ref=e306]
+                    - cell "2шб + 9ст + 61" [ref=e307]:
+                      - generic [ref=e309]:
+                        - textbox "0" [disabled] [ref=e310]: 2шб + 9ст + 61
+                        - button "Присоединиться к задаче" [ref=e311] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e314]:
+                      - generic "ink_visit_or" [ref=e316]
+                    - cell [ref=e317]:
+                      - checkbox [disabled] [ref=e319]
+                  - row "Белая керамика 4шб + 16ст + 38 1шб + 14ст + 34 Ceymeo" [ref=e320]:
+                    - cell "Белая керамика" [ref=e321]:
+                      - generic [ref=e322]:
+                        - generic "minecraft:white:terracotta" [ref=e323]
+                        - generic [ref=e325]: Белая керамика
+                    - cell "4шб + 16ст + 38" [ref=e326]
+                    - cell "1шб + 14ст + 34" [ref=e327]:
+                      - generic [ref=e329]:
+                        - textbox "0" [disabled] [ref=e330]: 1шб + 14ст + 34
+                        - button "Присоединиться к задаче" [ref=e331] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e334]:
+                      - generic "Ceymeo" [ref=e336]
+                    - cell [ref=e337]:
+                      - checkbox [disabled] [ref=e339]
+                  - row "Серая керамика 3шб + 19ст + 56 1шб + 6ст + 40 Ceymeo" [ref=e340]:
+                    - cell "Серая керамика" [ref=e341]:
+                      - generic [ref=e342]:
+                        - generic "minecraft:gray:terracotta" [ref=e343]
+                        - generic [ref=e345]: Серая керамика
+                    - cell "3шб + 19ст + 56" [ref=e346]
+                    - cell "1шб + 6ст + 40" [ref=e347]:
+                      - generic [ref=e349]:
+                        - textbox "0" [disabled] [ref=e350]: 1шб + 6ст + 40
+                        - button "Присоединиться к задаче" [ref=e351] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e354]:
+                      - generic "Ceymeo" [ref=e356]
+                    - cell [ref=e357]:
+                      - checkbox [disabled] [ref=e359]
+                  - row "Серая шерсть 2шб + 9ст + 33 21ст + 11 ink_visit_or" [ref=e360]:
+                    - cell "Серая шерсть" [ref=e361]:
+                      - generic [ref=e362]:
+                        - generic "minecraft:gray:wool" [ref=e363]
+                        - generic [ref=e365]: Серая шерсть
+                    - cell "2шб + 9ст + 33" [ref=e366]
+                    - cell "21ст + 11" [ref=e367]:
+                      - generic [ref=e369]:
+                        - textbox "0" [disabled] [ref=e370]: 21ст + 11
+                        - button "Присоединиться к задаче" [ref=e371] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e374]:
+                      - generic "ink_visit_or" [ref=e376]
+                    - cell [ref=e377]:
+                      - checkbox [disabled] [ref=e379]
+                  - row "Зелёная шерсть 2шб + 3ст + 18 19ст + 6 ink_visit_or" [ref=e380]:
+                    - cell "Зелёная шерсть" [ref=e381]:
+                      - generic [ref=e382]:
+                        - generic "minecraft:green:wool" [ref=e383]
+                        - generic [ref=e385]: Зелёная шерсть
+                    - cell "2шб + 3ст + 18" [ref=e386]
+                    - cell "19ст + 6" [ref=e387]:
+                      - generic [ref=e389]:
+                        - textbox "0" [disabled] [ref=e390]: 19ст + 6
+                        - button "Присоединиться к задаче" [ref=e391] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e394]:
+                      - generic "ink_visit_or" [ref=e396]
+                    - cell [ref=e397]:
+                      - checkbox [disabled] [ref=e399]
+                  - row "Призмариновые кирпичи 1шб + 17ст + 19 0 Ceymeo" [ref=e400]:
+                    - cell "Призмариновые кирпичи" [ref=e401]:
+                      - generic [ref=e402]:
+                        - generic "minecraft:prismarine:bricks" [ref=e403]
+                        - generic [ref=e405]: Призмариновые кирпичи
+                    - cell "1шб + 17ст + 19" [ref=e406]
+                    - cell "0" [ref=e407]:
+                      - generic [ref=e409]:
+                        - textbox "0" [disabled] [ref=e410]
+                        - button "Присоединиться к задаче" [ref=e411] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e413]:
+                      - generic "Ceymeo" [ref=e415]
+                    - cell [ref=e416]:
+                      - checkbox [disabled] [ref=e418]
+                  - row "Бирюзовая керамика 1шб + 12ст 13ст Ceymeo" [ref=e419]:
+                    - cell "Бирюзовая керамика" [ref=e420]:
+                      - generic [ref=e421]:
+                        - generic "minecraft:cyan:terracotta" [ref=e422]
+                        - generic [ref=e424]: Бирюзовая керамика
+                    - cell "1шб + 12ст" [ref=e425]
+                    - cell "13ст" [ref=e426]:
+                      - generic [ref=e428]:
+                        - textbox "0" [disabled] [ref=e429]: 13ст
+                        - button "Присоединиться к задаче" [ref=e430] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e433]:
+                      - generic "Ceymeo" [ref=e435]
+                    - cell [ref=e436]:
+                      - checkbox [disabled] [ref=e438]
+                  - row "Светло-серая шерсть 1шб + 5ст + 16 10ст + 48 ink_visit_or" [ref=e439]:
+                    - cell "Светло-серая шерсть" [ref=e440]:
+                      - generic [ref=e441]:
+                        - generic "minecraft:light:gray:wool" [ref=e442]
+                        - generic [ref=e444]: Светло-серая шерсть
+                    - cell "1шб + 5ст + 16" [ref=e445]
+                    - cell "10ст + 48" [ref=e446]:
+                      - generic [ref=e448]:
+                        - textbox "0" [disabled] [ref=e449]: 10ст + 48
+                        - button "Присоединиться к задаче" [ref=e450] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e453]:
+                      - generic "ink_visit_or" [ref=e455]
+                    - cell [ref=e456]:
+                      - checkbox [disabled] [ref=e458]
+                  - row "Ножка гриба 25ст + 47 8ст + 37 ink_visit_or" [ref=e459]:
+                    - cell "Ножка гриба" [ref=e460]:
+                      - generic [ref=e461]:
+                        - generic "minecraft:mushroom:stem" [ref=e462]
+                        - generic [ref=e464]: Ножка гриба
+                    - cell "25ст + 47" [ref=e465]
+                    - cell "8ст + 37" [ref=e466]:
+                      - generic [ref=e468]:
+                        - textbox "0" [disabled] [ref=e469]: 8ст + 37
+                        - button "Присоединиться к задаче" [ref=e470] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e473]:
+                      - generic "ink_visit_or" [ref=e475]
+                    - cell [ref=e476]:
+                      - checkbox [disabled] [ref=e478]
+                  - row "Зелёная керамика 25ст + 41 8ст + 35 Ceymeo" [ref=e479]:
+                    - cell "Зелёная керамика" [ref=e480]:
+                      - generic [ref=e481]:
+                        - generic "minecraft:green:terracotta" [ref=e482]
+                        - generic [ref=e484]: Зелёная керамика
+                    - cell "25ст + 41" [ref=e485]
+                    - cell "8ст + 35" [ref=e486]:
+                      - generic [ref=e488]:
+                        - textbox "0" [disabled] [ref=e489]: 8ст + 35
+                        - button "Присоединиться к задаче" [ref=e490] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e493]:
+                      - generic "Ceymeo" [ref=e495]
+                    - cell [ref=e496]:
+                      - checkbox [disabled] [ref=e498]
+                  - row "Глина 23ст + 25 7ст + 51 ink_visit_or" [ref=e499]:
+                    - cell "Глина" [ref=e500]:
+                      - generic [ref=e501]:
+                        - generic "minecraft:clay" [ref=e502]
+                        - generic [ref=e504]: Глина
+                    - cell "23ст + 25" [ref=e505]
+                    - cell "7ст + 51" [ref=e506]:
+                      - generic [ref=e508]:
+                        - textbox "0" [disabled] [ref=e509]: 7ст + 51
+                        - button "Присоединиться к задаче" [ref=e510] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e513]:
+                      - generic "ink_visit_or" [ref=e515]
+                    - cell [ref=e516]:
+                      - checkbox [disabled] [ref=e518]
+                  - row "Лаймовая керамика 17ст + 46 5ст + 58 Ceymeo" [ref=e519]:
+                    - cell "Лаймовая керамика" [ref=e520]:
+                      - generic [ref=e521]:
+                        - generic "minecraft:lime:terracotta" [ref=e522]
+                        - generic [ref=e524]: Лаймовая керамика
+                    - cell "17ст + 46" [ref=e525]
+                    - cell "5ст + 58" [ref=e526]:
+                      - generic [ref=e528]:
+                        - textbox "0" [disabled] [ref=e529]: 5ст + 58
+                        - button "Присоединиться к задаче" [ref=e530] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e533]:
+                      - generic "Ceymeo" [ref=e535]
+                    - cell [ref=e536]:
+                      - checkbox [disabled] [ref=e538]
+                  - row "Искажённый нилий 14ст + 55 4ст + 61 Ceymeo" [ref=e539]:
+                    - cell "Искажённый нилий" [ref=e540]:
+                      - generic [ref=e541]:
+                        - generic "minecraft:warped:nylium" [ref=e542]
+                        - generic [ref=e544]: Искажённый нилий
+                    - cell "14ст + 55" [ref=e545]
+                    - cell "4ст + 61" [ref=e546]:
+                      - generic [ref=e548]:
+                        - textbox "0" [disabled] [ref=e549]: 4ст + 61
+                        - button "Присоединиться к задаче" [ref=e550] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e553]:
+                      - generic "Ceymeo" [ref=e555]
+                    - cell [ref=e556]:
+                      - checkbox [disabled] [ref=e558]
+                  - row "Коричневая керамика 8ст + 49 2ст + 59 Ceymeo" [ref=e559]:
+                    - cell "Коричневая керамика" [ref=e560]:
+                      - generic [ref=e561]:
+                        - generic "minecraft:brown:terracotta" [ref=e562]
+                        - generic [ref=e564]: Коричневая керамика
+                    - cell "8ст + 49" [ref=e565]
+                    - cell "2ст + 59" [ref=e566]:
+                      - generic [ref=e568]:
+                        - textbox "0" [disabled] [ref=e569]: 2ст + 59
+                        - button "Присоединиться к задаче" [ref=e570] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e573]:
+                      - generic "Ceymeo" [ref=e575]
+                    - cell [ref=e576]:
+                      - checkbox [disabled] [ref=e578]
+                  - row "Светло-серая керамика 5ст + 52 1ст + 60 Ceymeo" [ref=e579]:
+                    - cell "Светло-серая керамика" [ref=e580]:
+                      - generic [ref=e581]:
+                        - generic "minecraft:light:gray:terracotta" [ref=e582]
+                        - generic [ref=e584]: Светло-серая керамика
+                    - cell "5ст + 52" [ref=e585]
+                    - cell "1ст + 60" [ref=e586]:
+                      - generic [ref=e588]:
+                        - textbox "0" [disabled] [ref=e589]: 1ст + 60
+                        - button "Присоединиться к задаче" [ref=e590] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e593]:
+                      - generic "Ceymeo" [ref=e595]
+                    - cell [ref=e596]:
+                      - checkbox [disabled] [ref=e598]
+                  - row "Бирюзовая шерсть 1ст + 29 31 ink_visit_or" [ref=e599]:
+                    - cell "Бирюзовая шерсть" [ref=e600]:
+                      - generic [ref=e601]:
+                        - generic "minecraft:cyan:wool" [ref=e602]
+                        - generic [ref=e604]: Бирюзовая шерсть
+                    - cell "1ст + 29" [ref=e605]
+                    - cell "31" [ref=e606]:
+                      - generic [ref=e608]:
+                        - textbox "0" [disabled] [ref=e609]: "31"
+                        - button "Присоединиться к задаче" [ref=e610] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e613]:
+                      - generic "ink_visit_or" [ref=e615]
+                    - cell [ref=e616]:
+                      - checkbox [disabled] [ref=e618]
+                  - row "Дубовая нажимная плита 27 9 Ceymeo" [ref=e619]:
+                    - cell "Дубовая нажимная плита" [ref=e620]:
+                      - generic [ref=e621]:
+                        - generic "minecraft:oak:pressure:plate" [ref=e622]
+                        - generic [ref=e624]: Дубовая нажимная плита
+                    - cell "27" [ref=e625]
+                    - cell "9" [ref=e626]:
+                      - generic [ref=e628]:
+                        - textbox "0" [disabled] [ref=e629]: "9"
+                        - button "Присоединиться к задаче" [ref=e630] [cursor=pointer]:
+                          - img
+                    - cell "Ceymeo" [ref=e633]:
+                      - generic "Ceymeo" [ref=e635]
+                    - cell [ref=e636]:
+                      - checkbox [disabled] [ref=e638]
+                  - row "Песчаник 27 9 ink_visit_or" [ref=e639]:
+                    - cell "Песчаник" [ref=e640]:
+                      - generic [ref=e641]:
+                        - generic "minecraft:sandstone" [ref=e642]
+                        - generic [ref=e644]: Песчаник
+                    - cell "27" [ref=e645]
+                    - cell "9" [ref=e646]:
+                      - generic [ref=e648]:
+                        - textbox "0" [disabled] [ref=e649]: "9"
+                        - button "Присоединиться к задаче" [ref=e650] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e653]:
+                      - generic "ink_visit_or" [ref=e655]
+                    - cell [ref=e656]:
+                      - checkbox [disabled] [ref=e658]
+                  - row "Коричневая шерсть 15 5 ink_visit_or" [ref=e659]:
+                    - cell "Коричневая шерсть" [ref=e660]:
+                      - generic [ref=e661]:
+                        - generic "minecraft:brown:wool" [ref=e662]
+                        - generic [ref=e664]: Коричневая шерсть
+                    - cell "15" [ref=e665]
+                    - cell "5" [ref=e666]:
+                      - generic [ref=e668]:
+                        - textbox "0" [disabled] [ref=e669]: "5"
+                        - button "Присоединиться к задаче" [ref=e670] [cursor=pointer]:
+                          - img
+                    - cell "ink_visit_or" [ref=e673]:
+                      - generic "ink_visit_or" [ref=e675]
+                    - cell [ref=e676]:
+                      - checkbox [disabled] [ref=e678]
+      - generic [ref=e40]:
+        - 'link "Telegram: @senkore" [ref=e41] [cursor=pointer]':
+          - /url: https://t.me/senkore
+          - img [ref=e42]
+          - generic [ref=e45]: "Telegram: @senkore"
+        - generic [ref=e46]:
+          - img [ref=e47]
+          - generic [ref=e49]: "Discord: @senkore_"

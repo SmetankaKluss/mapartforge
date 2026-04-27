@@ -56,6 +56,7 @@ import { decodeGif } from './lib/gifDecoder';
 import type { GifFrames } from './lib/gifDecoder';
 import { BuildTrackerModal } from './components/BuildTrackerModal';
 import type { SessionMaterial } from './lib/buildSession';
+import { computeSessionMaterials } from './components/MaterialsList';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -237,6 +238,11 @@ export default function App() {
   const [showPerspective, setShowPerspective] = useState(false);
   const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
   const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
+  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
+    if (!compositeImageData) return [];
+    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
@@ -2165,7 +2171,6 @@ export default function App() {
                 staircaseMode={staircaseMode}
                 supportBlock={supportBlock}
                 supportMode={supportMode}
-                onCreateTracker={(mats) => setTrackerMaterials(mats)}
               />
             </div>
           </div>
@@ -2200,6 +2205,7 @@ export default function App() {
               intensity={intensity}
               adjustments={adjustments}
               bnScale={bnScale}
+              onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
             />
           </div>
         </aside>

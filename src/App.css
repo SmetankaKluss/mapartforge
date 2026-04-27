@@ -1250,6 +1250,8 @@ input, select, textarea { outline: none; }
 .link-export-btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 80ms; }
 .link-export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .link-export-btn-error { border-color: rgba(255,68,85,0.5); color: var(--red); background: rgba(255,68,85,0.08); }
+.tracker-export-btn { background: var(--gold-dim) !important; border-color: rgba(255,215,0,0.4) !important; color: var(--gold) !important; }
+.tracker-export-btn:hover:not(:disabled) { background: rgba(255,215,0,0.2) !important; border-color: var(--gold) !important; box-shadow: 0 0 12px var(--gold-glow) !important; }
 
 /* ── Materials List ────────────────────────────────────────────────────── */
 .sidebar-section .mat-header { border-top: 1px solid var(--border); }

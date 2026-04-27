@@ -3,6 +3,12 @@
 /* accent:#57FF6E  gold:#FFD700  text:#dbd2bc                              */
 /* font-pixel:'Press Start 2P'  font-ui:'Tektur'  font-mono:'JetBrains Mono' */
 
+/* ─── Override main app's overflow:hidden ────────────────────────────────── */
+/* App.css sets html/body/root to overflow:hidden for the editor,            */
+/* which breaks scrolling on the tracker page since they share a bundle.     */
+html, body { height: auto !important; overflow: auto !important; min-height: 100%; }
+#root { height: auto !important; overflow: visible !important; }
+
 /* ─── Base ───────────────────────────────────────────────────────────────── */
 .bt-page {
   min-height: 100vh;
@@ -191,6 +197,7 @@
 }
 .bt-per-map-btn:hover { background: rgba(255,215,0,0.16); color: #FFD700; }
 .bt-per-map-btn:active { transform: scale(0.97); }
+.bt-per-map-btn--active { background: rgba(255,215,0,0.18) !important; color: #FFD700 !important; border-color: rgba(255,215,0,0.55) !important; }
 
 .bt-table-head {
   display: grid;

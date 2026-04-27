@@ -98,12 +98,13 @@ interface RowProps {
   onChange: (nbtName: string, val: number) => void;
   accentColor: string;
   lang: Lang;
+  perMapTarget: number; // effective target (total or per-map)
 }
 
-function MaterialRow({ mat, value, onChange, accentColor, lang }: RowProps) {
+function MaterialRow({ mat, value, onChange, accentColor, lang, perMapTarget }: RowProps) {
   const [addVal, setAddVal] = useState('');
-  const pct  = Math.min(100, (value / mat.count) * 100);
-  const done = value >= mat.count;
+  const pct  = Math.min(100, (value / perMapTarget) * 100);
+  const done = value >= perMapTarget;
 
   function handleAdd() {
     const delta = parseInt(addVal) || 0;
@@ -135,7 +136,7 @@ function MaterialRow({ mat, value, onChange, accentColor, lang }: RowProps) {
 
       {/* Need */}
       <div className="bt-cell">
-        <span className="bt-row-need">{fmtStacks(mat.count, lang)}</span>
+        <span className="bt-row-need">{fmtStacks(perMapTarget, lang)}</span>
       </div>
 
       {/* Progress bar */}
@@ -180,6 +181,8 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
     (localStorage.getItem('bt_lang') as Lang) ?? 'ru'
   );
 
+  const [perMapMode, setPerMapMode] = useState(false);
+
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const colorRef   = useRef<ImageData | null>(null);
@@ -202,7 +205,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
       colorRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      drawSnakeReveal(canvas, colorRef.current, modeRef.current === 'building' ? pctRef.current : 0);
+      drawSnakeReveal(canvas, colorRef.current, modeRef.current === 'building' ? pctRef.current : 100);
     };
     img.src = src;
   }
@@ -294,9 +297,9 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   const pctDone = total > 0 ? Math.min(100, (done / total) * 100) : 0;
   pctRef.current = pctDone;
 
-  // Update canvas
+  // Update canvas: gathering = full color, building = snake reveal by progress
   if (canvasRef.current && colorRef.current) {
-    drawSnakeReveal(canvasRef.current, colorRef.current, mode === 'building' ? pctDone : 0);
+    drawSnakeReveal(canvasRef.current, colorRef.current, mode === 'building' ? pctDone : 100);
   }
 
   const accent = mode === 'gathering' ? '#57FF6E' : '#FFD700';
@@ -410,21 +413,13 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
           <span className="bt-table-count">{s.materials.length} {t('blockTypes', lang)}</span>
           <div className="bt-toolbar-spacer" />
           <button
-            className="bt-per-map-btn"
+            className={`bt-per-map-btn${perMapMode ? ' bt-per-map-btn--active' : ''}`}
             title={lang === 'ru'
-              ? `Установить количество на 1 карту из ${s.map_grid.wide * s.map_grid.tall}`
-              : `Set amount for 1 map out of ${s.map_grid.wide * s.map_grid.tall}`}
-            onClick={() => {
-              const totalMaps = s.map_grid.wide * s.map_grid.tall;
-              const next = { ...record };
-              s.materials.forEach(m => {
-                next[m.nbtName] = Math.ceil(m.count / totalMaps);
-              });
-              if (mode === 'gathering') { setGathered(next); debounceSave(next, placed, 'gathering'); }
-              else { setPlaced(next); debounceSave(gathered, next, 'building'); }
-            }}
+              ? `Показать нужное количество на 1 карту из ${s.map_grid.wide * s.map_grid.tall}`
+              : `Show needed amount for 1 map out of ${s.map_grid.wide * s.map_grid.tall}`}
+            onClick={() => setPerMapMode(v => !v)}
           >
-            {t('perMap', lang)} ({s.map_grid.wide}×{s.map_grid.tall})
+            {perMapMode ? (lang === 'ru' ? 'Все карты' : 'All maps') : `${t('perMap', lang)} (1/${s.map_grid.wide * s.map_grid.tall})`}
           </button>
         </div>
         <div className="bt-table-head">
@@ -434,7 +429,10 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
           <div className="bt-th">{mode === 'gathering' ? t('colAction', lang) : t('colActionB', lang)}</div>
         </div>
         <div className="bt-table-body">
-          {s.materials.map(mat => (
+          {s.materials.map(mat => {
+            const totalMaps = s.map_grid.wide * s.map_grid.tall;
+            const perMapTarget = perMapMode ? Math.ceil(mat.count / totalMaps) : mat.count;
+            return (
             <MaterialRow
               key={mat.nbtName}
               mat={mat}
@@ -442,8 +440,10 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
               onChange={mode === 'gathering' ? handleGatheredChange : handlePlacedChange}
               accentColor={accent}
               lang={lang}
+              perMapTarget={perMapTarget}
             />
-          ))}
+            );
+          })}
         </div>
       </div>
 
