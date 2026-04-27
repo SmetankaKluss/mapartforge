@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { createBuildSession, buildThumbnail } from '../lib/buildSession';
+import { buildLitematicBytes } from '../lib/exportLitematic';
 import type { SessionMaterial } from '../lib/buildSession';
+import type { ComputedPalette } from '../lib/dithering';
+import type { BlockSelection } from '../lib/paletteBlocks';
 import '../buildTracker.css';
 
 interface Props {
   materials: SessionMaterial[];
   imageData: ImageData;
   mapGrid: { wide: number; tall: number };
+  cp: ComputedPalette;
+  blockGroups: BlockSelection;
   onClose: () => void;
 }
 
-export function BuildTrackerModal({ materials, imageData, mapGrid, onClose }: Props) {
+export function BuildTrackerModal({ materials, imageData, mapGrid, cp, blockGroups, onClose }: Props) {
   const [state, setState] = useState<'idle' | 'creating' | 'done' | 'error'>('idle');
   const [url, setUrl] = useState('');
   const [copied, setCopied] = useState(false);
@@ -25,12 +30,24 @@ export function BuildTrackerModal({ materials, imageData, mapGrid, onClose }: Pr
     setState('creating');
     try {
       const preview = buildThumbnail(imageData);
+
+      // Generate .litematic for download on tracker page
+      let litematicB64: string | undefined;
+      try {
+        const bytes = await buildLitematicBytes(imageData, cp, blockGroups, title.trim() || 'MapArt', 'flat');
+        const b64 = btoa(String.fromCharCode(...bytes));
+        litematicB64 = b64;
+      } catch {
+        // Non-fatal: tracker works without schematic
+      }
+
       const id = await createBuildSession(mapGrid, preview, materials, {
         title: title.trim() || undefined,
         server: server.trim() || undefined,
         coords: coords.trim() || undefined,
         description: description.trim() || undefined,
-      });
+      }, litematicB64);
+
       const link = `${window.location.origin}/build/${id}`;
       setUrl(link);
       setState('done');

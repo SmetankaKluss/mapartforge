@@ -265,7 +265,7 @@ function extractTile(src: ImageData, col: number, row: number): ImageData {
 }
 
 /** Core builder: returns gzipped .litematic bytes for one tile. */
-async function buildLitematicBytes(
+export async function buildLitematicBytes(
   imageData:        ImageData,
   cp:               ComputedPalette,
   groups:           BlockSelection,

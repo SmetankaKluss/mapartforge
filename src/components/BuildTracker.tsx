@@ -30,12 +30,13 @@ const T = {
   server:       { ru: 'Сервер', en: 'Server' },
   coords:       { ru: 'Координаты', en: 'Coords' },
   notes:        { ru: 'Заметки', en: 'Notes' },
-  maps:         { ru: 'карт', en: 'maps' },
+  maps:         { ru: 'Карты', en: 'Maps' },
   confirmTitle: { ru: 'Начать строительство?', en: 'Start building?' },
   confirmDesc:  { ru: 'Режим переключится на отслеживание поставленных блоков. Данные сбора сохранятся.', en: 'Switch to tracking placed blocks. Gathering data is preserved.' },
   cancel:       { ru: 'Отмена', en: 'Cancel' },
   confirmYes:   { ru: 'Да, начать', en: 'Yes, start' },
   switching:    { ru: 'Переключение…', en: 'Switching…' },
+  downloadLite: { ru: '⬇ Схематика (.litematic)', en: '⬇ Schematic (.litematic)' },
 } as const;
 
 function t(key: keyof typeof T, lang: Lang): string {
@@ -56,6 +57,13 @@ function totalBlocks(materials: SessionMaterial[]) {
 }
 function totalDone(record: Record<string, number>, materials: SessionMaterial[]) {
   return materials.reduce((s, m) => s + Math.min(record[m.nbtName] ?? 0, m.count), 0);
+}
+
+/** Wiki texture URL for a block nbtName (strips minecraft: prefix) */
+function blockIconUrl(nbtName: string): string {
+  const simple = nbtName.replace(/^minecraft:/, '');
+  const title = simple.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('_');
+  return `https://minecraft.wiki/w/Special:FilePath/${title}.png`;
 }
 
 // Snake-reveal canvas
@@ -105,8 +113,15 @@ function MaterialRow({ mat, value, onChange, accentColor, lang }: RowProps) {
 
   return (
     <div className={`bt-row${done ? ' bt-row--done' : ''}`}>
-      {/* Name */}
+      {/* Name + icon */}
       <div className="bt-cell">
+        <img
+          className="bt-block-icon"
+          src={blockIconUrl(mat.nbtName)}
+          alt=""
+          loading="lazy"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
         <span className="bt-row-name">{mat.displayName}</span>
         {done && <span className="bt-row-check">✓</span>}
       </div>
@@ -235,6 +250,21 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
     finally { setSwitching(false); setShowConfirm(false); }
   }
 
+  function handleDownloadLitematic() {
+    const s = session;
+    if (!s?.litematic_b64) return;
+    const binary = atob(s.litematic_b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `${s.info?.title || 'MapArt'}_2d.litematic`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (loading) return (
     <div className="bt-page bt-page--loading">
       <div className="bt-spinner" />
@@ -293,7 +323,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
               {t(mode, lang)}
             </span>
           </div>
-          <div className="bt-project-meta-row">
+          <div className="bt-project-meta-grid">
             {info.server && (
               <div className="bt-meta-item">
                 <span className="bt-meta-label">{t('server', lang)}</span>
@@ -306,31 +336,37 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
                 <span className="bt-meta-value">{info.coords}</span>
               </div>
             )}
-            {info.description && (
-              <div className="bt-meta-item">
-                <span className="bt-meta-label">{t('notes', lang)}</span>
-                <span className="bt-meta-value">{info.description}</span>
-              </div>
-            )}
             <div className="bt-meta-item">
               <span className="bt-meta-label">{t('maps', lang)}</span>
               <span className="bt-meta-value">{s.map_grid.wide}×{s.map_grid.tall}</span>
             </div>
+            {info.description && (
+              <div className="bt-meta-item bt-meta-item--wide">
+                <span className="bt-meta-label">{t('notes', lang)}</span>
+                <span className="bt-meta-value">{info.description}</span>
+              </div>
+            )}
           </div>
+
+          {s.litematic_b64 && (
+            <button className="bt-download-lite" onClick={handleDownloadLitematic}>
+              {t('downloadLite', lang)}
+            </button>
+          )}
         </div>
 
         {/* Stats */}
         <div className="bt-project-stats">
           <div className="bt-stats-title">{t('statsTitle', lang)}</div>
-          <div>
+          <div className="bt-stat-block">
             <div className="bt-stats-big">{s.materials.length}</div>
             <div className="bt-stats-sub">{t('blockTypes', lang)}</div>
           </div>
-          <div>
-            <div className="bt-stats-big" style={{ fontSize: 14 }}>{total.toLocaleString()}</div>
+          <div className="bt-stat-block">
+            <div className="bt-stats-big" style={{ fontSize: 18 }}>{total.toLocaleString()}</div>
             <div className="bt-stats-sub">{t('blocksTotal', lang)}</div>
           </div>
-          <div>
+          <div className="bt-stat-block">
             <div className="bt-stats-progress-label">
               <span>{t('progress', lang)}</span>
               <span className="bt-stats-pct" style={{ color: accent }}>{Math.round(pctDone)}%</span>
@@ -338,8 +374,11 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
             <div className="bt-stats-bar">
               <div
                 className={`bt-stats-bar-fill bt-stats-bar-fill--${mode}`}
-                style={{ width: `${pctDone}%`, background: accent }}
+                style={{ width: `${pctDone}%` }}
               />
+            </div>
+            <div className="bt-stats-done-count" style={{ color: accent }}>
+              {done.toLocaleString()} / {total.toLocaleString()}
             </div>
           </div>
         </div>

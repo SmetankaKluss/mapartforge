@@ -18,6 +18,7 @@ export interface BuildSession {
   created_at: string;
   map_grid: { wide: number; tall: number };
   image_preview: string; // base64 dataURL ~200px thumbnail
+  litematic_b64?: string; // base64-encoded .litematic file
   materials: SessionMaterial[];
   gathered: Record<string, number>; // nbtName → amount
   placed: Record<string, number>;   // nbtName → amount
@@ -31,12 +32,14 @@ export async function createBuildSession(
   imagePreview: string,
   materials: SessionMaterial[],
   info: SessionInfo = {},
+  litematicB64?: string,
 ): Promise<string> {
   const { data, error } = await supabase
     .from('build_sessions')
     .insert({
       map_grid: mapGrid,
       image_preview: imagePreview,
+      litematic_b64: litematicB64 ?? null,
       materials,
       gathered: {},
       placed: {},

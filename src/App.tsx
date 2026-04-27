@@ -2295,6 +2295,8 @@ export default function App() {
         materials={trackerMaterials}
         imageData={compositeImageData}
         mapGrid={mapGrid}
+        cp={exportRef.current.activePalette}
+        blockGroups={exportRef.current.blockSelection as BlockSelection}
         onClose={() => setTrackerMaterials(null)}
       />
     )}
