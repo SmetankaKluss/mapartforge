@@ -50,6 +50,7 @@ import { createDefaultPattern } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
 import { PerspectiveModal } from './components/PerspectiveModal';
+import { importMapDat, MapDatImportError } from './lib/importMapDat';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -1237,6 +1238,28 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Import map.dat ────────────────────────────────────────────────────────
+  const handleDatFile = useCallback(async (file: File) => {
+    try {
+      const importedImageData = await importMapDat(file);
+      // Set the grid to 1×1 (one map = 128×128)
+      setMapGrid({ wide: 1, tall: 1 });
+      // Put the imported imageData directly into the active layer (skip re-processing)
+      setLayerState(prev => ({
+        ...prev,
+        layers: prev.layers.map(l =>
+          l.id === prev.activeLayerId
+            ? { ...l, imageData: importedImageData, isDirty: true, sourceImage: undefined }
+            : l
+        ),
+      }));
+      setImageData(importedImageData);
+    } catch (e) {
+      const msg = e instanceof MapDatImportError ? e.message : 'Failed to read map.dat';
+      alert(msg);
+    }
+  }, []);
+
   const baseScale    = gridScale(mapGrid);
   const zoomFactor   = zoom / 100;
   const displayScale = Math.max(1, Math.round(baseScale * zoomFactor));
@@ -1412,7 +1435,7 @@ export default function App() {
         {/* ── LEFT PANEL ── */}
         <aside className="panel panel-left">
           <div className="panel-scroll">
-            <ImageUpload onImageLoaded={handleImageLoaded} />
+            <ImageUpload onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} />
             <div className="new-canvas-row">
               <button
                 className="new-canvas-btn"
