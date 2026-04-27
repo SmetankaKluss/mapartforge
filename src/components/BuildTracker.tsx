@@ -27,6 +27,7 @@ const T = {
   colAction:    { ru: 'Собрано', en: 'Gathered' },
   colActionB:   { ru: 'Поставлено', en: 'Placed' },
   tableTitle:   { ru: 'Список материалов', en: 'Materials list' },
+  perMap:       { ru: 'На карту', en: 'Per map' },
   server:       { ru: 'Сервер', en: 'Server' },
   coords:       { ru: 'Координаты', en: 'Coords' },
   notes:        { ru: 'Заметки', en: 'Notes' },
@@ -106,8 +107,14 @@ function MaterialRow({ mat, value, onChange, accentColor, lang }: RowProps) {
 
   function handleAdd() {
     const delta = parseInt(addVal) || 0;
-    if (delta <= 0) return;
-    onChange(mat.nbtName, Math.min(mat.count, value + delta));
+    if (delta === 0) return;
+    onChange(mat.nbtName, Math.min(mat.count, Math.max(0, value + delta)));
+    setAddVal('');
+  }
+  function handleSub() {
+    const delta = parseInt(addVal) || 0;
+    if (delta === 0) return;
+    onChange(mat.nbtName, Math.max(0, value - delta));
     setAddVal('');
   }
 
@@ -148,12 +155,13 @@ function MaterialRow({ mat, value, onChange, accentColor, lang }: RowProps) {
         <input
           className="bt-row-add-input"
           type="number"
-          placeholder="+?"
+          placeholder="N"
           value={addVal}
           onChange={e => setAddVal(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
+          onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
         />
-        <button className="bt-row-add-btn" onClick={handleAdd}>+</button>
+        <button className="bt-row-sub-btn" onClick={handleSub} title="Убрать / Remove">–</button>
+        <button className="bt-row-add-btn" onClick={handleAdd} title="Добавить / Add">+</button>
       </div>
     </div>
   );
@@ -400,6 +408,24 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
         <div className="bt-table-toolbar">
           <span className="bt-table-toolbar-title">{t('tableTitle', lang)}</span>
           <span className="bt-table-count">{s.materials.length} {t('blockTypes', lang)}</span>
+          <div className="bt-toolbar-spacer" />
+          <button
+            className="bt-per-map-btn"
+            title={lang === 'ru'
+              ? `Установить количество на 1 карту из ${s.map_grid.wide * s.map_grid.tall}`
+              : `Set amount for 1 map out of ${s.map_grid.wide * s.map_grid.tall}`}
+            onClick={() => {
+              const totalMaps = s.map_grid.wide * s.map_grid.tall;
+              const next = { ...record };
+              s.materials.forEach(m => {
+                next[m.nbtName] = Math.ceil(m.count / totalMaps);
+              });
+              if (mode === 'gathering') { setGathered(next); debounceSave(next, placed, 'gathering'); }
+              else { setPlaced(next); debounceSave(gathered, next, 'building'); }
+            }}
+          >
+            {t('perMap', lang)} ({s.map_grid.wide}×{s.map_grid.tall})
+          </button>
         </div>
         <div className="bt-table-head">
           <div className="bt-th">{t('colBlock', lang)}</div>

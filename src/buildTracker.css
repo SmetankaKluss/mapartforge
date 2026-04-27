@@ -182,6 +182,15 @@
   color: rgba(87,255,110,0.75); text-transform: uppercase; letter-spacing: 0.05em;
 }
 .bt-table-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(210,193,162,0.35); }
+.bt-toolbar-spacer { flex: 1; }
+.bt-per-map-btn {
+  font-family: 'Tektur', sans-serif; font-size: 10px; font-weight: 600;
+  background: rgba(255,215,0,0.07); border: 1px solid rgba(255,215,0,0.28);
+  color: rgba(255,215,0,0.75); cursor: pointer; padding: 4px 10px;
+  transition: all 150ms; white-space: nowrap;
+}
+.bt-per-map-btn:hover { background: rgba(255,215,0,0.16); color: #FFD700; }
+.bt-per-map-btn:active { transform: scale(0.97); }
 
 .bt-table-head {
   display: grid;
@@ -268,6 +277,15 @@
 .bt-row-add-input::-webkit-outer-spin-button,
 .bt-row-add-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .bt-row-add-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.bt-row-sub-btn {
+  background: rgba(255,68,85,0.08);
+  border: 1px solid rgba(255,68,85,0.25);
+  color: #ff4455; font-size: 16px; line-height: 1;
+  cursor: pointer; padding: 2px 9px;
+  transition: all 120ms; flex-shrink: 0;
+}
+.bt-row-sub-btn:hover { background: rgba(255,68,85,0.18); }
+.bt-row-sub-btn:active { transform: scale(0.94); }
 .bt-row-add-btn {
   background: rgba(87,255,110,0.1);
   border: 1px solid rgba(87,255,110,0.3);
