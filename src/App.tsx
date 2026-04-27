@@ -51,6 +51,9 @@ import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
 import { PerspectiveModal } from './components/PerspectiveModal';
 import { importMapDat, MapDatImportError } from './lib/importMapDat';
+import { GifModal } from './components/GifModal';
+import { decodeGif } from './lib/gifDecoder';
+import type { GifFrames } from './lib/gifDecoder';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -230,6 +233,7 @@ export default function App() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTourSelector, setShowTourSelector] = useState(false);
   const [showPerspective, setShowPerspective] = useState(false);
+  const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
@@ -1260,6 +1264,16 @@ export default function App() {
     }
   }, []);
 
+  // ── Import GIF ───────────────────────────────────────────────────────────
+  const handleGifFile = useCallback(async (file: File) => {
+    try {
+      const decoded = await decodeGif(file);
+      setGifFrames(decoded);
+    } catch (e) {
+      alert('Не удалось прочитать GIF: ' + String(e));
+    }
+  }, []);
+
   const baseScale    = gridScale(mapGrid);
   const zoomFactor   = zoom / 100;
   const displayScale = Math.max(1, Math.round(baseScale * zoomFactor));
@@ -1435,7 +1449,7 @@ export default function App() {
         {/* ── LEFT PANEL ── */}
         <aside className="panel panel-left">
           <div className="panel-scroll">
-            <ImageUpload onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} />
+            <ImageUpload onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} onGifFile={handleGifFile} />
             <div className="new-canvas-row">
               <button
                 className="new-canvas-btn"
@@ -2268,6 +2282,21 @@ export default function App() {
       <PerspectiveModal
         imageData={compareMode ? (compareData?.left ?? compositeImageData) : compositeImageData}
         onClose={() => setShowPerspective(false)}
+      />
+    )}
+
+    {/* ── GIF export modal ── */}
+    {gifFrames && (
+      <GifModal
+        gifFrames={gifFrames}
+        mapGrid={mapGrid}
+        palette={activePalette}
+        dithering={dithering}
+        intensity={intensity}
+        klussParams={klussParams}
+        adjustments={effectiveAdjustments}
+        bnScale={bnScale}
+        onClose={() => setGifFrames(null)}
       />
     )}
 

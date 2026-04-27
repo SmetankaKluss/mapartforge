@@ -5,7 +5,7 @@ import type { MapGrid } from './types';
 const MAP_SIZE = 128;
 
 /** Build reverse lookup: packed RGB → PaletteColor */
-function buildLookup(cp: ComputedPalette): Map<number, { baseId: number; shade: number }> {
+export function buildLookup(cp: ComputedPalette): Map<number, { baseId: number; shade: number }> {
   const m = new Map<number, { baseId: number; shade: number }>();
   for (const c of cp.colors) {
     const key = (c.r << 16) | (c.g << 8) | c.b;
@@ -15,7 +15,7 @@ function buildLookup(cp: ComputedPalette): Map<number, { baseId: number; shade: 
 }
 
 /** Build a 16384-byte color array for one 128×128 map tile. */
-function buildTileColors(
+export function buildTileColors(
   imageData: ImageData,
   tileCol: number,
   tileRow: number,
@@ -39,7 +39,7 @@ function buildTileColors(
 }
 
 /** Write a single map.dat NBT payload (uncompressed). */
-function buildMapNbt(colors: Uint8Array): Uint8Array {
+export function buildMapNbt(colors: Uint8Array): Uint8Array {
   const w = new NbtWriter();
   // Outer compound (root, named "")
   w.tagCompoundStart('');

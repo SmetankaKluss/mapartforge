@@ -6,9 +6,10 @@ import { useLocale } from '../lib/locale';
 interface Props {
   onImageLoaded: (img: HTMLImageElement, file: File) => void;
   onDatFile?: (file: File) => void;
+  onGifFile?: (file: File) => void;
 }
 
-export function ImageUpload({ onImageLoaded, onDatFile }: Props) {
+export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
   const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -20,6 +21,11 @@ export function ImageUpload({ onImageLoaded, onDatFile }: Props) {
     // Handle Minecraft map.dat files
     if (file.name.endsWith('.dat') && onDatFile) {
       onDatFile(file);
+      return;
+    }
+    // Handle animated GIF
+    if (file.type === 'image/gif' && onGifFile) {
+      onGifFile(file);
       return;
     }
     if (!file.type.startsWith('image/')) return;
