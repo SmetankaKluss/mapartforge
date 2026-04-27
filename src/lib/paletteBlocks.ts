@@ -1,6 +1,7 @@
 // Auto-generated from MapartCraft's coloursJSON.json
 // csId = colour set index (0-60) — used for sprite sheet Y position
 // baseId = Minecraft map colour ID (1-61) — matches palette.ts baseId
+import { filterBlocksForVersion } from './versionPresets';
 
 export interface PaletteBlock {
   blockId: number;       // sprite X index
@@ -2835,7 +2836,6 @@ export function buildPaletteFromSelection(
   shades: number[] = [0, 1, 2, 3],
   mcVersion?: import('./versionPresets').MinecraftVersion,
 ): PaletteColor[] {
-  const { filterBlocksForVersion } = require('./versionPresets');
   const activeBaseIds = new Set<number>();
 
   for (const [csIdStr, blockIds] of Object.entries(sel)) {
