@@ -2617,3 +2617,139 @@ input, select, textarea { outline: none; }
   background: rgba(255, 68, 85, 0.15);
   box-shadow: 0 0 6px rgba(255, 68, 85, 0.4);
 }
+
+/* ── Tour selector modal ────────────────────────────────────────────── */
+
+.tour-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.tour-selector-modal {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 32px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 32px rgba(0, 0, 0, 0.8);
+  animation: slideUp 0.2s ease-out;
+}
+
+.tour-selector-title {
+  font-family: var(--font-header);
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.tour-selector-description {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.tour-selector-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tour-selector-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(87, 255, 110, 0.05);
+  border: 1px solid rgba(87, 255, 110, 0.3);
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  border-radius: 2px;
+  text-align: left;
+}
+
+.tour-selector-btn:hover {
+  background: rgba(87, 255, 110, 0.12);
+  border-color: rgba(87, 255, 110, 0.6);
+  box-shadow: 0 0 12px rgba(87, 255, 110, 0.25);
+  transform: translateY(-1px);
+}
+
+.tour-selector-btn:active {
+  transform: scale(0.98);
+}
+
+.tour-selector-btn-title {
+  font-family: var(--font-header);
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tour-selector-btn-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.tour-selector-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.15s;
+}
+
+.tour-selector-close:hover {
+  color: var(--red);
+}
+
+@media (max-width: 600px) {
+  .tour-selector-modal {
+    padding: 24px;
+    width: 95%;
+  }
+
+  .tour-selector-title {
+    font-size: 16px;
+  }
+
+  .tour-selector-btn {
+    padding: 12px;
+  }
+
+  .tour-selector-btn-title {
+    font-size: 13px;
+  }
+
+  .tour-selector-btn-desc {
+    font-size: 11px;
+  }
+}
