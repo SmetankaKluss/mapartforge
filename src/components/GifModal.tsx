@@ -4,9 +4,11 @@ import type { GifFrames } from '../lib/gifDecoder';
 import type { MapGrid } from '../lib/types';
 import type { ComputedPalette, DitheringMode, KlussParams } from '../lib/dithering';
 import type { ImageAdjustments } from '../lib/adjustments';
+import type { BlockSelection } from '../lib/paletteBlocks';
 import { buildLookup, buildTileColors, buildMapNbt } from '../lib/exportMapDat';
 import { gzipBytes } from '../lib/nbt';
 import { processImage } from '../lib/processor';
+import type { GifFrameConfig } from '../lib/gifProject';
 
 interface Props {
   gifFrames: GifFrames;
@@ -17,11 +19,15 @@ interface Props {
   klussParams: KlussParams;
   adjustments: ImageAdjustments;
   bnScale: number;
+  blockSelection: BlockSelection;
   onClose: () => void;
+  /** Called with selected frames + current settings to open in filmstrip mode */
+  onOpenAsProject?: (frames: ImageData[], initialConfig: GifFrameConfig) => void;
 }
 
 export function GifModal({
-  gifFrames, mapGrid, palette, dithering, intensity, klussParams, adjustments, bnScale, onClose,
+  gifFrames, mapGrid, palette, dithering, intensity, klussParams, adjustments, bnScale,
+  blockSelection, onClose, onOpenAsProject,
 }: Props) {
   const { info, frames } = gifFrames;
 
@@ -207,15 +213,31 @@ export function GifModal({
             <button className="gif-btn gif-btn--cancel" onClick={() => { cancelRef.current = true; }}>
               Отмена
             </button>
-          ) : (
+          ) : (<>
             <button
               className="gif-btn gif-btn--export"
               onClick={handleExport}
               disabled={totalSelected === 0 || totalSelected > 64}
             >
-              ⬇ Экспорт {totalSelected} кадров (ZIP)
+              ⬇ Экспорт {totalSelected} кадров (.dat ZIP)
             </button>
-          )}
+            {onOpenAsProject && (
+              <button
+                className="gif-btn gif-btn--project"
+                disabled={totalSelected === 0 || totalSelected > 64}
+                onClick={() => {
+                  const selected = selectedFrameIdxs.map(i => frames[i]);
+                  onOpenAsProject(selected, {
+                    dithering, intensity, mapMode: 'flat' as never,
+                    staircaseMode: 'classic', adjustments, bnScale,
+                    klussParams, blockSelection,
+                  });
+                }}
+              >
+                🎞 Открыть как проект ({totalSelected} кадров)
+              </button>
+            )}
+          </>)}
         </div>
       </div>
     </div>

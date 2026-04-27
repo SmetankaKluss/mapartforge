@@ -52,6 +52,8 @@ interface Props {
   bnScale:     number;
   // Tracker
   onCreateTracker?: () => void;
+  // GIF Project
+  onExportGifPack?: () => void;
 }
 
 
@@ -77,7 +79,7 @@ export function ExportPanel({
   supportBlock, supportMode,
   artistMode, hybridLayers, activeLayerExport,
   sourceImage, intensity, adjustments, bnScale,
-  onCreateTracker,
+  onCreateTracker, onExportGifPack,
 }: Props) {
   const { t } = useLocale();
   const [collapsed, setCollapsed]         = useState(false);
@@ -300,6 +302,17 @@ export function ExportPanel({
               title={t('Создать общий трекер сбора и постройки для команды', 'Create a shared gathering & building tracker for your team')}
             >
               {t('⛏ ТРЕКЕР ПОСТРОЙКИ', '⛏ BUILD TRACKER')}
+            </button>
+          </div>
+        )}
+        {onExportGifPack && (
+          <div className="link-row">
+            <button
+              className="link-export-btn gif-pack-export-btn"
+              onClick={onExportGifPack}
+              title={t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
+            >
+              {t('🎞 GIF LITEMATIC PACK', '🎞 GIF LITEMATIC PACK')}
             </button>
           </div>
         )}

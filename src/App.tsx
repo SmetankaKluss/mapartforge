@@ -52,8 +52,11 @@ import { PatternEditorPopup } from './components/PatternEditorPopup';
 import { PerspectiveModal } from './components/PerspectiveModal';
 import { importMapDat, MapDatImportError } from './lib/importMapDat';
 import { GifModal } from './components/GifModal';
+import { GifFilmstrip } from './components/GifFilmstrip';
 import { decodeGif } from './lib/gifDecoder';
 import type { GifFrames } from './lib/gifDecoder';
+import type { GifProject, GifFrameConfig } from './lib/gifProject';
+import { makeThumbnail, imageDataToHtmlImage } from './lib/gifProject';
 import { BuildTrackerModal } from './components/BuildTrackerModal';
 import type { SessionMaterial } from './lib/buildSession';
 import { computeSessionMaterials } from './components/MaterialsList';
@@ -237,6 +240,7 @@ export default function App() {
   const [showTourSelector, setShowTourSelector] = useState(false);
   const [showPerspective, setShowPerspective] = useState(false);
   const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
+  const [gifProject, setGifProject] = useState<GifProject | null>(null);
   const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
@@ -599,6 +603,98 @@ export default function App() {
     setRedoStack([]);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
   }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams]);
+
+  // ── GIF Project handlers ─────────────────────────────────────────────────────
+
+  const handleOpenAsGifProject = useCallback(async (frames: ImageData[], initialConfig: GifFrameConfig) => {
+    const thumbnails = frames.map(f => makeThumbnail(f, 80));
+    const configs: GifFrameConfig[] = frames.map(() => ({ ...initialConfig }));
+    setGifProject({ frames, thumbnails, currentIndex: 0, configs });
+    setGifFrames(null);
+    // Load frame 0 into editor
+    const img = await imageDataToHtmlImage(frames[0]);
+    uploadedFileRef.current = null;
+    handleImageLoaded(img);
+  }, [handleImageLoaded]);
+
+  const handleGifFrameSelect = useCallback(async (index: number) => {
+    if (!gifProject) return;
+    // Save current frame's config
+    const currentConfig: GifFrameConfig = {
+      dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection,
+    };
+    const updatedConfigs = [...gifProject.configs];
+    updatedConfigs[gifProject.currentIndex] = currentConfig;
+
+    setGifProject(prev => prev ? { ...prev, configs: updatedConfigs, currentIndex: index } : prev);
+
+    // Load new frame's config
+    const newConfig = updatedConfigs[index];
+    setDithering(newConfig.dithering);
+    setIntensity(newConfig.intensity);
+    setMapMode(newConfig.mapMode);
+    setStaircaseMode(newConfig.staircaseMode);
+    setAdjustments(newConfig.adjustments);
+    setBnScale(newConfig.bnScale);
+    setKlussParams(newConfig.klussParams);
+    setBlockSelection(newConfig.blockSelection);
+
+    // Load new frame into editor
+    const img = await imageDataToHtmlImage(gifProject.frames[index]);
+    uploadedFileRef.current = null;
+    uploadedImageRef.current = img;
+    setSourceImage(img);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: null, sourceUploadedImage: img } : l),
+    }));
+    setUndoStack([]);
+    setRedoStack([]);
+    const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
+    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion));
+    runProcess(img, newConfig.dithering, mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams);
+  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, modeShades, minecraftVersion, mapGrid, compareMode, compareLeft, compareRight]);
+
+  const handleGifProjectConfigChange = useCallback((index: number, partial: Partial<GifFrameConfig>) => {
+    setGifProject(prev => {
+      if (!prev) return prev;
+      const configs = [...prev.configs];
+      configs[index] = { ...configs[index], ...partial };
+      return { ...prev, configs };
+    });
+  }, []);
+
+  const handleCloseGifProject = useCallback(() => {
+    setGifProject(null);
+  }, []);
+
+  const handleExportGifLitematicPack = useCallback(async () => {
+    if (!gifProject) return;
+    const { buildLitematicBytes } = await import('./lib/exportLitematic');
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    for (let i = 0; i < gifProject.frames.length; i++) {
+      const frame = gifProject.frames[i];
+      const cfg = gifProject.configs[i];
+      const cfgShades = cfg.mapMode === '2d' ? [1] : [0, 1, 2];
+      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion));
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
+      const { processImage } = await import('./lib/processor');
+      const result = await processImage(bitmap, { dithering: cfg.dithering, width: w, height: h, intensity: cfg.intensity / 100, bnScale: cfg.bnScale, palette: pal, adjustments: cfg.adjustments, klussParams: cfg.klussParams });
+      bitmap.close();
+      const pad = String(i + 1).padStart(3, '0');
+      const structure = cfg.mapMode === '3d' ? 'staircase' : 'flat';
+      const bytes = await buildLitematicBytes(result.processed, pal, cfg.blockSelection, `frame_${pad}`, structure, undefined, cfg.staircaseMode);
+      zip.file(`frame_${pad}.litematic`, bytes);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'gif_mapart.zip' });
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [gifProject, modeShades, minecraftVersion, mapGrid]);
 
   const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
     setShowCropModal(false);
@@ -2206,6 +2302,7 @@ export default function App() {
               adjustments={adjustments}
               bnScale={bnScale}
               onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
+              onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
             />
           </div>
         </aside>
@@ -2318,7 +2415,19 @@ export default function App() {
         klussParams={klussParams}
         adjustments={effectiveAdjustments}
         bnScale={bnScale}
+        blockSelection={blockSelection}
         onClose={() => setGifFrames(null)}
+        onOpenAsProject={handleOpenAsGifProject}
+      />
+    )}
+
+    {/* ── GIF Filmstrip ── */}
+    {gifProject && (
+      <GifFilmstrip
+        project={gifProject}
+        onFrameSelect={handleGifFrameSelect}
+        onConfigChange={handleGifProjectConfigChange}
+        onClose={handleCloseGifProject}
       />
     )}
 
