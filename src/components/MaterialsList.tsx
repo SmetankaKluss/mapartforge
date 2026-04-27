@@ -19,6 +19,7 @@ interface Props {
   staircaseMode?: 'classic' | 'optimized';
   supportBlock?: string;
   supportMode?: SupportMode;
+  onCreateTracker?: (materials: { nbtName: string; displayName: string; count: number }[]) => void;
 }
 
 interface MaterialEntry {
@@ -154,7 +155,7 @@ function buildCopyText(entries: MaterialEntry[], total: number, maxPerMap: boole
   return lines.join('\n');
 }
 
-export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode }: Props) {
+export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode, onCreateTracker }: Props) {
   const { t } = useLocale();
   const [copied,     setCopied]     = useState(false);
   const [maxPerMap,  setMaxPerMap]  = useState(false);
@@ -302,6 +303,15 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
         <button className="mat-copy-btn" onClick={handleDownload} title={t('Скачать как .txt и .csv с учётом режима Макс/карта', 'Download as .txt and .csv respecting Max/map mode')}>
           {t('↓ СКАЧАТЬ', '↓ DOWNLOAD')}
         </button>
+        {onCreateTracker && imageData && (
+          <button
+            className="mat-copy-btn mat-tracker-btn"
+            onClick={() => onCreateTracker(materials.map(e => ({ nbtName: e.nbtName, displayName: e.displayName, count: e.count })))}
+            title={t('Создать общий трекер сбора ресурсов для команды строителей', 'Create a shared resource tracker for your build team')}
+          >
+            {t('⛏ ТРЕКЕР', '⛏ TRACKER')}
+          </button>
+        )}
       </div>
     </section>
   );

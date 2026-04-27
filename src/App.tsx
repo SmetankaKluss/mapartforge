@@ -54,6 +54,8 @@ import { importMapDat, MapDatImportError } from './lib/importMapDat';
 import { GifModal } from './components/GifModal';
 import { decodeGif } from './lib/gifDecoder';
 import type { GifFrames } from './lib/gifDecoder';
+import { BuildTrackerModal } from './components/BuildTrackerModal';
+import type { SessionMaterial } from './lib/buildSession';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
@@ -234,6 +236,7 @@ export default function App() {
   const [showTourSelector, setShowTourSelector] = useState(false);
   const [showPerspective, setShowPerspective] = useState(false);
   const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
+  const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
   const [showProjectsPanel, setShowProjectsPanel] = useState(false);
   const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
   const [showAdjustments, setShowAdjustments] = useState(true);
@@ -2162,6 +2165,7 @@ export default function App() {
                 staircaseMode={staircaseMode}
                 supportBlock={supportBlock}
                 supportMode={supportMode}
+                onCreateTracker={(mats) => setTrackerMaterials(mats)}
               />
             </div>
           </div>
@@ -2282,6 +2286,16 @@ export default function App() {
       <PerspectiveModal
         imageData={compareMode ? (compareData?.left ?? compositeImageData) : compositeImageData}
         onClose={() => setShowPerspective(false)}
+      />
+    )}
+
+    {/* ── Build tracker modal ── */}
+    {trackerMaterials && compositeImageData && (
+      <BuildTrackerModal
+        materials={trackerMaterials}
+        imageData={compositeImageData}
+        mapGrid={mapGrid}
+        onClose={() => setTrackerMaterials(null)}
       />
     )}
 
