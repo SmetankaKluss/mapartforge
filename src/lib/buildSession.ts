@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { getSupabaseClient } from './supabase';
 
 export interface SessionMaterial {
   nbtName: string;
@@ -34,6 +34,7 @@ export async function createBuildSession(
   info: SessionInfo = {},
   litematicB64?: string,
 ): Promise<string> {
+  const supabase = getSupabaseClient();
   const row: Record<string, unknown> = {
     map_grid: mapGrid,
     image_preview: imagePreview,
@@ -57,6 +58,7 @@ export async function createBuildSession(
 
 /** Fetch a single session */
 export async function getSession(id: string): Promise<BuildSession> {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('build_sessions')
     .select('*')
@@ -69,6 +71,7 @@ export async function getSession(id: string): Promise<BuildSession> {
 
 /** Update gathered amounts (partial patch) */
 export async function updateGathered(id: string, gathered: Record<string, number>) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('build_sessions')
     .update({ gathered })
@@ -78,6 +81,7 @@ export async function updateGathered(id: string, gathered: Record<string, number
 
 /** Update placed amounts (partial patch) */
 export async function updatePlaced(id: string, placed: Record<string, number>) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('build_sessions')
     .update({ placed })
@@ -87,6 +91,7 @@ export async function updatePlaced(id: string, placed: Record<string, number>) {
 
 /** Switch from gathering → building mode */
 export async function switchToBuilding(id: string) {
+  const supabase = getSupabaseClient();
   const { error } = await supabase
     .from('build_sessions')
     .update({ mode: 'building' })
@@ -99,6 +104,7 @@ export function subscribeSession(
   id: string,
   onUpdate: (session: BuildSession) => void,
 ) {
+  const supabase = getSupabaseClient();
   const channel = supabase
     .channel(`build_session_${id}`)
     .on(

@@ -1,0 +1,31 @@
+----------------------------------------------------------------------------------
+ENG: 
+MapKluss is launched! 🚀 mapkluss.art
+Hi! I've launched MapKluss - a free map art generator for Minecraft that turns any image into a beautiful pixel painting for the game.
+What MapKluss can do:
+ • Converts images into 2D (flat ~61 colors) or 3D (stepped structure ~183 colors) arts
+ • Supports 7 dithering algorithms for the best quality
+ • Exports to LITEMATIC (for the Litematica mod), PNG, and MAP.DAT
+ • Works entirely in the browser, no registration needed - just upload an image and you're done
+The site is constantly evolving, and on this channel, I'll share all updates, new features, and improvements.
+Your feedback is super important!
+If you have ideas, suggestions for improvements, or spot any bugs - let me know:
+ • Comments under posts
+ • Direct messages in Telegram: @SmetankaKluss
+Thanks for the support! Together, we'll make the best tool for creating map arts!
+----------------------------------------------------------------------------------
+RU:
+MapKluss запущен! 🚀 mapkluss.art
+Привет! Я запустил MapKluss - бесплатный генератор мап артов в игре minecraft, который превращает любое изображение в красивую пиксельную картину для игры.
+Что умеет MapKluss:
+ • Конвертирует изображения в 2D (плоские ~61 цвет) или 3D (со ступенчатой структурой ~183 цвета) арты
+ • Поддерживает 7 алгоритмов дизеринга для лучшего качества
+ • Экспортирует в LITEMATIC (для мода litematica), PNG и MAP.DAT
+ • Работает полностью в браузере, без регистрации - просто загрузил картинку и готово
+Сайт постоянно развивается, и на этом канале я буду делиться всеми обновлениями, новыми фишками и улучшениями.
+Ваша обратная связь очень важна!
+Если у вас есть идеи, предложения по улучшению или вы заметили баги - пишите мне:
+ • Комментарии под постами
+ • Личные сообщения в Telegram: @SmetankaKluss
+Спасибо за поддержку! Вместе сделаем лучший инструмент для создания мап артов!
+----------------------------------------------------------------------------------

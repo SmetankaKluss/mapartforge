@@ -27,6 +27,7 @@ import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
 import type { SavedSettings } from './lib/localStorage';
 import { loadShare } from './lib/share';
 import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
+import { getExampleById } from './lib/examples';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematicHybrid } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
@@ -134,6 +135,10 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
 };
 const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
 
+function coerceDitheringMode(mode: unknown): DitheringMode {
+  return ALL_MODES.includes(mode as DitheringMode) ? mode as DitheringMode : 'floyd-steinberg';
+}
+
 /** Returns true if the layer ref's imageData has at least one non-transparent pixel. */
 function activeLayerHasContent(ref: React.MutableRefObject<{ imageData: ImageData | null } | undefined>): boolean {
   const img = ref.current?.imageData;
@@ -225,10 +230,10 @@ export default function App() {
   const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
   const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'classic');
   const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
-  const [dithering, setDithering]       = useState<DitheringMode>(saved.dithering ?? 'floyd-steinberg');
+  const [dithering, setDithering]       = useState<DitheringMode>(coerceDitheringMode(saved.dithering));
   const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
   const [bnScale, setBnScale]           = useState(saved.bnScale ?? 2);
-  const [klussParams, setKlussParams]   = useState<KlussParams>(DEFAULT_KLUSS_PARAMS);
+  const [klussParams, setKlussParams]   = useState<KlussParams>(saved.klussParams ?? DEFAULT_KLUSS_PARAMS);
   const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
   const [processing, setProcessing]     = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
@@ -346,6 +351,7 @@ export default function App() {
   useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
   useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
+  useEffect(() => { saveSettings({ klussParams }); }, [klussParams]);
   useEffect(() => { saveSettings({ minecraftVersion }); }, [minecraftVersion]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
 
@@ -357,7 +363,7 @@ export default function App() {
     if (!layer) return;
     setMapMode(layer.mapMode ?? '2d');
     setStaircaseMode(layer.staircaseMode ?? 'classic');
-    if (layer.dithering !== undefined) setDithering(layer.dithering);
+    if (layer.dithering !== undefined) setDithering(coerceDitheringMode(layer.dithering));
     setSelectionMask(null);
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
     if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
@@ -565,7 +571,7 @@ export default function App() {
       if (workerRef.current !== worker) { bitmap.close(); return; }
       if (compare) {
         worker.postMessage(
-          { type: 'compare', bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn },
+          { type: 'compare', bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn, klussParams: kp },
           [bitmap],
         );
       } else {
@@ -630,13 +636,13 @@ export default function App() {
 
     // Load new frame's config
     const newConfig = updatedConfigs[index];
-    setDithering(newConfig.dithering);
+    setDithering(coerceDitheringMode(newConfig.dithering));
     setIntensity(newConfig.intensity);
     setMapMode(newConfig.mapMode);
     setStaircaseMode(newConfig.staircaseMode);
     setAdjustments(newConfig.adjustments);
     setBnScale(newConfig.bnScale);
-    setKlussParams(newConfig.klussParams);
+    setKlussParams(newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
     setBlockSelection(newConfig.blockSelection);
 
     // Load new frame into editor
@@ -652,7 +658,7 @@ export default function App() {
     setRedoStack([]);
     const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
     const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion));
-    runProcess(img, newConfig.dithering, mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams);
+    runProcess(img, coerceDitheringMode(newConfig.dithering), mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
   }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, modeShades, minecraftVersion, mapGrid, compareMode, compareLeft, compareRight]);
 
   const handleGifProjectConfigChange = useCallback((index: number, partial: Partial<GifFrameConfig>) => {
@@ -682,7 +688,7 @@ export default function App() {
       const h = gridPixelHeight(mapGrid);
       const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
       const { processImage } = await import('./lib/processor');
-      const result = await processImage(bitmap, { dithering: cfg.dithering, width: w, height: h, intensity: cfg.intensity / 100, bnScale: cfg.bnScale, palette: pal, adjustments: cfg.adjustments, klussParams: cfg.klussParams });
+      const result = await processImage(bitmap, { dithering: coerceDitheringMode(cfg.dithering), width: w, height: h, intensity: cfg.intensity / 100, bnScale: cfg.bnScale, palette: pal, adjustments: cfg.adjustments, klussParams: cfg.klussParams ?? DEFAULT_KLUSS_PARAMS });
       bitmap.close();
       const pad = String(i + 1).padStart(3, '0');
       const structure = cfg.mapMode === '3d' ? 'staircase' : 'flat';
@@ -1198,7 +1204,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keyboard shortcuts: 1-8 select dithering, C toggles compare mode
+  // Keyboard shortcuts: 1-9 select dithering, C toggles compare mode
   // (declared here, after handleDitheringChange / handleCompareModeChange, to avoid TDZ)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -1261,14 +1267,13 @@ export default function App() {
   }, [sourceImage, compareMode, compareLeft, compareRight]);
 
   // ── Load from ?palette= URL param (runs once on mount) ───────────────────
-  // Must run before the ?share= check so the ref guard doesn't block it.
+  // ?share= and ?example= take priority because they restore their own settings.
   useEffect(() => {
     const params   = new URLSearchParams(window.location.search);
     const shareId  = params.get('share');
+    const exampleId = params.get('example');
     const paletteQ = params.get(PALETTE_PARAM);
-    // ?share= takes priority — don't apply a palette-only link on top of a
-    // full image share, because the image share will restore its own palette.
-    if (shareId || !paletteQ) return;
+    if (shareId || exampleId || !paletteQ) return;
     const sel = decodePalette(paletteQ);
     if (!sel) return;
     setBlockSelection(sel);
@@ -1290,7 +1295,7 @@ export default function App() {
       if (!result) return;
       const s = result.settings;
       // Restore settings
-      if (s.dithering)       setDithering(s.dithering);
+      if (s.dithering)       setDithering(coerceDitheringMode(s.dithering));
       if (s.intensity != null)  setIntensity(s.intensity);
       if (s.bnScale != null)    setBnScale(s.bnScale);
       if (s.mapGrid)         setMapGrid(s.mapGrid);
@@ -1326,6 +1331,68 @@ export default function App() {
       };
       img.src = result.imageUrl;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Load from ?example= URL param (runs once on mount) ───────────────────
+  // Runs after ?share= priority check; examples are static and do not use Supabase.
+  const exampleLoadedRef = useRef(false);
+  useEffect(() => {
+    if (exampleLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('share')) return;
+    const example = getExampleById(params.get('example'));
+    if (!example) return;
+    exampleLoadedRef.current = true;
+
+    const { trySettings } = example;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      uploadedFileRef.current = null;
+      uploadedImageRef.current = img;
+      setSourceImage(img);
+      setOriginalData(null);
+      setCompareData(null);
+      setDithering(trySettings.dithering);
+      setIntensity(trySettings.intensity);
+      setMapGrid(trySettings.mapGrid);
+      setMapMode(trySettings.mapMode);
+      setStaircaseMode(trySettings.staircaseMode);
+      setBnScale(trySettings.bnScale);
+      setViewBanner(true);
+      setUndoStack([]);
+      setRedoStack([]);
+      setLayerState(prev => ({
+        ...prev,
+        layers: prev.layers.map(l => l.id === prev.activeLayerId ? {
+          ...l,
+          sourceImage: img,
+          sourceFile: null,
+          sourceUploadedImage: img,
+          dithering: trySettings.dithering,
+          mapMode: trySettings.mapMode,
+          staircaseMode: trySettings.staircaseMode,
+          isDirty: false,
+        } : l),
+      }));
+      const shades = trySettings.mapMode === '2d' ? [1] : [0, 1, 2];
+      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion));
+      runProcess(
+        img,
+        trySettings.dithering,
+        trySettings.mapGrid,
+        trySettings.intensity,
+        false,
+        compareLeft,
+        compareRight,
+        palette,
+        effectiveAdjustments,
+        trySettings.bnScale,
+        klussParams,
+      );
+    };
+    img.src = example.originalUrl;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1446,6 +1513,7 @@ export default function App() {
         mapMode,
         staircaseMode,
         bnScale,
+        klussParams,
         originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
         minecraftVersion,
       };
@@ -1455,7 +1523,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to save project to history', err);
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, minecraftVersion, saveThumbnail]);
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, saveThumbnail]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -1475,16 +1543,17 @@ export default function App() {
         isDirty: !canReprocess,  // false if we can reprocess, true if we can't
         mapMode: result.settings.mapMode,
         staircaseMode: result.settings.staircaseMode,
-        dithering: result.settings.dithering as import('./lib/dithering').DitheringMode,
+        dithering: coerceDitheringMode(result.settings.dithering),
       }));
       setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: [] });
-      setDithering(result.settings.dithering as import('./lib/dithering').DitheringMode);
+      setDithering(coerceDitheringMode(result.settings.dithering));
       setIntensity(result.settings.intensity);
       setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
       setAdjustments(result.settings.adjustments);
       setMapMode(result.settings.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
+      setKlussParams(result.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
       if (result.settings.minecraftVersion) {
         setMinecraftVersion(result.settings.minecraftVersion);
       }
@@ -1528,6 +1597,7 @@ export default function App() {
             onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
           >🎨 {t('Художник', 'Artist')}</button>
+          <a href="/examples" className="examples-link-btn" title={t('Посмотреть готовые примеры MapKluss', 'Browse finished MapKluss examples')}>{t('Примеры', 'Examples')}</a>
           <button className="tour-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
           <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
@@ -2032,7 +2102,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>Z</kbd><span>{t('Сетка', 'Grid')}</span></div>
                   <div className="shortcut-row"><kbd>O</kbd><span>{t('Сброс разделителя', 'Reset split')}</span></div>
                   <div className="shortcut-row"><kbd>C</kbd><span>{t('Режим сравнения', 'Compare mode')}</span></div>
-                  <div className="shortcut-row"><kbd>1 – 7</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
+                  <div className="shortcut-row"><kbd>1 – 9</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
                   <div className="shortcuts-divider" />
                   <div className="shortcut-row"><kbd>E</kbd><span>{t('Пипетка', 'Eyedropper')}</span></div>
                   <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
@@ -2334,7 +2404,7 @@ export default function App() {
         {hasContent && <span>█ {pw}×{ph}px</span>}
         <span className="status-spacer" />
         <span className="status-credit">Made by SmetankaKluss</span>
-        <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noreferrer">
+        <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="#57FF6E" aria-hidden="true">
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-1.97 9.269c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 14.173l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.496.413z"/>
           </svg>

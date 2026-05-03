@@ -111,13 +111,14 @@ export async function processCompare(
   palette:    ComputedPalette = DEFAULT_PALETTE,
   adjustments: ImageAdjustments = DEFAULT_ADJUSTMENTS,
   bnScale:    number = 2,
+  klussParams: KlussParams = DEFAULT_KLUSS_PARAMS,
 ): Promise<{ left: ImageData; right: ImageData; original: ImageData }> {
   const raw      = await scaleSource(source, width, height);
   const adjusted = applyAdjustments(raw, adjustments);
 
   const [leftData, rightData] = await Promise.all([
-    applyDithering(adjusted, width, height, leftMode,  intensity, palette, bnScale),
-    applyDithering(adjusted, width, height, rightMode, intensity, palette, bnScale),
+    applyDithering(adjusted, width, height, leftMode,  intensity, palette, bnScale, undefined, klussParams),
+    applyDithering(adjusted, width, height, rightMode, intensity, palette, bnScale, undefined, klussParams),
   ]);
 
   return {

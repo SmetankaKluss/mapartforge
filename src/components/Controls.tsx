@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { NumInput } from './NumInput';
 import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
@@ -193,8 +193,6 @@ export function Controls({
   // Local live state for KlussDither sliders — updated on every drag tick (display only).
   // Commits to parent only on mouseUp/touchEnd to avoid racing with processingRef guard.
   const [liveKluss, setLiveKluss] = useState<KlussParams>(klussParams);
-  // Sync when parent resets params (e.g. "Reset to defaults" button)
-  useEffect(() => { setLiveKluss(klussParams); }, [klussParams]);
 
   // Custom grid state
   const [showCustom, setShowCustom] = useState(false);

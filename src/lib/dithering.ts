@@ -828,6 +828,5 @@ export async function applyDithering(
   if (mode === 'jjn')              return applyJJN(data, width, height, intensity, cp, onProgress);
   if (mode === 'atkinson')         return applyAtkinson(data, width, height, intensity, cp, onProgress);
   if (mode === 'kluss')            return applyKlussDither(data, width, height, intensity, cp, klussParams ?? DEFAULT_KLUSS_PARAMS, onProgress);
-
   return out;
 }

@@ -1,4 +1,4 @@
-import type { DitheringMode } from './dithering';
+import type { DitheringMode, KlussParams } from './dithering';
 import type { MapGrid } from './types';
 import { COLOUR_ROWS } from './paletteBlocks';
 import type { BlockSelection } from './paletteBlocks';
@@ -13,6 +13,7 @@ export interface SavedSettings {
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;
+  klussParams?: KlussParams;
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
 }
 

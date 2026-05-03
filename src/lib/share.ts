@@ -1,8 +1,13 @@
-import { supabase } from './supabase';
+import { getSupabaseClient, isSupabaseConfigured } from './supabase';
 import type { SavedSettings } from './localStorage';
 
-const SHARE_BASE = 'https://klussforge.vercel.app'; // redirect → mapkluss.art
 const BUCKET = 'mapartforge';
+
+function getShareBase(): string {
+  const configured = import.meta.env.VITE_SHARE_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return window.location.origin;
+}
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -33,6 +38,7 @@ export async function uploadPermalink(
   previewData: ImageData,
   settings: SavedSettings,
 ): Promise<string> {
+  const supabase = getSupabaseClient();
   const id = generateId();
 
   const [srcBlob, previewBlob] = await Promise.all([
@@ -55,13 +61,15 @@ export async function uploadPermalink(
   });
   if (dbErr) { console.error('[share] database insert failed:', dbErr); throw dbErr; }
 
-  return `${SHARE_BASE}/?share=${id}`;
+  return `${getShareBase()}/?share=${id}`;
 }
 
 export async function loadShare(id: string): Promise<{
   settings: SavedSettings;
   imageUrl: string;
 } | null> {
+  if (!isSupabaseConfigured) return null;
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('shares')
     .select('settings, image_path')

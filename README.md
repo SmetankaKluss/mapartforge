@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# MapKluss
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MapKluss is a browser-based Minecraft map art generator and editor. It converts images into 2D flat map art or 3D stair map art, lets you edit the result with artist tools, and exports files for Minecraft and Litematica.
 
-Currently, two official plugins are available:
+Site: https://mapkluss.art
+Author: https://github.com/SmetankaKluss
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Image to Minecraft map art conversion in the browser
+- 2D flat mode and 3D stair mode
+- Minecraft palette controls with version-aware block selection
+- Dithering modes including KlussDither, Floyd-Steinberg, Stucki, Atkinson, Blue Noise, and Yliluoma
+- Artist mode with layers, brush, fill, text, selections, undo and redo
+- PNG, MAP.DAT, LITEMATIC, ZIP, material list, and showcase exports
+- Build tracker for team projects
+- Gallery / examples page with shareable example settings
+- RU / EN interface
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Privacy
 
-## Expanding the ESLint configuration
+Normal image processing runs locally in the browser. Images are not uploaded for basic conversion, editing, or local export.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Supabase is used only for features that need online storage, such as share links and build tracker sessions. Those features require explicit user action.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Development
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Build check:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npx tsc -b --pretty false
+npm run build
 ```
+
+## Environment
+
+Copy `.env.example` to `.env.local` if you need share links or build tracker locally:
+
+```bash
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_SHARE_BASE_URL=https://mapkluss.art
+```
+
+The app still runs without Supabase variables. Share links and build tracker creation will be disabled by configuration errors instead of exposing keys in the source code.
+
+## Project Structure
+
+- `src/components` - React UI components
+- `src/lib` - image processing, palettes, exports, storage helpers
+- `src/workers` - Web Worker processing pipeline
+- `public/examples` - curated gallery example assets
+- `docs` - project notes, changelog, and post drafts
+
+## Repository Notes
+
+Generated screenshots, local tool state, exported `.litematic` files, `.dat` files, and local `.env` files are intentionally ignored. Keep public assets in `public/` and source assets in `src/assets/`.
+
+## License
+
+All rights reserved unless a separate license file is added.
