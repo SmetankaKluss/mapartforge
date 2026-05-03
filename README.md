@@ -1,9 +1,16 @@
 # MapKluss
 
+[![Deploy to GitHub Pages](https://github.com/SmetankaKluss/mapartforge/actions/workflows/deploy.yml/badge.svg)](https://github.com/SmetankaKluss/mapartforge/actions/workflows/deploy.yml)
+[![Website](https://img.shields.io/badge/website-mapkluss.art-57FF6E)](https://mapkluss.art)
+[![Made with React](https://img.shields.io/badge/React-TypeScript-61DAFB)](https://react.dev/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 MapKluss is a browser-based Minecraft map art generator and editor. It converts images into 2D flat map art or 3D stair map art, lets you edit the result with artist tools, and exports files for Minecraft and Litematica.
 
 Site: https://mapkluss.art
 Author: https://github.com/SmetankaKluss
+
+![MapKluss comparison preview](public/readme-showcase.png)
 
 ## Features
 
@@ -63,4 +70,4 @@ Generated screenshots, local tool state, exported `.litematic` files, `.dat` fil
 
 ## License
 
-All rights reserved unless a separate license file is added.
+MIT. See [LICENSE](LICENSE).

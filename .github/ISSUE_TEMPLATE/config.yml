@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Open MapKluss
+    url: https://mapkluss.art
+    about: Use the web app here.
+  - name: Boosty
+    url: https://boosty.to/klussforge
+    about: Follow development posts and support the project.

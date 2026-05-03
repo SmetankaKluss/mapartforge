@@ -1,0 +1,35 @@
+name: Bug report
+description: Report something that is broken or behaves incorrectly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem clearly.
+      placeholder: The export button does not download a file...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that trigger the problem.
+      placeholder: |
+        1. Open MapKluss
+        2. Upload this image
+        3. Select 3D Stair
+        4. Click LITEMATIC
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Chrome 124 on Windows 11
+  - type: textarea
+    id: files
+    attributes:
+      label: Screenshots or files
+      description: Attach screenshots, input images, or exported files if they help.

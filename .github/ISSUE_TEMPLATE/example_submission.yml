@@ -1,0 +1,34 @@
+name: Gallery example submission
+description: Submit a MapKluss result for the examples/gallery page.
+title: "[Example]: "
+labels: ["gallery", "example"]
+body:
+  - type: textarea
+    id: images
+    attributes:
+      label: Images
+      description: Attach the original image, MapKluss preview, and Minecraft screenshot if available.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - 2D Flat
+        - 3D Stair
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: Size
+      placeholder: 1x1 maps, 2x2 maps, 4x4 maps
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings and notes
+      description: Dithering, palette restrictions, Minecraft version, materials, or build notes.
