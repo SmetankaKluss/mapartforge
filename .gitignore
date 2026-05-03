@@ -12,8 +12,36 @@ dist
 dist-ssr
 *.local
 
-# Claude Code local settings
-.claude/
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local workspace/tool state
+.*/skills/
+.*/settings.local.json
+.*/launch.json
+.*/workspace-state.json
+.*/metrics/
+.*/security/audit-status.json
+.playwright-mcp/
+rtk/
+
+# Local screenshots and manual verification artifacts
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/page*.png
+/screenshot*.png
+/test-*.js
+/check-*.js
+/snap-*.md
+
+# Generated Minecraft exports
+/*.litematic
+/map_*.dat
+/*.zip
 
 # Editor directories and files
 .vscode/*

@@ -222,13 +222,19 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
       })
       .catch(() => { setError('not_found'); setLoading(false); });
 
-    const unsub = subscribeSession(sessionId, s => {
-      setSession(s);
-      setGathered(s.gathered);
-      setPlaced(s.placed);
-      modeRef.current = s.mode;
-    });
-    return unsub;
+    let unsub = () => {};
+    try {
+      unsub = subscribeSession(sessionId, s => {
+        setSession(s);
+        setGathered(s.gathered);
+        setPlaced(s.placed);
+        modeRef.current = s.mode;
+      });
+    } catch {
+      setError('not_found');
+      setLoading(false);
+    }
+    return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 

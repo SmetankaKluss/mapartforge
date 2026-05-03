@@ -103,6 +103,7 @@ export interface FullProjectSettings {
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;
+  klussParams?: import('./dithering').KlussParams;
   originalDataB64?: string; // base64-encoded pre-dithering image data for reprocessing
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
 }

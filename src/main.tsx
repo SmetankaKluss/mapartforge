@@ -3,6 +3,7 @@ import './index.css'
 import App from './App.tsx'
 import { LocaleProvider } from './lib/locale'
 import { BuildTracker } from './components/BuildTracker.tsx'
+import { ExamplesPage } from './components/ExamplesPage.tsx'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
 const searchParams = new URLSearchParams(window.location.search);
@@ -22,6 +23,12 @@ const root = document.getElementById('root')!;
 if (buildMatch) {
   const sessionId = buildMatch[1];
   createRoot(root).render(<BuildTracker sessionId={sessionId} />);
+} else if (path === '/examples') {
+  createRoot(root).render(
+    <LocaleProvider>
+      <ExamplesPage />
+    </LocaleProvider>,
+  );
 } else {
   createRoot(root).render(
     <LocaleProvider>

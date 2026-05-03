@@ -3,7 +3,7 @@ export {};
 
 import { processImage, processCompare } from '../lib/processor';
 import type { ProcessOptions } from '../lib/processor';
-import type { DitheringMode, ComputedPalette } from '../lib/dithering';
+import type { DitheringMode, ComputedPalette, KlussParams } from '../lib/dithering';
 import type { ImageAdjustments } from '../lib/adjustments';
 
 type InMsg =
@@ -23,6 +23,7 @@ type InMsg =
       palette: ComputedPalette;
       adjustments: ImageAdjustments;
       bnScale: number;
+      klussParams?: KlussParams;
     };
 
 self.onmessage = async (e: MessageEvent<InMsg>) => {
@@ -42,8 +43,8 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
         [pd.buffer, od.buffer],
       );
     } else {
-      const { bitmap, width, height, intensity, leftMode, rightMode, palette, adjustments, bnScale } = msg;
-      const result = await processCompare(bitmap, width, height, intensity, leftMode, rightMode, palette, adjustments, bnScale);
+      const { bitmap, width, height, intensity, leftMode, rightMode, palette, adjustments, bnScale, klussParams } = msg;
+      const result = await processCompare(bitmap, width, height, intensity, leftMode, rightMode, palette, adjustments, bnScale, klussParams);
       const ld = result.left.data;
       const rd = result.right.data;
       const od = result.original.data;

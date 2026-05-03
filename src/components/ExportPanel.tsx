@@ -9,6 +9,7 @@ import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
+import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
 
@@ -89,6 +90,7 @@ export function ExportPanel({
   const [busyHybrid,   setBusyHybrid]     = useState(false);
   const [busyLayer,    setBusyLayer]      = useState(false);
   const [busyZip,      setBusyZip]        = useState(false);
+  const [busyShowcase, setBusyShowcase]   = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
@@ -105,6 +107,25 @@ export function ExportPanel({
       downloadPng(compareData!.right, makePngFilename(mapGrid, compareRight) .replace('.png', '_right.png'));
     } else if (exportData) {
       downloadPng(exportData, makePngFilename(mapGrid, dithering));
+    }
+  }
+
+  async function handleShowcase() {
+    const src = compareMode ? compareData?.left ?? null : imageData;
+    if (!src) return;
+    setBusyShowcase(true);
+    try {
+      const blob = await generateShowcaseImage({
+        originalImage: sourceImage,
+        processed: src,
+        mapGrid,
+        mapMode,
+        dithering: compareMode ? compareLeft : dithering,
+        colors: activePalette.colors.length,
+      });
+      downloadBlob(blob, `mapkluss_showcase_${mapGrid.wide}x${mapGrid.tall}_${mapMode}.png`);
+    } finally {
+      setBusyShowcase(false);
     }
   }
 
@@ -227,6 +248,15 @@ export function ExportPanel({
             title={compareMode ? t('Скачать левую и правую панели как отдельные PNG', 'Download left and right panels as separate PNG') : t('Скачать обработанное изображение как PNG', 'Download processed image as PNG')}
           >
             {busyPng ? t('Сохранение…', 'Saving…') : compareMode ? '↓ PNG ×2' : '↓ PNG'}
+          </button>
+
+          <button
+            className="export-btn export-btn-showcase"
+            onClick={handleShowcase}
+            disabled={base || busyShowcase}
+            title={t('Скачать промо-картинку Original | MapKluss Preview для публикации', 'Download an Original | MapKluss Preview promo image for sharing')}
+          >
+            {busyShowcase ? t('Сборка…', 'Building…') : t('↓ ВИТРИНА', '↓ SHOWCASE')}
           </button>
 
           <button

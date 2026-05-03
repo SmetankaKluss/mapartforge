@@ -9,15 +9,28 @@ interface Props {
   onGifFile?: (file: File) => void;
 }
 
+const MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+function hasAllowedImageExtension(name: string): boolean {
+  return /\.(png|jpe?g|webp|gif)$/i.test(name);
+}
+
 export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
   const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [globalDragging, setGlobalDragging] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   // Counter to handle enter/leave across child elements
   const dragCounterRef = useRef(0);
 
   function loadFile(file: File) {
+    setUploadError('');
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(t('Файл слишком большой. Максимум 80 МБ.', 'File is too large. Maximum size is 80 MB.'));
+      return;
+    }
     // Handle Minecraft map.dat files
     if (file.name.endsWith('.dat') && onDatFile) {
       onDatFile(file);
@@ -28,12 +41,20 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
       onGifFile(file);
       return;
     }
-    if (!file.type.startsWith('image/')) return;
+    const isAllowedImage = ACCEPTED_IMAGE_TYPES.has(file.type) || (!file.type && hasAllowedImageExtension(file.name));
+    if (!isAllowedImage) {
+      setUploadError(t('Поддерживаются PNG, JPG, WebP, GIF и map.dat.', 'Supported files: PNG, JPG, WebP, GIF, and map.dat.'));
+      return;
+    }
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       onImageLoaded(img, file);
       URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      setUploadError(t('Не удалось прочитать изображение.', 'Could not read this image.'));
     };
     img.src = url;
   }
@@ -141,10 +162,11 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
         <div className="upload-icon">⛏</div>
         <p className="upload-sub">{t('нажми или перетащи', 'click or drag')}</p>
         <p className="upload-hint">Ctrl+V</p>
+        {uploadError && <p className="upload-error">{uploadError}</p>}
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,.dat"
+          accept="image/png,image/jpeg,image/webp,image/gif,.dat"
           style={{ display: 'none' }}
           onChange={onChange}
         />

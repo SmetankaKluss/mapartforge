@@ -13,7 +13,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
       content: (
         <div>
           <p>
-            <b>MapKluss</b> is a free, browser-based Minecraft map art generator. It converts any image into a schematic or map.dat file that you can build in Minecraft using the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a> or vanilla survival mode.
+            <b>MapKluss</b> is a free, browser-based Minecraft map art generator. It converts any image into a schematic or map.dat file that you can build in Minecraft using the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank" rel="noopener noreferrer">Litematica mod</a> or vanilla survival mode.
           </p>
           <h4>Key features:</h4>
           <ul>
@@ -304,7 +304,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           </ul>
 
           <h4>↓ LITEMATIC</h4>
-          <p>Building schematic for the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank">Litematica mod</a>.</p>
+          <p>Building schematic for the <a href="https://www.curseforge.com/minecraft/mc-mods/litematica" target="_blank" rel="noopener noreferrer">Litematica mod</a>.</p>
           <ul>
             <li><b>Format:</b> Single .litematic file containing the full structure</li>
             <li><b>2D mode:</b> Flat schematic (blocks at Y=0)</li>

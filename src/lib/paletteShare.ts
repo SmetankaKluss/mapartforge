@@ -3,7 +3,12 @@ import type { BlockSelection } from './paletteBlocks';
 import { COLOUR_ROWS } from './paletteBlocks';
 
 export const PALETTE_PARAM = 'palette';
-const SHARE_BASE = 'https://klussforge.vercel.app'; // redirect → mapkluss.art
+
+function getShareBase(): string {
+  const configured = import.meta.env.VITE_SHARE_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return window.location.origin;
+}
 
 /**
  * Encode a BlockSelection into a URL-safe compressed string.
@@ -41,5 +46,5 @@ export function decodePalette(encoded: string): BlockSelection | null {
 
 /** Build the full shareable URL for a block selection. */
 export function buildPaletteUrl(sel: BlockSelection): string {
-  return `${SHARE_BASE}/?${PALETTE_PARAM}=${encodePalette(sel)}`;
+  return `${getShareBase()}/?${PALETTE_PARAM}=${encodePalette(sel)}`;
 }
