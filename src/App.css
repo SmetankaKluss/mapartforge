@@ -145,9 +145,6 @@ input, select, textarea { outline: none; }
 .header-spacer { flex: 1; }
 .tour-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--accent); background: none; border: 1px solid var(--accent); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; transition: background 0.12s, box-shadow 0.12s; }
 .tour-btn:hover { background: var(--accent-dim); box-shadow: 0 0 6px var(--accent-glow); }
-.examples-link-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--gold); background: none; border: 1px solid rgba(255,215,0,0.55); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; text-decoration: none; display: inline-block; transition: background 0.12s, box-shadow 0.12s; }
-.examples-link-btn:hover { background: var(--gold-dim); color: var(--gold); box-shadow: 0 0 6px var(--gold-glow); }
-
 /* ── Tour Selector Modal ────────────────────────────────────────────────── */
 .tour-selector-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.15s var(--ease-out); }
 .tour-selector-modal { position: relative; background: var(--bg-panel); border: 1px solid var(--border); padding: 28px 32px 32px; min-width: 340px; max-width: 480px; width: 90vw; animation: slideUp 0.2s var(--ease-out); }
@@ -2069,7 +2066,7 @@ input, select, textarea { outline: none; }
 }
 
 /* ── Artist mode toggle ──────────────────────────────────────────────────── */
-.artist-mode-btn { font-family: var(--font-pixel); font-size: 7px; background: none; border: 1px solid var(--gold); color: var(--gold); padding: 4px 8px; cursor: pointer; letter-spacing: 0.05em; margin-right: 8px; white-space: nowrap; }
+.artist-mode-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; background: none; border: 1px solid var(--gold); color: var(--gold); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; }
 .artist-mode-btn:hover { background: var(--gold-dim); }
 .artist-mode-btn.active { background: var(--gold-dim); box-shadow: 0 0 6px var(--gold-glow); }
 
