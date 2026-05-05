@@ -64,6 +64,11 @@ import { computeSessionMaterials } from './components/MaterialsList';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
+const ANNOUNCEMENT = {
+  id: 'mapkluss-v1.10.0-2026-05-06',
+  url: 'https://t.me/mapkluss',
+};
+
 // Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
 function sliderToZoom(s: number): number { return Math.round(50 * Math.pow(16, s / 100)); }
 function zoomToSlider(z: number): number { return Math.round(Math.log(z / 50) / Math.log(16) * 100); }
@@ -295,6 +300,10 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
+  const [showAnnouncement, setShowAnnouncement] = useState(() => {
+    const force = new URLSearchParams(window.location.search).get('announcement') === '1';
+    return force || localStorage.getItem('mapkluss_seen_announcement') !== ANNOUNCEMENT.id;
+  });
   const [supportBlock,  setSupportBlock]  = useState('stone');
   const [supportMode,   setSupportMode]   = useState<1 | 2 | 3>(2);
   const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
@@ -1597,13 +1606,47 @@ export default function App() {
             onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
           >🎨 {t('Художник', 'Artist')}</button>
-          <button className="tour-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')}>? {t('Гид', 'Guide')}</button>
-          <button className="wiki-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')}>📖 Wiki</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
+          <button className="header-icon-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}>?</button>
+          <button className="header-icon-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki">📖</button>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
         </div>
       </header>
+
+      {showAnnouncement && (
+        <div className="update-banner">
+          <div className="update-banner-main">
+            <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
+            <span className="update-banner-text">
+              {t('MapKluss v1.10.0: галерея примеров, showcase export и исправленные share-ссылки.',
+                'MapKluss v1.10.0: examples gallery, showcase export and fixed share links.')}
+            </span>
+          </div>
+          <a
+            className="update-banner-link"
+            href={ANNOUNCEMENT.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              localStorage.setItem('mapkluss_seen_announcement', ANNOUNCEMENT.id);
+              setShowAnnouncement(false);
+            }}
+          >
+            {t('Читать в TG', 'Read on TG')}
+          </a>
+          <button
+            className="update-banner-close"
+            onClick={() => {
+              localStorage.setItem('mapkluss_seen_announcement', ANNOUNCEMENT.id);
+              setShowAnnouncement(false);
+            }}
+            title={t('Закрыть', 'Close')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {viewBanner && (
         <div className="view-banner">

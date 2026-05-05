@@ -1,7 +1,7 @@
 {
   "name": "mapart",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
