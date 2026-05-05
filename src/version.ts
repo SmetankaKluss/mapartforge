@@ -30,7 +30,8 @@
  *   1.9.0  — мобильная вкладка canvas, онбординг-стрелка, анимации пустого состояния,
  *            превью дизеринга, progress bar; устранение лага split line, select overlay,
  *            hover tooltip — прямые DOM-обновления без React re-render
- *   1.10.0 — Gallery / Examples, Showcase export для соцсетей, панель обновлений,
- *            компактная шапка, восстановление публичных share links
+ *   1.10.0 — импорт/экспорт MAP.DAT, GIF-проекты и GIF LITEMATIC PACK,
+ *            build tracker для команды, панель обновлений, компактная шапка,
+ *            восстановление публичных share links
  */
 export const VERSION = 'v1.10.0';

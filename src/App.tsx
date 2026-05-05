@@ -1619,8 +1619,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('MapKluss v1.10.0: галерея примеров, showcase export и исправленные share-ссылки.',
-                'MapKluss v1.10.0: examples gallery, showcase export and fixed share links.')}
+              {t('MapKluss v1.10.0: MAP.DAT, GIF-проекты, трекер постройки и исправленные share-ссылки.',
+                'MapKluss v1.10.0: MAP.DAT, GIF projects, build tracker and fixed share links.')}
             </span>
           </div>
           <a
