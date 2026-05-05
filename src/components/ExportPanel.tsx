@@ -260,7 +260,7 @@ export function ExportPanel({
           </button>
 
           <button
-            className="export-btn"
+            className="export-btn export-btn-mapdat"
             onClick={handleMapDat}
             disabled={base || busyMapdat}
             title={t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}

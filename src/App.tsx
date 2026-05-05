@@ -1610,7 +1610,7 @@ export default function App() {
           <button className="header-icon-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}>?</button>
           <button className="header-icon-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki">📖</button>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Поддержать разработку', 'Support development')}>{VERSION}</a>
+          <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
         </div>
       </header>
 
