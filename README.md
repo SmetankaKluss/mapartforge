@@ -54,7 +54,7 @@ VITE_SUPABASE_ANON_KEY=
 VITE_SHARE_BASE_URL=https://mapkluss.art
 ```
 
-The app still runs without Supabase variables. Share links and build tracker creation will be disabled by configuration errors instead of exposing keys in the source code.
+The app includes the public Supabase anon configuration used by the production site, so share links and build tracker sessions work in the default build. Override these variables only when using a different Supabase project.
 
 ## Project Structure
 
