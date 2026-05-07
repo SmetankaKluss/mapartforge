@@ -178,10 +178,10 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   return (
     <section className="sidebar-section">
       {/* Section header */}
-      <h3 className="section-title">
+      <h2 className="section-title">
         {t('Палитра', 'Palette')}
         <span className="palette-count">{paletteSize} {t('цветов', 'colors')} · {blockCount} {t('блоков', 'blocks')}</span>
-      </h3>
+      </h2>
 
       {/* ── Row 1: preset dropdown ── */}
       <div className="pe-preset-bar">

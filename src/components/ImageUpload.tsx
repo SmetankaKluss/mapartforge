@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { DragEvent, ChangeEvent, ClipboardEvent } from 'react';
+import type { DragEvent, ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import { useLocale } from '../lib/locale';
+import { IconGlyph, mkIcons } from './IconGlyph';
 
 interface Props {
   onImageLoaded: (img: HTMLImageElement, file: File) => void;
@@ -90,6 +91,13 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
     }
   }
 
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      inputRef.current?.click();
+    }
+  }
+
   // Глобальные обработчики paste и drag-and-drop для всего документа
   useEffect(() => {
     function handleGlobalPaste(e: Event) {
@@ -156,13 +164,16 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         onPaste={onPaste}
+        onKeyDown={onKeyDown}
         tabIndex={0}
+        role="button"
+        aria-label={t('Загрузить изображение, GIF или map.dat', 'Upload image, GIF, or map.dat')}
         title={t('Нажми Ctrl+V чтобы вставить изображение из буфера', 'Press Ctrl+V to paste image from clipboard')}
       >
-        <div className="upload-icon">⛏</div>
-        <p className="upload-sub">{t('нажми или перетащи', 'click or drag')}</p>
-        <p className="upload-hint">Ctrl+V</p>
-        {uploadError && <p className="upload-error">{uploadError}</p>}
+        <p className="upload-label">{t('Исходник', 'Source image')}</p>
+        <p className="upload-sub">{t('нажми, перетащи или вставь', 'click, drop, or paste')}</p>
+        <p className="upload-hint">PNG · JPG · WebP · GIF · MAP.DAT · Ctrl+V</p>
+        {uploadError && <p className="upload-error" role="alert">{uploadError}</p>}
         <input
           ref={inputRef}
           type="file"
@@ -175,7 +186,7 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
       {globalDragging && createPortal(
         <div className="global-drop-overlay">
           <div className="global-drop-inner">
-            <div className="global-drop-icon">⛏</div>
+            <div className="global-drop-icon"><IconGlyph icon={mkIcons.pickaxe} size={52} /></div>
             <p className="global-drop-text">{t('Отпусти чтобы загрузить', 'Drop to load image')}</p>
           </div>
         </div>,

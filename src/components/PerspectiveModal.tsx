@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useLocale } from '../lib/locale';
+import { IconGlyph, mkIcons } from './IconGlyph';
 
 interface Props {
   imageData: ImageData | null;
@@ -200,8 +201,8 @@ export function PerspectiveModal({ imageData, onClose }: Props) {
     <div className="persp-overlay" onClick={onClose}>
       <div className="persp-modal" onClick={e => e.stopPropagation()}>
         <div className="persp-header">
-          <span className="persp-title">🖼 {t('ПРЕДПРОСМОТР', 'PREVIEW')}</span>
-          <button className="persp-close" onClick={onClose}>×</button>
+          <span className="persp-title"><IconGlyph icon={mkIcons.view} /> {t('ПРЕДПРОСМОТР', 'PREVIEW')}</span>
+          <button className="persp-close" onClick={onClose}><IconGlyph icon={mkIcons.close} size={15} /></button>
         </div>
 
         {/* Scene */}

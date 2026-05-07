@@ -12,6 +12,7 @@ import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
+import { IconGlyph, mkIcons } from './IconGlyph';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
 function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
@@ -98,6 +99,9 @@ export function ExportPanel({
   const hasCmp     = compareData !== null;
   const hasContent = compareMode ? hasCmp : hasImage;
   const mapCount   = mapGrid.wide * mapGrid.tall;
+  const disabledReason = disabled
+    ? t('Обработка ещё идёт.', 'Processing is still running.')
+    : t('Сначала обработай изображение.', 'Process an image first.');
 
   const exportData = compareMode ? null : imageData;
 
@@ -232,10 +236,10 @@ export function ExportPanel({
 
   return (
     <section className="sidebar-section" id="tour-export">
-      <h3 className="section-title section-title-collapsible" onClick={() => setCollapsed(c => !c)}>
+      <h2 className="section-title section-title-collapsible" onClick={() => setCollapsed(c => !c)}>
         {t('Экспорт', 'Export')}
-        <span className="section-collapse-arrow">{collapsed ? '▶' : '▼'}</span>
-      </h3>
+        <IconGlyph icon={mkIcons.chevronDown} className={`section-collapse-arrow${collapsed ? ' collapsed' : ''}`} />
+      </h2>
       {!collapsed && !hasContent && (
         <p className="export-empty">{t('Загрузи изображение — экспорт появится здесь.', 'Upload an image to enable export.')}</p>
       )}
@@ -247,16 +251,17 @@ export function ExportPanel({
             disabled={base || busyPng}
             title={compareMode ? t('Скачать левую и правую панели как отдельные PNG', 'Download left and right panels as separate PNG') : t('Скачать обработанное изображение как PNG', 'Download processed image as PNG')}
           >
-            {busyPng ? t('Сохранение…', 'Saving…') : compareMode ? '↓ PNG ×2' : '↓ PNG'}
+            <IconGlyph icon={mkIcons.download} /> {busyPng ? t('Сохранение…', 'Saving…') : compareMode ? 'PNG ×2' : 'PNG'}
           </button>
 
           <button
             className="export-btn export-btn-showcase"
             onClick={handleShowcase}
             disabled={base || busyShowcase}
+            aria-label={t('Скачать витрину PNG для публикации', 'Download showcase PNG for sharing')}
             title={t('Скачать промо-картинку Original | MapKluss Preview для публикации', 'Download an Original | MapKluss Preview promo image for sharing')}
           >
-            {busyShowcase ? t('Сборка…', 'Building…') : t('↓ ВИТРИНА', '↓ SHOWCASE')}
+            <IconGlyph icon={mkIcons.view} /> {busyShowcase ? t('Сборка…', 'Building…') : t('ВИТРИНА PNG', 'SHOWCASE PNG')}
           </button>
 
           <button
@@ -265,7 +270,7 @@ export function ExportPanel({
             disabled={base || busyMapdat}
             title={t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}
           >
-            {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `↓ MAP.DAT (${mapCount} ${t('файлов', 'files')})` : '↓ MAP.DAT'}
+            <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT (${mapCount} ${t('файлов', 'files')})` : 'MAP.DAT'}
           </button>
 
           {artistMode ? (<>
@@ -275,7 +280,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite || !hybridLayers?.length}
               title={t('Все видимые слои в одной схематике — 3D и 2D части объединены', 'All visible layers in one schematic — 3D and 2D parts combined')}
             >
-              {busyHybrid ? t('Сборка…', 'Building…') : '↓ LITEMATIC'}
+              <IconGlyph icon={mkIcons.download} /> {busyHybrid ? t('Сборка…', 'Building…') : 'LITEMATIC'}
             </button>
             <button
               className="export-btn"
@@ -283,7 +288,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite || !activeLayerExport}
               title={t('Только активный слой с его режимом постройки', 'Active layer only with its build mode')}
             >
-              {busyLayer ? t('Сборка…', 'Building…') : `↓ ${t('СЛОЙ', 'LAYER')}${isMultiMap ? ' ZIP' : ''} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
+              <IconGlyph icon={mkIcons.layer} /> {busyLayer ? t('Сборка…', 'Building…') : `${t('СЛОЙ', 'LAYER')}${isMultiMap ? ' ZIP' : ''} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
             </button>
           </>) : (
             <button
@@ -292,7 +297,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite}
               title={mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
             >
-              {busyLiteFlat ? t('Сборка…', 'Building…') : `↓ LITEMATIC ${mapMode.toUpperCase()}`}
+              <IconGlyph icon={mkIcons.download} /> {busyLiteFlat ? t('Сборка…', 'Building…') : `LITEMATIC ${mapMode.toUpperCase()}`}
             </button>
           )}
 
@@ -303,7 +308,7 @@ export function ExportPanel({
               disabled={base || busyAnyLite}
               title={t(`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`, `Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files in archive`)}
             >
-              {busyZip ? t('Архивирование…', 'Archiving…') : `↓ ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})`}
+              <IconGlyph icon={mkIcons.download} /> {busyZip ? t('Архивирование…', 'Archiving…') : `ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})`}
             </button>
           )}
 
@@ -318,9 +323,10 @@ export function ExportPanel({
             className={`link-export-btn${linkState === 'error' ? ' link-export-btn-error' : ''}`}
             onClick={handleGetLink}
             disabled={base || linkState === 'uploading'}
+            aria-label={t('Создать публичную ссылку на проект', 'Create a public project link')}
             title={!hasContent ? t('Сначала обработай изображение', 'Process image first') : t('Создать постоянную ссылку на этот мап-арт с текущими настройками', 'Create permanent link to this map art with current settings')}
           >
-            {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('🔗 ПОЛУЧИТЬ ССЫЛКУ', '🔗 GET LINK')}
+            <IconGlyph icon={mkIcons.share} /> {linkState === 'uploading' ? t('Загрузка…', 'Uploading…') : linkState === 'error' ? t('Ошибка загрузки', 'Upload failed') : t('ПОЛУЧИТЬ ССЫЛКУ', 'GET LINK')}
           </button>
         </div>
         {onCreateTracker && (
@@ -329,9 +335,10 @@ export function ExportPanel({
               className="link-export-btn tracker-export-btn"
               onClick={onCreateTracker}
               disabled={base}
+              aria-label={t('Создать трекер постройки', 'Create build tracker')}
               title={t('Создать общий трекер сбора и постройки для команды', 'Create a shared gathering & building tracker for your team')}
             >
-              {t('⛏ ТРЕКЕР ПОСТРОЙКИ', '⛏ BUILD TRACKER')}
+              <IconGlyph icon={mkIcons.pickaxe} /> {t('ТРЕКЕР ПОСТРОЙКИ', 'BUILD TRACKER')}
             </button>
           </div>
         )}
@@ -340,14 +347,21 @@ export function ExportPanel({
             <button
               className="link-export-btn gif-pack-export-btn"
               onClick={onExportGifPack}
+              aria-label={t('Экспортировать GIF проект как Litematic ZIP', 'Export GIF project as Litematic ZIP')}
               title={t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
             >
-              {t('🎞 GIF LITEMATIC PACK', '🎞 GIF LITEMATIC PACK')}
+              <IconGlyph icon={mkIcons.download} /> {t('GIF LITEMATIC PACK', 'GIF LITEMATIC PACK')}
             </button>
           </div>
         )}
         {linkUrl && (
           <LinkModal url={linkUrl} onClose={() => setLinkUrl(null)} />
+        )}
+        {!hasContent && <p className="export-disabled-note">{disabledReason}</p>}
+        {linkState === 'error' && hasContent && (
+          <p className="export-error-note" role="alert">
+            {t('Ссылка не создалась. Проверь интернет и попробуй ещё раз.', 'Could not create the link. Check your connection and try again.')}
+          </p>
         )}
       </>}
     </section>

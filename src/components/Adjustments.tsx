@@ -71,7 +71,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
 
   return (
     <section className={`control-group${disabled ? ' adj-disabled' : ''}`}>
-      <h3 className="control-title">
+      <h2 className="control-title">
         <span className={`section-arrow${collapsed ? ' collapsed' : ''}`} onClick={onToggle}>▼</span>
         <button
           className={`adj-toggle-btn${showAdjustments ? ' active' : ''}`}
@@ -84,7 +84,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
           </button>
         )}
         <span style={{ flex: 1, textAlign: 'right' }}>{t('Коррекция', 'Adjustments')}</span>
-      </h3>
+      </h2>
 
       <div className={`control-group-content${collapsed ? ' collapsed' : ''}`}>
 

@@ -61,11 +61,12 @@ import { makeThumbnail, imageDataToHtmlImage } from './lib/gifProject';
 import { BuildTrackerModal } from './components/BuildTrackerModal';
 import type { SessionMaterial } from './lib/buildSession';
 import { computeSessionMaterials } from './components/MaterialsList';
+import { IconGlyph, mkIcons } from './components/IconGlyph';
 import 'driver.js/dist/driver.css';
 import './App.css';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.10.0-2026-05-06',
+  id: 'mapkluss-v1.10.1-2026-05-07',
   url: 'https://t.me/mapkluss',
 };
 
@@ -121,6 +122,11 @@ interface LayerState {
   layers: Layer[];
   activeLayerId: string;
   groups: LayerGroup[];
+}
+
+interface AppNotice {
+  message: string;
+  tone: 'info' | 'error';
 }
 
 function makeInitialLayerState(): LayerState {
@@ -300,6 +306,7 @@ export default function App() {
   const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
+  const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(() => {
     const force = new URLSearchParams(window.location.search).get('announcement') === '1';
     return force || localStorage.getItem('mapkluss_seen_announcement') !== ANNOUNCEMENT.id;
@@ -327,6 +334,16 @@ export default function App() {
   // be re-applied after the worker returns (preserves deletions/transparency edits).
   const pendingAlphaMaskRef = useRef<Uint8Array | null>(null);
   const [showCancel, setShowCancel] = useState(false);
+
+  const showAppNotice = useCallback((message: string, tone: AppNotice['tone'] = 'info') => {
+    setAppNotice({ message, tone });
+  }, []);
+
+  useEffect(() => {
+    if (!appNotice) return;
+    const timer = window.setTimeout(() => setAppNotice(null), appNotice.tone === 'error' ? 5200 : 3200);
+    return () => window.clearTimeout(timer);
+  }, [appNotice]);
   const previewSectionRef = useRef<HTMLElement>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
@@ -1196,7 +1213,10 @@ export default function App() {
         if (!file) return;
         file.text().then(json => {
           const result = deserializeProject(json);
-          if (!result) { alert('Не удалось загрузить проект — файл повреждён или несовместим.'); return; }
+          if (!result) {
+            showAppNotice(t('Не удалось загрузить проект: файл повреждён или несовместим.', 'Could not load project: file is damaged or incompatible.'), 'error');
+            return;
+          }
           setMapGrid(result.grid);
           setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId, groups: [] });
           setSourceImage(null);
@@ -1211,7 +1231,7 @@ export default function App() {
     projectFileInputRef.current.value = '';
     projectFileInputRef.current.click();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showAppNotice, t]);
 
   // Keyboard shortcuts: 1-9 select dithering, C toggles compare mode
   // (declared here, after handleDitheringChange / handleCompareModeChange, to avoid TDZ)
@@ -1435,10 +1455,10 @@ export default function App() {
       }));
       setImageData(importedImageData);
     } catch (e) {
-      const msg = e instanceof MapDatImportError ? e.message : 'Failed to read map.dat';
-      alert(msg);
+      const msg = e instanceof MapDatImportError ? e.message : t('Не удалось прочитать map.dat.', 'Failed to read map.dat.');
+      showAppNotice(msg, 'error');
     }
-  }, []);
+  }, [showAppNotice, t]);
 
   // ── Import GIF ───────────────────────────────────────────────────────────
   const handleGifFile = useCallback(async (file: File) => {
@@ -1446,9 +1466,9 @@ export default function App() {
       const decoded = await decodeGif(file);
       setGifFrames(decoded);
     } catch (e) {
-      alert('Не удалось прочитать GIF: ' + String(e));
+      showAppNotice(t('Не удалось прочитать GIF.', 'Could not read GIF.') + ' ' + String(e), 'error');
     }
-  }, []);
+  }, [showAppNotice, t]);
 
   const baseScale    = gridScale(mapGrid);
   const zoomFactor   = zoom / 100;
@@ -1529,10 +1549,12 @@ export default function App() {
       const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
       const id = Date.now().toString();
       await saveProject({ id, name, timestamp: Date.now(), thumbnail: saveThumbnail ?? '', data });
+      showAppNotice(t('Проект сохранён в истории.', 'Project saved to history.'));
     } catch (err) {
       console.error('Failed to save project to history', err);
+      showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, saveThumbnail]);
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, saveThumbnail, showAppNotice, t]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -1585,10 +1607,12 @@ export default function App() {
       setUndoStack([]);
       setRedoStack([]);
       setShowProjectsPanel(false);
+      showAppNotice(t('Проект открыт из истории.', 'Project opened from history.'));
     } catch (err) {
       console.error('Failed to load project from history', err);
+      showAppNotice(t('Не удалось открыть проект из истории.', 'Could not open project from history.'), 'error');
     }
-  }, []);
+  }, [showAppNotice, t]);
 
   return (
     <>
@@ -1605,10 +1629,10 @@ export default function App() {
             className={`tour-btn artist-mode-btn${editorMode === 'artist' ? ' active' : ''}`}
             onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
-          >🎨 {t('Художник', 'Artist')}</button>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}>❤ {t('Поддержать', 'Support')}</a>
-          <button className="header-icon-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}>?</button>
-          <button className="header-icon-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki">📖</button>
+          ><IconGlyph icon={mkIcons.artist} /> {t('Художник', 'Artist')}</button>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
+          <button className="header-icon-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
+          <button className="header-icon-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
         </div>
@@ -1619,8 +1643,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('MapKluss v1.10.0: MAP.DAT, GIF-проекты, трекер постройки и исправленные share-ссылки.',
-                'MapKluss v1.10.0: MAP.DAT, GIF projects, build tracker and fixed share links.')}
+              {t('MapKluss v1.10.1: MAP.DAT, GIF-проекты, трекер постройки, исправленные share-ссылки и улучшенный дизайн.',
+                'MapKluss v1.10.1: MAP.DAT, GIF projects, build tracker, fixed share links and improved design.')}
             </span>
           </div>
           <a
@@ -1643,7 +1667,7 @@ export default function App() {
             }}
             title={t('Закрыть', 'Close')}
           >
-            ✕
+            <IconGlyph icon={mkIcons.close} size={14} />
           </button>
         </div>
       )}
@@ -1651,14 +1675,32 @@ export default function App() {
       {viewBanner && (
         <div className="view-banner">
           <span>█ {t('ЗАГРУЖЕНО ПО ССЫЛКЕ', 'LOADED FROM LINK')}</span>
-          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title={t('Закрыть', 'Close')}>✕</button>
+          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} size={14} /></button>
         </div>
       )}
 
       {paletteBanner && (
         <div className="view-banner palette-banner">
-          <span>⬡ {t('ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ', 'PALETTE LOADED FROM LINK')}</span>
-          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title={t('Закрыть', 'Close')}>✕</button>
+          <span><IconGlyph icon={mkIcons.palette} size={13} /> {t('ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ', 'PALETTE LOADED FROM LINK')}</span>
+          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} size={14} /></button>
+        </div>
+      )}
+
+      {appNotice && (
+        <div
+          className={`app-notice app-notice--${appNotice.tone}`}
+          role={appNotice.tone === 'error' ? 'alert' : 'status'}
+          aria-live={appNotice.tone === 'error' ? 'assertive' : 'polite'}
+        >
+          <span>{appNotice.message}</span>
+          <button
+            className="app-notice-close"
+            onClick={() => setAppNotice(null)}
+            aria-label={t('Закрыть уведомление', 'Close notification')}
+            title={t('Закрыть', 'Close')}
+          >
+            <IconGlyph icon={mkIcons.close} size={14} />
+          </button>
         </div>
       )}
 
@@ -1673,17 +1715,17 @@ export default function App() {
                 onClick={() => setShowNewCanvasModal(true)}
                 disabled={processing}
                 title={t('Создать пустой холст для рисования с нуля', 'Create blank canvas to draw from scratch')}
-              >+ {t('Новый холст', 'New canvas')}</button>
+              >{t('Новый холст', 'New canvas')}</button>
               <button
                 className="canvas-icon-btn"
                 onClick={handleOpenSaveModal}
                 title={t('Сохранить проект', 'Save project')}
-              >💾</button>
+              ><IconGlyph icon={mkIcons.save} /></button>
               <button
                 className="canvas-icon-btn"
                 onClick={() => setShowProjectsPanel(true)}
                 title={t('Мои проекты', 'My projects')}
-              >📁</button>
+              ><IconGlyph icon={mkIcons.project} /></button>
             </div>
             {sourceHasAlpha && (
               <div className="alpha-controls">
@@ -1774,7 +1816,7 @@ export default function App() {
                 }
               }}
             >
-              <span className="reset-icon">↺</span> {resetDefaultsPending ? t('Точно?', 'Sure?') : t('Сбросить всё', 'Reset All')}
+              <IconGlyph icon={mkIcons.reset} className="reset-icon" /> {resetDefaultsPending ? t('Точно?', 'Sure?') : t('Сбросить всё', 'Reset All')}
             </button>
           </div>
         </aside>
@@ -1785,8 +1827,8 @@ export default function App() {
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
-              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}><i className="ph-bold ph-arrow-counter-clockwise" /></button>
-              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><i className="ph-bold ph-arrow-clockwise" /></button>
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')}><IconGlyph icon={mkIcons.reset} /></button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><IconGlyph icon={mkIcons.redo} /></button>
             </div>
             <div className="toolbar-sep" />
 
@@ -1796,19 +1838,19 @@ export default function App() {
                 {/* Tool buttons */}
                 <div className="toolbar-group">
                   <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Выбрать / снять (Esc)', 'Select / deselect (Esc)')}>
-                    <i className="ph-bold ph-cursor" />
+                    <IconGlyph icon={mkIcons.select} />
                   </button>
                   <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')}>
-                    <i className="ph-bold ph-eyedropper" />
+                    <IconGlyph icon={mkIcons.eyedropper} />
                   </button>
                   <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')}>
-                    <i className="ph-bold ph-paint-brush" />
+                    <IconGlyph icon={mkIcons.brush} />
                   </button>
                   <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')}>
-                    <i className="ph-bold ph-paint-bucket" />
+                    <IconGlyph icon={mkIcons.fill} />
                   </button>
                   <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
-                    <i className="ph-bold ph-eraser" />
+                    <IconGlyph icon={mkIcons.eraser} />
                   </button>
                   {/* text and pattern tools hidden — work in progress */}
                 </div>
@@ -1887,7 +1929,7 @@ export default function App() {
                       <span className="paint-no-block">{t('нет блока', 'no block')}</span>
                     )}
                   </div>
-                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}><i className="ph-bold ph-caret-down" /></button>
+                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}><IconGlyph icon={mkIcons.chevronDown} /></button>
                   {showBlockPicker && (
                     <BlockPickerPopup
                       blockSelection={blockSelection}
@@ -1906,30 +1948,30 @@ export default function App() {
                         className={`tool-btn${activeTool === 'move' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'move' ? null : 'move')}
                         title={t('Переместить слой (V)', 'Move layer (V)')}
-                      ><i className="ph-bold ph-arrows-out-cardinal" /></button>
+                      ><IconGlyph icon={mkIcons.move} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
                         title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
-                      ><i className="ph-bold ph-selection" /></button>
+                      ><IconGlyph icon={mkIcons.selectRect} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
                         title={t('Лассо (L)', 'Lasso (L)')}
-                      ><i className="ph-bold ph-lasso" /></button>
+                      ><IconGlyph icon={mkIcons.lasso} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
                         title={t('Волшебная палочка (W)', 'Magic wand (W)')}
-                      ><i className="ph-bold ph-magic-wand" /></button>
+                      ><IconGlyph icon={mkIcons.wand} /></button>
                     </div>
                     {selectionMask && (
                       <div className="toolbar-group selection-ops">
-                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><i className="ph-bold ph-trash" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><i className="ph-bold ph-paint-bucket" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><i className="ph-bold ph-arrows-clockwise" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><i className="ph-bold ph-stack-plus" /></button>
-                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><i className="ph-bold ph-x-circle" /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><IconGlyph icon={mkIcons.trash} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><IconGlyph icon={mkIcons.fill} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><IconGlyph icon={mkIcons.invert} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><IconGlyph icon={mkIcons.layer} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><IconGlyph icon={mkIcons.deselect} /></button>
                         <span className="selection-count">{selectedPixelCount}px</span>
                       </div>
                     )}
@@ -1941,27 +1983,27 @@ export default function App() {
                         className={`tool-btn${activeTool === 'pattern-tile' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
                         title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
-                      ><i className="ph-bold ph-grid-nine" /></button>
+                      ><IconGlyph icon={mkIcons.pattern} /></button>
                       {activeTool === 'pattern-tile' && (<>
                         <button
                           className="tool-btn"
                           onClick={() => setShowPatternEditor(true)}
                           title={t('Редактировать паттерн', 'Edit pattern')}
-                        ><i className="ph-bold ph-gear" /></button>
+                        ><IconGlyph icon={mkIcons.settings} /></button>
                         <button
                           className={`tool-btn${patternAnchorMode === 'brush' ? ' active' : ''}`}
                           onClick={() => setPatternAnchorMode(m => m === 'brush' ? 'canvas' : 'brush')}
                           title={patternAnchorMode === 'brush'
                             ? t('Якорь: от кисти (кликни для холста)', 'Anchor: brush start (click for canvas)')
                             : t('Якорь: холст (кликни для кисти)', 'Anchor: canvas (click for brush)')}
-                        ><i className="ph-bold ph-anchor" /></button>
+                        ><IconGlyph icon={mkIcons.anchor} /></button>
                         <button
                           className="tool-btn"
                           onClick={() => activePattern && exportPattern(activePattern)}
                           title={t('Экспорт паттерна в JSON', 'Export pattern as JSON')}
-                        ><i className="ph-bold ph-export" /></button>
+                        ><IconGlyph icon={mkIcons.export} /></button>
                         <label className="tool-btn" title={t('Импорт паттерна из JSON', 'Import pattern from JSON')} style={{ cursor: 'pointer' }}>
-                          <i className="ph-bold ph-upload-simple" />
+                          <IconGlyph icon={mkIcons.import} />
                           <input type="file" accept=".json" style={{ display: 'none' }}
                             onChange={e => { const f = e.target.files?.[0]; if (f) importPattern(f); e.target.value = ''; }}
                           />
@@ -1975,7 +2017,7 @@ export default function App() {
                         className={`tool-btn${activeTool === 'gradient' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'gradient' ? null : 'gradient')}
                         title={t('Градиент (G)', 'Gradient (G)')}
-                      ><i className="ph-bold ph-gradient" /></button>
+                      ><IconGlyph icon={mkIcons.gradient} /></button>
                     </div>
                     {activeTool === 'gradient' && (
                       <div className="toolbar-group gradient-stops-bar">
@@ -2074,7 +2116,7 @@ export default function App() {
                           className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
                           title={t('Дизеринг (упорядоченный Байер)', 'Ordered dithering (Bayer)')}
                           onClick={() => setGradientDithering(d => d === 'ordered' ? 'none' : 'ordered')}
-                        ><i className="ph-bold ph-grid-four" /></button>
+                        ><IconGlyph icon={mkIcons.grid} /></button>
                       </div>
                     )}
                   </>
@@ -2104,35 +2146,35 @@ export default function App() {
                     className="tool-btn tool-btn-zoom-reset"
                     title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
                     onClick={() => setZoom(100)}
-                  >⌖</button>
+                  ><IconGlyph icon={mkIcons.zoomReset} /></button>
                   <button
                     className={`tool-btn${showSplitLine ? ' active' : ''}`}
                     title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
                     onClick={() => setShowSplitLine(v => !v)}
-                  >╎</button>
+                  ><IconGlyph icon={mkIcons.compare} /></button>
                   <button
                     className="tool-btn"
                     title={t('Сбросить разделитель', 'Reset split to center')}
                     onClick={() => setSplitPos(50)}
-                  >⟺</button>
+                  ><IconGlyph icon={mkIcons.invert} /></button>
                   {!compareMode && (
-                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')}>{t('Блоки', 'Blocks')}</button>
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')}><IconGlyph icon={mkIcons.blockTextures} />{t('Блоки', 'Blocks')}</button>
                   )}
                   <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}>{t('Сетка', 'Grid')}</button>
-                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр на стене', 'Wall preview')}>🖼</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}><IconGlyph icon={mkIcons.grid} />{t('Сетка', 'Grid')}</button>
+                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр на стене', 'Wall preview')}><IconGlyph icon={mkIcons.view} /></button>
                 </div>
               </>
             )}
 
             {/* TABLET DRAWER TOGGLE */}
             <div className="toolbar-sep tablet-right-sep" />
-            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title={t('Палитра и экспорт', 'Palette & Export')}><i className="ph-bold ph-package" /></button>
+            <button className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`} onClick={() => setTabletRightOpen(v => !v)} title={t('Палитра и экспорт', 'Palette & Export')}><IconGlyph icon={mkIcons.package} /></button>
 
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}><i className="ph-bold ph-keyboard" /></button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}><IconGlyph icon={mkIcons.keyboard} /></button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
                   <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
@@ -2241,7 +2283,7 @@ export default function App() {
                   <span className="processing-label">{t('ОБРАБОТКА…', 'PROCESSING…')} {DITHERING_LABELS[dithering].toUpperCase()}</span>
                   <span className="processing-pct">{processingProgress}%</span>
                   {showCancel && (
-                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}>✕ {t('ОТМЕНА', 'CANCEL')}</button>
+                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}><IconGlyph icon={mkIcons.close} size={14} /> {t('ОТМЕНА', 'CANCEL')}</button>
                   )}
                 </div>
                 <div className="processing-bar-track">
@@ -2422,15 +2464,15 @@ export default function App() {
         {/* ── MOBILE TAB BAR ── */}
         <div className="mobile-tab-bar">
           <button className={`mobile-tab-btn${mobileTab === 'settings' ? ' active' : ''}`} onClick={() => setMobileTab('settings')}>
-            <span className="mobile-tab-icon">⚙</span>
+            <IconGlyph icon={mkIcons.sliders} className="mobile-tab-icon" />
             <span className="mobile-tab-label">Настройки</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
-            <span className="mobile-tab-icon">▦</span>
+            <IconGlyph icon={mkIcons.palette} className="mobile-tab-icon" />
             <span className="mobile-tab-label">Палитра</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
-            <span className="mobile-tab-icon">⬇</span>
+            <IconGlyph icon={mkIcons.download} className="mobile-tab-icon" />
             <span className="mobile-tab-label">Экспорт</span>
           </button>
         </div>
@@ -2547,8 +2589,8 @@ export default function App() {
     {showTourSelector && (
       <div className="tour-selector-overlay" onClick={() => setShowTourSelector(false)}>
         <div className="tour-selector-modal" onClick={e => e.stopPropagation()}>
-          <button className="tour-selector-close" onClick={() => setShowTourSelector(false)}>×</button>
-          <div className="tour-selector-title">? {t('ВЫБЕРИ ТУР', 'SELECT A TOUR')}</div>
+          <button className="tour-selector-close" onClick={() => setShowTourSelector(false)}><IconGlyph icon={mkIcons.close} size={15} /></button>
+          <div className="tour-selector-title"><IconGlyph icon={mkIcons.guide} /> {t('ВЫБЕРИ ТУР', 'SELECT A TOUR')}</div>
           <div className="tour-selector-desc">{t(
             'Выбери уровень — тур покажет только нужные функции.',
             'Choose a level — the tour shows only relevant features.',
@@ -2558,7 +2600,7 @@ export default function App() {
               className="tour-selector-btn tour-selector-btn--basic"
               onClick={() => { setShowTourSelector(false); startTour('basic'); }}
             >
-              <span className="tour-selector-btn-icon">▶</span>
+              <IconGlyph icon={mkIcons.play} className="tour-selector-btn-icon" />
               <span className="tour-selector-btn-body">
                 <span className="tour-selector-btn-title">{t('БАЗОВЫЙ', 'BASIC')}</span>
                 <span className="tour-selector-btn-sub">{t(
@@ -2571,7 +2613,7 @@ export default function App() {
               className="tour-selector-btn tour-selector-btn--advanced"
               onClick={() => { setShowTourSelector(false); startTour('advanced'); }}
             >
-              <span className="tour-selector-btn-icon">★</span>
+              <IconGlyph icon={mkIcons.tourAdvanced} className="tour-selector-btn-icon" />
               <span className="tour-selector-btn-body">
                 <span className="tour-selector-btn-title">{t('ПРОДВИНУТЫЙ', 'ADVANCED')}</span>
                 <span className="tour-selector-btn-sub">{t(

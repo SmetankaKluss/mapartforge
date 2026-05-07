@@ -228,7 +228,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
   return (
     <section className="sidebar-section">
       <div className="mat-header">
-        <h3 className="section-title" style={{ margin: 0 }}>{t('Материалы', 'Materials')}</h3>
+        <h2 className="section-title" style={{ margin: 0 }}>{t('Материалы', 'Materials')}</h2>
         <label
           className="mat-mode-toggle"
           title={t(`Показать максимальное количество каждого блока в любой из ${numMaps} секций — удобно для расчёта что взять с собой`, `Show max count of each block in any of ${numMaps} sections — useful for planning what to bring`)}

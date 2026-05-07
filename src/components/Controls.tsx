@@ -235,11 +235,11 @@ export function Controls({
 
       {/* ── Map grid selector ─────────────────────────────────── */}
       <section className={`control-group${isBlankCanvas ? ' section-disabled' : ''}`}>
-        <h3 className="control-title">
+        <h2 className="control-title">
           <span className={`section-arrow${collapsedSections['map-grid'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-grid')}>▼</span>
           {t('Размер', 'Size')}
           {isBlankCanvas && <span className="section-disabled-hint"> {t('(холст)', '(canvas)')}</span>}
-        </h3>
+        </h2>
         <div className={`control-group-content${collapsedSections['map-grid'] ? ' collapsed' : ''}`}>
         <div className="grid-options">
           {MAP_GRID_OPTIONS.map((g) => {
@@ -376,10 +376,10 @@ export function Controls({
 
       {/* ── Map mode (2D/3D) ──────────────────────────────────── */}
       <section className="control-group">
-        <h3 className="control-title">
+        <h2 className="control-title">
           <span className={`section-arrow${collapsedSections['map-mode'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('map-mode')}>▼</span>
           {t('Режим', 'Mode')}
-        </h3>
+        </h2>
         <div className={`control-group-content${collapsedSections['map-mode'] ? ' collapsed' : ''}`}>
           <div className="mode-toggle">
             <button
@@ -423,10 +423,10 @@ export function Controls({
 
       {/* ── Dithering ─────────────────────────────────────────── */}
       <section className="control-group">
-        <h3 className="control-title">
+        <h2 className="control-title">
           <span className={`section-arrow${collapsedSections['dithering'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('dithering')}>▼</span>
           {t('Дизеринг', 'Dithering')}
-        </h3>
+        </h2>
         <div className={`control-group-content${collapsedSections['dithering'] ? ' collapsed' : ''}`}>
         <div className="dither-options">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
@@ -466,10 +466,10 @@ export function Controls({
       {/* ── Blue noise pattern scale ──────────────────────────── */}
       {dithering === 'blue-noise' && (
         <section className="control-group">
-          <h3 className="control-title">
+          <h2 className="control-title">
             <span className={`section-arrow${collapsedSections['pattern-scale'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('pattern-scale')}>▼</span>
             Масштаб паттерна
-          </h3>
+          </h2>
           <div className={`control-group-content${collapsedSections['pattern-scale'] ? ' collapsed' : ''}`}>
           <div className="bn-scale-options">
             {BN_SCALES.map(s => (
@@ -496,10 +496,10 @@ export function Controls({
       {/* ── KlussDither params ───────────────────────────────────── */}
       {dithering === 'kluss' && (
         <section className="control-group">
-          <h3 className="control-title">
+          <h2 className="control-title">
             <span className={`section-arrow${collapsedSections['klussettings'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('klussettings')}>▼</span>
             {t('Настройки KlussDither', 'KlussDither Settings')}
-          </h3>
+          </h2>
           <div className={`control-group-content${collapsedSections['klussettings'] ? ' collapsed' : ''}`}>
 
           {/* Clean threshold */}
@@ -612,14 +612,14 @@ export function Controls({
       {/* ── Intensity ─────────────────────────────────────────── */}
       {showIntensity && (
         <section className="control-group">
-          <h3 className="control-title">
+          <h2 className="control-title">
             <span className={`section-arrow${collapsedSections['intensity'] ? ' collapsed' : ''}`} onClick={() => onToggleSection('intensity')}>▼</span>
             {t('Интенсивность', 'Intensity')}
             <span className="slider-value-wrap">
               <NumInput value={intensity} min={0} max={100} step={1} onCommit={v => { onIntensityChange(v); onIntensityCommit(v); }} disabled={processing} />
               <span className="num-input-unit">%</span>
             </span>
-          </h3>
+          </h2>
           <div className={`control-group-content${collapsedSections['intensity'] ? ' collapsed' : ''}`}>
           <input
             type="range"
