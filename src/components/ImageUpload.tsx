@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { DragEvent, ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import { useLocale } from '../lib/locale';
 import { IconGlyph, mkIcons } from './IconGlyph';
+import { trackEvent } from '../lib/analytics';
 
 interface Props {
   onImageLoaded: (img: HTMLImageElement, file: File) => void;
@@ -26,7 +27,7 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
   // Counter to handle enter/leave across child elements
   const dragCounterRef = useRef(0);
 
-  function loadFile(file: File) {
+  function loadFile(file: File, source: 'click' | 'drop' | 'paste' | 'global_drop' | 'global_paste' = 'click') {
     setUploadError('');
     if (file.size > MAX_UPLOAD_BYTES) {
       setUploadError(t('Файл слишком большой. Максимум 80 МБ.', 'File is too large. Maximum size is 80 MB.'));
@@ -34,11 +35,13 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
     }
     // Handle Minecraft map.dat files
     if (file.name.endsWith('.dat') && onDatFile) {
+      trackEvent('mapdat_uploaded', { source, size_mb: Math.round(file.size / 1024 / 1024) });
       onDatFile(file);
       return;
     }
     // Handle animated GIF
     if (file.type === 'image/gif' && onGifFile) {
+      trackEvent('gif_uploaded', { source, size_mb: Math.round(file.size / 1024 / 1024) });
       onGifFile(file);
       return;
     }
@@ -50,6 +53,13 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
+      trackEvent('image_uploaded', {
+        source,
+        file_type: file.type || file.name.split('.').pop()?.toLowerCase() || 'unknown',
+        size_mb: Math.round(file.size / 1024 / 1024),
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
       onImageLoaded(img, file);
       URL.revokeObjectURL(url);
     };
@@ -64,12 +74,12 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) loadFile(file);
+    if (file) loadFile(file, 'drop');
   }
 
   function onChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) loadFile(file);
+    if (file) loadFile(file, 'click');
     e.target.value = '';
   }
 
@@ -84,7 +94,7 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
         const file = item.getAsFile();
         if (file) {
           e.preventDefault();
-          loadFile(file);
+          loadFile(file, 'paste');
           return;
         }
       }
@@ -110,7 +120,7 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
         const item = items[i];
         if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
-          if (file) { e.preventDefault(); loadFile(file); return; }
+          if (file) { e.preventDefault(); loadFile(file, 'global_paste'); return; }
         }
       }
     }
@@ -138,7 +148,7 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
       setGlobalDragging(false);
       const de = e as unknown as DragEvent;
       const file = de.dataTransfer?.files[0];
-      if (file) loadFile(file);
+      if (file) loadFile(file, 'global_drop');
     }
 
     document.addEventListener('paste', handleGlobalPaste);

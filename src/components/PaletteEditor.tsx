@@ -7,6 +7,7 @@ import { PaletteShareModal } from './PaletteShareModal';
 import { useLocale } from '../lib/locale';
 import { isBlockAvailable } from '../lib/versionPresets';
 import type { MinecraftVersion } from '../lib/versionPresets';
+import { trackEvent } from '../lib/analytics';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
@@ -62,6 +63,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   // ── Preset selector ──────────────────────────────────────────────────────
 
   function handlePresetSelect(name: string) {
+    trackEvent('palette_preset_selected', { preset: name || 'none', custom: Boolean(name && !(name in BUILTIN_PRESETS)) });
     setSelectedPreset(name);
     if (!name) {
       // Reset to empty selection when "select preset" is chosen
@@ -82,6 +84,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     if (!selectedPreset || selectedPreset in BUILTIN_PRESETS) return;
     const next = { ...customPresets };
     delete next[selectedPreset];
+    trackEvent('palette_preset_deleted', { preset: selectedPreset });
     persistPresets(next);
     setSelectedPreset('');
   }
@@ -98,6 +101,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
       if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
       setClearPending(false);
       const empty = Object.fromEntries(COLOUR_ROWS.map(r => [r.csId, []]));
+      trackEvent('palette_cleared');
       onSelectionChange(empty);
     }
   }
@@ -106,12 +110,14 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
 
   function openSaveModal() {
     setModalName('');
+    trackEvent('palette_save_modal_opened');
     setShowSaveModal(true);
   }
 
   function confirmSave() {
     const name = modalName.trim();
     if (!name || name in BUILTIN_PRESETS) return;
+    trackEvent('palette_preset_saved', { preset: name });
     persistPresets({ ...customPresets, [name]: blockSelection });
     setSelectedPreset(name);
     setModalName('');
@@ -130,6 +136,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     const cur = blockSelection[csId] ?? [];
     const isSelected = cur.includes(blockId);
     const next = isSelected ? cur : [blockId];
+    trackEvent('palette_block_changed', { color_group: csId, block_id: blockId, selected: !isSelected });
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
 
@@ -139,6 +146,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     const hasSelection = cur.length > 0;
     // Toggle: if any block selected, deselect all; otherwise select first block
     const next = hasSelection ? [] : [row.blocks[0]?.blockId ?? 0];
+    trackEvent('palette_row_changed', { color_group: csId, selected: !hasSelection });
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
 
@@ -250,7 +258,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
       <div className="pe-share-bar">
         <button
           className="pe-share-btn"
-          onClick={() => setPaletteUrl(buildPaletteUrl(blockSelection))}
+          onClick={() => { trackEvent('palette_share_clicked'); setPaletteUrl(buildPaletteUrl(blockSelection)); }}
           disabled={disabled}
           title={t('Создать ссылку для текущей палитры блоков', 'Create link for current palette')}
         >⬡ {t('Поделиться палитрой', 'Share palette')}</button>

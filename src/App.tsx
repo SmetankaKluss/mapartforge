@@ -64,6 +64,7 @@ import { computeSessionMaterials } from './components/MaterialsList';
 import { IconGlyph, mkIcons } from './components/IconGlyph';
 import 'driver.js/dist/driver.css';
 import './App.css';
+import { trackEvent } from './lib/analytics';
 
 const ANNOUNCEMENT = {
   id: 'mapkluss-v1.10.1-2026-05-07',
@@ -749,6 +750,7 @@ export default function App() {
     bg: { r: number; g: number; b: number; a: number } | null,
     grid: MapGrid,
   ) => {
+    trackEvent('blank_canvas_created', { map_wide: grid.wide, map_tall: grid.tall, has_background: Boolean(bg) });
     setShowNewCanvasModal(false);
     const width  = gridPixelWidth(grid);
     const height = gridPixelHeight(grid);
@@ -888,6 +890,7 @@ export default function App() {
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
+    trackEvent('map_mode_applied', { map_mode: mode });
     setMapMode(mode);
     setLayerState(prev => ({
       ...prev,
@@ -910,6 +913,7 @@ export default function App() {
   }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams]);
 
   const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
+    trackEvent('staircase_mode_applied', { staircase_mode: mode });
     setStaircaseMode(mode);
     setLayerState(prev => ({
       ...prev,
@@ -1627,7 +1631,11 @@ export default function App() {
           <div className="header-spacer" />
           <button
             className={`tour-btn artist-mode-btn${editorMode === 'artist' ? ' active' : ''}`}
-            onClick={() => setEditorMode(m => m === 'simple' ? 'artist' : 'simple')}
+            onClick={() => setEditorMode(m => {
+              const next = m === 'simple' ? 'artist' : 'simple';
+              trackEvent('artist_mode_toggled', { enabled: next === 'artist' });
+              return next;
+            })}
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
           ><IconGlyph icon={mkIcons.artist} /> {t('Художник', 'Artist')}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
@@ -1712,18 +1720,18 @@ export default function App() {
             <div className="new-canvas-row">
               <button
                 className="new-canvas-btn"
-                onClick={() => setShowNewCanvasModal(true)}
+                onClick={() => { trackEvent('new_canvas_clicked'); setShowNewCanvasModal(true); }}
                 disabled={processing}
                 title={t('Создать пустой холст для рисования с нуля', 'Create blank canvas to draw from scratch')}
               >{t('Новый холст', 'New canvas')}</button>
               <button
                 className="canvas-icon-btn"
-                onClick={handleOpenSaveModal}
+                onClick={() => { trackEvent('save_project_clicked'); handleOpenSaveModal(); }}
                 title={t('Сохранить проект', 'Save project')}
               ><IconGlyph icon={mkIcons.save} /></button>
               <button
                 className="canvas-icon-btn"
-                onClick={() => setShowProjectsPanel(true)}
+                onClick={() => { trackEvent('projects_panel_opened'); setShowProjectsPanel(true); }}
                 title={t('Мои проекты', 'My projects')}
               ><IconGlyph icon={mkIcons.project} /></button>
             </div>
@@ -1757,7 +1765,7 @@ export default function App() {
               <div className="crop-section">
                 <button
                   className="crop-tool-btn"
-                  onClick={() => setShowCropModal(true)}
+                  onClick={() => { trackEvent('crop_tool_opened', { map_wide: mapGrid.wide, map_tall: mapGrid.tall }); setShowCropModal(true); }}
                   disabled={processing}
                   title={t(`Обрезать изображение под пропорции карты ${pw}×${ph}`, `Crop image to map ratio ${pw}×${ph}`)}
                 >✂ {t('Обрезать', 'Crop')}</button>

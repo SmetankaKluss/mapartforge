@@ -25,6 +25,8 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_CLARITY_PROJECT_ID: wolhmrblof
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4

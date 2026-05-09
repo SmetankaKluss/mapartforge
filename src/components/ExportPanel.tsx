@@ -13,6 +13,7 @@ import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
 import { IconGlyph, mkIcons } from './IconGlyph';
+import { trackEvent } from '../lib/analytics';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
 function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
@@ -105,7 +106,21 @@ export function ExportPanel({
 
   const exportData = compareMode ? null : imageData;
 
+  function trackExport(format: string) {
+    trackEvent('export_clicked', {
+      format,
+      map_mode: mapMode,
+      staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
+      map_wide: mapGrid.wide,
+      map_tall: mapGrid.tall,
+      dithering: compareMode ? compareLeft : dithering,
+      compare_mode: compareMode,
+      artist_mode: Boolean(artistMode),
+    });
+  }
+
   function handlePng() {
+    trackExport(compareMode ? 'png_compare' : 'png');
     if (compareMode && hasCmp) {
       downloadPng(compareData!.left,  makePngFilename(mapGrid, compareLeft)  .replace('.png', '_left.png'));
       downloadPng(compareData!.right, makePngFilename(mapGrid, compareRight) .replace('.png', '_right.png'));
@@ -117,6 +132,7 @@ export function ExportPanel({
   async function handleShowcase() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    trackExport('showcase_png');
     setBusyShowcase(true);
     try {
       const blob = await generateShowcaseImage({
@@ -136,6 +152,7 @@ export function ExportPanel({
   async function handleMapDat() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    trackExport('map_dat');
     setBusyMapdat(true);
     try {
       await exportMapDat(src, mapGrid, activePalette);
@@ -147,6 +164,7 @@ export function ExportPanel({
   async function handleLitematic() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    trackExport('litematic');
     const structure = mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLiteFlat(true);
     try {
@@ -162,6 +180,7 @@ export function ExportPanel({
   async function handleZip() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    trackExport('litematic_zip');
     const structure     = mapMode === '3d' ? 'staircase' : 'flat';
     const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
     const zipFilename   = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
@@ -177,6 +196,7 @@ export function ExportPanel({
 
   async function handleHybridLitematic() {
     if (!hybridLayers || hybridLayers.length === 0) return;
+    trackExport('litematic_hybrid');
     setBusyHybrid(true);
     try {
       const has3D = hybridLayers.some(l => l.mapMode === '3d');
@@ -191,6 +211,7 @@ export function ExportPanel({
 
   async function handleLayerLitematic() {
     if (!activeLayerExport) return;
+    trackExport('litematic_layer');
     const structure = activeLayerExport.mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLayer(true);
     try {
@@ -211,6 +232,13 @@ export function ExportPanel({
   async function handleGetLink() {
     const src = compareMode ? compareData?.left ?? null : imageData;
     if (!src) return;
+    trackEvent('share_link_clicked', {
+      map_mode: mapMode,
+      map_wide: mapGrid.wide,
+      map_tall: mapGrid.tall,
+      dithering,
+      artist_mode: Boolean(artistMode),
+    });
     setLinkState('uploading');
     try {
       // Use sourceImage if available; otherwise use imageData as fallback for blank canvas projects
@@ -333,7 +361,10 @@ export function ExportPanel({
           <div className="link-row">
             <button
               className="link-export-btn tracker-export-btn"
-              onClick={onCreateTracker}
+              onClick={() => {
+                trackEvent('build_tracker_clicked', { map_mode: mapMode, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
+                onCreateTracker();
+              }}
               disabled={base}
               aria-label={t('Создать трекер постройки', 'Create build tracker')}
               title={t('Создать общий трекер сбора и постройки для команды', 'Create a shared gathering & building tracker for your team')}
@@ -346,7 +377,10 @@ export function ExportPanel({
           <div className="link-row">
             <button
               className="link-export-btn gif-pack-export-btn"
-              onClick={onExportGifPack}
+              onClick={() => {
+                trackEvent('export_clicked', { format: 'gif_litematic_pack', map_wide: mapGrid.wide, map_tall: mapGrid.tall });
+                onExportGifPack();
+              }}
               aria-label={t('Экспортировать GIF проект как Litematic ZIP', 'Export GIF project as Litematic ZIP')}
               title={t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
             >

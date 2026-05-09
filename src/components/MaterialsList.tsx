@@ -10,6 +10,7 @@ import { useLocale } from '../lib/locale';
 import { countSupportBlocks } from '../lib/exportLitematic';
 import type { SupportMode } from '../lib/exportLitematic';
 import { downloadFile } from '../lib/exportMaterials';
+import { trackEvent } from '../lib/analytics';
 
 interface Props {
   imageData: ImageData | null;
@@ -205,6 +206,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
   const numMaps = mapGrid.wide * mapGrid.tall;
 
   function handleCopy() {
+    trackEvent('materials_copied', { max_per_map: maxPerMap, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
     navigator.clipboard.writeText(buildCopyText(materials, total, maxPerMap, mapGrid)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -213,6 +215,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
 
   function handleDownload() {
     const mode = maxPerMap ? `max_per_map` : 'total';
+    trackEvent('materials_downloaded', { mode, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
     const text = buildCopyText(materials, total, maxPerMap, mapGrid);
     const csv = [
       `Block Name,${maxPerMap ? 'MAX/MAP' : 'Total'},Stacks,Shulkers`,
@@ -236,7 +239,10 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
           <input
             type="checkbox"
             checked={maxPerMap}
-            onChange={e => setMaxPerMap(e.target.checked)}
+            onChange={e => {
+              trackEvent('materials_mode_changed', { max_per_map: e.target.checked, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
+              setMaxPerMap(e.target.checked);
+            }}
           />
           <span>{t('Макс / карта', 'Max / map')}</span>
         </label>

@@ -4,6 +4,7 @@ import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
 import type { MapGrid } from '../lib/types';
+import { trackEvent } from '../lib/analytics';
 
 interface Props {
   dithering: DitheringMode;
@@ -208,15 +209,18 @@ export function Controls({
     if (customMode === 'pixels') {
       const pw = Math.max(1, Math.min(MAX_PX, customPxW));
       const ph = Math.max(1, Math.min(MAX_PX, customPxH));
-      onMapGridChange({
+      const nextGrid = {
         wide: Math.max(1, Math.ceil(pw / MAP_BLOCK_SIZE)),
         tall: Math.max(1, Math.ceil(ph / MAP_BLOCK_SIZE)),
         pixelW: pw,
         pixelH: ph,
-      });
+      };
+      trackEvent('map_size_changed', { mode: 'custom_pixels', map_wide: nextGrid.wide, map_tall: nextGrid.tall, pixel_w: pw, pixel_h: ph });
+      onMapGridChange(nextGrid);
     } else {
       const w = Math.max(1, Math.min(MAX_CUSTOM, customW));
       const h = Math.max(1, Math.min(MAX_CUSTOM, customH));
+      trackEvent('map_size_changed', { mode: 'custom_maps', map_wide: w, map_tall: h });
       onMapGridChange({ wide: w, tall: h });
     }
     setShowCustom(false);
@@ -248,7 +252,11 @@ export function Controls({
               <button
                 key={`${g.wide}x${g.tall}`}
                 className={`grid-btn ${active ? 'active' : ''}`}
-                onClick={() => { onMapGridChange(g); setShowCustom(false); }}
+                onClick={() => {
+                  trackEvent('map_size_changed', { mode: 'preset', map_wide: g.wide, map_tall: g.tall });
+                  onMapGridChange(g);
+                  setShowCustom(false);
+                }}
                 disabled={processing}
                 title={`${g.wide}×${g.tall} maps`}
               >
@@ -384,13 +392,13 @@ export function Controls({
           <div className="mode-toggle">
             <button
               className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
-              onClick={() => onMapModeChange('2d')}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); onMapModeChange('2d'); }}
               disabled={processing}
               title="2D flat — one shade per color, ~61 colors"
             >2D Flat</button>
             <button
               className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
-              onClick={() => onMapModeChange('3d')}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '3d' }); onMapModeChange('3d'); }}
               disabled={processing}
               title="3D staircase — 3 shades per color, ~183 colors"
             >3D Stair</button>
@@ -399,14 +407,14 @@ export function Controls({
             <div className="mode-toggle" style={{ marginTop: '6px' }}>
               <button
                 className={`mode-btn${staircaseMode === 'classic' ? ' active' : ''}`}
-                onClick={() => onStaircaseModeChange('classic')}
+                onClick={() => { trackEvent('staircase_mode_changed', { staircase_mode: 'classic' }); onStaircaseModeChange('classic'); }}
                 disabled={processing}
                 title="Classic: each shade at its own height"
                 style={{ fontSize: '10px' }}
               >Classic</button>
               <button
                 className={`mode-btn${staircaseMode === 'optimized' ? ' active' : ''}`}
-                onClick={() => onStaircaseModeChange('optimized')}
+                onClick={() => { trackEvent('staircase_mode_changed', { staircase_mode: 'optimized' }); onStaircaseModeChange('optimized'); }}
                 disabled={processing}
                 title="Optimized: all shades at height 0, texture only"
                 style={{ fontSize: '10px' }}
@@ -441,7 +449,7 @@ export function Controls({
                 name="dithering"
                 value={value}
                 checked={dithering === value}
-                onChange={() => onDitheringChange(value)}
+                onChange={() => { trackEvent('dithering_changed', { dithering: value }); onDitheringChange(value); }}
                 disabled={processing}
               />
               <span className="dither-label">{label}</span>
@@ -476,7 +484,7 @@ export function Controls({
               <button
                 key={s}
                 className={`bn-scale-btn ${bnScale === s ? 'active' : ''}`}
-                onClick={() => onBnScaleChange(s)}
+                onClick={() => { trackEvent('blue_noise_scale_changed', { scale: s }); onBnScaleChange(s); }}
                 disabled={processing}
                 title={`${s}×${s} block area per noise threshold`}
               >
@@ -602,7 +610,7 @@ export function Controls({
 
           <button
             className="kluss-reset-btn"
-            onClick={() => onKlussParamsChange(DEFAULT_KLUSS_PARAMS)}
+            onClick={() => { trackEvent('kluss_params_reset'); onKlussParamsChange(DEFAULT_KLUSS_PARAMS); }}
             disabled={processing}
           >{t('Сбросить настройки', 'Reset settings')}</button>
           </div>
@@ -628,8 +636,8 @@ export function Controls({
             step={1}
             value={intensity}
             onChange={(e) => onIntensityChange(Number(e.target.value))}
-            onMouseUp={(e) => onIntensityCommit(Number((e.target as HTMLInputElement).value))}
-            onTouchEnd={(e) => onIntensityCommit(Number((e.target as HTMLInputElement).value))}
+            onMouseUp={(e) => { const value = Number((e.target as HTMLInputElement).value); trackEvent('dithering_intensity_changed', { intensity: value, dithering }); onIntensityCommit(value); }}
+            onTouchEnd={(e) => { const value = Number((e.target as HTMLInputElement).value); trackEvent('dithering_intensity_changed', { intensity: value, dithering }); onIntensityCommit(value); }}
             disabled={processing}
             className="intensity-slider"
           />

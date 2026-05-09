@@ -4,6 +4,7 @@ import App from './App.tsx'
 import { LocaleProvider } from './lib/locale'
 import { BuildTracker } from './components/BuildTracker.tsx'
 import { ExamplesPage } from './components/ExamplesPage.tsx'
+import { initClarity, trackEvent } from './lib/analytics'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
 const searchParams = new URLSearchParams(window.location.search);
@@ -17,6 +18,9 @@ if (encodedPath) {
 // Simple path-based routing without react-router
 const path = window.location.pathname;
 const buildMatch = path.match(/^\/build\/([0-9a-f-]{36})$/i);
+
+initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
+trackEvent('app_route_opened', { path: window.location.pathname });
 
 const root = document.getElementById('root')!;
 
