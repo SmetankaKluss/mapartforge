@@ -229,7 +229,7 @@ export function GifModal({
                   const selected = selectedFrameIdxs.map(i => frames[i]);
                   onOpenAsProject(selected, {
                     dithering, intensity, mapMode: 'flat' as never,
-                    staircaseMode: 'classic', adjustments, bnScale,
+                    staircaseMode: 'optimized', adjustments, bnScale,
                     klussParams, blockSelection,
                   });
                 }}

@@ -32,9 +32,9 @@ export type SupportMode =
   | 2  // 1 block under every art block
   | 3; // 2 blocks under every art block
 
-interface ColorEntry { baseId: number; shade: number }
+export interface ColorEntry { baseId: number; shade: number }
 
-function buildLookup(cp: ComputedPalette): Map<number, ColorEntry> {
+export function buildLookup(cp: ComputedPalette): Map<number, ColorEntry> {
   const m = new Map<number, ColorEntry>();
   for (const c of cp.colors) {
     const key = (c.r << 16) | (c.g << 8) | c.b;
@@ -111,7 +111,7 @@ function groundSegment(col: number[], start: number, end: number): void {
  * Classic 3D: each X-column is an independent "sausage".
  * Each solid segment is normalised independently so no island floats.
  */
-function computeStaircaseClassic(
+export function computeStaircaseClassic(
   data: Uint8ClampedArray,
   width: number,
   height: number,
@@ -185,7 +185,7 @@ function applyValleyAlgorithm(col: number[]): void {
   }
 }
 
-function computeStaircaseOptimized(
+export function computeStaircaseOptimized(
   data: Uint8ClampedArray,
   width: number,
   height: number,
@@ -619,7 +619,7 @@ async function buildHybridBytes(
   let maxY3D = 0;
   if (has3D) {
     // Use the first 3D layer's staircaseMode
-    const mode3D = layers.find(l => l.mapMode === '3d')?.staircaseMode ?? 'classic';
+    const mode3D = layers.find(l => l.mapMode === '3d')?.staircaseMode ?? 'optimized';
     const sc = mode3D === 'optimized'
       ? computeStaircaseOptimized(data3D, sizeX, sizeZ, lookup)
       : computeStaircaseClassic(data3D, sizeX, sizeZ, lookup);

@@ -10,13 +10,14 @@ import '../buildTracker.css';
 interface Props {
   materials: SessionMaterial[];
   imageData: ImageData;
+  previewImageData?: ImageData;
   mapGrid: { wide: number; tall: number };
   cp: ComputedPalette;
   blockGroups: BlockSelection;
   onClose: () => void;
 }
 
-export function BuildTrackerModal({ materials, imageData, mapGrid, cp, blockGroups, onClose }: Props) {
+export function BuildTrackerModal({ materials, imageData, previewImageData, mapGrid, cp, blockGroups, onClose }: Props) {
   const { t } = useLocale();
   const [state, setState] = useState<'idle' | 'creating' | 'done' | 'error'>('idle');
   const [url, setUrl] = useState('');
@@ -30,7 +31,7 @@ export function BuildTrackerModal({ materials, imageData, mapGrid, cp, blockGrou
   async function handleCreate() {
     setState('creating');
     try {
-      const preview = buildThumbnail(imageData);
+      const preview = buildThumbnail(previewImageData ?? imageData);
 
       let litematicB64: string | undefined;
       try {

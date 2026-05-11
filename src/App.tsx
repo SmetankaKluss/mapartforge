@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { type SelectionMask, selectAllMask, invertMask, countSelected } from './lib/selectionMask';
+import type { MagicWandMatchMode } from './lib/selectionMask';
 import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
@@ -62,6 +63,7 @@ import { BuildTrackerModal } from './components/BuildTrackerModal';
 import type { SessionMaterial } from './lib/buildSession';
 import { computeSessionMaterials } from './components/MaterialsList';
 import { IconGlyph, mkIcons } from './components/IconGlyph';
+import { buildFinalPreview } from './lib/finalPreview';
 import 'driver.js/dist/driver.css';
 import './App.css';
 import { trackEvent } from './lib/analytics';
@@ -240,7 +242,7 @@ export default function App() {
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
   const [compareData, setCompareData]   = useState<{ left: ImageData; right: ImageData } | null>(null);
   const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
-  const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'classic');
+  const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'optimized');
   const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
   const [dithering, setDithering]       = useState<DitheringMode>(coerceDitheringMode(saved.dithering));
   const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
@@ -249,6 +251,7 @@ export default function App() {
   const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
   const [processing, setProcessing]     = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [showShadeWarnings, setShowShadeWarnings] = useState(false);
   const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -266,6 +269,9 @@ export default function App() {
   const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
   const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
   const [selectionMask, setSelectionMask] = useState<SelectionMask | null>(null);
+  const [magicWandTolerance, setMagicWandTolerance] = useState<number>(0.04);
+  const [magicWandContiguous, setMagicWandContiguous] = useState(true);
+  const [magicWandMode, setMagicWandMode] = useState<MagicWandMatchMode>('similar');
   const [patternBlocks, setPatternBlocks] = useState<PaintBlock[]>([]);
   const [showPatternPicker, setShowPatternPicker] = useState<number | null>(null); // index of open picker
   const [brushSize, setBrushSize]       = useState<number>(1);
@@ -389,7 +395,7 @@ export default function App() {
     const layer = layersRef.current.find(l => l.id === activeLayerId);
     if (!layer) return;
     setMapMode(layer.mapMode ?? '2d');
-    setStaircaseMode(layer.staircaseMode ?? 'classic');
+    setStaircaseMode(layer.staircaseMode ?? 'optimized');
     if (layer.dithering !== undefined) setDithering(coerceDitheringMode(layer.dithering));
     setSelectionMask(null);
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
@@ -1192,7 +1198,7 @@ export default function App() {
     exportLitematicHybrid(visLayers.map(l => ({
       imageData: l.imageData!,
       mapMode: l.mapMode ?? '2d',
-      staircaseMode: l.staircaseMode ?? 'classic',
+      staircaseMode: l.staircaseMode ?? 'optimized',
     })), ap, groups, 'MapartForge');
   }, []);
 
@@ -1429,18 +1435,22 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const switchTourStep = useCallback((tab: 'settings' | 'palette' | 'export') => {
+    setMobileTab(tab);
+  }, []);
+
   // ── Onboarding tour ───────────────────────────────────────────────────────
   const startTour = useCallback((tourType: TourType) => {
     markTourDone(tourType);
-    createTour(tourType, setMobileTab, lang).drive();
-  }, [lang]);
+    createTour(tourType, switchTourStep, lang).drive();
+  }, [lang, switchTourStep]);
   useEffect(() => {
     if (shouldAutoStart()) {
-      const timer = setTimeout(() => createTour('basic', setMobileTab, lang).drive(), 600);
+      const timer = setTimeout(() => createTour('basic', switchTourStep, lang).drive(), 600);
       return () => clearTimeout(timer);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang, switchTourStep]);
 
   // ── Import map.dat ────────────────────────────────────────────────────────
   const handleDatFile = useCallback(async (file: File) => {
@@ -1486,6 +1496,16 @@ export default function App() {
     if (!hasAny) return null;
     return compositeLayersToImageData(layers, pw, ph);
   }, [layers, pw, ph]);
+  const previewLayers = useMemo(() => layers
+    .filter(layer => layer.visible && layer.imageData)
+    .map(layer => ({
+      imageData: layer.imageData!,
+      mapMode: layer.mapMode ?? '2d',
+      staircaseMode: layer.staircaseMode ?? 'optimized',
+    })), [layers]);
+
+  const finalPreview = useMemo(() => buildFinalPreview(previewLayers, activePalette), [previewLayers, activePalette]);
+  const previewImageData = finalPreview?.displayImage ?? compositeImageData;
 
   // Composite of all visible layers EXCEPT the active one — shown as backdrop during painting
   const otherLayersData: ImageData | null = useMemo(() => {
@@ -1500,9 +1520,29 @@ export default function App() {
   }, [compositeImageData, activePalette, blockSelection, mapGrid]);
 
   // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
-  exportRef.current = { imageData: compositeImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
+  exportRef.current = { imageData: previewImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
 
   const hasContent = compositeImageData !== null || compareData !== null;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Control') setShowShadeWarnings(true);
+    }
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === 'Control') setShowShadeWarnings(false);
+    }
+    function handleBlur() {
+      setShowShadeWarnings(false);
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   // ── Project history (IndexedDB) ──────────────────────────────────────────────
   // Declared after compositeImageData to avoid TDZ in the thumbnail handler.
@@ -1795,17 +1835,17 @@ export default function App() {
               t={t}
             />
             <div className="panel-section">
-            <Adjustments
-              adjustments={adjustments}
-              sourceImage={sourceImage}
-              onChange={handleAdjChange}
-              onCommit={handleAdjCommit}
-              disabled={processing || !showAdjustments}
-              showAdjustments={showAdjustments}
-              onToggleAdjustments={handleToggleAdjustments}
-              collapsed={!!collapsedSections['adjustments']}
-              onToggle={() => handleToggleSection('adjustments')}
-            />
+              <Adjustments
+                adjustments={adjustments}
+                sourceImage={sourceImage}
+                onChange={handleAdjChange}
+                onCommit={handleAdjCommit}
+                disabled={processing || !showAdjustments}
+                showAdjustments={showAdjustments}
+                onToggleAdjustments={handleToggleAdjustments}
+                collapsed={!!collapsedSections['adjustments']}
+                onToggle={() => handleToggleSection('adjustments')}
+              />
             </div>
           </div>
           <div className="panel-footer">
@@ -1973,6 +2013,59 @@ export default function App() {
                         title={t('Волшебная палочка (W)', 'Magic wand (W)')}
                       ><IconGlyph icon={mkIcons.wand} /></button>
                     </div>
+                    {activeTool === 'select-magic' && (
+                      <div className="toolbar-group wand-controls">
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'similar' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('similar')}
+                          title={t('Сравнивать по близости цвета', 'Match by color similarity')}
+                        >
+                          {t('Похоже', 'Similar')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'exact' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('exact')}
+                          title={t('Искать только точное совпадение цвета', 'Match only exact color')}
+                        >
+                          {t('Точно', 'Exact')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'alpha' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('alpha')}
+                          title={t('Сравнивать только прозрачность и пустые области', 'Match transparency only')}
+                        >
+                          {t('Прозр.', 'Alpha')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandContiguous ? ' active' : ''}`}
+                          onClick={() => setMagicWandContiguous(true)}
+                          title={t('Выделять только связанную область', 'Select only the connected area')}
+                        >
+                          {t('Смежные', 'Contiguous')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${!magicWandContiguous ? ' active' : ''}`}
+                          onClick={() => setMagicWandContiguous(false)}
+                          title={t('Искать похожие пиксели по всему слою', 'Find similar pixels across the whole layer')}
+                        >
+                          {t('Везде', 'Global')}
+                        </button>
+                        {magicWandMode === 'similar' && (
+                          <label className="wand-tolerance">
+                            <span>{t('Чувств.', 'Tol.')}</span>
+                            <input
+                              type="range"
+                              min={0.005}
+                              max={0.12}
+                              step={0.005}
+                              value={magicWandTolerance}
+                              onChange={(e) => setMagicWandTolerance(Number(e.target.value))}
+                            />
+                            <span className="wand-tolerance-value">{magicWandTolerance.toFixed(3)}</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
                     {selectionMask && (
                       <div className="toolbar-group selection-ops">
                         <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><IconGlyph icon={mkIcons.trash} /></button>
@@ -1983,7 +2076,6 @@ export default function App() {
                         <span className="selection-count">{selectedPixelCount}px</span>
                       </div>
                     )}
-
                     {/* Pattern-tile tool */}
                     <div className="toolbar-sep" />
                     <div className="toolbar-group">
@@ -2242,6 +2334,11 @@ export default function App() {
             <span className="corner corner-tr" />
             <span className="corner corner-bl" />
             <span className="corner corner-br" />
+            {!compareMode && editorMode === 'artist' && finalPreview?.has3D && finalPreview.shadeWarnings.some(Boolean) && (
+              <div className={`shade-warning-hint${showShadeWarnings ? ' active' : ''}`}>
+                {t('Ctrl: показать проблемные пиксели', 'Ctrl: show shade problem pixels')}
+              </div>
+            )}
 
             {compareMode ? (
               <CompareView
@@ -2256,7 +2353,7 @@ export default function App() {
               <div>
                 <PreviewCanvas
                   mode={textureMode}
-                  imageData={compositeImageData ?? imageData} paintData={imageData} originalData={originalData}
+                  imageData={previewImageData ?? imageData} paintData={imageData} originalData={originalData}
                   showOriginal={false} showGrid={showGrid}
                   width={pw} height={ph} scale={displayScale}
                   cp={activePalette} blockSelection={blockSelection}
@@ -2275,10 +2372,15 @@ export default function App() {
                   onSplitPosChange={setSplitPos}
                   selectionMask={selectionMask}
                   onSelectionChange={setSelectionMask}
+                  magicWandTolerance={magicWandTolerance}
+                  magicWandContiguous={magicWandContiguous}
+                  magicWandMode={magicWandMode}
                   activePattern={activePattern}
                   patternAnchorMode={patternAnchorMode}
                   gradientStops={gradientStops}
                   gradientDithering={gradientDithering}
+                  warningMask={finalPreview?.shadeWarnings ?? null}
+                  showWarningMask={editorMode === 'artist' && showShadeWarnings}
                   onZoomWheel={handleCanvasWheel}
                 />
               </div>
@@ -2435,6 +2537,7 @@ export default function App() {
           <div className="panel-footer mobile-export-content">
             <ExportPanel
               imageData={compositeImageData}
+              previewImageData={previewImageData}
               compareData={compareData}
               compareMode={compareMode}
               dithering={dithering}
@@ -2452,12 +2555,12 @@ export default function App() {
               hybridLayers={layers.filter(l => l.visible && l.imageData).map(l => ({
                 imageData: l.imageData!,
                 mapMode: l.mapMode ?? '2d',
-                staircaseMode: l.staircaseMode ?? 'classic',
+                staircaseMode: l.staircaseMode ?? 'optimized',
               }))}
               activeLayerExport={activeLayer?.imageData ? {
                 imageData: activeLayer.imageData,
                 mapMode: activeLayer.mapMode ?? '2d',
-                staircaseMode: activeLayer.staircaseMode ?? 'classic',
+                staircaseMode: activeLayer.staircaseMode ?? 'optimized',
               } : undefined}
               sourceImage={sourceImage}
               intensity={intensity}
@@ -2473,15 +2576,15 @@ export default function App() {
         <div className="mobile-tab-bar">
           <button className={`mobile-tab-btn${mobileTab === 'settings' ? ' active' : ''}`} onClick={() => setMobileTab('settings')}>
             <IconGlyph icon={mkIcons.sliders} className="mobile-tab-icon" />
-            <span className="mobile-tab-label">Настройки</span>
+            <span className="mobile-tab-label">{t('Настройки', 'Settings')}</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
             <IconGlyph icon={mkIcons.palette} className="mobile-tab-icon" />
-            <span className="mobile-tab-label">Палитра</span>
+            <span className="mobile-tab-label">{t('Палитра', 'Palette')}</span>
           </button>
           <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
             <IconGlyph icon={mkIcons.download} className="mobile-tab-icon" />
-            <span className="mobile-tab-label">Экспорт</span>
+            <span className="mobile-tab-label">{t('Экспорт', 'Export')}</span>
           </button>
         </div>
       </div>
@@ -2549,7 +2652,7 @@ export default function App() {
     {/* ── Perspective preview modal ── */}
     {showPerspective && (
       <PerspectiveModal
-        imageData={compareMode ? (compareData?.left ?? compositeImageData) : compositeImageData}
+        imageData={compareMode ? (compareData?.left ?? previewImageData) : previewImageData}
         onClose={() => setShowPerspective(false)}
       />
     )}
@@ -2559,6 +2662,7 @@ export default function App() {
       <BuildTrackerModal
         materials={trackerMaterials}
         imageData={compositeImageData}
+        previewImageData={previewImageData ?? undefined}
         mapGrid={mapGrid}
         cp={exportRef.current.activePalette}
         blockGroups={exportRef.current.blockSelection as BlockSelection}

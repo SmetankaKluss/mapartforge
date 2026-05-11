@@ -31,6 +31,7 @@ function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
 
 interface Props {
   imageData:   ImageData | null;
+  previewImageData?: ImageData | null;
   compareData: { left: ImageData; right: ImageData } | null;
   compareMode: boolean;
   dithering:   DitheringMode;
@@ -76,6 +77,7 @@ function makePngFilename(grid: MapGrid, dithering: DitheringMode): string {
 }
 
 export function ExportPanel({
+  previewImageData,
   imageData, compareData, compareMode,
   dithering, compareLeft, compareRight,
   mapGrid, mapMode, staircaseMode, activePalette, blockSelection, disabled,
@@ -96,15 +98,15 @@ export function ExportPanel({
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
-  const hasImage   = imageData !== null;
+  const hasPreview = (previewImageData ?? imageData) !== null;
   const hasCmp     = compareData !== null;
-  const hasContent = compareMode ? hasCmp : hasImage;
+  const hasContent = compareMode ? hasCmp : hasPreview;
   const mapCount   = mapGrid.wide * mapGrid.tall;
   const disabledReason = disabled
     ? t('Обработка ещё идёт.', 'Processing is still running.')
     : t('Сначала обработай изображение.', 'Process an image first.');
 
-  const exportData = compareMode ? null : imageData;
+  const previewData = compareMode ? null : (previewImageData ?? imageData);
 
   function trackExport(format: string) {
     trackEvent('export_clicked', {
@@ -124,13 +126,13 @@ export function ExportPanel({
     if (compareMode && hasCmp) {
       downloadPng(compareData!.left,  makePngFilename(mapGrid, compareLeft)  .replace('.png', '_left.png'));
       downloadPng(compareData!.right, makePngFilename(mapGrid, compareRight) .replace('.png', '_right.png'));
-    } else if (exportData) {
-      downloadPng(exportData, makePngFilename(mapGrid, dithering));
+    } else if (previewData) {
+      downloadPng(previewData, makePngFilename(mapGrid, dithering));
     }
   }
 
   async function handleShowcase() {
-    const src = compareMode ? compareData?.left ?? null : imageData;
+    const src = compareMode ? compareData?.left ?? null : (previewImageData ?? imageData);
     if (!src) return;
     trackExport('showcase_png');
     setBusyShowcase(true);
@@ -150,7 +152,7 @@ export function ExportPanel({
   }
 
   async function handleMapDat() {
-    const src = compareMode ? compareData?.left ?? null : imageData;
+    const src = compareMode ? compareData?.left ?? null : (previewImageData ?? imageData);
     if (!src) return;
     trackExport('map_dat');
     setBusyMapdat(true);
@@ -230,8 +232,9 @@ export function ExportPanel({
   }
 
   async function handleGetLink() {
-    const src = compareMode ? compareData?.left ?? null : imageData;
-    if (!src) return;
+    const sourceData = compareMode ? compareData?.left ?? null : imageData;
+    const preview = compareMode ? compareData?.left ?? null : (previewImageData ?? imageData);
+    if (!sourceData || !preview) return;
     trackEvent('share_link_clicked', {
       map_mode: mapMode,
       map_wide: mapGrid.wide,
@@ -243,11 +246,11 @@ export function ExportPanel({
     try {
       // Use sourceImage if available; otherwise use imageData as fallback for blank canvas projects
       let imgToShare = sourceImage;
-      if (!imgToShare && src) {
-        imgToShare = await imageDataToHtmlImage(src);
+      if (!imgToShare && sourceData) {
+        imgToShare = await imageDataToHtmlImage(sourceData);
       }
       if (!imgToShare) return;
-      const url = await uploadPermalink(imgToShare, src, {
+      const url = await uploadPermalink(imgToShare, preview, {
         dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, staircaseMode, bnScale,
       });
       setLinkUrl(url);

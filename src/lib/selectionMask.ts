@@ -1,4 +1,7 @@
+import { oklabDistance, rgbToOklab } from './oklab';
+
 export type SelectionMask = Uint8Array; // length = w*h, 1=selected 0=not
+export type MagicWandMatchMode = 'similar' | 'exact' | 'alpha';
 
 export function selectAllMask(w: number, h: number): SelectionMask {
   return new Uint8Array(w * h).fill(1);
@@ -80,6 +83,100 @@ export function maskFromFloodFill(
     if (by > 0)     stack.push(flat - w);
     if (by < h - 1) stack.push(flat + w);
   }
+  return mask;
+}
+
+export function maskFromMagicWand(
+  imageData: ImageData,
+  startX: number,
+  startY: number,
+  w: number,
+  h: number,
+  tolerance: number,
+  contiguous: boolean,
+  mode: MagicWandMatchMode = 'similar',
+): SelectionMask {
+  const mask = new Uint8Array(w * h);
+  const { data } = imageData;
+  const startFlat = startY * w + startX;
+  const startIndex = startFlat * 4;
+  const startAlpha = data[startIndex + 3];
+  const startR = data[startIndex];
+  const startG = data[startIndex + 1];
+  const startB = data[startIndex + 2];
+  const startKey = (startR << 16) | (startG << 8) | startB;
+
+  const matchesAt = (flat: number): boolean => {
+    const bi = flat * 4;
+    const alpha = data[bi + 3];
+
+    if (mode === 'alpha') {
+      return startAlpha < 16 ? alpha < 16 : alpha >= 16;
+    }
+
+    if (startAlpha < 16 || alpha < 16) return false;
+
+    if (mode === 'exact') {
+      const key = (data[bi] << 16) | (data[bi + 1] << 8) | data[bi + 2];
+      return key === startKey;
+    }
+
+    if (Math.abs(alpha - startAlpha) > 48) return false;
+    const lab = rgbToOklab(data[bi], data[bi + 1], data[bi + 2]);
+    return oklabDistance(startLab, lab) <= tolerance;
+  };
+
+  if (mode !== 'alpha' && startAlpha < 16) {
+    if (contiguous) {
+      const visited = new Uint8Array(w * h);
+      const stack = [startFlat];
+      while (stack.length > 0) {
+        const flat = stack.pop()!;
+        if (visited[flat]) continue;
+        visited[flat] = 1;
+        const bx = flat % w;
+        const by = (flat / w) | 0;
+        const bi = flat * 4;
+        if (data[bi + 3] >= 16) continue;
+        mask[flat] = 1;
+        if (bx > 0) stack.push(flat - 1);
+        if (bx < w - 1) stack.push(flat + 1);
+        if (by > 0) stack.push(flat - w);
+        if (by < h - 1) stack.push(flat + w);
+      }
+      return mask;
+    }
+    for (let i = 0; i < w * h; i++) {
+      if (data[i * 4 + 3] < 16) mask[i] = 1;
+    }
+    return mask;
+  }
+
+  const startLab = rgbToOklab(data[startIndex], data[startIndex + 1], data[startIndex + 2]);
+
+  if (!contiguous) {
+    for (let i = 0; i < w * h; i++) {
+      if (matchesAt(i)) mask[i] = 1;
+    }
+    return mask;
+  }
+
+  const visited = new Uint8Array(w * h);
+  const stack = [startFlat];
+  while (stack.length > 0) {
+    const flat = stack.pop()!;
+    if (visited[flat]) continue;
+    visited[flat] = 1;
+    if (!matchesAt(flat)) continue;
+    mask[flat] = 1;
+    const bx = flat % w;
+    const by = (flat / w) | 0;
+    if (bx > 0) stack.push(flat - 1);
+    if (bx < w - 1) stack.push(flat + 1);
+    if (by > 0) stack.push(flat - w);
+    if (by < h - 1) stack.push(flat + w);
+  }
+
   return mask;
 }
 

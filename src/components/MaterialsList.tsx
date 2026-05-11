@@ -184,7 +184,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
   // Support block count (only in 3D staircase mode with a support block selected)
   const supportCount = useMemo(() => {
     if (!imageData || mapMode !== '3d' || !supportBlock || supportBlock === 'air' || !supportMode) return 0;
-    return countSupportBlocks(imageData, cp, blockSelection, staircaseMode ?? 'classic', supportMode);
+    return countSupportBlocks(imageData, cp, blockSelection, staircaseMode ?? 'optimized', supportMode);
   }, [imageData, cp, blockSelection, mapMode, staircaseMode, supportBlock, supportMode]);
 
   // Cheap derivation: pick total or max-per-section based on toggle

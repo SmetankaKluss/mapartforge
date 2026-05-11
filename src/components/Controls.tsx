@@ -38,6 +38,11 @@ interface DitheringOption {
   tooltip: { fullName: string; description: string; bestFor: string };
 }
 
+interface DitheringGuide {
+  title: string;
+  body: string;
+}
+
 function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOption[] {
   return [
     {
@@ -123,6 +128,56 @@ function getDitheringOptions(t: (ru: string, en: string) => string): DitheringOp
   ];
 }
 
+function getDitheringGuide(mode: DitheringMode, t: (ru: string, en: string) => string): DitheringGuide {
+  switch (mode) {
+    case 'none':
+      return {
+        title: t('Чистый режим', 'Clean mode'),
+        body: t('Каждый пиксель заменяется ближайшим цветом палитры по расстоянию OKLAB, без смешивания с соседями. Подходит для логотипов, пиксель-арта и другой графики с чистыми краями, но на фото и мягких переходах могут появляться заметные ступени по тону.', 'Each pixel is replaced with the nearest palette color by OKLAB distance, without mixing with neighbors. Good for logos, pixel art, and other clean-edged graphics, but photos and soft gradients can show visible tone stepping.'),
+      };
+    case 'floyd-steinberg':
+      return {
+        title: t('Классическая диффузия', 'Classic diffusion'),
+        body: t('После замены пикселя ошибка цвета передаётся четырём соседям по схеме Флойда-Стейнберга. Это быстрый и универсальный режим для фото и обычных изображений, когда нужен живой рисунок без слишком тяжёлой структуры.', 'After each pixel is quantized, the color error is passed to four neighbors using the Floyd-Steinberg scheme. This is a fast general-purpose mode for photos and mixed imagery when you want lively tone reconstruction without a heavy structure.'),
+      };
+    case 'stucki':
+      return {
+        title: t('Широкая диффузия', 'Wide diffusion'),
+        body: t('Ошибка цвета распределяется по более широкому ядру из двенадцати соседей, поэтому переходы получаются мягче и ровнее. Хорошо подходит для портретов, фото и больших градиентов, где важна плавность, а не предельно жёсткий край.', 'Color error is spread over a wider twelve-neighbor kernel, so transitions become softer and smoother. Works well for portraits, photos, and broad gradients where smoothness matters more than razor-sharp edges.'),
+      };
+    case 'jjn':
+      return {
+        title: t('Мягкая широкая сетка', 'Soft wide kernel'),
+        body: t('Режим Jarvis–Judice–Ninke тоже использует расширенное ядро, но распределяет ошибку ещё равномернее вокруг пикселя. Подходит для детальных фотографий и сложных текстур, где нужно аккуратно собирать промежуточные тона.', 'Jarvis-Judice-Ninke also uses a wide kernel, but spreads error even more evenly around the pixel. Good for detailed photos and complex textures where intermediate tones need to be reconstructed carefully.'),
+      };
+    case 'atkinson':
+      return {
+        title: t('Контрастная диффузия', 'Contrast-preserving diffusion'),
+        body: t('Передаёт соседям только часть ошибки, поэтому изображение сохраняет больше жёсткости и светлых акцентов. Полезен для иллюстраций, контрастных кадров и рисунков, где не хочется слишком размягчать форму.', 'Only part of the error is diffused to neighbors, so the image keeps more crispness and bright accents. Useful for illustrations, high-contrast scenes, and artwork where you do not want shapes to soften too much.'),
+      };
+    case 'blue-noise':
+      return {
+        title: t('Шумовой порог', 'Noise-threshold mode'),
+        body: t('Цвет выбирается через пороговую карту на основе шумового рисунка, а не через перенос ошибки по соседям. Режим хорошо передаёт плавные переходы и богатые тона на крупных артах, но оставляет заметную мозаичную фактуру, особенно на коже и больших ровных участках.', 'Color is chosen through a noise-based threshold map instead of diffusing error into neighbors. This mode preserves smooth transitions and rich tones on large artwork, but it leaves a visible mosaic texture, especially on skin and broad even areas.'),
+      };
+    case 'yliluoma2':
+      return {
+        title: t('Паттерновый режим', 'Pattern mode'),
+        body: t('Цвет собирается из повторяющихся узоров палитры, а не из обычной диффузии ошибки, поэтому изображение выглядит более сеточно и предсказуемо. Лучше всего подходит для пиксель-арта, ретро-графики и жёстких форм, а на мягких фотографиях может смотреться слишком регулярным.', 'Color is built from repeating palette patterns instead of ordinary error diffusion, so the image feels more gridded and controlled. Best for pixel art, retro graphics, and hard-edged forms, while soft photos can look too regular.'),
+      };
+    case 'kluss':
+      return {
+        title: t('Гибридный режим', 'Hybrid mode'),
+        body: t('Режим сначала ищет спокойные однородные области и оставляет их чистыми, а затем добавляет дизеринг только там, где без него теряются тени и переходы. Обычно хорошо работает на аниме, иллюстрациях и артах с крупными заливками, где важно не разрушить контур лишней рябью.', 'This mode first finds calm uniform areas and keeps them clean, then adds dithering only where shadows and transitions would otherwise collapse. It usually works well for anime, illustrations, and artwork with large fills where preserving the contour matters.'),
+      };
+    default:
+      return {
+        title: t('Режим дизеринга', 'Dithering mode'),
+        body: t('Выбранный режим определяет, как палитра Minecraft будет собирать промежуточные оттенки и насколько заметной окажется итоговая фактура.', 'The selected mode determines how the Minecraft palette reconstructs intermediate tones and how visible the final texture becomes.'),
+      };
+  }
+}
+
 const ERROR_DIFFUSION: DitheringMode[] = ['floyd-steinberg', 'stucki', 'jjn', 'atkinson'];
 
 const MAX_CUSTOM = 100;
@@ -170,6 +225,8 @@ export function Controls({
 }: Props) {
   const DITHERING_OPTIONS = getDitheringOptions(t);
   const showIntensity = dithering !== 'none';
+  const activeDitherOption = DITHERING_OPTIONS.find(option => option.value === dithering);
+  const ditherGuide = getDitheringGuide(dithering, t);
   const blockW = mapGrid.wide * MAP_BLOCK_SIZE;
   const blockH = mapGrid.tall * MAP_BLOCK_SIZE;
 
@@ -468,6 +525,13 @@ export function Controls({
             </div>
           );
         })()}
+        <div className="dither-guide">
+          <div className="dither-guide-header">
+            <span className="dither-guide-title">{ditherGuide.title}</span>
+            {activeDitherOption && <span className="dither-guide-chip">{activeDitherOption.label}</span>}
+          </div>
+          <p className="dither-guide-summary">{ditherGuide.body}</p>
+        </div>
         </div>
       </section>
 

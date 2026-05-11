@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import { MapCanvas, drawImageData } from './MapCanvas';
-import { type SelectionMask, maskFromRect, maskFromPolygon, maskFromFloodFill, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
+import { type MagicWandMatchMode, type SelectionMask, maskFromRect, maskFromPolygon, maskFromMagicWand, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
 import { BlockCanvas } from './BlockCanvas';
 import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
@@ -116,11 +116,16 @@ interface Props {
   onSplitPosChange?: (p: number) => void;
   selectionMask?: SelectionMask | null;
   onSelectionChange?: (mask: SelectionMask | null) => void;
+  magicWandTolerance?: number;
+  magicWandContiguous?: boolean;
+  magicWandMode?: MagicWandMatchMode;
   activePattern?: PatternDefinition | null;
   patternAnchorMode?: 'canvas' | 'brush';
   gradientStops?: GradientStop[];
   gradientDithering?: 'none' | 'ordered';
   overlayRef?: React.RefObject<HTMLCanvasElement | null>;
+  warningMask?: Uint8Array | null;
+  showWarningMask?: boolean;
   onZoomWheel?: (e: WheelEvent) => void;
 }
 
@@ -523,9 +528,14 @@ export function PreviewCanvas({
   onTextCommit,
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
+  magicWandTolerance = 0.04,
+  magicWandContiguous = true,
+  magicWandMode = 'similar',
   activePattern, patternAnchorMode, gradientStops, gradientDithering,
+  warningMask, showWarningMask,
   onZoomWheel,
 }: Props) {
+  const [clarityMirrorSrc, setClarityMirrorSrc] = useState<string | null>(null);
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
   const [mousePos, setMousePos]       = useState({ x: 0, y: 0 });
@@ -556,6 +566,8 @@ export function PreviewCanvas({
     addMode: 'replace' | 'add' | 'sub';
   } | null>(null);
   const selectionMaskRef = useRef<SelectionMask | null>(null);
+  const magicPreviewMaskRef = useRef<SelectionMask | null>(null);
+  const magicPreviewKeyRef = useRef<string>('');
   const antsPhaseRef = useRef(0);
 
   // Floating selection drag (move selection content)
@@ -636,10 +648,15 @@ export function PreviewCanvas({
     brushSize: number; showGrid: boolean;
     otherLayersData: ImageData | null | undefined;
     selectionMask: SelectionMask | null | undefined;
+    magicWandTolerance: number;
+    magicWandContiguous: boolean;
+    magicWandMode: MagicWandMatchMode;
     activePattern: PatternDefinition | null | undefined;
     patternAnchorMode: 'canvas' | 'brush' | undefined;
     gradientStops: GradientStop[] | undefined;
     gradientDithering: 'none' | 'ordered' | undefined;
+    warningMask: Uint8Array | null | undefined;
+    showWarningMask: boolean | undefined;
   }>({
     activeTool: null, paintBlock: null,
     patternBlocks: [],
@@ -648,14 +665,41 @@ export function PreviewCanvas({
     brushSize: 1, showGrid: false,
     otherLayersData: null,
     selectionMask: null,
+    magicWandTolerance: 0.04,
+    magicWandContiguous: true,
+    magicWandMode: 'similar',
     activePattern: null,
     patternAnchorMode: undefined,
     gradientStops: undefined,
     gradientDithering: undefined,
+    warningMask: null,
+    showWarningMask: false,
   });
 
   const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
-  propsRef.current = { activeTool, paintBlock, patternBlocks, scale, width, height, cp, colorLookup, brushSize, showGrid, otherLayersData, selectionMask, activePattern, patternAnchorMode, gradientStops, gradientDithering };
+  propsRef.current = {
+    activeTool,
+    paintBlock,
+    patternBlocks,
+    scale,
+    width,
+    height,
+    cp,
+    colorLookup,
+    brushSize,
+    showGrid,
+    otherLayersData,
+    selectionMask,
+    magicWandTolerance,
+    magicWandContiguous,
+    magicWandMode,
+    activePattern,
+    patternAnchorMode,
+    gradientStops,
+    gradientDithering,
+    warningMask,
+    showWarningMask,
+  };
   selectionMaskRef.current = selectionMask ?? null;
   onSplitPosChangeRef.current = onSplitPosChange;
 
@@ -664,6 +708,49 @@ export function PreviewCanvas({
     if (buf && otherLayersData) return compositeTwo(otherLayersData, buf, width, height);
     return buf ?? imageData;
   })();
+
+  useEffect(() => {
+    if (!displayImageData) {
+      setClarityMirrorSrc(null);
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = displayImageData.width;
+    canvas.height = displayImageData.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setClarityMirrorSrc(null);
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleId: number | null = null;
+
+    const run = () => {
+      if (cancelled) return;
+      ctx.putImageData(displayImageData, 0, 0);
+      try {
+        const src = canvas.toDataURL('image/png');
+        if (!cancelled) setClarityMirrorSrc(src);
+      } catch {
+        if (!cancelled) setClarityMirrorSrc(null);
+      }
+    };
+
+    if ('requestIdleCallback' in globalThis) {
+      idleId = globalThis.requestIdleCallback(run);
+    } else {
+      timeoutId = globalThis.setTimeout(run, 0);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && 'cancelIdleCallback' in globalThis) globalThis.cancelIdleCallback(idleId);
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    };
+  }, [displayImageData]);
 
   // ── Text preview effect — draws text overlay + selection box ───────────────
   // useLayoutEffect runs synchronously before paint — keeps canvas in sync
@@ -812,8 +899,32 @@ export function PreviewCanvas({
         return;
       }
 
-      if (!mask) { ctx.clearRect(0, 0, cw, ch); return; }
-      drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
+      ctx.clearRect(0, 0, cw, ch);
+      const { warningMask: wMask, showWarningMask: showWarnings } = propsRef.current;
+      if (showWarnings && wMask) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 90, 90, 0.34)';
+        for (let py = 0; py < h; py++) {
+          for (let px = 0; px < w; px++) {
+            if (!wMask[py * w + px]) continue;
+            ctx.fillRect(px * s, py * s, s, s);
+          }
+        }
+        ctx.restore();
+      }
+      const previewMask = magicPreviewMaskRef.current;
+      if (previewMask) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(87, 255, 110, 0.18)';
+        for (let py = 0; py < h; py++) {
+          for (let px = 0; px < w; px++) {
+            if (!previewMask[py * w + px]) continue;
+            ctx.fillRect(px * s, py * s, s, s);
+          }
+        }
+        ctx.restore();
+      }
+      if (mask) drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
     }
     antsRafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(antsRafRef.current);
@@ -1403,7 +1514,18 @@ export function PreviewCanvas({
 
       if (activeTool === 'select-magic') {
         if (!paintData) return;
-        const newMask = maskFromFloodFill(paintData, px, py, colorLookup, width, height);
+        magicPreviewMaskRef.current = null;
+        magicPreviewKeyRef.current = '';
+        const newMask = maskFromMagicWand(
+          paintData,
+          px,
+          py,
+          width,
+          height,
+          magicWandTolerance,
+          magicWandContiguous,
+          magicWandMode,
+        );
         let finalMask: SelectionMask = newMask;
         if (addMode === 'add' && selectionMask) finalMask = unionMask(selectionMask, newMask);
         else if (addMode === 'sub' && selectionMask) finalMask = subtractMask(selectionMask, newMask);
@@ -1636,6 +1758,32 @@ export function PreviewCanvas({
       return;
     }
 
+    if (activeTool === 'select-magic') {
+      const pos = getPixelCoords(e);
+      if (!pos || !paintData) {
+        magicPreviewMaskRef.current = null;
+        magicPreviewKeyRef.current = '';
+        return;
+      }
+      const previewKey = `${pos.px},${pos.py}:${magicWandTolerance}:${magicWandContiguous ? 1 : 0}`;
+      const modeKey = magicWandMode;
+      const fullPreviewKey = `${previewKey}:${modeKey}`;
+      if (magicPreviewKeyRef.current !== fullPreviewKey) {
+        magicPreviewKeyRef.current = fullPreviewKey;
+        magicPreviewMaskRef.current = maskFromMagicWand(
+          paintData,
+          pos.px,
+          pos.py,
+          width,
+          height,
+          magicWandTolerance,
+          magicWandContiguous,
+          magicWandMode,
+        );
+      }
+      return;
+    }
+
     if (activeTool) return;
     if (isPinned) return;
     const info = lookupAtEvent(e);
@@ -1675,7 +1823,16 @@ export function PreviewCanvas({
     }
   }
 
-  function handleZoneLeave() { if (!isPinned && !activeTool) scheduleHide(); if (brushCursorWrapperRef.current) brushCursorWrapperRef.current.style.visibility = 'hidden'; if (stampCursorWrapperRef.current) stampCursorWrapperRef.current.style.visibility = 'hidden'; if (activeTool === 'text') setTextCursor(null); }
+  function handleZoneLeave() {
+    if (!isPinned && !activeTool) scheduleHide();
+    if (activeTool === 'select-magic') {
+      magicPreviewMaskRef.current = null;
+      magicPreviewKeyRef.current = '';
+    }
+    if (brushCursorWrapperRef.current) brushCursorWrapperRef.current.style.visibility = 'hidden';
+    if (stampCursorWrapperRef.current) stampCursorWrapperRef.current.style.visibility = 'hidden';
+    if (activeTool === 'text') setTextCursor(null);
+  }
   function handleTooltipEnter() { cancelHide(); }
   function handleTooltipLeave() { if (!isPinned) scheduleHide(); }
 
@@ -1825,14 +1982,26 @@ export function PreviewCanvas({
   return (
     <div
       ref={canvasZoneRef}
-      className="preview-hover-zone"
+      className="preview-hover-zone map-preview"
       style={zoneCursor ? { cursor: zoneCursor } : undefined}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleZoneLeave}
       onMouseDown={handleZoneMouseDown}
       onClick={handleZoneClick}
     >
-      {inner}
+      {clarityMirrorSrc && (
+        <img
+          className="canvas-preview clarity-preview-mirror"
+          src={clarityMirrorSrc}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
+      )}
+
+      <div className="preview-render-surface">
+        {inner}
+      </div>
 
       {/* Brush cursor — position set imperatively via transform (no layout reflow) */}
       <div

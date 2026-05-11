@@ -48,7 +48,7 @@ export function createLayer(name: string, imageData: ImageData | null = null, is
     imageData,
     buildMode: '2d',
     mapMode: '2d',
-    staircaseMode: 'classic',
+    staircaseMode: 'optimized',
   };
 }
 
