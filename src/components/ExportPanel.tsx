@@ -10,6 +10,7 @@ import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../l
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
+import { uploadDiagnosticCapture } from '../lib/diagnostics';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/locale';
 import { IconGlyph, mkIcons } from './IconGlyph';
@@ -108,6 +109,28 @@ export function ExportPanel({
 
   const previewData = compareMode ? null : (previewImageData ?? imageData);
 
+  function captureDiagnostics(action: string, preview: ImageData | null) {
+    if (!preview) return;
+    void uploadDiagnosticCapture({
+      action,
+      previewData: preview,
+      sourceImage,
+      settings: {
+        dithering: compareMode ? compareLeft : dithering,
+        intensity,
+        mapGrid,
+        blockSelection,
+        adjustments,
+        mapMode,
+        staircaseMode,
+        bnScale,
+        compareMode,
+        artistMode: Boolean(artistMode),
+        paletteSize: activePalette.colors.length,
+      },
+    });
+  }
+
   function trackExport(format: string) {
     trackEvent('export_clicked', {
       format,
@@ -124,9 +147,12 @@ export function ExportPanel({
   function handlePng() {
     trackExport(compareMode ? 'png_compare' : 'png');
     if (compareMode && hasCmp) {
+      captureDiagnostics('export_png_compare_left', compareData!.left);
+      captureDiagnostics('export_png_compare_right', compareData!.right);
       downloadPng(compareData!.left,  makePngFilename(mapGrid, compareLeft)  .replace('.png', '_left.png'));
       downloadPng(compareData!.right, makePngFilename(mapGrid, compareRight) .replace('.png', '_right.png'));
     } else if (previewData) {
+      captureDiagnostics('export_png', previewData);
       downloadPng(previewData, makePngFilename(mapGrid, dithering));
     }
   }
@@ -137,6 +163,7 @@ export function ExportPanel({
     trackExport('showcase_png');
     setBusyShowcase(true);
     try {
+      captureDiagnostics('export_showcase_png', src);
       const blob = await generateShowcaseImage({
         originalImage: sourceImage,
         processed: src,
@@ -157,6 +184,7 @@ export function ExportPanel({
     trackExport('map_dat');
     setBusyMapdat(true);
     try {
+      captureDiagnostics('export_map_dat', src);
       await exportMapDat(src, mapGrid, activePalette);
     } finally {
       setBusyMapdat(false);
@@ -170,6 +198,7 @@ export function ExportPanel({
     const structure = mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLiteFlat(true);
     try {
+      captureDiagnostics('export_litematic', src);
       // For 2D flat mode, use 'air' as support block to disable support layer
       const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematic(src, activePalette, blockSelection, 'MapartForge', structure,
@@ -188,6 +217,7 @@ export function ExportPanel({
     const zipFilename   = `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`;
     setBusyZip(true);
     try {
+      captureDiagnostics('export_litematic_zip', src);
       const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename,
         supportForExport, supportMode, staircaseMode);
@@ -201,6 +231,7 @@ export function ExportPanel({
     trackExport('litematic_hybrid');
     setBusyHybrid(true);
     try {
+      captureDiagnostics('export_litematic_hybrid', imageData);
       const has3D = hybridLayers.some(l => l.mapMode === '3d');
       // For 2D-only hybrid, use 'air' as support block to disable support layer
       const supportForExport = has3D ? supportBlock : 'air';
@@ -217,6 +248,7 @@ export function ExportPanel({
     const structure = activeLayerExport.mapMode === '3d' ? 'staircase' : 'flat';
     setBusyLayer(true);
     try {
+      captureDiagnostics('export_litematic_layer', activeLayerExport.imageData);
       // For 2D flat mode, use 'air' as support block to disable support layer
       const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       if (mapGrid.wide * mapGrid.tall > 1) {
@@ -244,6 +276,7 @@ export function ExportPanel({
     });
     setLinkState('uploading');
     try {
+      captureDiagnostics('create_share_link', preview);
       // Use sourceImage if available; otherwise use imageData as fallback for blank canvas projects
       let imgToShare = sourceImage;
       if (!imgToShare && sourceData) {

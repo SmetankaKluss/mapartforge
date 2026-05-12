@@ -535,7 +535,6 @@ export function PreviewCanvas({
   warningMask, showWarningMask,
   onZoomWheel,
 }: Props) {
-  const [clarityMirrorSrc, setClarityMirrorSrc] = useState<string | null>(null);
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
   const [mousePos, setMousePos]       = useState({ x: 0, y: 0 });
@@ -708,49 +707,6 @@ export function PreviewCanvas({
     if (buf && otherLayersData) return compositeTwo(otherLayersData, buf, width, height);
     return buf ?? imageData;
   })();
-
-  useEffect(() => {
-    if (!displayImageData) {
-      setClarityMirrorSrc(null);
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = displayImageData.width;
-    canvas.height = displayImageData.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setClarityMirrorSrc(null);
-      return;
-    }
-
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let idleId: number | null = null;
-
-    const run = () => {
-      if (cancelled) return;
-      ctx.putImageData(displayImageData, 0, 0);
-      try {
-        const src = canvas.toDataURL('image/png');
-        if (!cancelled) setClarityMirrorSrc(src);
-      } catch {
-        if (!cancelled) setClarityMirrorSrc(null);
-      }
-    };
-
-    if ('requestIdleCallback' in globalThis) {
-      idleId = globalThis.requestIdleCallback(run);
-    } else {
-      timeoutId = globalThis.setTimeout(run, 0);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId !== null && 'cancelIdleCallback' in globalThis) globalThis.cancelIdleCallback(idleId);
-      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
-    };
-  }, [displayImageData]);
 
   // ── Text preview effect — draws text overlay + selection box ───────────────
   // useLayoutEffect runs synchronously before paint — keeps canvas in sync
@@ -1982,26 +1938,14 @@ export function PreviewCanvas({
   return (
     <div
       ref={canvasZoneRef}
-      className="preview-hover-zone map-preview"
+      className="preview-hover-zone"
       style={zoneCursor ? { cursor: zoneCursor } : undefined}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleZoneLeave}
       onMouseDown={handleZoneMouseDown}
       onClick={handleZoneClick}
     >
-      {clarityMirrorSrc && (
-        <img
-          className="canvas-preview clarity-preview-mirror"
-          src={clarityMirrorSrc}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-        />
-      )}
-
-      <div className="preview-render-surface">
-        {inner}
-      </div>
+      {inner}
 
       {/* Brush cursor — position set imperatively via transform (no layout reflow) */}
       <div

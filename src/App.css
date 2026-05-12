@@ -1074,19 +1074,6 @@ input, select, textarea { outline: none; }
 .canvas-area::-webkit-scrollbar-track { background: transparent; }
 .canvas-area::-webkit-scrollbar-thumb { background: var(--border); }
 .canvas-inner { display: flex; align-items: center; justify-content: center; padding: 32px; min-width: 100%; min-height: 100%; }
-.preview-hover-zone { position: relative; display: inline-block; line-height: 0; }
-.preview-render-surface { position: relative; z-index: 1; }
-.clarity-preview-mirror {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-  image-rendering: pixelated;
-  pointer-events: none;
-  user-select: none;
-  z-index: 0;
-}
 
 /* ── Empty Canvas Placeholder ────────────────────────────────────────────── */
 .canvas-placeholder {
