@@ -105,6 +105,7 @@ function makeInstancedVoxelGroup(blocks: SchematicPreviewBlock[], center: { x: n
       instanced.setMatrixAt(index, tempMatrix);
     });
     instanced.instanceMatrix.needsUpdate = true;
+    instanced.frustumCulled = false;
     root.add(instanced);
   }
 
