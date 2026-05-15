@@ -3,6 +3,7 @@ import { type SelectionMask, selectAllMask, invertMask, countSelected } from './
 import type { MagicWandMatchMode } from './lib/selectionMask';
 import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
+import type { ImageUploadHandle } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
 import type { PaintTool, PaintBlock } from './components/PreviewCanvas';
 import { BlockPickerPopup } from './components/BlockPickerPopup';
@@ -22,6 +23,8 @@ import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlock
 import type { BlockSelection } from './lib/paletteBlocks';
 import type { MinecraftVersion } from './lib/versionPresets';
 import { getVersionLabel } from './lib/versionPresets';
+import { sanitizeSelectionForPlatform } from './lib/platformMode';
+import type { PlatformMode } from './lib/platformMode';
 import { DEFAULT_ADJUSTMENTS } from './lib/adjustments';
 import type { ImageAdjustments } from './lib/adjustments';
 import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
@@ -64,6 +67,7 @@ import type { SessionMaterial } from './lib/buildSession';
 import { computeSessionMaterials } from './components/MaterialsList';
 import { IconGlyph, mkIcons } from './components/IconGlyph';
 import { buildFinalPreview } from './lib/finalPreview';
+import type { PreviewMode } from './lib/preview3d';
 import 'driver.js/dist/driver.css';
 import './App.css';
 import { trackEvent } from './lib/analytics';
@@ -189,6 +193,7 @@ export default function App() {
 
   const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
+  const imageUploadRef = useRef<ImageUploadHandle>(null);
 
   // ── Layer system ─────────────────────────────────────────────────────────────
   const [layerState, setLayerState] = useState<LayerState>(makeInitialLayerState);
@@ -237,6 +242,7 @@ export default function App() {
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
     VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.21.4'
   );
+  const [platformMode, setPlatformMode] = useState<PlatformMode>(saved.platformMode ?? 'java');
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
@@ -259,6 +265,7 @@ export default function App() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTourSelector, setShowTourSelector] = useState(false);
   const [showPerspective, setShowPerspective] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('schematic3d');
   const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
   const [gifProject, setGifProject] = useState<GifProject | null>(null);
   const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
@@ -363,7 +370,7 @@ export default function App() {
 
   // Always-current ref — updated each render so callbacks never see stale state
   const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[]; activeLayerId: string }>({
-    imageData: null, blockSelection: DEFAULT_SELECTION, layers: layerState.layers, activeLayerId: layerState.activeLayerId,
+    imageData: null, blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode), layers: layerState.layers, activeLayerId: layerState.activeLayerId,
   });
   latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId };
 
@@ -386,6 +393,10 @@ export default function App() {
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
   useEffect(() => { saveSettings({ klussParams }); }, [klussParams]);
   useEffect(() => { saveSettings({ minecraftVersion }); }, [minecraftVersion]);
+  useEffect(() => { saveSettings({ platformMode }); }, [platformMode]);
+  useEffect(() => {
+    setBlockSelection(prev => sanitizeSelectionForPlatform(prev, platformMode));
+  }, [platformMode]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
 
   // Per-layer settings: restore mapMode/staircaseMode/dithering when active layer changes
@@ -493,9 +504,9 @@ export default function App() {
   const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
 
   const activePalette = useMemo<ComputedPalette>(
-    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion)),
+    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion, platformMode)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blockSelection, mapMode, minecraftVersion],
+    [blockSelection, mapMode, minecraftVersion, platformMode],
   );
 
 
@@ -690,7 +701,7 @@ export default function App() {
     setUndoStack([]);
     setRedoStack([]);
     const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
-    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion));
+    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion, platformMode));
     runProcess(img, coerceDitheringMode(newConfig.dithering), mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
   }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, modeShades, minecraftVersion, mapGrid, compareMode, compareLeft, compareRight]);
 
@@ -716,7 +727,7 @@ export default function App() {
       const frame = gifProject.frames[i];
       const cfg = gifProject.configs[i];
       const cfgShades = cfg.mapMode === '2d' ? [1] : [0, 1, 2];
-      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion));
+      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion, platformMode));
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
       const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
@@ -888,7 +899,7 @@ export default function App() {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion, platformMode));
     if (sourceImage) {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
@@ -903,7 +914,7 @@ export default function App() {
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
     }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode));
     if (sourceImage && activeLayerHasContent(activeLayerRef)) {
       if (activeLayerRef.current?.isDirty) {
         const img = activeLayerRef.current.imageData;
@@ -969,7 +980,7 @@ export default function App() {
     const next: BlockSelection = { ...blockSelection, [csId]: [] };
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades, minecraftVersion, platformMode));
     if (sourceImage) {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
@@ -1296,11 +1307,11 @@ export default function App() {
     setIntensity(100);
     setBnScale(2);
     setMapGrid({ wide: 1, tall: 1 });
-    setBlockSelection(DEFAULT_SELECTION);
+    setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode));
     setAdjustments(DEFAULT_ADJUSTMENTS);
     setMapMode('2d');
     if (sourceImage) {
-      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1]));
+      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1], minecraftVersion, platformMode));
       runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
     }
   }, [sourceImage, compareMode, compareLeft, compareRight]);
@@ -1352,7 +1363,7 @@ export default function App() {
         setRedoStack([]);
         const shades = (s.mapMode ?? '2d') === '2d' ? [1] : [0, 1, 2];
         const palette = buildComputedPalette(
-          buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades),
+          buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades, minecraftVersion, platformMode),
         );
         runProcess(
           img,
@@ -1416,7 +1427,7 @@ export default function App() {
         } : l),
       }));
       const shades = trySettings.mapMode === '2d' ? [1] : [0, 1, 2];
-      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion));
+      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode));
       runProcess(
         img,
         trySettings.dithering,
@@ -1589,6 +1600,7 @@ export default function App() {
         klussParams,
         originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
         minecraftVersion,
+        platformMode,
       };
       const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
       const id = Date.now().toString();
@@ -1598,7 +1610,7 @@ export default function App() {
       console.error('Failed to save project to history', err);
       showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, saveThumbnail, showAppNotice, t]);
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -1631,6 +1643,9 @@ export default function App() {
       setKlussParams(result.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
       if (result.settings.minecraftVersion) {
         setMinecraftVersion(result.settings.minecraftVersion);
+      }
+      if (result.settings.platformMode) {
+        setPlatformMode(result.settings.platformMode);
       }
 
       // Restore originalData (pre-dithering image) if it was saved, and create virtual sourceImage for reprocessing
@@ -1756,7 +1771,7 @@ export default function App() {
         {/* ── LEFT PANEL ── */}
         <aside className="panel panel-left">
           <div className="panel-scroll">
-            <ImageUpload onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} onGifFile={handleGifFile} />
+            <ImageUpload ref={imageUploadRef} onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} onGifFile={handleGifFile} />
             <div className="new-canvas-row">
               <button
                 className="new-canvas-btn"
@@ -2262,7 +2277,7 @@ export default function App() {
                   )}
                   <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
                   <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}><IconGlyph icon={mkIcons.grid} />{t('Сетка', 'Grid')}</button>
-                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр на стене', 'Wall preview')}><IconGlyph icon={mkIcons.view} /></button>
+                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}><IconGlyph icon={mkIcons.view} /></button>
                 </div>
               </>
             )}
@@ -2329,7 +2344,19 @@ export default function App() {
             </div>
           )}
 
-          <div className="canvas-area">
+          <div
+            className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}`}
+            onClick={!hasContent ? () => imageUploadRef.current?.openPicker() : undefined}
+            onKeyDown={!hasContent ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                imageUploadRef.current?.openPicker();
+              }
+            } : undefined}
+            role={!hasContent ? 'button' : undefined}
+            tabIndex={!hasContent ? 0 : undefined}
+            aria-label={!hasContent ? t('Открыть выбор изображения', 'Open image picker') : undefined}
+          >
             <span className="corner corner-tl" />
             <span className="corner corner-tr" />
             <span className="corner corner-bl" />
@@ -2458,11 +2485,22 @@ export default function App() {
                 <select
                   className="version-selector-select"
                   value={minecraftVersion}
-                  onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(DEFAULT_SELECTION); }}
+                  onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode)); }}
                 >
                   {VALID_VERSIONS.map(v => (
                     <option key={v} value={v}>{getVersionLabel(v)}</option>
                   ))}
+                </select>
+              </div>
+              <div className="version-selector-row">
+                <span className="version-selector-label">{t('Платформа', 'Platform')}</span>
+                <select
+                  className="version-selector-select"
+                  value={platformMode}
+                  onChange={e => setPlatformMode(e.target.value as PlatformMode)}
+                >
+                  <option value="java">Java</option>
+                  <option value="bedrock">Bedrock</option>
                 </select>
               </div>
               <PaletteEditor
@@ -2471,6 +2509,7 @@ export default function App() {
                 paletteSize={activePalette.colors.length}
                 disabled={processing}
                 minecraftVersion={minecraftVersion}
+                platformMode={platformMode}
               />
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
@@ -2566,6 +2605,7 @@ export default function App() {
               intensity={intensity}
               adjustments={adjustments}
               bnScale={bnScale}
+              platformMode={platformMode}
               onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
               onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
             />
@@ -2652,7 +2692,16 @@ export default function App() {
     {/* ── Perspective preview modal ── */}
     {showPerspective && (
       <PerspectiveModal
-        imageData={compareMode ? (compareData?.left ?? previewImageData) : previewImageData}
+        imageData={compareMode ? (compareData?.left ?? previewImageData) : (previewImageData ?? compositeImageData)}
+        cp={activePalette}
+        blockSelection={blockSelection}
+        mapMode={mapMode}
+        staircaseMode={staircaseMode}
+        supportMode={supportMode}
+        supportBlock={supportBlock}
+        mapGrid={mapGrid}
+        previewMode={previewMode}
+        onPreviewModeChange={setPreviewMode}
         onClose={() => setShowPerspective(false)}
       />
     )}

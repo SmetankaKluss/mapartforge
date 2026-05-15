@@ -7,6 +7,8 @@ import { PaletteShareModal } from './PaletteShareModal';
 import { useLocale } from '../lib/locale';
 import { isBlockAvailable } from '../lib/versionPresets';
 import type { MinecraftVersion } from '../lib/versionPresets';
+import { isBlockAvailableOnPlatform } from '../lib/platformMode';
+import type { PlatformMode } from '../lib/platformMode';
 import { trackEvent } from '../lib/analytics';
 
 const STORAGE_KEY = 'mapart_custom_presets';
@@ -22,9 +24,10 @@ interface Props {
   paletteSize: number;
   disabled: boolean;
   minecraftVersion?: MinecraftVersion;
+  platformMode?: PlatformMode;
 }
 
-export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion }: Props) {
+export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion, platformMode = 'java' }: Props) {
   const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
   const [selectedPreset,  setSelectedPreset]  = useState('');
@@ -135,7 +138,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     // Radio-select: only one block per color group
     const cur = blockSelection[csId] ?? [];
     const isSelected = cur.includes(blockId);
-    const next = isSelected ? cur : [blockId];
+    const next = isSelected ? [] : [blockId];
     trackEvent('palette_block_changed', { color_group: csId, block_id: blockId, selected: !isSelected });
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
@@ -153,14 +156,16 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   // ── Version filtering ────────────────────────────────────────────────────
 
   const versionRows = useMemo(() => {
-    if (!minecraftVersion) return COLOUR_ROWS;
     return COLOUR_ROWS
       .map(row => ({
         ...row,
-        blocks: row.blocks.filter(b => isBlockAvailable(b.nbtName, minecraftVersion)),
+        blocks: row.blocks.filter(b =>
+          (!minecraftVersion || isBlockAvailable(b.nbtName, minecraftVersion))
+          && isBlockAvailableOnPlatform(b.nbtName, platformMode),
+        ),
       }))
       .filter(row => row.blocks.length > 0);
-  }, [minecraftVersion]);
+  }, [minecraftVersion, platformMode]);
 
   // ── Search filtering ─────────────────────────────────────────────────────
 

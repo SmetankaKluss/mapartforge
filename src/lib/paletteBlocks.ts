@@ -2,6 +2,7 @@
 // csId = colour set index (0-60) — used for sprite sheet Y position
 // baseId = Minecraft map colour ID (1-61) — matches palette.ts baseId
 import { filterBlocksForVersion } from './versionPresets';
+import { filterBlocksForPlatform } from './platformMode';
 
 export interface PaletteBlock {
   blockId: number;       // sprite X index
@@ -2835,6 +2836,7 @@ export function buildPaletteFromSelection(
   sel: BlockSelection,
   shades: number[] = [0, 1, 2, 3],
   mcVersion?: import('./versionPresets').MinecraftVersion,
+  platformMode: import('./platformMode').PlatformMode = 'java',
 ): PaletteColor[] {
   const activeBaseIds = new Set<number>();
 
@@ -2850,6 +2852,17 @@ export function buildPaletteFromSelection(
         mcVersion
       );
       validBlockIds = blockIds.filter(bid => {
+        const block = row.blocks.find(b => b.blockId === bid);
+        return block && validNbtNames.includes(block.nbtName);
+      });
+    }
+
+    if (platformMode !== 'java') {
+      const validNbtNames = filterBlocksForPlatform(
+        row.blocks.map(b => b.nbtName),
+        platformMode,
+      );
+      validBlockIds = validBlockIds.filter(bid => {
         const block = row.blocks.find(b => b.blockId === bid);
         return block && validNbtNames.includes(block.nbtName);
       });

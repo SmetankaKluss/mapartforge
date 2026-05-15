@@ -4,6 +4,7 @@ import type { DitheringMode } from '../lib/dithering';
 import type { MapGrid } from '../lib/types';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ImageAdjustments } from '../lib/adjustments';
+import type { PlatformMode } from '../lib/platformMode';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
@@ -55,6 +56,7 @@ interface Props {
   intensity:   number;
   adjustments: ImageAdjustments;
   bnScale:     number;
+  platformMode: PlatformMode;
   // Tracker
   onCreateTracker?: () => void;
   // GIF Project
@@ -85,6 +87,7 @@ export function ExportPanel({
   supportBlock, supportMode,
   artistMode, hybridLayers, activeLayerExport,
   sourceImage, intensity, adjustments, bnScale,
+  platformMode,
   onCreateTracker, onExportGifPack,
 }: Props) {
   const { t } = useLocale();
@@ -297,6 +300,8 @@ export function ExportPanel({
   const base        = disabled || !hasContent;
   const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
+  const isBedrock = platformMode === 'bedrock';
+  const javaOnlyReason = t('Пока доступно только для Java Edition.', 'Currently available for Java Edition only.');
 
   return (
     <section className="sidebar-section" id="tour-export">
@@ -331,37 +336,37 @@ export function ExportPanel({
           <button
             className="export-btn export-btn-mapdat"
             onClick={handleMapDat}
-            disabled={base || busyMapdat}
-            title={t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}
+            disabled={base || busyMapdat || isBedrock}
+            title={isBedrock ? javaOnlyReason : t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}
           >
-            <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT (${mapCount} ${t('файлов', 'files')})` : 'MAP.DAT'}
+            <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT (${mapCount} ${t('файлов', 'files')})` : 'MAP.DAT'}{isBedrock ? ' · Java' : ''}
           </button>
 
           {artistMode ? (<>
             <button
               className="export-btn"
               onClick={handleHybridLitematic}
-              disabled={base || busyAnyLite || !hybridLayers?.length}
-              title={t('Все видимые слои в одной схематике — 3D и 2D части объединены', 'All visible layers in one schematic — 3D and 2D parts combined')}
+              disabled={base || busyAnyLite || !hybridLayers?.length || isBedrock}
+              title={isBedrock ? javaOnlyReason : t('Все видимые слои в одной схематике — 3D и 2D части объединены', 'All visible layers in one schematic — 3D and 2D parts combined')}
             >
-              <IconGlyph icon={mkIcons.download} /> {busyHybrid ? t('Сборка…', 'Building…') : 'LITEMATIC'}
+              <IconGlyph icon={mkIcons.download} /> {busyHybrid ? t('Сборка…', 'Building…') : `LITEMATIC${isBedrock ? ' · Java' : ''}`}
             </button>
             <button
               className="export-btn"
               onClick={handleLayerLitematic}
-              disabled={base || busyAnyLite || !activeLayerExport}
-              title={t('Только активный слой с его режимом постройки', 'Active layer only with its build mode')}
+              disabled={base || busyAnyLite || !activeLayerExport || isBedrock}
+              title={isBedrock ? javaOnlyReason : t('Только активный слой с его режимом постройки', 'Active layer only with its build mode')}
             >
-              <IconGlyph icon={mkIcons.layer} /> {busyLayer ? t('Сборка…', 'Building…') : `${t('СЛОЙ', 'LAYER')}${isMultiMap ? ' ZIP' : ''} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})`}
+              <IconGlyph icon={mkIcons.layer} /> {busyLayer ? t('Сборка…', 'Building…') : `${t('СЛОЙ', 'LAYER')}${isMultiMap ? ' ZIP' : ''} (${(activeLayerExport?.mapMode ?? '2d').toUpperCase()})${isBedrock ? ' · Java' : ''}`}
             </button>
           </>) : (
             <button
               className="export-btn"
               onClick={handleLitematic}
-              disabled={base || busyAnyLite}
-              title={mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
+              disabled={base || busyAnyLite || isBedrock}
+              title={isBedrock ? javaOnlyReason : mapMode === '3d' ? t('Лестничная структура — дополнительные оттенки за счёт высоты', 'Staircase structure — extra shades from height') : t('Один плоский слой — стандартный 2D мап-арт для выживания', 'Single flat layer — standard 2D map art for survival')}
             >
-              <IconGlyph icon={mkIcons.download} /> {busyLiteFlat ? t('Сборка…', 'Building…') : `LITEMATIC ${mapMode.toUpperCase()}`}
+              <IconGlyph icon={mkIcons.download} /> {busyLiteFlat ? t('Сборка…', 'Building…') : `LITEMATIC ${mapMode.toUpperCase()}${isBedrock ? ' · Java' : ''}`}
             </button>
           )}
 
@@ -369,14 +374,17 @@ export function ExportPanel({
             <button
               className="export-btn export-btn-zip"
               onClick={handleZip}
-              disabled={base || busyAnyLite}
-              title={t(`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`, `Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files in archive`)}
+              disabled={base || busyAnyLite || isBedrock}
+              title={isBedrock ? javaOnlyReason : t(`Разделить на ${mapGrid.wide * mapGrid.tall} отдельных .litematic файла по 128×128, в архиве`, `Split into ${mapGrid.wide * mapGrid.tall} separate 128×128 .litematic files in archive`)}
             >
-              <IconGlyph icon={mkIcons.download} /> {busyZip ? t('Архивирование…', 'Archiving…') : `ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})`}
+              <IconGlyph icon={mkIcons.download} /> {busyZip ? t('Архивирование…', 'Archiving…') : `ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})${isBedrock ? ' · Java' : ''}`}
             </button>
           )}
 
         </div>
+      )}
+      {!collapsed && hasContent && isBedrock && (
+        <p className="export-note">{t('Bedrock сейчас работает как совместимая палитра и preview. Экспорты map.dat и litematic пока остаются Java-only.', 'Bedrock currently works as a compatible palette and preview mode. map.dat and litematic exports remain Java-only for now.')}</p>
       )}
       {!collapsed && compareMode && hasContent && (
         <p className="export-note">{t('Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.', 'Compare mode: PNG exports both panels; other formats use left panel.')}</p>
@@ -418,9 +426,10 @@ export function ExportPanel({
                 onExportGifPack();
               }}
               aria-label={t('Экспортировать GIF проект как Litematic ZIP', 'Export GIF project as Litematic ZIP')}
-              title={t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
+              title={isBedrock ? javaOnlyReason : t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
+              disabled={isBedrock}
             >
-              <IconGlyph icon={mkIcons.download} /> {t('GIF LITEMATIC PACK', 'GIF LITEMATIC PACK')}
+              <IconGlyph icon={mkIcons.download} /> {t('GIF LITEMATIC PACK', 'GIF LITEMATIC PACK')}{isBedrock ? ' · Java' : ''}
             </button>
           </div>
         )}

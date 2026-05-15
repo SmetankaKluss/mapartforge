@@ -3,6 +3,7 @@ import type { MapGrid } from './types';
 import { COLOUR_ROWS } from './paletteBlocks';
 import type { BlockSelection } from './paletteBlocks';
 import type { ImageAdjustments } from './adjustments';
+import type { PlatformMode } from './platformMode';
 
 export interface SavedSettings {
   dithering: DitheringMode;
@@ -15,6 +16,7 @@ export interface SavedSettings {
   bnScale: number;
   klussParams?: KlussParams;
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
+  platformMode?: PlatformMode;
 }
 
 const STORAGE_KEY = 'mapartforge-v4';

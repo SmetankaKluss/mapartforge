@@ -106,6 +106,7 @@ export interface FullProjectSettings {
   klussParams?: import('./dithering').KlussParams;
   originalDataB64?: string; // base64-encoded pre-dithering image data for reprocessing
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
+  platformMode?: import('./platformMode').PlatformMode;
 }
 
 interface FullProjectData {

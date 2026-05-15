@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { DragEvent, ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import { useLocale } from '../lib/locale';
@@ -11,6 +11,10 @@ interface Props {
   onGifFile?: (file: File) => void;
 }
 
+export interface ImageUploadHandle {
+  openPicker: () => void;
+}
+
 const MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
@@ -18,7 +22,7 @@ function hasAllowedImageExtension(name: string): boolean {
   return /\.(png|jpe?g|webp|gif)$/i.test(name);
 }
 
-export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
+export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props, ref) {
   const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -26,6 +30,10 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
   const [uploadError, setUploadError] = useState('');
   // Counter to handle enter/leave across child elements
   const dragCounterRef = useRef(0);
+
+  useImperativeHandle(ref, () => ({
+    openPicker: () => inputRef.current?.click(),
+  }), []);
 
   function loadFile(file: File, source: 'click' | 'drop' | 'paste' | 'global_drop' | 'global_paste' = 'click') {
     setUploadError('');
@@ -204,4 +212,4 @@ export function ImageUpload({ onImageLoaded, onDatFile, onGifFile }: Props) {
       )}
     </>
   );
-}
+});
