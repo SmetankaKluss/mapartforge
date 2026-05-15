@@ -72,7 +72,11 @@ function downloadCanvasImage(canvas: HTMLCanvasElement, filename: string) {
   a.click();
 }
 
-function makeInstancedVoxelGroup(blocks: SchematicPreviewBlock[], center: { x: number; y: number; z: number }) {
+function makeInstancedVoxelGroup(
+  blocks: SchematicPreviewBlock[],
+  center: { x: number; y: number; z: number },
+  analyticalView = false,
+) {
   const root = new THREE.Group();
   if (blocks.length === 0) return root;
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -89,10 +93,14 @@ function makeInstancedVoxelGroup(blocks: SchematicPreviewBlock[], center: { x: n
   for (const [key, bucket] of colorBuckets) {
     const [kind, colorStr] = key.split(':');
     const color = Number(colorStr);
+    const opacity = analyticalView
+      ? kind === 'art' ? 0.48 : kind === 'support' ? 0.18 : 0.22
+      : kind === 'noobline' ? 0.72 : kind === 'support' ? 0.92 : 1;
     const material = new THREE.MeshLambertMaterial({
       color,
-      transparent: kind !== 'art',
-      opacity: kind === 'noobline' ? 0.72 : kind === 'support' ? 0.92 : 1,
+      transparent: analyticalView || kind !== 'art',
+      opacity,
+      depthWrite: !analyticalView,
     });
     const instanced = new THREE.InstancedMesh(geometry, material, bucket.length);
     instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -106,6 +114,7 @@ function makeInstancedVoxelGroup(blocks: SchematicPreviewBlock[], center: { x: n
     });
     instanced.instanceMatrix.needsUpdate = true;
     instanced.frustumCulled = false;
+    instanced.renderOrder = kind === 'art' ? 2 : kind === 'support' ? 1 : 0;
     root.add(instanced);
   }
 
@@ -366,7 +375,7 @@ export function PerspectiveModal({
         x: (model.width - 1) / 2,
         y: model.minHeight < 0 ? model.minHeight - 0.5 : -0.5,
         z: -model.exportDepth / 2,
-      });
+      }, schematicView !== 'perspective');
       scene.add(root);
 
       controls.enableRotate = schematicView === 'perspective';
