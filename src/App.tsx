@@ -2518,34 +2518,6 @@ export default function App() {
             )}
           </div>
 
-          <section className="seo-intro-panel" aria-label={t('О MapKluss', 'About MapKluss')}>
-            <div className="seo-intro-copy">
-              <p className="seo-intro-kicker">{t('MINECRAFT MAP ART WORKSHOP', 'MINECRAFT MAP ART WORKSHOP')}</p>
-              <h2>{t('MapKluss — браузерный генератор Minecraft map art', 'MapKluss is a browser-based Minecraft map art generator')}</h2>
-              <p>
-                {t(
-                  'Загружай изображение, подбирай палитру Minecraft, сравнивай дизеринг и выбирай 2D Flat или 3D Stair режим. После этого можно экспортировать Litematic, MAP.DAT, PNG и список материалов для постройки.',
-                  'Upload an image, tune the Minecraft palette, compare dithering, and choose 2D Flat or 3D Stair mode. Then export Litematic, MAP.DAT, PNG, and a materials list for the final build.',
-                )}
-              </p>
-              <p>
-                {t(
-                  'MapKluss подходит для аниме-артов, логотипов, фото, пиксель-арта и больших multi-map проектов. Это более современный workflow для тех, кому уже тесно в старых map art генераторах.',
-                  'MapKluss works for anime art, logos, photos, pixel art, and larger multi-map projects. It is a more modern workflow for builders who have outgrown older map-art generators.',
-                )}
-              </p>
-            </div>
-            <div className="seo-intro-links">
-              <a href="/minecraft-map-art-generator">{t('Генератор map art', 'Map art generator')}</a>
-              <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
-              <a href="/minecraft-litematic-map-art-generator">{t('Экспорт Litematic', 'Litematic export')}</a>
-              <a href="/minecraft-map-dat-generator">{t('Экспорт MAP.DAT', 'MAP.DAT export')}</a>
-              <a href="/how-to-make-minecraft-map-art">{t('Как сделать map art', 'How to make map art')}</a>
-              <a href="/best-dithering-for-minecraft-map-art">{t('Выбор дизеринга', 'Dithering guide')}</a>
-              <a href="/2d-vs-3d-stair-map-art">{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
-              <a href="/examples">{t('Примеры map art', 'Map art examples')}</a>
-            </div>
-          </section>
         </main>
 
         {showPatternEditor && activePattern && (
