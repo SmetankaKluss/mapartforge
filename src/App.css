@@ -3541,6 +3541,13 @@ input, select, textarea { outline: none; }
 }
 .example-actions button { cursor: pointer; }
 .example-actions button:last-child { color: var(--terra); border-color: rgba(200,98,42,0.42); background: var(--terra-dim); }
+.example-triptych-detail {
+  width: min(1180px, calc(100% - 48px));
+  margin: 16px auto 0;
+}
+.example-materials-detail {
+  margin-top: 16px;
+}
 .examples-insight-section,
 .examples-cta-band {
   width: min(1180px, calc(100% - 48px));

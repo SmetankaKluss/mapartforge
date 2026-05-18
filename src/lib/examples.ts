@@ -163,3 +163,8 @@ export function getExampleById(id: string | null): ExampleProject | undefined {
   if (!id) return undefined;
   return EXAMPLES.find(example => example.id === id);
 }
+
+export function getExampleByPath(path: string): ExampleProject | undefined {
+  const match = path.match(/^\/examples\/([a-z0-9-]+)$/i);
+  return getExampleById(match?.[1] ?? null);
+}

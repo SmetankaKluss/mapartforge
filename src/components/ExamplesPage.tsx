@@ -72,7 +72,7 @@ export function ExamplesPage() {
         '@type': 'ListItem',
         position: index + 1,
         name: lang === 'ru' ? example.titleRu : example.titleEn,
-        url: `${window.location.origin}/?example=${encodeURIComponent(example.id)}`,
+        url: `${window.location.origin}/examples/${example.id}`,
         image: `${window.location.origin}${example.previewUrl}`,
       })),
     };
@@ -223,6 +223,7 @@ export function ExamplesPage() {
 
             <div className="example-actions">
               <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Попробовать этот пример', 'Try this example')}</a>
+              <a href={buildTrackedHref(`/examples/${example.id}`)}>{t('Подробнее', 'Read details')}</a>
               <button onClick={() => downloadImage(example.previewUrl, `mapkluss_${example.id}.png`)}>
                 {t('Скачать preview', 'Download preview')}
               </button>
