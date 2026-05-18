@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { buildTrackedHref } from '../lib/analytics';
 import { getExampleById, EXAMPLES, type ExampleProject } from '../lib/examples';
 import { useLocale } from '../lib/locale';
@@ -10,11 +10,6 @@ interface Props {
 
 export function ExampleDetailPage({ example }: Props) {
   const { lang, toggle, t } = useLocale();
-
-  const relatedExamples = useMemo(
-    () => EXAMPLES.filter(item => item.id !== example.id).slice(0, 3),
-    [example.id],
-  );
 
   useEffect(() => {
     applyPageMeta({
@@ -146,21 +141,6 @@ export function ExampleDetailPage({ example }: Props) {
         </div>
         <div className="example-materials example-materials-detail">
           {example.materials.map(material => <span key={material}>{material}</span>)}
-        </div>
-      </section>
-
-      <section className="examples-insight-section">
-        <div className="examples-section-head">
-          <h2>{t('Похожие примеры', 'Related examples')}</h2>
-        </div>
-        <div className="examples-insight-grid">
-          {relatedExamples.map(item => (
-            <article className="examples-insight-card" key={item.id}>
-              <h3>{t(item.titleRu, item.titleEn)}</h3>
-              <p>{t(item.descriptionRu, item.descriptionEn)}</p>
-              <a href={buildTrackedHref(`/examples/${item.id}`)}>{t('Открыть пример', 'Open example')}</a>
-            </article>
-          ))}
         </div>
       </section>
 
