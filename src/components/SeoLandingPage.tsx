@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useLocale } from '../lib/locale';
 import { applyPageMeta } from '../lib/meta';
 import { EXAMPLES } from '../lib/examples';
+import { buildTrackedHref } from '../lib/analytics';
 import type { SeoPageDefinition } from '../lib/seoPages';
 
 interface Props {
@@ -59,7 +60,7 @@ export function SeoLandingPage({ page }: Props) {
   return (
     <main className="seo-page">
       <header className="examples-topbar seo-topbar">
-        <a className="examples-brand" href="/">
+        <a className="examples-brand" href={buildTrackedHref('/')}>
           <img src="/logo-opt.png" alt="MapKluss" />
           <span>
             <strong>MAPKLUSS</strong>
@@ -67,8 +68,8 @@ export function SeoLandingPage({ page }: Props) {
           </span>
         </a>
         <nav className="examples-nav">
-          <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
-          <a href="/examples">{t('Примеры', 'Examples')}</a>
+          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
+          <a href={buildTrackedHref('/examples')}>{t('Примеры', 'Examples')}</a>
           <button onClick={toggle}>{lang === 'ru' ? 'EN' : 'RU'}</button>
         </nav>
       </header>
@@ -79,8 +80,8 @@ export function SeoLandingPage({ page }: Props) {
         <p className="seo-hero-lead">{t(page.introRu, page.introEn)}</p>
         <p className="seo-hero-body">{t(page.bodyRu, page.bodyEn)}</p>
         <div className="examples-hero-actions">
-          <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
-          <a href="/examples">{t('Смотреть примеры', 'Browse examples')}</a>
+          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
+          <a href={buildTrackedHref('/examples')}>{t('Смотреть примеры', 'Browse examples')}</a>
         </div>
       </section>
 
@@ -154,8 +155,8 @@ export function SeoLandingPage({ page }: Props) {
                   </span>
                 </div>
                 <div className="seo-doc-actions">
-                  <a href={`/?example=${encodeURIComponent(example.id)}`}>{t('Открыть в редакторе', 'Open in editor')}</a>
-                  <a href="/examples">{t('Полная галерея', 'Full gallery')}</a>
+                  <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
+                  <a href={buildTrackedHref('/examples')}>{t('Полная галерея', 'Full gallery')}</a>
                 </div>
               </article>
             ))}
@@ -183,7 +184,7 @@ export function SeoLandingPage({ page }: Props) {
         </div>
         <div className="seo-related-links">
           {page.related.map(link => (
-            <a key={link.href} href={link.href}>{t(link.labelRu, link.labelEn)}</a>
+            <a key={link.href} href={buildTrackedHref(link.href)}>{t(link.labelRu, link.labelEn)}</a>
           ))}
         </div>
       </section>

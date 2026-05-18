@@ -5,7 +5,7 @@ import { LocaleProvider } from './lib/locale'
 import { BuildTracker } from './components/BuildTracker.tsx'
 import { ExamplesPage } from './components/ExamplesPage.tsx'
 import { SeoLandingPage } from './components/SeoLandingPage.tsx'
-import { initClarity, trackEvent } from './lib/analytics'
+import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
 import { getSeoPageByPath } from './lib/seoPages.ts'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
@@ -22,8 +22,12 @@ const path = window.location.pathname;
 const buildMatch = path.match(/^\/build\/([0-9a-f-]{36})$/i);
 const seoPage = getSeoPageByPath(path);
 
+initAnalyticsContext();
 initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
-trackEvent('app_route_opened', { path: window.location.pathname });
+trackEvent('app_route_opened', {
+  path: window.location.pathname,
+  page_type: buildMatch ? 'build_tracker' : path === '/examples' ? 'examples' : seoPage ? 'seo' : 'editor',
+});
 
 const root = document.getElementById('root')!;
 

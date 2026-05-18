@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { EXAMPLES } from '../lib/examples';
 import { applyPageMeta } from '../lib/meta';
 import { useLocale } from '../lib/locale';
+import { buildTrackedHref } from '../lib/analytics';
 
 function downloadImage(url: string, filename: string): void {
   const a = Object.assign(document.createElement('a'), { href: url, download: filename });
@@ -109,7 +110,7 @@ export function ExamplesPage() {
   return (
     <main className="examples-page">
       <header className="examples-topbar">
-        <a className="examples-brand" href="/">
+        <a className="examples-brand" href={buildTrackedHref('/')}>
           <img src="/logo-opt.png" alt="MapKluss" />
           <span>
             <strong>MAPKLUSS</strong>
@@ -117,7 +118,7 @@ export function ExamplesPage() {
           </span>
         </a>
         <nav className="examples-nav">
-          <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
+          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
           <button onClick={toggle}>{lang === 'ru' ? 'EN' : 'RU'}</button>
         </nav>
       </header>
@@ -138,17 +139,17 @@ export function ExamplesPage() {
           )}
         </p>
         <div className="examples-hero-actions">
-          <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
+          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
           <a href="#examples-grid">{t('Смотреть примеры', 'Browse examples')}</a>
         </div>
         <div className="examples-related-links">
-          <a href="/minecraft-map-art-generator">{t('Генератор map art', 'Map art generator')}</a>
-          <a href="/minecraft-litematic-map-art-generator">{t('Litematic export', 'Litematic export')}</a>
-          <a href="/minecraft-map-dat-generator">{t('MAP.DAT export', 'MAP.DAT export')}</a>
-          <a href="/how-to-make-minecraft-map-art">{t('Как сделать map art', 'How to make map art')}</a>
-          <a href="/best-dithering-for-minecraft-map-art">{t('Гайд по дизерингу', 'Dithering guide')}</a>
-          <a href="/2d-vs-3d-stair-map-art">{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
-          <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
+          <a href={buildTrackedHref('/minecraft-map-art-generator')}>{t('Генератор map art', 'Map art generator')}</a>
+          <a href={buildTrackedHref('/minecraft-litematic-map-art-generator')}>{t('Litematic export', 'Litematic export')}</a>
+          <a href={buildTrackedHref('/minecraft-map-dat-generator')}>{t('MAP.DAT export', 'MAP.DAT export')}</a>
+          <a href={buildTrackedHref('/how-to-make-minecraft-map-art')}>{t('Как сделать map art', 'How to make map art')}</a>
+          <a href={buildTrackedHref('/best-dithering-for-minecraft-map-art')}>{t('Гайд по дизерингу', 'Dithering guide')}</a>
+          <a href={buildTrackedHref('/2d-vs-3d-stair-map-art')}>{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
+          <a href={buildTrackedHref('/mapartcraft-alternative')}>{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
         </div>
       </section>
 
@@ -167,7 +168,7 @@ export function ExamplesPage() {
             <article className="examples-insight-card" key={item.titleEn}>
               <h3>{t(item.titleRu, item.titleEn)}</h3>
               <p>{t(item.bodyRu, item.bodyEn)}</p>
-              <a href={item.href}>{t(item.labelRu, item.labelEn)}</a>
+              <a href={buildTrackedHref(item.href)}>{t(item.labelRu, item.labelEn)}</a>
             </article>
           ))}
         </div>
@@ -221,7 +222,7 @@ export function ExamplesPage() {
             </div>
 
             <div className="example-actions">
-              <a href={`/?example=${encodeURIComponent(example.id)}`}>{t('Попробовать этот пример', 'Try this example')}</a>
+              <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Попробовать этот пример', 'Try this example')}</a>
               <button onClick={() => downloadImage(example.previewUrl, `mapkluss_${example.id}.png`)}>
                 {t('Скачать preview', 'Download preview')}
               </button>
@@ -276,8 +277,8 @@ export function ExamplesPage() {
           </p>
         </div>
         <div className="examples-cta-actions">
-          <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
-          <a href="/minecraft-map-art-generator">{t('Читать про генератор', 'Read about the generator')}</a>
+          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
+          <a href={buildTrackedHref('/minecraft-map-art-generator')}>{t('Читать про генератор', 'Read about the generator')}</a>
         </div>
       </section>
     </main>
