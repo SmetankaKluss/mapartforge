@@ -215,7 +215,15 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
 
   function handleDownload() {
     const mode = maxPerMap ? `max_per_map` : 'total';
-    trackEvent('materials_downloaded', { mode, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
+    trackEvent('materials_downloaded', {
+      mode,
+      map_wide: mapGrid.wide,
+      map_tall: mapGrid.tall,
+      map_mode: mapMode,
+      staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
+      has_supports: Boolean(mapMode === '3d' && supportBlock && supportBlock !== 'air' && supportMode),
+      support_mode: mapMode === '3d' ? supportMode : undefined,
+    });
     const text = buildCopyText(materials, total, maxPerMap, mapGrid);
     const csv = [
       `Block Name,${maxPerMap ? 'MAX/MAP' : 'Total'},Stacks,Shulkers`,

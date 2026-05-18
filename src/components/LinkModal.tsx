@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocale } from '../lib/locale';
+import { trackEvent } from '../lib/analytics';
 
 interface Props {
   url: string;
@@ -26,6 +27,7 @@ export function LinkModal({ url, onClose }: Props) {
 
   function handleCopy() {
     navigator.clipboard.writeText(url).then(() => {
+      trackEvent('share_link_copied', { location: 'share_modal' });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

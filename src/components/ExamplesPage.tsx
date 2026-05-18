@@ -16,6 +16,14 @@ export function ExamplesPage() {
       title: 'Minecraft Map Art Examples | MapKluss',
       description: 'Browse Minecraft map art examples made with MapKluss. Compare original images, generated previews, Minecraft screenshots, modes, sizes, colors, and materials.',
       url: `${window.location.origin}/examples`,
+      image: `${window.location.origin}/og-image.png`,
+      schema: {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Minecraft Map Art Examples',
+        url: `${window.location.origin}/examples`,
+        description: 'Examples of Minecraft map art created with MapKluss.',
+      },
     });
   }, []);
 
@@ -47,6 +55,12 @@ export function ExamplesPage() {
         <div className="examples-hero-actions">
           <a href="/">{t('Открыть редактор', 'Open Editor')}</a>
           <a href="#examples-grid">{t('Смотреть примеры', 'Browse examples')}</a>
+        </div>
+        <div className="examples-related-links">
+          <a href="/minecraft-map-art-generator">{t('Генератор map art', 'Map art generator')}</a>
+          <a href="/minecraft-litematic-map-art-generator">{t('Litematic export', 'Litematic export')}</a>
+          <a href="/minecraft-map-dat-generator">{t('MAP.DAT export', 'MAP.DAT export')}</a>
+          <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
         </div>
       </section>
 

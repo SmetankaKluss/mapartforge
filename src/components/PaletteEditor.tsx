@@ -67,6 +67,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
 
   function handlePresetSelect(name: string) {
     trackEvent('palette_preset_selected', { preset: name || 'none', custom: Boolean(name && !(name in BUILTIN_PRESETS)) });
+    trackEvent('preset_changed', { preset_type: 'palette', preset: name || 'none', custom: Boolean(name && !(name in BUILTIN_PRESETS)) });
     setSelectedPreset(name);
     if (!name) {
       // Reset to empty selection when "select preset" is chosen

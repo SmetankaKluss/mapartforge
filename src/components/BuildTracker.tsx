@@ -4,6 +4,7 @@ import {
   switchToBuilding, subscribeSession,
 } from '../lib/buildSession';
 import type { BuildSession, SessionMaterial } from '../lib/buildSession';
+import { applyPageMeta } from '../lib/meta';
 import '../buildTracker.css';
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
@@ -170,6 +171,15 @@ function MaterialRow({ mat, value, onChange, accentColor, lang, perMapTarget }: 
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export function BuildTracker({ sessionId }: { sessionId: string }) {
+  useEffect(() => {
+    applyPageMeta({
+      title: 'MapKluss Build Tracker',
+      description: 'Shared build tracker session for Minecraft map art.',
+      url: window.location.href,
+      robots: 'noindex,nofollow',
+    });
+  }, []);
+
   const [session,     setSession]     = useState<BuildSession | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');

@@ -121,6 +121,57 @@ function makeInstancedVoxelGroup(
   return root;
 }
 
+function makeTopProjectionGroup(
+  blocks: SchematicPreviewBlock[],
+  center: { x: number; z: number },
+) {
+  const root = new THREE.Group();
+  if (blocks.length === 0) return root;
+  const geometry = new THREE.BoxGeometry(1, 0.08, 1);
+  const tempMatrix = new THREE.Matrix4();
+  const footprint = new Map<string, SchematicPreviewBlock>();
+
+  for (const block of blocks) {
+    const key = `${block.kind}:${block.x}:${block.z}`;
+    const existing = footprint.get(key);
+    if (!existing || block.y > existing.y) footprint.set(key, block);
+  }
+
+  const colorBuckets = new Map<string, SchematicPreviewBlock[]>();
+  for (const block of footprint.values()) {
+    const key = `${block.kind}:${block.color}`;
+    const bucket = colorBuckets.get(key);
+    if (bucket) bucket.push(block);
+    else colorBuckets.set(key, [block]);
+  }
+
+  for (const [key, bucket] of colorBuckets) {
+    const [kind, colorStr] = key.split(':');
+    const material = new THREE.MeshLambertMaterial({
+      color: Number(colorStr),
+      transparent: kind !== 'art',
+      opacity: kind === 'art' ? 1 : kind === 'support' ? 0.22 : 0.35,
+      depthWrite: false,
+    });
+    const instanced = new THREE.InstancedMesh(geometry, material, bucket.length);
+    instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    bucket.forEach((block, index) => {
+      tempMatrix.makeTranslation(
+        block.x - center.x,
+        kind === 'art' ? 0.06 : kind === 'support' ? 0.02 : 0.1,
+        -block.z + center.z,
+      );
+      instanced.setMatrixAt(index, tempMatrix);
+    });
+    instanced.instanceMatrix.needsUpdate = true;
+    instanced.frustumCulled = false;
+    instanced.renderOrder = kind === 'art' ? 2 : kind === 'support' ? 0 : 1;
+    root.add(instanced);
+  }
+
+  return root;
+}
+
 function makeBlockTexture(kind: 'gallery-wall' | 'gallery-floor' | 'nether-wall' | 'nether-floor' | 'house-wall' | 'house-floor') {
   const canvas = document.createElement('canvas');
   canvas.width = 32;
@@ -371,11 +422,16 @@ export function PerspectiveModal({
             ? { ...block, color: new THREE.Color().setHSL(0.58 - ((block.y - model.minHeight) / denom) * 0.46, 0.65, 0.54).getHex() }
             : block
         ));
-      const root = makeInstancedVoxelGroup(displayBlocks, {
-        x: (model.width - 1) / 2,
-        y: model.minHeight < 0 ? model.minHeight - 0.5 : -0.5,
-        z: -model.exportDepth / 2,
-      }, schematicView !== 'perspective');
+      const root = schematicView === 'top'
+        ? makeTopProjectionGroup(displayBlocks, {
+            x: (model.width - 1) / 2,
+            z: model.exportDepth / 2,
+          })
+        : makeInstancedVoxelGroup(displayBlocks, {
+            x: (model.width - 1) / 2,
+            y: model.minHeight < 0 ? model.minHeight - 0.5 : -0.5,
+            z: -model.exportDepth / 2,
+          }, schematicView !== 'perspective');
       scene.add(root);
 
       controls.enableRotate = schematicView === 'perspective';
@@ -388,7 +444,7 @@ export function PerspectiveModal({
         controls.target.set(0, (model.maxHeight - model.minHeight) / 2 + 0.6, 0);
       } else if (schematicView === 'top') {
         const size = Math.max(model.width, model.exportDepth);
-        camera.position.set(0, Math.max(12, size + model.maxHeight + 6), 0.001);
+        camera.position.set(0, Math.max(12, size + 6), 0.001);
         controls.target.set(0, 0, 0);
       } else {
         const size = Math.max(model.exportDepth, model.heightRange + 4);

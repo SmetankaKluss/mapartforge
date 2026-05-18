@@ -68,6 +68,7 @@ import { computeSessionMaterials } from './components/MaterialsList';
 import { IconGlyph, mkIcons } from './components/IconGlyph';
 import { buildFinalPreview } from './lib/finalPreview';
 import type { PreviewMode } from './lib/preview3d';
+import { applyPageMeta } from './lib/meta';
 import 'driver.js/dist/driver.css';
 import './App.css';
 import { trackEvent } from './lib/analytics';
@@ -187,6 +188,47 @@ function imageDataToSourceImage(data: ImageData): Promise<HTMLImageElement> {
 
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
+
+  useEffect(() => {
+    applyPageMeta({
+      title: t(
+        'Генератор Minecraft map art, Litematic и MAP.DAT | MapKluss',
+        'Minecraft Map Art Generator, Litematic & MAP.DAT Export | MapKluss',
+      ),
+      description: t(
+        'MapKluss — браузерный генератор Minecraft map art. Загружай изображения, настраивай палитру и дизеринг, проверяй 2D/3D preview и экспортируй Litematic, MAP.DAT и материалы.',
+        'MapKluss is a browser-based Minecraft map art generator. Upload images, tune palette and dithering, preview 2D or 3D stair results, and export Litematic, MAP.DAT, and materials.',
+      ),
+      url: window.location.origin,
+      image: `${window.location.origin}/og-image.png`,
+      schema: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'MapKluss',
+          url: window.location.origin,
+        },
+        {
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'MapKluss',
+          applicationCategory: 'MultimediaApplication',
+          operatingSystem: 'Web',
+          url: window.location.origin,
+          image: `${window.location.origin}/og-image.png`,
+          description: t(
+            'Браузерный генератор Minecraft map art с экспортом Litematic, MAP.DAT и списком материалов.',
+            'Browser-based Minecraft map art generator with Litematic, MAP.DAT, and materials export.',
+          ),
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD',
+          },
+        },
+      ],
+    });
+  }, [lang, t]);
 
   // ── Restore persisted settings — lazy init runs exactly once on mount ─
   const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
@@ -369,10 +411,24 @@ export default function App() {
   originalDataRef.current = originalData;
 
   // Always-current ref — updated each render so callbacks never see stale state
-  const latestRef = useRef<{ imageData: ImageData | null; blockSelection: BlockSelection; layers: Layer[]; activeLayerId: string }>({
-    imageData: null, blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode), layers: layerState.layers, activeLayerId: layerState.activeLayerId,
+  const latestRef = useRef<{
+    imageData: ImageData | null;
+    blockSelection: BlockSelection;
+    layers: Layer[];
+    activeLayerId: string;
+    mapMode: '2d' | '3d';
+    staircaseMode: 'classic' | 'optimized';
+    platformMode: PlatformMode;
+  }>({
+    imageData: null,
+    blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode),
+    layers: layerState.layers,
+    activeLayerId: layerState.activeLayerId,
+    mapMode,
+    staircaseMode,
+    platformMode,
   });
-  latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId };
+  latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId, mapMode, staircaseMode, platformMode };
 
   // Ref to active layer — used in callbacks to check if layer has real content
   const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
@@ -593,12 +649,43 @@ export default function App() {
           setImageData(processed, false, true);  // fresh process, not dirty
         }
         setOriginalData(mk(msg.originalData));
+        trackEvent('map_generated', {
+          compare_mode: false,
+          output_variant: 'single',
+          map_mode: latestRef.current.mapMode,
+          staircase_mode: latestRef.current.mapMode === '3d' ? latestRef.current.staircaseMode : undefined,
+          dithering: mode,
+          map_wide: grid.wide,
+          map_tall: grid.tall,
+          intensity: intens,
+          bn_scale: bn,
+          palette_size: palette.colors.length,
+          platform_mode: latestRef.current.platformMode,
+          source_width: img.naturalWidth,
+          source_height: img.naturalHeight,
+        });
         done();
       } else if (msg.type === 'compare_result') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
         setCompareData({ left: mk(msg.leftData), right: mk(msg.rightData) });
         setOriginalData(mk(msg.originalData));
+        trackEvent('map_generated', {
+          compare_mode: true,
+          output_variant: 'compare',
+          map_mode: latestRef.current.mapMode,
+          staircase_mode: latestRef.current.mapMode === '3d' ? latestRef.current.staircaseMode : undefined,
+          compare_left: cmpLeft,
+          compare_right: cmpRight,
+          map_wide: grid.wide,
+          map_tall: grid.tall,
+          intensity: intens,
+          bn_scale: bn,
+          palette_size: palette.colors.length,
+          platform_mode: latestRef.current.platformMode,
+          source_width: img.naturalWidth,
+          source_height: img.naturalHeight,
+        });
         done();
       } else if (msg.type === 'error') {
         console.error('Processor worker error:', msg.message);
@@ -1453,6 +1540,7 @@ export default function App() {
   // ── Onboarding tour ───────────────────────────────────────────────────────
   const startTour = useCallback((tourType: TourType) => {
     markTourDone(tourType);
+    trackEvent('tutorial_opened', { tutorial_type: tourType === 'advanced' ? 'tour_advanced' : 'tour_basic', lang });
     createTour(tourType, switchTourStep, lang).drive();
   }, [lang, switchTourStep]);
   useEffect(() => {
@@ -1694,8 +1782,8 @@ export default function App() {
             title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
           ><IconGlyph icon={mkIcons.artist} /> {t('Художник', 'Artist')}</button>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
-          <button className="header-icon-btn" onClick={() => setShowTourSelector(true)} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
-          <button className="header-icon-btn" onClick={() => setShowWiki(true)} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
+          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
+          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang }); setShowWiki(true); }} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
         </div>
@@ -2429,6 +2517,32 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <section className="seo-intro-panel" aria-label={t('О MapKluss', 'About MapKluss')}>
+            <div className="seo-intro-copy">
+              <p className="seo-intro-kicker">{t('MINECRAFT MAP ART WORKSHOP', 'MINECRAFT MAP ART WORKSHOP')}</p>
+              <h2>{t('MapKluss — браузерный генератор Minecraft map art', 'MapKluss is a browser-based Minecraft map art generator')}</h2>
+              <p>
+                {t(
+                  'Загружай изображение, подбирай палитру Minecraft, сравнивай дизеринг и выбирай 2D Flat или 3D Stair режим. После этого можно экспортировать Litematic, MAP.DAT, PNG и список материалов для постройки.',
+                  'Upload an image, tune the Minecraft palette, compare dithering, and choose 2D Flat or 3D Stair mode. Then export Litematic, MAP.DAT, PNG, and a materials list for the final build.',
+                )}
+              </p>
+              <p>
+                {t(
+                  'MapKluss подходит для аниме-артов, логотипов, фото, пиксель-арта и больших multi-map проектов. Это более современный workflow для тех, кому уже тесно в старых map art генераторах.',
+                  'MapKluss works for anime art, logos, photos, pixel art, and larger multi-map projects. It is a more modern workflow for builders who have outgrown older map-art generators.',
+                )}
+              </p>
+            </div>
+            <div className="seo-intro-links">
+              <a href="/minecraft-map-art-generator">{t('Генератор map art', 'Map art generator')}</a>
+              <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
+              <a href="/minecraft-litematic-map-art-generator">{t('Экспорт Litematic', 'Litematic export')}</a>
+              <a href="/minecraft-map-dat-generator">{t('Экспорт MAP.DAT', 'MAP.DAT export')}</a>
+              <a href="/examples">{t('Примеры map art', 'Map art examples')}</a>
+            </div>
+          </section>
         </main>
 
         {showPatternEditor && activePattern && (

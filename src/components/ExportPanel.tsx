@@ -189,6 +189,16 @@ export function ExportPanel({
     try {
       captureDiagnostics('export_map_dat', src);
       await exportMapDat(src, mapGrid, activePalette);
+      trackEvent('dat_exported', {
+        map_mode: mapMode,
+        staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        compare_mode: compareMode,
+        artist_mode: Boolean(artistMode),
+        platform_mode: platformMode,
+        file_count: mapGrid.wide * mapGrid.tall,
+      });
     } finally {
       setBusyMapdat(false);
     }
@@ -206,6 +216,16 @@ export function ExportPanel({
       const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematic(src, activePalette, blockSelection, 'MapartForge', structure,
         supportForExport, supportMode, staircaseMode);
+      trackEvent('litematic_exported', {
+        variant: 'single',
+        map_mode: mapMode,
+        staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        compare_mode: compareMode,
+        artist_mode: Boolean(artistMode),
+        platform_mode: platformMode,
+      });
     } finally {
       setBusyLiteFlat(false);
     }
@@ -224,6 +244,16 @@ export function ExportPanel({
       const supportForExport = structure === 'staircase' ? supportBlock : 'air';
       await exportLitematicZip(src, activePalette, blockSelection, mapGrid, structure, zipFilename,
         supportForExport, supportMode, staircaseMode);
+      trackEvent('litematic_exported', {
+        variant: 'zip',
+        map_mode: mapMode,
+        staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        compare_mode: compareMode,
+        artist_mode: Boolean(artistMode),
+        platform_mode: platformMode,
+      });
     } finally {
       setBusyZip(false);
     }
@@ -240,6 +270,15 @@ export function ExportPanel({
       const supportForExport = has3D ? supportBlock : 'air';
       await exportLitematicHybrid(hybridLayers, activePalette, blockSelection, 'MapartForge',
         supportForExport, supportMode);
+      trackEvent('litematic_exported', {
+        variant: 'hybrid',
+        map_mode: 'hybrid',
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        compare_mode: compareMode,
+        artist_mode: Boolean(artistMode),
+        platform_mode: platformMode,
+      });
     } finally {
       setBusyHybrid(false);
     }
@@ -261,6 +300,16 @@ export function ExportPanel({
         await exportLitematic(activeLayerExport.imageData, activePalette, blockSelection, 'MapartForge_layer',
           structure, supportForExport, supportMode, activeLayerExport.staircaseMode);
       }
+      trackEvent('litematic_exported', {
+        variant: 'layer',
+        map_mode: activeLayerExport.mapMode,
+        staircase_mode: activeLayerExport.mapMode === '3d' ? activeLayerExport.staircaseMode : undefined,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        compare_mode: compareMode,
+        artist_mode: Boolean(artistMode),
+        platform_mode: platformMode,
+      });
     } finally {
       setBusyLayer(false);
     }
