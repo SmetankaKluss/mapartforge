@@ -113,20 +113,49 @@ export function SeoLandingPage({ page }: Props) {
       {exampleProjects.length > 0 && (
         <section className="seo-section">
           <div className="seo-section-head">
-            <h2>{t('Примеры результата', 'Result examples')}</h2>
-            <p>{t('Реальные примеры, которые можно открыть в редакторе и попробовать самому.', 'Real examples you can open in the editor and try yourself.')}</p>
+            <h2>{t('Примеры и настройки', 'Examples and settings')}</h2>
+            <p>{t('Вместо витрины с картинками здесь короткая документация: какой тип арта это был, какие настройки использовались и в каких случаях такой подход обычно подходит.', 'Instead of image-heavy showcase cards, this section works like short documentation: what kind of art this was, which settings were used, and when that approach usually makes sense.')}</p>
           </div>
-          <div className="seo-example-grid">
+          <div className="seo-doc-grid">
             {exampleProjects.map(example => (
-              <article className="seo-example-card" key={example.id}>
-                <img src={example.previewUrl} alt={t(`${example.titleRu}: результат MapKluss`, `${example.titleEn}: MapKluss result`)} loading="lazy" />
-                <div className="seo-example-card-body">
+              <article className="seo-doc-card" key={example.id}>
+                <div className="seo-doc-head">
                   <h3>{t(example.titleRu, example.titleEn)}</h3>
-                  <p>{t(example.descriptionRu, example.descriptionEn)}</p>
-                  <div className="seo-example-actions">
-                    <a href={`/?example=${encodeURIComponent(example.id)}`}>{t('Попробовать', 'Try this example')}</a>
-                    <a href="/examples">{t('Все примеры', 'All examples')}</a>
+                  <span className={`example-mode example-mode--${example.mode}`}>
+                    {example.mode === '3d' ? '3D Stair' : '2D Flat'}
+                  </span>
+                </div>
+                <p className="seo-doc-body">{t(example.descriptionRu, example.descriptionEn)}</p>
+                <dl className="seo-doc-meta">
+                  <div>
+                    <dt>{t('Размер', 'Size')}</dt>
+                    <dd>{example.size}</dd>
                   </div>
+                  <div>
+                    <dt>{t('Цвета', 'Colors')}</dt>
+                    <dd>{example.colors}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Дизеринг', 'Dithering')}</dt>
+                    <dd>{example.trySettings.dithering}</dd>
+                  </div>
+                </dl>
+                <div className="seo-doc-note">
+                  <strong>{t('Когда подходит:', 'Best used for:')}</strong>
+                  <span>
+                    {t(
+                      example.mode === '3d'
+                        ? 'сложных иллюстраций, более мягких переходов и случаев, где дополнительные оттенки важнее простоты постройки.'
+                        : 'логотипов, чистых форм, пиксель-арта и случаев, где важны простота и предсказуемые материалы.',
+                      example.mode === '3d'
+                        ? 'detailed illustrations, softer gradients, and cases where extra shades matter more than build simplicity.'
+                        : 'logos, cleaner shapes, pixel art, and cases where simplicity and predictable materials matter most.',
+                    )}
+                  </span>
+                </div>
+                <div className="seo-doc-actions">
+                  <a href={`/?example=${encodeURIComponent(example.id)}`}>{t('Открыть в редакторе', 'Open in editor')}</a>
+                  <a href="/examples">{t('Полная галерея', 'Full gallery')}</a>
                 </div>
               </article>
             ))}
