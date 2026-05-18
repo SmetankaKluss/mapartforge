@@ -3459,6 +3459,10 @@ input, select, textarea { outline: none; }
   font-size: 15px;
   line-height: 1.7;
 }
+.examples-hero-subline {
+  margin-top: 12px;
+  color: var(--text-dim);
+}
 .examples-hero-actions {
   display: flex;
   gap: 10px;
@@ -3591,6 +3595,122 @@ input, select, textarea { outline: none; }
 }
 .example-actions button { cursor: pointer; }
 .example-actions button:last-child { color: var(--terra); border-color: rgba(200,98,42,0.42); background: var(--terra-dim); }
+.examples-insight-section,
+.examples-cta-band {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.examples-insight-section {
+  padding: 12px 0 12px;
+}
+.examples-section-head h2,
+.examples-cta-band h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 28px;
+  color: var(--text);
+}
+.examples-section-head p,
+.examples-cta-band p {
+  margin: 0;
+  max-width: 860px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.examples-insight-grid,
+.examples-checklist-grid,
+.examples-faq-list {
+  margin-top: 16px;
+}
+.examples-insight-grid,
+.examples-checklist-grid {
+  display: grid;
+  gap: 12px;
+}
+.examples-insight-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.examples-checklist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.examples-insight-card,
+.examples-check-card,
+.examples-faq-item {
+  background: rgba(23,23,28,0.94);
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+.examples-insight-card h3,
+.examples-check-card h3,
+.examples-faq-item h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  color: var(--text);
+}
+.examples-insight-card p,
+.examples-check-card p,
+.examples-faq-item p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.examples-insight-card a {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid rgba(87,255,110,0.22);
+  background: rgba(87,255,110,0.08);
+  padding: 8px 10px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.examples-insight-card a:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.examples-faq-list {
+  display: grid;
+  gap: 12px;
+}
+.examples-cta-band {
+  margin-top: 4px;
+  margin-bottom: 72px;
+  padding: 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  background: rgba(23,23,28,0.94);
+  border: 1px solid var(--border);
+}
+.examples-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.examples-cta-actions a {
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--accent-dim);
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.examples-cta-actions a:last-child {
+  color: var(--gold);
+  border-color: rgba(255,215,0,0.38);
+  background: var(--gold-dim);
+}
+.examples-cta-actions a:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
 
 /* ── SEO landing pages ──────────────────────────────────────────────────── */
 .seo-page {
@@ -3740,8 +3860,11 @@ input, select, textarea { outline: none; }
   .examples-topbar { height: auto; min-height: 64px; padding: 10px 14px; flex-wrap: wrap; }
   .examples-hero { padding: 46px 18px 28px; }
   .examples-grid { width: calc(100% - 24px); grid-template-columns: 1fr; }
+  .examples-insight-section,
+  .examples-cta-band { width: calc(100% - 24px); }
   .example-triptych { grid-template-columns: 1fr; }
   .example-meta { grid-template-columns: 1fr; }
+  .examples-cta-band { padding: 16px; flex-direction: column; }
   .seo-hero { padding: 46px 18px 26px; }
   .seo-section { width: calc(100% - 24px); }
 }
