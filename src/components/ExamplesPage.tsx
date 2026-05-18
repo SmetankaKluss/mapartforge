@@ -60,6 +60,9 @@ export function ExamplesPage() {
           <a href="/minecraft-map-art-generator">{t('Генератор map art', 'Map art generator')}</a>
           <a href="/minecraft-litematic-map-art-generator">{t('Litematic export', 'Litematic export')}</a>
           <a href="/minecraft-map-dat-generator">{t('MAP.DAT export', 'MAP.DAT export')}</a>
+          <a href="/how-to-make-minecraft-map-art">{t('Как сделать map art', 'How to make map art')}</a>
+          <a href="/best-dithering-for-minecraft-map-art">{t('Гайд по дизерингу', 'Dithering guide')}</a>
+          <a href="/2d-vs-3d-stair-map-art">{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
           <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
         </div>
       </section>

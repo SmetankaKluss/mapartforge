@@ -2540,6 +2540,9 @@ export default function App() {
               <a href="/mapartcraft-alternative">{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
               <a href="/minecraft-litematic-map-art-generator">{t('Экспорт Litematic', 'Litematic export')}</a>
               <a href="/minecraft-map-dat-generator">{t('Экспорт MAP.DAT', 'MAP.DAT export')}</a>
+              <a href="/how-to-make-minecraft-map-art">{t('Как сделать map art', 'How to make map art')}</a>
+              <a href="/best-dithering-for-minecraft-map-art">{t('Выбор дизеринга', 'Dithering guide')}</a>
+              <a href="/2d-vs-3d-stair-map-art">{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
               <a href="/examples">{t('Примеры map art', 'Map art examples')}</a>
             </div>
           </section>

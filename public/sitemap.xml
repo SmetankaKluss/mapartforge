@@ -30,4 +30,19 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://mapkluss.art/how-to-make-minecraft-map-art</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://mapkluss.art/best-dithering-for-minecraft-map-art</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.76</priority>
+  </url>
+  <url>
+    <loc>https://mapkluss.art/2d-vs-3d-stair-map-art</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.76</priority>
+  </url>
 </urlset>
