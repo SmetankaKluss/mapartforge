@@ -1,52 +1,63 @@
 # MapKluss
 
-[![Deploy to GitHub Pages](https://github.com/SmetankaKluss/mapartforge/actions/workflows/deploy.yml/badge.svg)](https://github.com/SmetankaKluss/mapartforge/actions/workflows/deploy.yml)
-[![Website](https://img.shields.io/badge/website-mapkluss.art-57FF6E)](https://mapkluss.art)
-[![Made with React](https://img.shields.io/badge/React-TypeScript-61DAFB)](https://react.dev/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+Browser-based Minecraft map art generator and editor.
 
-MapKluss is a browser-based Minecraft map art generator and editor. It converts images into 2D flat map art or 3D stair map art, lets you edit the result with artist tools, and exports files for Minecraft and Litematica.
+[Website](https://mapkluss.art)  
+[Author](https://github.com/SmetankaKluss)
 
-Site: https://mapkluss.art
-Author: https://github.com/SmetankaKluss
+![MapKluss preview](public/readme-showcase.png)
 
-![MapKluss comparison preview](public/readme-showcase.png)
+## What It Does
 
-## Features
+MapKluss turns images into Minecraft map art directly in the browser. You can preview the result, adjust palette and dithering, work in 2D or 3D stair mode, edit the output, and export files for building in Minecraft.
 
-- Image to Minecraft map art conversion in the browser
-- 2D flat mode and 3D stair mode
-- Minecraft palette controls with version-aware block selection
-- Dithering modes including KlussDither, Floyd-Steinberg, Stucki, Atkinson, Blue Noise, and Yliluoma
-- Artist mode with layers, brush, fill, text, selections, undo and redo
-- PNG, MAP.DAT, LITEMATIC, ZIP, material list, and showcase exports
-- Build tracker for team projects
-- Gallery / examples page with shareable example settings
-- RU / EN interface
+## Main Features
 
-## Privacy
+- Image to Minecraft map art conversion
+- 2D Flat and 3D Stair modes
+- Palette control with Minecraft version awareness
+- Multiple dithering modes, including KlussDither
+- Built-in editor with brush, fill, text, layers, selections, undo and redo
+- 3D schematic preview
+- Export to:
+  - PNG
+  - MAP.DAT
+  - LITEMATIC
+  - ZIP
+  - materials list
+  - showcase image
+- Build tracker for larger projects
+- Russian and English interface
 
-Normal image processing runs locally in the browser. Images are not uploaded for basic conversion, editing, or local export.
+## How It Works
 
-Supabase is used only for features that need online storage, such as share links and build tracker sessions. Those features require explicit user action.
+1. Upload an image.
+2. Choose map size, mode, palette, and dithering.
+3. Preview the result and edit it if needed.
+4. Export the format you need for building.
 
-## Development
+## Running Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Build check:
+Build production bundle:
 
 ```bash
-npx tsc -b --pretty false
 npm run build
 ```
 
-## Environment
+Type check:
 
-Copy `.env.example` to `.env.local` if you need share links or build tracker locally:
+```bash
+npx tsc -b --pretty false
+```
+
+## Environment Variables
+
+If you want to run share links or build tracker with your own Supabase project, copy `.env.example` to `.env.local` and set:
 
 ```bash
 VITE_SUPABASE_URL=
@@ -54,19 +65,26 @@ VITE_SUPABASE_ANON_KEY=
 VITE_SHARE_BASE_URL=https://mapkluss.art
 ```
 
-The app includes the public Supabase anon configuration used by the production site, so share links and build tracker sessions work in the default build. Override these variables only when using a different Supabase project.
+## Tech Stack
 
-## Project Structure
+- React
+- TypeScript
+- Vite
+- Three.js
+- Supabase
 
-- `src/components` - React UI components
-- `src/lib` - image processing, palettes, exports, storage helpers
-- `src/workers` - Web Worker processing pipeline
-- `public/examples` - curated gallery example assets
-- `docs` - project notes, changelog, and post drafts
+## Repository Structure
 
-## Repository Notes
+- `src/components` - UI and editor panels
+- `src/lib` - processing, exports, analytics, SEO helpers
+- `src/workers` - image processing workers
+- `public` - static assets
 
-Generated screenshots, local tool state, exported `.litematic` files, `.dat` files, and local `.env` files are intentionally ignored. Keep public assets in `public/` and source assets in `src/assets/`.
+## Contacts
+
+- Telegram: [@SmetankaKluss](https://t.me/SmetankaKluss)
+- Boosty: [boosty.to/klussforge](https://boosty.to/klussforge)
+- Website: [mapkluss.art](https://mapkluss.art)
 
 ## License
 
