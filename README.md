@@ -1,21 +1,31 @@
 # MapKluss
 
-Minecraft map art generator for browser-based workflow, preview, editing, and export.
+Minecraft map art generator for preview, editing, and export directly in the browser.
 
 [Open MapKluss](https://mapkluss.art) • [Telegram](https://t.me/SmetankaKluss) • [Boosty](https://boosty.to/klussforge)
 
 ![MapKluss preview](public/readme-showcase.png)
 
-MapKluss converts images into Minecraft map art directly in the browser. It is built for players who want a cleaner workflow than older map art tools: preview first, tune palette and dithering, choose 2D or 3D stair mode, then export files that are actually useful for building.
+MapKluss converts images into Minecraft map art and gives you a full browser-based workflow: configure size, palette, dithering, and 2D or 3D mode, preview the result, edit it, then export files for building in Minecraft.
 
-## What You Can Do
+## Why MapKluss
 
-- Convert any image into Minecraft map art
-- Switch between 2D Flat and 3D Stair
-- Tune palette, blocks, size, and dithering
-- Edit the result inside the built-in editor
-- Preview the schematic in 3D
-- Export files for real building workflow
+- No desktop install
+- Works directly in the browser
+- Built for actual Minecraft map art workflow, not just image conversion
+- Supports preview, manual cleanup, and export in one place
+- Made for builders, server projects, and large multi-map art
+
+## Main Features
+
+- Image to Minecraft map art conversion
+- 2D Flat and 3D Stair modes
+- Minecraft version-aware palette filtering
+- Multiple dithering modes, including KlussDither
+- Built-in editor with brush, fill, text, layers, selections, undo and redo
+- 3D schematic preview
+- Build tracker for larger projects
+- Russian and English interface
 
 ## Exports
 
@@ -26,16 +36,7 @@ MapKluss converts images into Minecraft map art directly in the browser. It is b
 - materials list
 - showcase image
 
-## Main Features
-
-- Browser-based workflow, no desktop install required
-- Minecraft version-aware palette filtering
-- Multiple dithering modes, including KlussDither
-- Built-in editor with brush, fill, text, layers, selections, undo and redo
-- Build tracker for larger projects
-- Russian and English interface
-
-## How To Use
+## Workflow
 
 1. Upload an image
 2. Choose map size and mode
@@ -43,7 +44,7 @@ MapKluss converts images into Minecraft map art directly in the browser. It is b
 4. Preview and edit if needed
 5. Export the result for Minecraft
 
-## Who It Is For
+## Built For
 
 - survival builders
 - map art makers
@@ -51,48 +52,12 @@ MapKluss converts images into Minecraft map art directly in the browser. It is b
 - server communities
 - creators who need `.litematic`, `.dat`, and materials in one workflow
 
-## Links
+## Project Links
 
 - Website: [mapkluss.art](https://mapkluss.art)
 - Examples: [mapkluss.art/examples](https://mapkluss.art/examples)
 - Telegram: [@SmetankaKluss](https://t.me/SmetankaKluss)
 - Boosty: [boosty.to/klussforge](https://boosty.to/klussforge)
-
-## Development
-
-<details>
-<summary>Local setup</summary>
-
-### Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Type check
-
-```bash
-npx tsc -b --pretty false
-```
-
-### Environment variables
-
-If you want to run share links or build tracker with your own Supabase project, copy `.env.example` to `.env.local` and set:
-
-```bash
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-VITE_SHARE_BASE_URL=https://mapkluss.art
-```
-
-</details>
 
 ## Tech Stack
 
@@ -104,10 +69,10 @@ VITE_SHARE_BASE_URL=https://mapkluss.art
 
 ## Repository Structure
 
-- `src/components` - UI and editor panels
-- `src/lib` - processing, exports, analytics, SEO helpers
+- `src/components` - editor UI and panels
+- `src/lib` - processing, exports, palettes, analytics, SEO helpers
 - `src/workers` - image processing workers
-- `public` - static assets
+- `public` - static assets and showcase media
 
 ## Contacts
 
