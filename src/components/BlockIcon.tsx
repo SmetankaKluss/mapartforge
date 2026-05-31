@@ -12,6 +12,10 @@ interface Props {
 }
 
 type WikiState = 'loading' | 'loaded' | 'error';
+interface WikiResult {
+  nbtName: string;
+  state: WikiState;
+}
 
 /**
  * Renders a block texture icon.
@@ -21,31 +25,30 @@ type WikiState = 'loading' | 'loaded' | 'error';
  */
 export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: Props) {
   const inSprite = isInSpritesheet(csId, blockId);
+  const cachedTexture = inSprite ? undefined : getCachedWikiTexture(nbtName);
 
-  const [wikiState, setWikiState] = useState<WikiState>(() => {
-    if (inSprite) return 'loaded'; // state unused for sprite blocks
-    const cached = getCachedWikiTexture(nbtName);
-    if (cached === undefined) return 'loading';
-    return cached === null ? 'error' : 'loaded';
+  const [wikiResult, setWikiResult] = useState<WikiResult>(() => {
+    if (cachedTexture === undefined) return { nbtName, state: 'loading' };
+    return { nbtName, state: cachedTexture === null ? 'error' : 'loaded' };
   });
+
+  const wikiState: WikiState = cachedTexture !== undefined
+    ? (cachedTexture === null ? 'error' : 'loaded')
+    : wikiResult.nbtName === nbtName
+      ? wikiResult.state
+      : 'loading';
 
   useEffect(() => {
     if (inSprite) return;
-
-    // Already resolved?
-    const cached = getCachedWikiTexture(nbtName);
-    if (cached !== undefined) {
-      setWikiState(cached === null ? 'error' : 'loaded');
-      return;
-    }
+    if (cachedTexture !== undefined) return;
 
     let cancelled = false;
     fetchWikiTexture(nbtName).then(
-      () => { if (!cancelled) setWikiState('loaded'); },
-      () => { if (!cancelled) setWikiState('error'); },
+      () => { if (!cancelled) setWikiResult({ nbtName, state: 'loaded' }); },
+      () => { if (!cancelled) setWikiResult({ nbtName, state: 'error' }); },
     );
     return () => { cancelled = true; };
-  }, [nbtName, inSprite]);
+  }, [nbtName, inSprite, cachedTexture]);
 
   if (inSprite) {
     return (
