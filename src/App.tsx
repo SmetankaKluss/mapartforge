@@ -38,6 +38,7 @@ import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
 const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
+const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
@@ -54,7 +55,6 @@ import type { PatternDefinition } from './lib/patternTool';
 import { createDefaultPattern } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
-import { PerspectiveModal } from './components/PerspectiveModal';
 import { importMapDat, MapDatImportError } from './lib/importMapDat';
 import { GifModal } from './components/GifModal';
 import { GifFilmstrip } from './components/GifFilmstrip';
@@ -2801,19 +2801,21 @@ export default function App() {
 
     {/* ── Perspective preview modal ── */}
     {showPerspective && (
-      <PerspectiveModal
-        imageData={compareMode ? (compareData?.left ?? previewImageData) : (previewImageData ?? compositeImageData)}
-        cp={activePalette}
-        blockSelection={blockSelection}
-        mapMode={mapMode}
-        staircaseMode={staircaseMode}
-        supportMode={supportMode}
-        supportBlock={supportBlock}
-        mapGrid={mapGrid}
-        previewMode={previewMode}
-        onPreviewModeChange={setPreviewMode}
-        onClose={() => setShowPerspective(false)}
-      />
+      <Suspense fallback={null}>
+        <PerspectiveModal
+          imageData={compareMode ? (compareData?.left ?? previewImageData) : (previewImageData ?? compositeImageData)}
+          cp={activePalette}
+          blockSelection={blockSelection}
+          mapMode={mapMode}
+          staircaseMode={staircaseMode}
+          supportMode={supportMode}
+          supportBlock={supportBlock}
+          mapGrid={mapGrid}
+          previewMode={previewMode}
+          onPreviewModeChange={setPreviewMode}
+          onClose={() => setShowPerspective(false)}
+        />
+      </Suspense>
     )}
 
     {/* ── Build tracker modal ── */}
