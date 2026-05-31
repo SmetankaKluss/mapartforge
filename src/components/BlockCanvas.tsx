@@ -108,73 +108,84 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
     const canvas = canvasRef.current;
     if (!canvas || !imageData || !spritePixels || !spriteReady) return;
 
-    setRendering(true);
+    let renderRafId = 0;
+    let cancelled = false;
 
-    const rafId = requestAnimationFrame(() => {
-      const lookup = buildLookup(cp, blockSelection);
-      const ctx = canvas.getContext('2d')!;
-      const cw = width  * scale;
-      const ch = height * scale;
-      canvas.width  = cw;
-      canvas.height = ch;
+    const overlayRafId = requestAnimationFrame(() => {
+      if (cancelled) return;
+      setRendering(true);
 
-      // Build the entire output as a single ImageData — no per-pixel canvas API calls.
-      // Nearest-neighbor samples from the sprite sheet typed array.
-      const CELL = 32;
-      const sw   = spritePixels.width;
-      const sp   = spritePixels.data;
-      const output = new ImageData(cw, ch);
-      const dst    = output.data;
+      renderRafId = requestAnimationFrame(() => {
+        if (cancelled) return;
+        const lookup = buildLookup(cp, blockSelection);
+        const ctx = canvas.getContext('2d')!;
+        const cw = width  * scale;
+        const ch = height * scale;
+        canvas.width  = cw;
+        canvas.height = ch;
 
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const pi  = (y * width + x) * 4;
-          const r   = imageData.data[pi], g = imageData.data[pi + 1], b = imageData.data[pi + 2];
-          const entry = lookup.get((r << 16) | (g << 8) | b);
+        // Build the entire output as a single ImageData — no per-pixel canvas API calls.
+        // Nearest-neighbor samples from the sprite sheet typed array.
+        const CELL = 32;
+        const sw   = spritePixels.width;
+        const sp   = spritePixels.data;
+        const output = new ImageData(cw, ch);
+        const dst    = output.data;
 
-          for (let sy = 0; sy < scale; sy++) {
-            for (let sx = 0; sx < scale; sx++) {
-              const di = ((y * scale + sy) * cw + (x * scale + sx)) * 4;
-              if (entry) {
-                const bounds   = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
-                const spriteY0 = bounds ? bounds.y : entry.csId * CELL;
-                const spriteH  = bounds ? bounds.h : CELL;
-                // Nearest-neighbor sample (matches imageSmoothingEnabled=false behavior)
-                const ssx = entry.blockId * CELL + Math.floor(sx * CELL  / scale);
-                const ssy = spriteY0          + Math.floor(sy * spriteH / scale);
-                const si  = (ssy * sw + ssx) * 4;
-                dst[di]   = sp[si]; dst[di+1] = sp[si+1]; dst[di+2] = sp[si+2]; dst[di+3] = 255;
-              } else {
-                dst[di] = r; dst[di+1] = g; dst[di+2] = b; dst[di+3] = 255;
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const pi  = (y * width + x) * 4;
+            const r   = imageData.data[pi], g = imageData.data[pi + 1], b = imageData.data[pi + 2];
+            const entry = lookup.get((r << 16) | (g << 8) | b);
+
+            for (let sy = 0; sy < scale; sy++) {
+              for (let sx = 0; sx < scale; sx++) {
+                const di = ((y * scale + sy) * cw + (x * scale + sx)) * 4;
+                if (entry) {
+                  const bounds   = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
+                  const spriteY0 = bounds ? bounds.y : entry.csId * CELL;
+                  const spriteH  = bounds ? bounds.h : CELL;
+                  // Nearest-neighbor sample (matches imageSmoothingEnabled=false behavior)
+                  const ssx = entry.blockId * CELL + Math.floor(sx * CELL  / scale);
+                  const ssy = spriteY0          + Math.floor(sy * spriteH / scale);
+                  const si  = (ssy * sw + ssx) * 4;
+                  dst[di]   = sp[si]; dst[di+1] = sp[si+1]; dst[di+2] = sp[si+2]; dst[di+3] = 255;
+                } else {
+                  dst[di] = r; dst[di+1] = g; dst[di+2] = b; dst[di+3] = 255;
+                }
               }
             }
           }
         }
-      }
 
-      ctx.putImageData(output, 0, 0);
+        ctx.putImageData(output, 0, 0);
 
-      if (showGrid) {
-        const mapsWide = width  / 128;
-        const mapsTall = height / 128;
-        if (mapsWide > 1 || mapsTall > 1) {
-          ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-          ctx.lineWidth = 2;
-          for (let mx = 1; mx < mapsWide; mx++) {
-            const px = mx * 128 * scale;
-            ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, height * scale); ctx.stroke();
-          }
-          for (let my = 1; my < mapsTall; my++) {
-            const py = my * 128 * scale;
-            ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(width * scale, py); ctx.stroke();
+        if (showGrid) {
+          const mapsWide = width  / 128;
+          const mapsTall = height / 128;
+          if (mapsWide > 1 || mapsTall > 1) {
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.lineWidth = 2;
+            for (let mx = 1; mx < mapsWide; mx++) {
+              const px = mx * 128 * scale;
+              ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, height * scale); ctx.stroke();
+            }
+            for (let my = 1; my < mapsTall; my++) {
+              const py = my * 128 * scale;
+              ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(width * scale, py); ctx.stroke();
+            }
           }
         }
-      }
 
-      setRendering(false);
+        setRendering(false);
+      });
     });
 
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(overlayRafId);
+      cancelAnimationFrame(renderRafId);
+    };
   }, [imageData, spritePixels, spriteBounds, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
 
   if (!imageData) {
