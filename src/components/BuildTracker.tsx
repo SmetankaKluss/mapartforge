@@ -245,7 +245,6 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
       setLoading(false);
     }
     return () => unsub();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   const debounceSave = useCallback((g: Record<string, number>, p: Record<string, number>, mode: string) => {

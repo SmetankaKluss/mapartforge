@@ -48,7 +48,6 @@ export function CompareView({
     clearTimeout(labelTimerRef.current);
     labelTimerRef.current = setTimeout(() => setLabelsVisible(false), 2000);
     return () => clearTimeout(labelTimerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Global mouse drag ───────────────────────────────────────────────────────

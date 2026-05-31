@@ -884,7 +884,6 @@ export function PreviewCanvas({
     }
     antsRafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(antsRafRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Show split labels on mount / when split activates ───────────────────────
@@ -948,7 +947,6 @@ export function PreviewCanvas({
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Global mousemove + mouseup ──────────────────────────────────────────────
@@ -1873,7 +1871,6 @@ export function PreviewCanvas({
     }
     const span = 2 * ri + 1;
     return <svg width={span * scale} height={span * scale} style={{ display: 'block' }}>{rects}</svg>;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasBrushCursor, isStampMode, activeTool, brushSize, scale]);
 
   // ── Canvas child ────────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
+      'react-hooks/refs': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
       'react-refresh/only-export-components': 'warn',
     },

@@ -472,7 +472,6 @@ export default function App() {
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
     if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
     if ('sourceUploadedImage' in layer) uploadedImageRef.current = layer.sourceUploadedImage ?? null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLayerId]);
 
   // Push current state onto undo stack before a tracked action
@@ -484,7 +483,6 @@ export default function App() {
     });
     setRedoStack([]);
   // latestRef is a stable ref, setters are stable
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -1327,7 +1325,6 @@ export default function App() {
     const json = serializeProject(layers, activeLayerId, mapGrid);
     const name = `MapKluss_${mapGrid.wide}x${mapGrid.tall}_${new Date().toISOString().slice(0,10)}.mapkluss`;
     downloadProject(json, name);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers, activeLayerId, mapGrid]);
 
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1359,7 +1356,6 @@ export default function App() {
     }
     projectFileInputRef.current.value = '';
     projectFileInputRef.current.click();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAppNotice, t]);
 
   // Keyboard shortcuts: 1-9 select dithering, C toggles compare mode
@@ -1436,7 +1432,6 @@ export default function App() {
     if (!sel) return;
     setBlockSelection(sel);
     setPaletteBanner(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Load from ?share= URL param (runs once on mount) ──────────────────────
@@ -1569,7 +1564,6 @@ export default function App() {
       const timer = setTimeout(() => createTour('basic', switchTourStep, lang).drive(), 600);
       return () => clearTimeout(timer);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, switchTourStep]);
 
   // ── Import map.dat ────────────────────────────────────────────────────────
