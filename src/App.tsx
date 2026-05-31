@@ -385,6 +385,8 @@ export default function App() {
   // Raw file for color-accurate bitmap creation (bypasses ICC profile correction)
   const uploadedFileRef  = useRef<File | null>(null);
   const workerRef     = useRef<Worker | null>(null);
+  const workerJobSeqRef = useRef(0);
+  const activeWorkerJobIdRef = useRef<number | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // When re-processing a manually-edited layer, store the alpha mask here so it can
   // be re-applied after the worker returns (preserves deletions/transparency edits).
@@ -571,6 +573,7 @@ export default function App() {
   // exportRef is updated below, after compositeImageData is computed
 
   function handleCancelProcessing() {
+    activeWorkerJobIdRef.current = null;
     workerRef.current?.terminate();
     workerRef.current = null;
     if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
@@ -593,6 +596,7 @@ export default function App() {
     kp: KlussParams,
   ) {
     // Terminate any running worker and clear pending cancel timer
+    activeWorkerJobIdRef.current = null;
     workerRef.current?.terminate();
     if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
 
@@ -610,9 +614,12 @@ export default function App() {
       new URL('./workers/processor.worker.ts', import.meta.url),
       { type: 'module' },
     );
+    const jobId = ++workerJobSeqRef.current;
+    activeWorkerJobIdRef.current = jobId;
     workerRef.current = worker;
 
     function done() {
+      if (activeWorkerJobIdRef.current === jobId) activeWorkerJobIdRef.current = null;
       if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
       setShowCancel(false);
       setProcessing(false);
@@ -622,6 +629,7 @@ export default function App() {
 
     worker.onmessage = (e: MessageEvent) => {
       const msg = e.data;
+      if (msg.jobId !== jobId || activeWorkerJobIdRef.current !== jobId || workerRef.current !== worker) return;
       if (msg.type === 'progress') {
         setProcessingProgress(msg.pct as number);
       } else if (msg.type === 'result') {
@@ -692,26 +700,30 @@ export default function App() {
         done();
       }
     };
-    worker.onerror = () => done();
+    worker.onerror = () => {
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) done();
+    };
 
     // Create transferable bitmap, then dispatch to worker.
     // Use raw File if available to bypass ICC profile color correction.
     const bitmapSource: ImageBitmapSource = uploadedFileRef.current ?? img;
     createImageBitmap(bitmapSource, { colorSpaceConversion: 'none' }).then(bitmap => {
       // If a newer runProcess call superseded this one, discard
-      if (workerRef.current !== worker) { bitmap.close(); return; }
+      if (workerRef.current !== worker || activeWorkerJobIdRef.current !== jobId) { bitmap.close(); return; }
       if (compare) {
         worker.postMessage(
-          { type: 'compare', bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn, klussParams: kp },
+          { type: 'compare', jobId, bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn, klussParams: kp },
           [bitmap],
         );
       } else {
         worker.postMessage(
-          { type: 'process', bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp, bgMode: bgModeRef.current, bgColor: bgColorRef.current } },
+          { type: 'process', jobId, bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp, bgMode: bgModeRef.current, bgColor: bgColorRef.current } },
           [bitmap],
         );
       }
-    }).catch(() => done());
+    }).catch(() => {
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) done();
+    });
   }
 
   const handleImageLoaded = useCallback((img: HTMLImageElement, file?: File) => {
