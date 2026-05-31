@@ -1,4 +1,4 @@
-import type { PaintBlock } from '../components/PreviewCanvas';
+import type { PaintBlock } from '../components/previewCanvasShared';
 import type { ComputedPalette } from './dithering';
 
 export interface PatternDefinition {

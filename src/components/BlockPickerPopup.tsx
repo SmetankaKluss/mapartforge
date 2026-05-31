@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { useLocale } from '../lib/useLocale';
 import type { BlockSelection } from '../lib/paletteBlocks';
-import type { PaintBlock } from './PreviewCanvas';
-import { TRANSPARENT_PAINT_BLOCK } from './PreviewCanvas';
+import type { PaintBlock } from './previewCanvasShared';
+import { TRANSPARENT_PAINT_BLOCK } from './previewCanvasShared';
 import { SPRITE_URL } from './BlockCanvas';
 
 interface Props {

@@ -5,7 +5,7 @@ import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import type { ImageUploadHandle } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
-import type { PaintTool, PaintBlock } from './components/PreviewCanvas';
+import type { PaintTool, PaintBlock } from './components/previewCanvasShared';
 import { BlockPickerPopup } from './components/BlockPickerPopup';
 import { SPRITE_URL } from './components/BlockCanvas';
 import { CompareView } from './components/CompareView';

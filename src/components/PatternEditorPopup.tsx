@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { PaintBlock } from './PreviewCanvas';
+import type { PaintBlock } from './previewCanvasShared';
 import type { ComputedPalette } from '../lib/dithering';
 import type { PatternDefinition } from '../lib/patternTool';
 import { resizePattern } from '../lib/patternTool';
