@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 
 type WikiSection = 'overview' | 'getting-started' | 'map-grid' | 'dithering' | '2d-vs-3d' | 'blocks' | 'tools' | 'export' | 'tips' | 'troubleshoot';
 

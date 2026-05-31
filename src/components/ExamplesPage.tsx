@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { EXAMPLES } from '../lib/examples';
 import { applyPageMeta } from '../lib/meta';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { buildTrackedHref } from '../lib/analytics';
 
 function downloadImage(url: string, filename: string): void {

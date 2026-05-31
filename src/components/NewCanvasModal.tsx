@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { MapGrid } from '../lib/types';
 import { MAP_BLOCK_SIZE } from '../lib/types';
 import type { PaletteColor } from '../lib/palette';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 
 interface Props {
   currentGrid: MapGrid;

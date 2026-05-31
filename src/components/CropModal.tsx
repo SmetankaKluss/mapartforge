@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 
 interface CropBox { x: number; y: number; w: number; h: number; }
 type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se';

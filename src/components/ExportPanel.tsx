@@ -13,7 +13,7 @@ import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { uploadDiagnosticCapture } from '../lib/diagnostics';
 import { LinkModal } from './LinkModal';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { IconGlyph, mkIcons } from './IconGlyph';
 import { trackEvent } from '../lib/analytics';
 

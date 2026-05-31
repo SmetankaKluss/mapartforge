@@ -4,7 +4,7 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { buildPaletteUrl } from '../lib/paletteShare';
 import { PaletteShareModal } from './PaletteShareModal';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { isBlockAvailable } from '../lib/versionPresets';
 import type { MinecraftVersion } from '../lib/versionPresets';
 import { isBlockAvailableOnPlatform } from '../lib/platformMode';

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { buildTrackedHref } from '../lib/analytics';
 import { getExampleById, EXAMPLES, type ExampleProject } from '../lib/examples';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { applyPageMeta } from '../lib/meta';
 
 interface Props {

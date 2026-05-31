@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { trackEvent } from '../lib/analytics';
 
 interface Props {

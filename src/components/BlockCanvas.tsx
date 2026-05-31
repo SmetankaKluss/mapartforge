@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';

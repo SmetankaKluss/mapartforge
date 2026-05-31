@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { NumInput } from './NumInput';
 import { applyAdjustments } from '../lib/adjustments';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import type { ImageAdjustments } from '../lib/adjustments';
 
 const THUMB_SIZE = 80; // px

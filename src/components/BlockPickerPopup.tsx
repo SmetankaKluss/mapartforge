@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { PaintBlock } from './PreviewCanvas';
 import { TRANSPARENT_PAINT_BLOCK } from './PreviewCanvas';

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Layer, LayerGroup } from '../lib/layers';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 
 function getDisplayName(name: string, lang: string): string {
   if (lang === 'en') {

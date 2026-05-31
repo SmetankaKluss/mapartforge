@@ -4,7 +4,7 @@ import { buildLitematicBytes } from '../lib/exportLitematic';
 import type { SessionMaterial } from '../lib/buildSession';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import '../buildTracker.css';
 
 interface Props {

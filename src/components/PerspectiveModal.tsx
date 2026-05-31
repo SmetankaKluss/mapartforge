@@ -6,7 +6,7 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import type { MapGrid } from '../lib/types';
 import type { SupportMode } from '../lib/exportLitematic';
 import { IconGlyph, mkIcons } from './IconGlyph';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import {
   buildSchematicPreviewModel,
   getSceneArtSize,

@@ -51,7 +51,7 @@ import { SaveProjectModal } from './components/SaveProjectModal';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { createTour, shouldAutoStart, markTourDone } from './lib/tour';
 import type { TourType } from './lib/tour';
-import { useLocale } from './lib/locale';
+import { useLocale } from './lib/useLocale';
 import type { PatternDefinition } from './lib/patternTool';
 import { createDefaultPattern } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';

@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { LocaleProvider } from './lib/locale'
+import { LocaleProvider } from './lib/LocaleProvider'
 import { BuildTracker } from './components/BuildTracker.tsx'
 import { ExamplesPage } from './components/ExamplesPage.tsx'
 import { ExampleDetailPage, ExampleDetailNotFound } from './components/ExampleDetailPage.tsx'

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { MAP_BLOCK_SIZE } from '../lib/types';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 
 interface Props {
   imageData: ImageData | null;

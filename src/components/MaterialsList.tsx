@@ -6,7 +6,7 @@ import { MAP_BLOCK_SIZE } from '../lib/types';
 import type { SessionMaterial } from '../lib/buildSession';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { countSupportBlocks } from '../lib/exportLitematic';
 import type { SupportMode } from '../lib/exportLitematic';
 import { downloadFile } from '../lib/exportMaterials';

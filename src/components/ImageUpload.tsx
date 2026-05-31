@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { DragEvent, ChangeEvent, ClipboardEvent, KeyboardEvent } from 'react';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { IconGlyph, mkIcons } from './IconGlyph';
 import { trackEvent } from '../lib/analytics';
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useLocale } from '../lib/locale';
+import { useLocale } from '../lib/useLocale';
 import { applyPageMeta } from '../lib/meta';
 import { EXAMPLES } from '../lib/examples';
 import { buildTrackedHref } from '../lib/analytics';
