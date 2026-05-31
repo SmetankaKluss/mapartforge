@@ -325,12 +325,9 @@ export function PerspectiveModal({
   );
 
   const sceneCameraPresets = activeScenePreset.cameraPresets;
-
-  useEffect(() => {
-    if (!sceneCameraPresets.some(cam => cam.id === sceneCameraId)) {
-      setSceneCameraId(sceneCameraPresets[0].id);
-    }
-  }, [sceneCameraId, sceneCameraPresets]);
+  const effectiveSceneCameraId = sceneCameraPresets.some(cam => cam.id === sceneCameraId)
+    ? sceneCameraId
+    : sceneCameraPresets[0].id;
 
   const applyCameraPreset = useCallback((cameraPreset: SceneCameraPreset) => {
     const camera = cameraRef.current;
@@ -474,7 +471,7 @@ export function PerspectiveModal({
       controls.enablePan = false;
       controls.minDistance = 4;
       controls.maxDistance = 26;
-      const preset = sceneCameraPresets.find(cam => cam.id === sceneCameraId) ?? sceneCameraPresets[0];
+      const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
       applyCameraPreset(preset);
       render();
       return () => artTexture.dispose();
@@ -486,7 +483,7 @@ export function PerspectiveModal({
     mapGrid,
     model,
     previewMode,
-    sceneCameraId,
+    effectiveSceneCameraId,
     sceneCameraPresets,
     schematicDisplay,
     schematicView,
@@ -597,7 +594,7 @@ export function PerspectiveModal({
                     {sceneCameraPresets.map(cameraPreset => (
                       <button
                         key={cameraPreset.id}
-                        className={`persp-chip${sceneCameraId === cameraPreset.id ? ' active' : ''}`}
+                        className={`persp-chip${effectiveSceneCameraId === cameraPreset.id ? ' active' : ''}`}
                         onClick={() => setSceneCameraId(cameraPreset.id)}
                       >
                         {t(cameraPreset.titleRu, cameraPreset.titleEn)}
