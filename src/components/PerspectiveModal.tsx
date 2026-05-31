@@ -5,7 +5,8 @@ import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { MapGrid } from '../lib/types';
 import type { SupportMode } from '../lib/exportLitematic';
-import { IconGlyph, mkIcons } from './IconGlyph';
+import { IconGlyph } from './IconGlyph';
+import { mkIcons } from './mkIcons';
 import { useLocale } from '../lib/useLocale';
 import {
   buildSchematicPreviewModel,

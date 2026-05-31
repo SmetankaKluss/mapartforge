@@ -14,7 +14,8 @@ import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { uploadDiagnosticCapture } from '../lib/diagnostics';
 import { LinkModal } from './LinkModal';
 import { useLocale } from '../lib/useLocale';
-import { IconGlyph, mkIcons } from './IconGlyph';
+import { IconGlyph } from './IconGlyph';
+import { mkIcons } from './mkIcons';
 import { trackEvent } from '../lib/analytics';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
