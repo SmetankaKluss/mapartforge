@@ -25,12 +25,18 @@
  <!-- Phosphor Icons bold -->
  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
  <!-- Google Analytics -->
- <script async src="https://www.googletagmanager.com/gtag/js?id=G-2W7QM7DL8R"></script>
  <script>
   window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-2W7QM7DL8R');
+  window.gtag = function gtag(){ window.dataLayer.push(arguments); };
+  const mapKlussIsLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!mapKlussIsLocalHost) {
+   window.gtag('js', new Date());
+   window.gtag('config', 'G-2W7QM7DL8R');
+   const analyticsScript = document.createElement('script');
+   analyticsScript.async = true;
+   analyticsScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-2W7QM7DL8R';
+   document.head.appendChild(analyticsScript);
+  }
  </script>
  </head>
  <body>

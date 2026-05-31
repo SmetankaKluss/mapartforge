@@ -14,6 +14,11 @@ type AttributionSnapshot = {
 const ATTRIBUTION_STORAGE_KEY = 'mapkluss_attribution_v1';
 const ATTRIBUTION_QUERY_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'] as const;
 
+function isLocalAnalyticsHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
 declare global {
   interface Window {
     dataLayer?: unknown[];
@@ -96,12 +101,12 @@ function getAttributionParams(): AnalyticsParams {
 }
 
 export function trackEvent(name: string, params: AnalyticsParams = {}): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || isLocalAnalyticsHost()) return;
   window.gtag?.('event', name, cleanParams({ ...getAttributionParams(), ...params }));
 }
 
 export function initClarity(projectId: string | undefined): void {
-  if (!projectId || typeof window === 'undefined' || window.clarity) return;
+  if (!projectId || typeof window === 'undefined' || window.clarity || isLocalAnalyticsHost()) return;
 
   window.clarity = function clarityShim(...args: unknown[]) {
     window.clarity!.q = window.clarity!.q || [];
