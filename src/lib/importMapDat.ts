@@ -178,7 +178,7 @@ export async function importMapDat(file: File): Promise<ImageData> {
 
   // Skip root name (usually empty string: 2 bytes = 0x00 0x00)
   const { end: rootNameEnd } = readString(view, 1);
-  let offset = rootNameEnd;
+  const offset = rootNameEnd;
 
   const colorBytes = extractColors(view, offset, false);
   if (!colorBytes) {

@@ -191,7 +191,7 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
         <BlockPickerPopup
           blockSelection={blockSelection}
           current={pattern.pixels[showBlockPicker]}
-          onSelect={_b => {
+          onSelect={() => {
             paintCell(showBlockPicker, false);
             setShowBlockPicker(null);
           }}

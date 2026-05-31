@@ -70,7 +70,6 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
           placeholder={t('Поиск блоков…', 'Search blocks…')}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
         />
       </div>

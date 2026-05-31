@@ -507,7 +507,7 @@ function drawBrushLine(
   brushSize: number, erase: boolean, baseId: number, shade: number, cp: ComputedPalette,
   mask?: SelectionMask | null,
 ): void {
-  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx - dy;
   while (true) {

@@ -285,7 +285,7 @@ export async function buildLitematicBytes(
   let sizeY: number;
   let yGrid: Int32Array | null = null;
   // Both flat and staircase add 1 extra Z row at z=0 for the noobline (north shading reference)
-  let exportSizeZ = sizeZ + 1;
+  const exportSizeZ = sizeZ + 1;
 
   if (structure === 'staircase') {
     const sc = staircaseMode === 'optimized'

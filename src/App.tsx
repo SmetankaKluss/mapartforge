@@ -78,6 +78,8 @@ const ANNOUNCEMENT = {
   url: 'https://t.me/mapkluss',
 };
 
+const SHOW_PATTERN_BLOCKS = false;
+
 // Exponential zoom mapping: slider 0–100 ↔ zoom 50–800%
 function sliderToZoom(s: number): number { return Math.round(50 * Math.pow(16, s / 100)); }
 function zoomToSlider(z: number): number { return Math.round(Math.log(z / 50) / Math.log(16) * 100); }
@@ -2038,7 +2040,7 @@ export default function App() {
                 )}
 
                 {/* Pattern blocks — hidden while text/pattern tools are WIP */}
-                {false && editorMode === 'artist' && activeTool === 'pattern' && (
+                {SHOW_PATTERN_BLOCKS && editorMode === 'artist' && activeTool === 'pattern' && (
                   <div className="toolbar-group pattern-blocks-group" style={{ position: 'relative', flexWrap: 'wrap', gap: 3 }}>
                     {patternBlocks.map((pb, idx) => (
                       <div key={idx} className="pattern-block-chip" style={{ position: 'relative' }}>
