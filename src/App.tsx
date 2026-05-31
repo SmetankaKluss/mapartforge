@@ -697,11 +697,15 @@ export default function App() {
         done();
       } else if (msg.type === 'error') {
         console.error('Processor worker error:', msg.message);
+        showAppNotice(t('Не удалось обработать изображение.', 'Could not process the image.'), 'error');
         done();
       }
     };
     worker.onerror = () => {
-      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) done();
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) {
+        showAppNotice(t('Не удалось обработать изображение.', 'Could not process the image.'), 'error');
+        done();
+      }
     };
 
     // Create transferable bitmap, then dispatch to worker.
@@ -722,7 +726,10 @@ export default function App() {
         );
       }
     }).catch(() => {
-      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) done();
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) {
+        showAppNotice(t('Не удалось подготовить изображение для обработки.', 'Could not prepare the image for processing.'), 'error');
+        done();
+      }
     });
   }
 
