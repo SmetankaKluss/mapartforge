@@ -30,7 +30,10 @@ export function CompareView({
   const [labelsVisible, setLabelsVisible] = useState(true);
   const labelTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onSplitPosChangeRef = useRef(onSplitPosChange);
-  onSplitPosChangeRef.current = onSplitPosChange;
+
+  useEffect(() => {
+    onSplitPosChangeRef.current = onSplitPosChange;
+  }, [onSplitPosChange]);
 
   useEffect(() => {
     if (!leftRef.current || !leftData) return;
