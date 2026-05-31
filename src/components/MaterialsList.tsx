@@ -1,16 +1,15 @@
 import { useMemo, useState } from 'react';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
-import type { MapGrid } from '../lib/types';
-import { MAP_BLOCK_SIZE } from '../lib/types';
-import type { SessionMaterial } from '../lib/buildSession';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+import type { MapGrid } from '../lib/types';
 import { BlockIcon } from './BlockIcon';
 import { useLocale } from '../lib/useLocale';
 import { countSupportBlocks } from '../lib/exportLitematic';
 import type { SupportMode } from '../lib/exportLitematic';
 import { downloadFile } from '../lib/exportMaterials';
 import { trackEvent } from '../lib/analytics';
+import { computeRawMaterials } from '../lib/sessionMaterials';
 
 interface Props {
   imageData: ImageData | null;
@@ -29,94 +28,6 @@ interface MaterialEntry {
   nbtName: string;
   displayName: string;
   count: number;
-}
-
-interface RawEntry {
-  csId: number;
-  blockId: number;
-  nbtName: string;
-  displayName: string;
-  total: number;
-  /** count[s] = number of this block in map-section s */
-  perSection: number[];
-}
-
-function computeRawMaterials(
-  imageData: ImageData,
-  cp: ComputedPalette,
-  sel: BlockSelection,
-  mapGrid: MapGrid,
-): RawEntry[] {
-  // color rgb key → baseId
-  const colorToBase = new Map<number, number>();
-  for (const c of cp.colors) {
-    const key = (c.r << 16) | (c.g << 8) | c.b;
-    if (!colorToBase.has(key)) colorToBase.set(key, c.baseId);
-  }
-
-  // baseId → selected block info
-  const baseToBlock = new Map<number, { csId: number; blockId: number; nbtName: string; displayName: string }>();
-  for (const row of COLOUR_ROWS) {
-    const activeIds = sel[row.csId] ?? [];
-    const block = row.blocks.find(b => activeIds.includes(b.blockId)) ?? row.blocks[0];
-    if (block) {
-      baseToBlock.set(row.baseId, {
-        csId: row.csId, blockId: block.blockId,
-        nbtName: block.nbtName, displayName: block.displayName,
-      });
-    }
-  }
-
-  const numSections = mapGrid.wide * mapGrid.tall;
-  // key → [total, sec0, sec1, ..., secN-1]
-  const counts = new Map<string, number[]>();
-  const infos  = new Map<string, { csId: number; blockId: number; nbtName: string; displayName: string }>();
-  const { data, width, height } = imageData;
-
-  for (let y = 0; y < height; y++) {
-    const secY = Math.min(Math.floor(y / MAP_BLOCK_SIZE), mapGrid.tall - 1);
-    for (let x = 0; x < width; x++) {
-      const base = (y * width + x) * 4;
-      const rgbKey = (data[base] << 16) | (data[base + 1] << 8) | data[base + 2];
-      const baseId = colorToBase.get(rgbKey);
-      if (baseId === undefined) continue;
-      const info = baseToBlock.get(baseId);
-      if (!info) continue;
-
-      const k = `${info.csId}_${info.blockId}`;
-      if (!counts.has(k)) {
-        counts.set(k, new Array(1 + numSections).fill(0));
-        infos.set(k, info);
-      }
-      const arr = counts.get(k)!;
-      arr[0]++; // total
-      const secX = Math.min(Math.floor(x / MAP_BLOCK_SIZE), mapGrid.wide - 1);
-      arr[1 + secY * mapGrid.wide + secX]++;
-    }
-  }
-
-  return [...counts.entries()]
-    .map(([k, arr]) => ({
-      ...infos.get(k)!,
-      total: arr[0],
-      perSection: arr.slice(1),
-    }))
-    .filter(e => e.total > 0)
-    .sort((a, b) => b.total - a.total);
-}
-
-/** Exported helper — compute session materials from current render state */
-export function computeSessionMaterials(
-  imageData: ImageData,
-  cp: ComputedPalette,
-  sel: BlockSelection,
-  mapGrid: MapGrid,
-): SessionMaterial[] {
-  return computeRawMaterials(imageData, cp, sel, mapGrid).map(e => ({
-    nbtName: e.nbtName,
-    displayName: e.displayName,
-    count: e.total,
-  }));
 }
 
 function fmtN(n: number): string {

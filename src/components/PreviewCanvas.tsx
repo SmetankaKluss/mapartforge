@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
-import { MapCanvas, drawImageData } from './MapCanvas';
+import { MapCanvas } from './MapCanvas';
+import { drawImageData } from '../lib/drawImageData';
 import { type MagicWandMatchMode, type SelectionMask, maskFromRect, maskFromPolygon, maskFromMagicWand, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
 import { BlockCanvas } from './BlockCanvas';
 import { SPRITE_URL } from './BlockCanvas';

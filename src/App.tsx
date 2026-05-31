@@ -64,7 +64,7 @@ import type { GifProject, GifFrameConfig } from './lib/gifProject';
 import { makeThumbnail, imageDataToHtmlImage } from './lib/gifProject';
 import { BuildTrackerModal } from './components/BuildTrackerModal';
 import type { SessionMaterial } from './lib/buildSession';
-import { computeSessionMaterials } from './components/MaterialsList';
+import { computeSessionMaterials } from './lib/sessionMaterials';
 import { IconGlyph } from './components/IconGlyph';
 import { mkIcons } from './components/mkIcons';
 import { buildFinalPreview } from './lib/finalPreview';

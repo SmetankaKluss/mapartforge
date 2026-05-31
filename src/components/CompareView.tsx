@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { drawImageData } from './MapCanvas';
+import { drawImageData } from '../lib/drawImageData';
 import { useLocale } from '../lib/useLocale';
 
 interface CompareViewProps {
