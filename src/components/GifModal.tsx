@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import JSZip from 'jszip';
 import type { GifFrames } from '../lib/gifDecoder';
 import type { MapGrid } from '../lib/types';
@@ -39,8 +39,11 @@ export function GifModal({
   const [statusMsg, setStatusMsg] = useState('');
   const cancelRef = useRef(false);
 
-  const selectedFrameIdxs: number[] = [];
-  for (let i = frameStart; i <= frameEnd; i += step) selectedFrameIdxs.push(i);
+  const selectedFrameIdxs = useMemo(() => {
+    const indexes: number[] = [];
+    for (let i = frameStart; i <= frameEnd; i += step) indexes.push(i);
+    return indexes;
+  }, [frameStart, frameEnd, step]);
   const totalSelected = selectedFrameIdxs.length;
 
   // Show thumbnail of first selected frame
