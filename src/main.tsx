@@ -7,6 +7,7 @@ import { ExamplesPage } from './components/ExamplesPage.tsx'
 import { ExampleDetailPage, ExampleDetailNotFound } from './components/ExampleDetailPage.tsx'
 import { SeoLandingPage } from './components/SeoLandingPage.tsx'
 import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
+import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
 import { getExampleByPath } from './lib/examples.ts'
 
@@ -24,12 +25,14 @@ const path = window.location.pathname;
 const buildMatch = path.match(/^\/build\/([0-9a-f-]{36})$/i);
 const seoPage = getSeoPageByPath(path);
 const examplePage = getExampleByPath(path);
+const pageType = buildMatch ? 'build_tracker' : examplePage ? 'example_detail' : path === '/examples' ? 'examples' : seoPage ? 'seo' : 'editor';
 
 initAnalyticsContext();
 initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
+installClientErrorReporting({ pageType });
 trackEvent('app_route_opened', {
   path: window.location.pathname,
-  page_type: buildMatch ? 'build_tracker' : examplePage ? 'example_detail' : path === '/examples' ? 'examples' : seoPage ? 'seo' : 'editor',
+  page_type: pageType,
 });
 
 const root = document.getElementById('root')!;

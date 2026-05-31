@@ -29,6 +29,7 @@ export interface SchematicPreviewModel {
   maxHeight: number;
   heightRange: number;
   nonTransparentCount: number;
+  transparentCount: number;
   supportCount: number;
   has3D: boolean;
   blocks: SchematicPreviewBlock[];
@@ -270,6 +271,7 @@ export function buildSchematicPreviewModel({
     maxHeight,
     heightRange: maxHeight - minHeight,
     nonTransparentCount,
+    transparentCount: n - nonTransparentCount,
     supportCount,
     has3D,
     blocks,

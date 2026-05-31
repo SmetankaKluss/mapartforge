@@ -234,7 +234,44 @@ function addRoomBox(scene: THREE.Scene, size: [number, number, number], center: 
   return mesh;
 }
 
-function addSceneEnvironment(scene: THREE.Scene, presetId: string, artMesh: THREE.Object3D) {
+function makeFramedArtGroup(imageData: ImageData, artSize: { width: number; height: number }) {
+  const artTexture = imageDataToTexture(imageData);
+  const artGroup = new THREE.Group();
+  const frameMat = new THREE.MeshLambertMaterial({ color: 0x4b2d16 });
+  const backingMat = new THREE.MeshLambertMaterial({ color: 0x1f1510 });
+  const artMat = new THREE.MeshBasicMaterial({ map: artTexture, transparent: true });
+  const rail = 0.18;
+  const depth = 0.16;
+  const backing = new THREE.Mesh(new THREE.BoxGeometry(artSize.width + rail * 2, artSize.height + rail * 2, 0.08), backingMat);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(artSize.width + rail * 2, rail, depth), frameMat);
+  const bottom = top.clone();
+  const left = new THREE.Mesh(new THREE.BoxGeometry(rail, artSize.height, depth), frameMat);
+  const right = left.clone();
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(artSize.width, artSize.height), artMat);
+
+  backing.position.z = -0.04;
+  top.position.set(0, artSize.height / 2 + rail / 2, 0.04);
+  bottom.position.set(0, -artSize.height / 2 - rail / 2, 0.04);
+  left.position.set(-artSize.width / 2 - rail / 2, 0, 0.04);
+  right.position.set(artSize.width / 2 + rail / 2, 0, 0.04);
+  plane.position.z = 0.12;
+  artGroup.add(backing, top, bottom, left, right, plane);
+  return { artGroup, artTexture };
+}
+
+function getSceneAnchor(presetId: string, artSize: { width: number; height: number }): { position: [number, number, number]; rotationY: number } {
+  const y = Math.max(3, artSize.height / 2 + 0.85);
+  if (presetId === 'house-interior') return { position: [4.45, y, 0], rotationY: -Math.PI / 2 };
+  if (presetId === 'nether-corridor') return { position: [0, y, -9.35], rotationY: 0 };
+  return { position: [0, y, -4.45], rotationY: 0 };
+}
+
+function addSceneEnvironment(scene: THREE.Scene, presetId: string, artMesh: THREE.Object3D, artSize: { width: number; height: number }) {
+  const roomWidth = Math.max(14, artSize.width + 4);
+  const roomHeight = Math.max(8, artSize.height + 2.2);
+  const corridorWidth = Math.max(8, artSize.width + 1.2);
+  const corridorHeight = Math.max(7, artSize.height + 1.8);
+  const houseSize = Math.max(14, artSize.width + 4, artSize.height + 4);
   const blockMaterials = {
     galleryWall: new THREE.MeshLambertMaterial({ map: makeBlockTexture('gallery-wall') ?? undefined }),
     galleryFloor: new THREE.MeshLambertMaterial({ map: makeBlockTexture('gallery-floor') ?? undefined }),
@@ -246,31 +283,31 @@ function addSceneEnvironment(scene: THREE.Scene, presetId: string, artMesh: THRE
 
   switch (presetId) {
     case 'gallery-wall':
-      addRoomBox(scene, [14, 0.8, 12], [0, -0.4, 0], blockMaterials.galleryFloor);
-      addRoomBox(scene, [14, 8, 0.6], [0, 3.6, -4.8], blockMaterials.galleryWall);
-      addRoomBox(scene, [0.6, 8, 12], [-6.8, 3.6, 0], blockMaterials.galleryWall);
-      addRoomBox(scene, [0.6, 8, 12], [6.8, 3.6, 0], blockMaterials.galleryWall);
-      addRoomBox(scene, [14, 0.5, 0.4], [0, 6.8, -4.45], new THREE.MeshLambertMaterial({ color: 0x5c4d36 }));
+      addRoomBox(scene, [roomWidth, 0.8, 12], [0, -0.4, 0], blockMaterials.galleryFloor);
+      addRoomBox(scene, [roomWidth, roomHeight, 0.6], [0, roomHeight / 2 - 0.4, -4.8], blockMaterials.galleryWall);
+      addRoomBox(scene, [0.6, roomHeight, 12], [-roomWidth / 2 + 0.3, roomHeight / 2 - 0.4, 0], blockMaterials.galleryWall);
+      addRoomBox(scene, [0.6, roomHeight, 12], [roomWidth / 2 - 0.3, roomHeight / 2 - 0.4, 0], blockMaterials.galleryWall);
+      addRoomBox(scene, [roomWidth, 0.5, 0.4], [0, roomHeight - 0.8, -4.45], new THREE.MeshLambertMaterial({ color: 0x5c4d36 }));
       scene.add(artMesh);
       break;
     case 'nether-corridor':
-      addRoomBox(scene, [8, 0.8, 22], [0, -0.4, 0], blockMaterials.netherFloor);
-      addRoomBox(scene, [8, 0.6, 22], [0, 6.2, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [0.7, 7, 22], [-4.35, 3.1, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [0.7, 7, 22], [4.35, 3.1, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [8, 7, 0.8], [0, 3.1, -9.8], blockMaterials.netherWall);
+      addRoomBox(scene, [corridorWidth, 0.8, 22], [0, -0.4, 0], blockMaterials.netherFloor);
+      addRoomBox(scene, [corridorWidth, 0.6, 22], [0, corridorHeight - 0.8, 0], blockMaterials.netherWall);
+      addRoomBox(scene, [0.7, corridorHeight, 22], [-corridorWidth / 2 - 0.35, corridorHeight / 2 - 0.4, 0], blockMaterials.netherWall);
+      addRoomBox(scene, [0.7, corridorHeight, 22], [corridorWidth / 2 + 0.35, corridorHeight / 2 - 0.4, 0], blockMaterials.netherWall);
+      addRoomBox(scene, [corridorWidth, corridorHeight, 0.8], [0, corridorHeight / 2 - 0.4, -9.8], blockMaterials.netherWall);
       for (let i = -8; i <= 8; i += 4) {
         const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshLambertMaterial({ color: 0xe5a343, emissive: 0x8a4d12 }));
-        lantern.position.set(0, 5.4, i);
+        lantern.position.set(0, corridorHeight - 1.5, i);
         scene.add(lantern);
       }
       scene.add(artMesh);
       break;
     case 'house-interior':
-      addRoomBox(scene, [14, 0.8, 14], [0, -0.4, 0], blockMaterials.houseFloor);
-      addRoomBox(scene, [14, 8, 0.7], [0, 3.6, -6.8], blockMaterials.houseWall);
-      addRoomBox(scene, [0.7, 8, 14], [6.8, 3.6, 0], blockMaterials.houseWall);
-      addRoomBox(scene, [14, 0.6, 14], [0, 7.6, 0], new THREE.MeshLambertMaterial({ color: 0x7d5934 }));
+      addRoomBox(scene, [houseSize, 0.8, houseSize], [0, -0.4, 0], blockMaterials.houseFloor);
+      addRoomBox(scene, [houseSize, roomHeight, 0.7], [0, roomHeight / 2 - 0.4, -houseSize / 2 + 0.2], blockMaterials.houseWall);
+      addRoomBox(scene, [0.7, roomHeight, houseSize], [houseSize / 2 - 0.2, roomHeight / 2 - 0.4, 0], blockMaterials.houseWall);
+      addRoomBox(scene, [houseSize, 0.6, houseSize], [0, roomHeight - 0.4, 0], new THREE.MeshLambertMaterial({ color: 0x7d5934 }));
       addRoomBox(scene, [2.4, 1.1, 1.2], [-3.8, 0.55, -2.2], new THREE.MeshLambertMaterial({ color: 0x6b533a }));
       addRoomBox(scene, [2.1, 1.6, 0.9], [-3.8, 1.3, -1.4], new THREE.MeshLambertMaterial({ color: 0xb68d5b }));
       scene.add(artMesh);
@@ -385,7 +422,9 @@ export function PerspectiveModal({
       controls.removeEventListener('change', render);
       controls.dispose();
       renderer.dispose();
-      mount.removeChild(renderer.domElement);
+      if (renderer.domElement.parentNode === mount) {
+        mount.removeChild(renderer.domElement);
+      }
       rendererRef.current = null;
       controlsRef.current = null;
       sceneRef.current = null;
@@ -455,25 +494,26 @@ export function PerspectiveModal({
     }
 
     if (previewMode === 'scene' && imageData) {
-      const artGroup = new THREE.Group();
       const artSize = getSceneArtSize(mapGrid);
-      const artTexture = imageDataToTexture(imageData);
-      const frameMat = new THREE.MeshLambertMaterial({ color: 0x4b2d16 });
-      const mat = new THREE.MeshBasicMaterial({ map: artTexture, transparent: true });
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(artSize.width + 0.32, artSize.height + 0.32, 0.18), frameMat);
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(artSize.width, artSize.height), mat);
-      plane.position.z = 0.11;
-      artGroup.add(frame, plane);
-      artGroup.position.set(...activeScenePreset.wallAnchor.position);
-      artGroup.rotation.y = activeScenePreset.wallAnchor.rotationY;
-      addSceneEnvironment(scene, activeScenePreset.id, artGroup);
+      const { artGroup, artTexture } = makeFramedArtGroup(imageData, artSize);
+      const anchor = getSceneAnchor(activeScenePreset.id, artSize);
+      artGroup.position.set(...anchor.position);
+      artGroup.rotation.y = anchor.rotationY;
+      addSceneEnvironment(scene, activeScenePreset.id, artGroup, artSize);
 
       controls.enableRotate = true;
       controls.enablePan = false;
       controls.minDistance = 4;
-      controls.maxDistance = 26;
+      controls.maxDistance = Math.max(26, Math.max(artSize.width, artSize.height) * 3);
       const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
-      applyCameraPreset(preset);
+      const target = new THREE.Vector3(...preset.target);
+      target.y = Math.max(target.y, anchor.position[1]);
+      const position = new THREE.Vector3(...preset.position);
+      const viewVector = position.sub(target);
+      const minDistance = Math.max(viewVector.length(), Math.max(artSize.width, artSize.height) * 1.35 + 3);
+      camera.position.copy(target.clone().add(viewVector.setLength(minDistance)));
+      controls.target.copy(target);
+      controls.update();
       render();
       return () => artTexture.dispose();
     }
@@ -561,6 +601,7 @@ export function PerspectiveModal({
                     <div className="persp-stat"><span>{t('Высота min/max', 'Height min/max')}</span><strong>{model ? `${model.minHeight} / ${model.maxHeight}` : '0 / 0'}</strong></div>
                     <div className="persp-stat"><span>{t('Перепад', 'Range')}</span><strong>{model?.heightRange ?? 0}</strong></div>
                     <div className="persp-stat"><span>{t('Блоков арта', 'Art blocks')}</span><strong>{model?.nonTransparentCount ?? 0}</strong></div>
+                    <div className="persp-stat"><span>{t('Прозрачных', 'Transparent')}</span><strong>{model?.transparentCount ?? 0}</strong></div>
                     <div className="persp-stat"><span>{t('Опорных блоков', 'Support blocks')}</span><strong>{mapMode === '3d' ? (model?.supportCount ?? 0) : 0}</strong></div>
                     <div className="persp-stat"><span>{t('Ступени', 'Staircase')}</span><strong>{mapMode === '3d' ? staircaseMode : 'flat'}</strong></div>
                   </div>

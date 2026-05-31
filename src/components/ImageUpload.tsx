@@ -119,6 +119,12 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
 
   // Глобальные обработчики paste и drag-and-drop для всего документа
   useEffect(() => {
+    function resetGlobalDrag() {
+      dragCounterRef.current = 0;
+      setGlobalDragging(false);
+      setDragging(false);
+    }
+
     function handleGlobalPaste(e: Event) {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
@@ -153,11 +159,14 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
 
     function handleGlobalDrop(e: Event) {
       e.preventDefault();
-      dragCounterRef.current = 0;
-      setGlobalDragging(false);
+      resetGlobalDrag();
       const de = e as unknown as DragEvent;
       const file = de.dataTransfer?.files[0];
       if (file) loadFile(file, 'global_drop');
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') resetGlobalDrag();
     }
 
     document.addEventListener('paste', handleGlobalPaste);
@@ -165,12 +174,18 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
     document.addEventListener('dragleave', handleDragLeave);
     document.addEventListener('dragover', handleDragOver);
     document.addEventListener('drop', handleGlobalDrop);
+    document.addEventListener('dragend', resetGlobalDrag);
+    window.addEventListener('blur', resetGlobalDrag);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('paste', handleGlobalPaste);
       document.removeEventListener('dragenter', handleDragEnter);
       document.removeEventListener('dragleave', handleDragLeave);
       document.removeEventListener('dragover', handleDragOver);
       document.removeEventListener('drop', handleGlobalDrop);
+      document.removeEventListener('dragend', resetGlobalDrag);
+      window.removeEventListener('blur', resetGlobalDrag);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

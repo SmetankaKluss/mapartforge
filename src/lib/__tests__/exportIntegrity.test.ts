@@ -65,3 +65,16 @@ describe('export integrity', () => {
     expect(formatMaterialsAsCSV(materials, { wide: 1, tall: 1 })).toContain('Total blocks,3');
   });
 });
+
+describe('client error reporting helpers', () => {
+  it('groups Clarity-style client errors into stable categories', async () => {
+    const { getClientErrorCategory, getClientErrorSignature } = await import('../errorReporting');
+
+    expect(getClientErrorCategory("Failed to execute 'insertBefore' on 'Node'")).toBe('insert_before');
+    expect(getClientErrorCategory("Failed to execute 'removeChild' on 'Node'")).toBe('remove_child');
+    expect(getClientErrorCategory("undefined is not an object (evaluating 'tx')")).toBe('tx');
+    expect(getClientErrorCategory('set maximum size exceeded')).toBe('max_size');
+    expect(getClientErrorCategory('Unexpected editor crash')).toBe('other');
+    expect(getClientErrorSignature("Failed to execute 'removeChild' on 'Node'")).toMatch(/^remove_child:/);
+  });
+});

@@ -33,26 +33,31 @@ export async function saveProject(p: StoredProject): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).put(p);
-    req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
 
 export async function loadProject(id: string): Promise<StoredProject | null> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
+    let result: StoredProject | null = null;
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).get(id);
-    req.onsuccess = () => resolve((req.result as StoredProject) ?? null);
+    req.onsuccess = () => { result = (req.result as StoredProject) ?? null; };
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    tx.oncomplete = () => { db.close(); resolve(result); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
 
 export async function listProjects(): Promise<StoredProjectMeta[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
+    let result: StoredProjectMeta[] = [];
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).getAll();
     req.onsuccess = () => {
@@ -63,10 +68,12 @@ export async function listProjects(): Promise<StoredProjectMeta[]> {
         thumbnail,
       }));
       all.sort((a, b) => b.timestamp - a.timestamp);
-      resolve(all);
+      result = all;
     };
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    tx.oncomplete = () => { db.close(); resolve(result); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
 
@@ -75,8 +82,9 @@ export async function deleteProject(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).delete(id);
-    req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
