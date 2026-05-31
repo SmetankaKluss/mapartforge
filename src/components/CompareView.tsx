@@ -47,7 +47,6 @@ export function CompareView({
 
   // Show labels briefly on mount and when splitPos first activates
   useEffect(() => {
-    setLabelsVisible(true);
     clearTimeout(labelTimerRef.current);
     labelTimerRef.current = setTimeout(() => setLabelsVisible(false), 2000);
     return () => clearTimeout(labelTimerRef.current);
