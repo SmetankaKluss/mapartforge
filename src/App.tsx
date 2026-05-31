@@ -39,6 +39,7 @@ import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
 const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
 const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
+const GifModal = lazy(() => import('./components/GifModal').then(m => ({ default: m.GifModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
@@ -56,7 +57,6 @@ import { createDefaultPattern } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
 import { importMapDat, MapDatImportError } from './lib/importMapDat';
-import { GifModal } from './components/GifModal';
 import { GifFilmstrip } from './components/GifFilmstrip';
 import { decodeGif } from './lib/gifDecoder';
 import type { GifFrames } from './lib/gifDecoder';
@@ -2833,19 +2833,21 @@ export default function App() {
 
     {/* ── GIF export modal ── */}
     {gifFrames && (
-      <GifModal
-        gifFrames={gifFrames}
-        mapGrid={mapGrid}
-        palette={activePalette}
-        dithering={dithering}
-        intensity={intensity}
-        klussParams={klussParams}
-        adjustments={effectiveAdjustments}
-        bnScale={bnScale}
-        blockSelection={blockSelection}
-        onClose={() => setGifFrames(null)}
-        onOpenAsProject={handleOpenAsGifProject}
-      />
+      <Suspense fallback={null}>
+        <GifModal
+          gifFrames={gifFrames}
+          mapGrid={mapGrid}
+          palette={activePalette}
+          dithering={dithering}
+          intensity={intensity}
+          klussParams={klussParams}
+          adjustments={effectiveAdjustments}
+          bnScale={bnScale}
+          blockSelection={blockSelection}
+          onClose={() => setGifFrames(null)}
+          onOpenAsProject={handleOpenAsGifProject}
+        />
+      </Suspense>
     )}
 
     {/* ── GIF Filmstrip ── */}
