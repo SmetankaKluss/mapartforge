@@ -76,12 +76,12 @@ export const SCENE_PRESETS: ScenePreset[] = [
     titleRu: 'Галерея',
     titleEn: 'Gallery Wall',
     environment: 'gallery',
-    wallAnchor: { position: [0, 3.1, -4.45], rotationY: 0 },
+    wallAnchor: { position: [0.46875, 2.5, 0], rotationY: -Math.PI / 2 },
     supportedMapRatios: 'any',
     cameraPresets: [
-      { id: 'front', titleRu: 'Фронт', titleEn: 'Front', position: [0, 3.1, 6.4], target: [0, 2.9, -4.4] },
-      { id: 'corner', titleRu: 'Угол', titleEn: 'Corner', position: [6.8, 4.2, 5.4], target: [0, 2.8, -3.9] },
-      { id: 'wide', titleRu: 'Общий', titleEn: 'Wide', position: [-7.2, 4.8, 8.4], target: [0, 2.7, -3.8] },
+      { id: 'front', titleRu: 'Фронт', titleEn: 'Front', position: [-5.4, 3.3, 0], target: [0.46875, 2.7, 0] },
+      { id: 'corner', titleRu: 'Угол', titleEn: 'Corner', position: [-5.9, 4.4, -5.2], target: [0.3, 2.9, -0.2] },
+      { id: 'wide', titleRu: 'Общий', titleEn: 'Wide', position: [-8.3, 5.2, 6.4], target: [0.2, 2.8, 0.6] },
     ],
   },
   {
