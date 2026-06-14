@@ -78,6 +78,7 @@ export async function exportMapDat(
   imageData: ImageData,
   mapGrid:   MapGrid,
   cp:        ComputedPalette,
+  startMapId = 0,
 ): Promise<void> {
   const lookup = buildLookup(cp);
   let idx = 0;
@@ -86,7 +87,7 @@ export async function exportMapDat(
       const colors  = buildTileColors(imageData, col, row, lookup);
       const nbt     = buildMapNbt(colors);
       const gzipped = await gzipBytes(nbt);
-      triggerDownload(gzipped, `map_${idx}.dat`);
+      triggerDownload(gzipped, `map_${startMapId + idx}.dat`);
       idx++;
     }
   }

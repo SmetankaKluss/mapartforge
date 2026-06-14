@@ -7,6 +7,7 @@ import type { ImageAdjustments } from '../lib/adjustments';
 import type { PlatformMode } from '../lib/platformMode';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
+import { downloadFrameFillCommands } from '../lib/exportFrameCommands';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
@@ -102,6 +103,7 @@ export function ExportPanel({
   const [busyShowcase, setBusyShowcase]   = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
+  const [mapStartId,     setMapStartId]     = useState(0);
 
   const hasPreview = (previewImageData ?? imageData) !== null;
   const hasCmp     = compareData !== null;
@@ -189,7 +191,7 @@ export function ExportPanel({
     setBusyMapdat(true);
     try {
       captureDiagnostics('export_map_dat', src);
-      await exportMapDat(src, mapGrid, activePalette);
+      await exportMapDat(src, mapGrid, activePalette, mapStartId);
       trackEvent('dat_exported', {
         map_mode: mapMode,
         staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
@@ -199,6 +201,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
         file_count: mapGrid.wide * mapGrid.tall,
+        start_map_id: mapStartId,
       });
     } finally {
       setBusyMapdat(false);
@@ -347,11 +350,24 @@ export function ExportPanel({
     }
   }
 
+  function handleFrameCommands() {
+    trackExport('frame_fill_commands');
+    downloadFrameFillCommands({ mapGrid, startMapId: mapStartId });
+    trackEvent('frame_fill_commands_exported', {
+      map_wide: mapGrid.wide,
+      map_tall: mapGrid.tall,
+      map_count: mapGrid.wide * mapGrid.tall,
+      start_map_id: mapStartId,
+      platform_mode: platformMode,
+    });
+  }
+
   const base        = disabled || !hasContent;
   const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
   const isBedrock = platformMode === 'bedrock';
   const javaOnlyReason = t('Пока доступно только для Java Edition.', 'Currently available for Java Edition only.');
+  const mapEndId = mapStartId + mapCount - 1;
 
   return (
     <section className="sidebar-section" id="tour-export">
@@ -391,6 +407,38 @@ export function ExportPanel({
           >
             <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT (${mapCount} ${t('файлов', 'files')})` : 'MAP.DAT'}{isBedrock ? ' · Java' : ''}
           </button>
+
+          <div className="frame-fill-export">
+            <label className="frame-fill-field">
+              <span>{t('Первый ID карты', 'First map ID')}</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={mapStartId}
+                onChange={(event) => {
+                  const next = Number.parseInt(event.target.value, 10);
+                  setMapStartId(Number.isFinite(next) ? Math.max(0, next) : 0);
+                }}
+                disabled={base || isBedrock}
+                aria-label={t('Первый ID карты для MAP.DAT и команд рамок', 'First map ID for MAP.DAT and item frame commands')}
+              />
+            </label>
+            <button
+              className="export-btn export-btn-frame-fill"
+              onClick={handleFrameCommands}
+              disabled={base || isBedrock}
+              title={isBedrock ? javaOnlyReason : t('Скачать команды, которые заполняют сетку рамок картами от нижней левой рамки', 'Download commands that fill an item-frame grid from the bottom-left frame')}
+            >
+              <IconGlyph icon={mkIcons.grid} /> {t('КОМАНДЫ РАМОК', 'FRAME COMMANDS')}
+            </button>
+            <p className="frame-fill-hint">
+              {t(
+                `Файлы будут map_${mapStartId}.dat–map_${mapEndId}.dat. Встань перед нижней левой рамкой и смотри на неё.`,
+                `Files will be map_${mapStartId}.dat–map_${mapEndId}.dat. Stand in front of the bottom-left frame and look at it.`,
+              )}
+            </p>
+          </div>
 
           {artistMode ? (<>
             <button
