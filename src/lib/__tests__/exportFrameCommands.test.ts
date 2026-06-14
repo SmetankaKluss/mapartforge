@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFrameFillCommands, mapIdForBottomLeftFrame } from '../exportFrameCommands';
+import { buildFrameFillCommands, buildFrameFillDatapackFiles, mapIdForBottomLeftFrame } from '../exportFrameCommands';
 
 describe('frame fill command export', () => {
   it('maps bottom-left frame order to top-to-bottom map.dat ids', () => {
@@ -20,10 +20,27 @@ describe('frame fill command export', () => {
 
     expect(commands).toContain('Maps: map_7.dat ... map_10.dat');
     expect(commands).toContain('positioned ^0 ^0 ^1');
-    expect(commands).toContain('minecraft:filled_map[minecraft:map_id=9]');
+    expect(commands).toContain('Item set value {id:"minecraft:filled_map",components:{}}');
+    expect(commands).toContain('Item.components."minecraft:map_id" set value 9');
     expect(commands).toContain('positioned ^-1 ^1 ^1');
-    expect(commands).toContain('minecraft:filled_map[minecraft:map_id=8]');
-    expect(commands.match(/item replace entity/g)).toHaveLength(4);
-    expect(commands.match(/container\.0/g)).toHaveLength(4);
+    expect(commands).toContain('Item.components."minecraft:map_id" set value 8');
+    expect(commands.match(/Item set value/g)).toHaveLength(4);
+    expect(commands.match(/Item\.components\."minecraft:map_id"/g)).toHaveLength(4);
+  });
+
+  it('builds a datapack with modern and legacy function paths', () => {
+    const files = buildFrameFillDatapackFiles({
+      mapGrid: { wide: 1, tall: 1 },
+      startMapId: 42,
+    });
+
+    expect(files.map(file => file.path)).toEqual([
+      'pack.mcmeta',
+      'data/mapkluss/function/fill_frames.mcfunction',
+      'data/mapkluss/functions/fill_frames.mcfunction',
+    ]);
+    expect(files[0].content).toContain('"pack_format": 48');
+    expect(files[1].content).toContain('/function mapkluss:fill_frames');
+    expect(files[1].content).toContain('set value 42');
   });
 });

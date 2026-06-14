@@ -6,6 +6,11 @@ export interface FrameCommandOptions {
   forwardOffset?: number;
 }
 
+export interface DatapackFile {
+  path: string;
+  content: string;
+}
+
 const DEFAULT_FORWARD_OFFSET = 1;
 
 function clampStartMapId(value: number): number {
@@ -38,10 +43,13 @@ export function buildFrameFillCommands({
     '#',
     '# How to use:',
     '# 1. Put the exported map_*.dat files into your world/data folder.',
-    '# 2. Place item frames in the same grid size.',
-    '# 3. Stand one block in front of the BOTTOM-LEFT frame and look at it.',
-    '# 4. Run these commands from that position. In a command block, use the same facing direction.',
+    '# 2. Put the mapkluss_map_art datapack folder into your world/datapacks folder.',
+    '# 3. Run /reload.',
+    '# 4. Place item frames in the same grid size.',
+    '# 5. Stand one block in front of the BOTTOM-LEFT frame and look at it.',
+    '# 6. Run /function mapkluss:fill_frames.',
     '#',
+    'tellraw @s {"text":"MapKluss: filling nearest item frames...","color":"green"}',
   ];
 
   for (let rowFromBottom = 0; rowFromBottom < mapGrid.tall; rowFromBottom++) {
@@ -50,12 +58,32 @@ export function buildFrameFillCommands({
       const left = -col;
       const up = rowFromBottom;
       lines.push(
-        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run item replace entity @s container.0 with minecraft:filled_map[minecraft:map_id=${mapId}] 1`,
+        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run data modify entity @s Item set value {id:"minecraft:filled_map",components:{}}`,
+      );
+      lines.push(
+        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run data modify entity @s Item.components."minecraft:map_id" set value ${mapId}`,
       );
     }
   }
 
+  lines.push('tellraw @s {"text":"MapKluss: done.","color":"green"}');
   return `${lines.join('\n')}\n`;
+}
+
+export function buildFrameFillDatapackFiles(options: FrameCommandOptions): DatapackFile[] {
+  const fillFunction = buildFrameFillCommands(options);
+  const packMeta = JSON.stringify({
+    pack: {
+      pack_format: 48,
+      description: 'MapKluss map art item-frame filler',
+    },
+  }, null, 2);
+
+  return [
+    { path: 'pack.mcmeta', content: `${packMeta}\n` },
+    { path: 'data/mapkluss/function/fill_frames.mcfunction', content: fillFunction },
+    { path: 'data/mapkluss/functions/fill_frames.mcfunction', content: fillFunction },
+  ];
 }
 
 export function downloadFrameFillCommands(options: FrameCommandOptions): void {

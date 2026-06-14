@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { NbtWriter, gzipBytes } from './nbt';
 import type { ComputedPalette } from './dithering';
 import type { MapGrid } from './types';
-import { buildFrameFillCommands } from './exportFrameCommands';
+import { buildFrameFillCommands, buildFrameFillDatapackFiles } from './exportFrameCommands';
 
 const MAP_SIZE = 128;
 
@@ -96,17 +96,27 @@ export async function exportMapDat(
     }
   }
 
-  zip.file(
-    'mapkluss_fill_frames.mcfunction',
-    buildFrameFillCommands({ mapGrid, startMapId }),
-  );
+  const commandOptions = { mapGrid, startMapId };
+  zip.file('mapkluss_fill_frames.mcfunction', buildFrameFillCommands(commandOptions));
+  const datapackFolder = 'datapacks/mapkluss_map_art';
+  for (const file of buildFrameFillDatapackFiles(commandOptions)) {
+    zip.file(`${datapackFolder}/${file.path}`, file.content);
+  }
   zip.file('README.txt', [
     'MapKluss MAP.DAT export',
     '',
+    'Install:',
     '1. Copy files from the data folder into your Minecraft world/data folder.',
-    '2. Place item frames in the same grid size as your art.',
-    '3. Stand one block in front of the bottom-left frame and look at it.',
-    '4. Run commands from mapkluss_fill_frames.mcfunction.',
+    '2. Copy the datapacks/mapkluss_map_art folder into your Minecraft world/datapacks folder.',
+    '3. Open the world and run /reload.',
+    '',
+    'Use:',
+    '1. Place item frames in the same grid size as your art.',
+    '2. Stand one block in front of the bottom-left frame and look at it.',
+    '3. Run /function mapkluss:fill_frames.',
+    '',
+    'Fallback:',
+    'If the datapack does not appear, commands are also included in mapkluss_fill_frames.mcfunction.',
     '',
     `Grid: ${mapGrid.wide}x${mapGrid.tall}`,
     `Map IDs: ${startMapId}..${startMapId + mapGrid.wide * mapGrid.tall - 1}`,
