@@ -24,8 +24,9 @@ describe('frame fill command export', () => {
     expect(commands).toContain('anchored eyes positioned ^-1 ^1 ^2');
     expect(commands).toContain('summon minecraft:item_frame ~ ~ ~ {Facing:5b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":8}}}');
     expect(commands.match(/summon minecraft:item_frame/g)).toHaveLength(24);
-    expect(commands.match(/run kill @s/g)).toHaveLength(4);
-    expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(32);
+    expect(commands.match(/tag @s add mapkluss_target_frame/g)).toHaveLength(4);
+    expect(commands.match(/kill @e\[type=minecraft:item_frame,tag=mapkluss_target_frame\]/g)).toHaveLength(4);
+    expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(8);
   });
 
   it('builds a datapack with modern and legacy function paths', () => {

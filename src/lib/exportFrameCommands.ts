@@ -15,6 +15,7 @@ export interface DatapackFile {
 const DEFAULT_FORWARD_OFFSET = 2;
 const DEFAULT_FRAME_SEARCH_RADIUS = 1.45;
 const ITEM_FRAME_FACINGS = [0, 1, 2, 3, 4, 5] as const;
+const TARGET_FRAME_TAG = 'mapkluss_target_frame';
 
 function clampStartMapId(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -64,17 +65,22 @@ export function buildFrameFillCommands({
       lines.push(
         `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} if entity @e[type=minecraft:item_frame,distance=..${frameSearchRadius},limit=1] run tellraw @s {"text":"MapKluss: frame ${col + 1},${rowFromBottom + 1} -> map_${mapId}","color":"dark_gray"}`,
       );
+      lines.push(`tag @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}] remove ${TARGET_FRAME_TAG}`);
+      lines.push(
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run tag @s add ${TARGET_FRAME_TAG}`,
+      );
       for (const facing of ITEM_FRAME_FACINGS) {
         lines.push(
-          `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] at @s if data entity @s {Facing:${facing}b} run summon minecraft:item_frame ~ ~ ~ {Facing:${facing}b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":${mapId}}}}`,
+          `execute as @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG},limit=1] at @s if data entity @s {Facing:${facing}b} run summon minecraft:item_frame ~ ~ ~ {Facing:${facing}b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":${mapId}}}}`,
         );
       }
       lines.push(
-        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run kill @s`,
+        `kill @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}]`,
       );
     }
   }
 
+  lines.push(`tag @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}] remove ${TARGET_FRAME_TAG}`);
   lines.push('tellraw @s {"text":"MapKluss: done.","color":"green"}');
   return `${lines.join('\n')}\n`;
 }
