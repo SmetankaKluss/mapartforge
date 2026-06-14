@@ -112,7 +112,7 @@ export async function exportMapDat(
     '',
     'Use:',
     '1. Place item frames in the same grid size as your art.',
-    '2. Stand one block in front of the bottom-left frame and look at it.',
+    '2. Put your crosshair on the bottom-left frame.',
     '3. Run /function mapkluss:fill_frames.',
     '',
     'Fallback:',

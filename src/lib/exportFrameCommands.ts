@@ -4,6 +4,7 @@ export interface FrameCommandOptions {
   mapGrid: MapGrid;
   startMapId: number;
   forwardOffset?: number;
+  frameSearchRadius?: number;
 }
 
 export interface DatapackFile {
@@ -11,7 +12,8 @@ export interface DatapackFile {
   content: string;
 }
 
-const DEFAULT_FORWARD_OFFSET = 1;
+const DEFAULT_FORWARD_OFFSET = 2;
+const DEFAULT_FRAME_SEARCH_RADIUS = 1.45;
 
 function clampStartMapId(value: number): number {
   if (!Number.isFinite(value)) return 0;
@@ -32,6 +34,7 @@ export function buildFrameFillCommands({
   mapGrid,
   startMapId,
   forwardOffset = DEFAULT_FORWARD_OFFSET,
+  frameSearchRadius = DEFAULT_FRAME_SEARCH_RADIUS,
 }: FrameCommandOptions): string {
   const firstId = clampStartMapId(startMapId);
   const lastId = firstId + mapGrid.wide * mapGrid.tall - 1;
@@ -46,10 +49,10 @@ export function buildFrameFillCommands({
     '# 2. Put the mapkluss_map_art datapack folder into your world/datapacks folder.',
     '# 3. Run /reload.',
     '# 4. Place item frames in the same grid size.',
-    '# 5. Stand one block in front of the BOTTOM-LEFT frame and look at it.',
+    '# 5. Put your crosshair on the BOTTOM-LEFT frame.',
     '# 6. Run /function mapkluss:fill_frames.',
     '#',
-    'tellraw @s {"text":"MapKluss: filling nearest item frames...","color":"green"}',
+    'tellraw @s {"text":"MapKluss: filling item frames from your crosshair...","color":"green"}',
   ];
 
   for (let rowFromBottom = 0; rowFromBottom < mapGrid.tall; rowFromBottom++) {
@@ -58,10 +61,10 @@ export function buildFrameFillCommands({
       const left = -col;
       const up = rowFromBottom;
       lines.push(
-        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run data modify entity @s Item set value {id:"minecraft:filled_map",components:{}}`,
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run data modify entity @s Item set value {id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":${mapId}}}`,
       );
       lines.push(
-        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run data modify entity @s Item.components."minecraft:map_id" set value ${mapId}`,
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} if entity @e[type=minecraft:item_frame,distance=..${frameSearchRadius},limit=1] run tellraw @s {"text":"MapKluss: frame ${col + 1},${rowFromBottom + 1} -> map_${mapId}","color":"dark_gray"}`,
       );
     }
   }
