@@ -20,11 +20,13 @@ describe('frame fill command export', () => {
 
     expect(commands).toContain('Maps: map_7.dat ... map_10.dat');
     expect(commands).toContain('anchored eyes positioned ^0 ^0 ^2');
-    expect(commands).toContain('Item set value {id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":9}}');
+    expect(commands).toContain('Item set value {id:"minecraft:filled_map",count:1,components:{}}');
+    expect(commands).toContain('Item.components."minecraft:map_id" set value 9');
     expect(commands).toContain('anchored eyes positioned ^-1 ^1 ^2');
-    expect(commands).toContain('Item set value {id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":8}}');
+    expect(commands).toContain('Item.components."minecraft:map_id" set value 8');
     expect(commands.match(/Item set value/g)).toHaveLength(4);
-    expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(8);
+    expect(commands.match(/Item\.components\."minecraft:map_id"/g)).toHaveLength(4);
+    expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(12);
   });
 
   it('builds a datapack with modern and legacy function paths', () => {
@@ -40,6 +42,6 @@ describe('frame fill command export', () => {
     ]);
     expect(files[0].content).toContain('"pack_format": 48');
     expect(files[1].content).toContain('/function mapkluss:fill_frames');
-    expect(files[1].content).toContain('"minecraft:map_id":42');
+    expect(files[1].content).toContain('Item.components."minecraft:map_id" set value 42');
   });
 });

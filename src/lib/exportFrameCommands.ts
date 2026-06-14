@@ -61,7 +61,10 @@ export function buildFrameFillCommands({
       const left = -col;
       const up = rowFromBottom;
       lines.push(
-        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run data modify entity @s Item set value {id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":${mapId}}}`,
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run data modify entity @s Item set value {id:"minecraft:filled_map",count:1,components:{}}`,
+      );
+      lines.push(
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run data modify entity @s Item.components."minecraft:map_id" set value ${mapId}`,
       );
       lines.push(
         `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} if entity @e[type=minecraft:item_frame,distance=..${frameSearchRadius},limit=1] run tellraw @s {"text":"MapKluss: frame ${col + 1},${rowFromBottom + 1} -> map_${mapId}","color":"dark_gray"}`,
