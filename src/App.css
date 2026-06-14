@@ -1609,18 +1609,6 @@ input, select, textarea { outline: none; }
 }
 .frame-fill-field input:focus { border-color: var(--terra); box-shadow: 0 0 0 1px var(--terra-glow); }
 .frame-fill-field input:disabled { opacity: 0.4; cursor: not-allowed; }
-.export-btn-frame-fill {
-  height: 32px;
-  border-color: rgb(var(--gold-rgb) / 0.45);
-  color: var(--gold);
-  background: rgb(var(--gold-rgb) / 0.055);
-}
-.export-btn-frame-fill:hover:not(:disabled) {
-  border-color: var(--gold);
-  color: var(--gold);
-  background: var(--gold-dim);
-  box-shadow: 0 0 8px var(--gold-glow);
-}
 .frame-fill-hint {
   margin: 0;
   font-family: var(--font-mono);

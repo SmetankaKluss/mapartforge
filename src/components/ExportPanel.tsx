@@ -7,7 +7,6 @@ import type { ImageAdjustments } from '../lib/adjustments';
 import type { PlatformMode } from '../lib/platformMode';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
-import { downloadFrameFillCommands } from '../lib/exportFrameCommands';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { uploadPermalink } from '../lib/share';
@@ -350,18 +349,6 @@ export function ExportPanel({
     }
   }
 
-  function handleFrameCommands() {
-    trackExport('frame_fill_commands');
-    downloadFrameFillCommands({ mapGrid, startMapId: mapStartId });
-    trackEvent('frame_fill_commands_exported', {
-      map_wide: mapGrid.wide,
-      map_tall: mapGrid.tall,
-      map_count: mapGrid.wide * mapGrid.tall,
-      start_map_id: mapStartId,
-      platform_mode: platformMode,
-    });
-  }
-
   const base        = disabled || !hasContent;
   const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
@@ -403,9 +390,9 @@ export function ExportPanel({
             className="export-btn export-btn-mapdat"
             onClick={handleMapDat}
             disabled={base || busyMapdat || isBedrock}
-            title={isBedrock ? javaOnlyReason : t('Скачать файл(ы) map.dat — по одному на каждые 128×128 тайл', 'Download map.dat file(s) — one per 128×128 tile')}
+            title={isBedrock ? javaOnlyReason : t('Скачать ZIP с map.dat файлами и командами для рамок', 'Download a ZIP with map.dat files and item-frame commands')}
           >
-            <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT (${mapCount} ${t('файлов', 'files')})` : 'MAP.DAT'}{isBedrock ? ' · Java' : ''}
+            <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT ZIP (${mapCount})` : 'MAP.DAT ZIP'}{isBedrock ? ' · Java' : ''}
           </button>
 
           <div className="frame-fill-export">
@@ -424,18 +411,10 @@ export function ExportPanel({
                 aria-label={t('Первый ID карты для MAP.DAT и команд рамок', 'First map ID for MAP.DAT and item frame commands')}
               />
             </label>
-            <button
-              className="export-btn export-btn-frame-fill"
-              onClick={handleFrameCommands}
-              disabled={base || isBedrock}
-              title={isBedrock ? javaOnlyReason : t('Скачать команды, которые заполняют сетку рамок картами от нижней левой рамки', 'Download commands that fill an item-frame grid from the bottom-left frame')}
-            >
-              <IconGlyph icon={mkIcons.grid} /> {t('КОМАНДЫ РАМОК', 'FRAME COMMANDS')}
-            </button>
             <p className="frame-fill-hint">
               {t(
-                `Файлы будут map_${mapStartId}.dat–map_${mapEndId}.dat. Встань перед нижней левой рамкой и смотри на неё.`,
-                `Files will be map_${mapStartId}.dat–map_${mapEndId}.dat. Stand in front of the bottom-left frame and look at it.`,
+                `В архиве будут map_${mapStartId}.dat–map_${mapEndId}.dat и .mcfunction для рамок.`,
+                `ZIP includes map_${mapStartId}.dat–map_${mapEndId}.dat and an item-frame .mcfunction.`,
               )}
             </p>
           </div>

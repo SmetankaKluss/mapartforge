@@ -1,6 +1,8 @@
+import JSZip from 'jszip';
 import { NbtWriter, gzipBytes } from './nbt';
 import type { ComputedPalette } from './dithering';
 import type { MapGrid } from './types';
+import { buildFrameFillCommands } from './exportFrameCommands';
 
 const MAP_SIZE = 128;
 
@@ -62,8 +64,7 @@ export function buildMapNbt(colors: Uint8Array): Uint8Array {
   return w.toBytes();
 }
 
-function triggerDownload(bytes: Uint8Array, filename: string) {
-  const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
+function triggerBlobDownload(blob: Blob, filename: string) {
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
   a.click();
@@ -71,8 +72,9 @@ function triggerDownload(bytes: Uint8Array, filename: string) {
 }
 
 /**
- * Export one map.dat per tile in the grid.
- * Files are named map_0.dat, map_1.dat, … in row-major order (left→right, top→bottom).
+ * Export map.dat files as one ZIP.
+ * Files are named map_0.dat, map_1.dat, … in row-major order (left→right, top→bottom),
+ * or start from startMapId when the user needs exact in-world map IDs.
  */
 export async function exportMapDat(
   imageData: ImageData,
@@ -81,14 +83,36 @@ export async function exportMapDat(
   startMapId = 0,
 ): Promise<void> {
   const lookup = buildLookup(cp);
+  const zip = new JSZip();
+  const mapsFolder = zip.folder('data') ?? zip;
   let idx = 0;
   for (let row = 0; row < mapGrid.tall; row++) {
     for (let col = 0; col < mapGrid.wide; col++) {
       const colors  = buildTileColors(imageData, col, row, lookup);
       const nbt     = buildMapNbt(colors);
       const gzipped = await gzipBytes(nbt);
-      triggerDownload(gzipped, `map_${startMapId + idx}.dat`);
+      mapsFolder.file(`map_${startMapId + idx}.dat`, gzipped);
       idx++;
     }
   }
+
+  zip.file(
+    'mapkluss_fill_frames.mcfunction',
+    buildFrameFillCommands({ mapGrid, startMapId }),
+  );
+  zip.file('README.txt', [
+    'MapKluss MAP.DAT export',
+    '',
+    '1. Copy files from the data folder into your Minecraft world/data folder.',
+    '2. Place item frames in the same grid size as your art.',
+    '3. Stand one block in front of the bottom-left frame and look at it.',
+    '4. Run commands from mapkluss_fill_frames.mcfunction.',
+    '',
+    `Grid: ${mapGrid.wide}x${mapGrid.tall}`,
+    `Map IDs: ${startMapId}..${startMapId + mapGrid.wide * mapGrid.tall - 1}`,
+    '',
+  ].join('\n'));
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  triggerBlobDownload(blob, `mapkluss_mapdat_${mapGrid.wide}x${mapGrid.tall}_maps_${startMapId}.zip`);
 }
