@@ -24,5 +24,6 @@ describe('frame fill command export', () => {
     expect(commands).toContain('positioned ^-1 ^1 ^1');
     expect(commands).toContain('minecraft:filled_map[minecraft:map_id=8]');
     expect(commands.match(/item replace entity/g)).toHaveLength(4);
+    expect(commands.match(/container\.0/g)).toHaveLength(4);
   });
 });

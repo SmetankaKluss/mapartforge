@@ -50,7 +50,7 @@ export function buildFrameFillCommands({
       const left = -col;
       const up = rowFromBottom;
       lines.push(
-        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run item replace entity @s contents with minecraft:filled_map[minecraft:map_id=${mapId}] 1`,
+        `execute positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..0.75,sort=nearest,limit=1] run item replace entity @s container.0 with minecraft:filled_map[minecraft:map_id=${mapId}] 1`,
       );
     }
   }
