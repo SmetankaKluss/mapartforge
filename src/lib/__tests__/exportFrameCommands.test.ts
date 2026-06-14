@@ -20,9 +20,9 @@ describe('frame fill command export', () => {
 
     expect(commands).toContain('Maps: map_7.dat ... map_10.dat');
     expect(commands).toContain('positioned ^0 ^0 ^1');
-    expect(commands).toContain('"minecraft:map_id":9');
+    expect(commands).toContain('minecraft:filled_map[minecraft:map_id=9]');
     expect(commands).toContain('positioned ^-1 ^1 ^1');
-    expect(commands).toContain('"minecraft:map_id":8');
-    expect(commands.match(/data merge entity/g)).toHaveLength(4);
+    expect(commands).toContain('minecraft:filled_map[minecraft:map_id=8]');
+    expect(commands.match(/item replace entity/g)).toHaveLength(4);
   });
 });
