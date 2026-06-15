@@ -3,6 +3,7 @@ import { NbtWriter, gzipBytes } from './nbt';
 import type { ComputedPalette } from './dithering';
 import type { MapGrid } from './types';
 import { buildFrameFillCommands, buildFrameFillDatapackFiles } from './exportFrameCommands';
+import type { MinecraftVersion } from './versionPresets';
 
 const MAP_SIZE = 128;
 
@@ -40,12 +41,17 @@ export function buildTileColors(
   return colors;
 }
 
+function dataVersionForMinecraft(version: MinecraftVersion | undefined): number {
+  if (version === '1.21.4') return 3953;
+  return 3465; // Java 1.20.1
+}
+
 /** Write a single map.dat NBT payload (uncompressed). */
-export function buildMapNbt(colors: Uint8Array): Uint8Array {
+export function buildMapNbt(colors: Uint8Array, minecraftVersion?: MinecraftVersion): Uint8Array {
   const w = new NbtWriter();
   // Outer compound (root, named "")
   w.tagCompoundStart('');
-    w.tagInt('DataVersion', 3953); // Minecraft 1.21.4
+    w.tagInt('DataVersion', dataVersionForMinecraft(minecraftVersion));
     w.tagCompoundStart('data');
       w.tagByte('scale', 0);
       w.tagString('dimension', 'minecraft:overworld');
@@ -81,6 +87,7 @@ export async function exportMapDat(
   mapGrid:   MapGrid,
   cp:        ComputedPalette,
   startMapId = 0,
+  minecraftVersion?: MinecraftVersion,
 ): Promise<void> {
   const lookup = buildLookup(cp);
   const zip = new JSZip();
@@ -89,14 +96,14 @@ export async function exportMapDat(
   for (let row = 0; row < mapGrid.tall; row++) {
     for (let col = 0; col < mapGrid.wide; col++) {
       const colors  = buildTileColors(imageData, col, row, lookup);
-      const nbt     = buildMapNbt(colors);
+      const nbt     = buildMapNbt(colors, minecraftVersion);
       const gzipped = await gzipBytes(nbt);
       mapsFolder.file(`map_${startMapId + idx}.dat`, gzipped);
       idx++;
     }
   }
 
-  const commandOptions = { mapGrid, startMapId };
+  const commandOptions = { mapGrid, startMapId, minecraftVersion };
   zip.file('mapkluss_fill_frames.mcfunction', buildFrameFillCommands(commandOptions));
   const datapackFolder = 'datapacks/mapkluss_map_art';
   for (const file of buildFrameFillDatapackFiles(commandOptions)) {

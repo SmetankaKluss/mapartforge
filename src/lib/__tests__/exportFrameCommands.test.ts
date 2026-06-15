@@ -20,13 +20,23 @@ describe('frame fill command export', () => {
 
     expect(commands).toContain('Maps: map_7.dat ... map_10.dat');
     expect(commands).toContain('anchored eyes positioned ^0 ^0 ^2');
-    expect(commands).toContain('summon minecraft:item_frame ~ ~ ~ {Facing:0b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":9}}}');
+    expect(commands).toContain('data merge entity @s {Item:{id:"minecraft:filled_map",Count:1b,tag:{map:9}}}');
     expect(commands).toContain('anchored eyes positioned ^-1 ^1 ^2');
-    expect(commands).toContain('summon minecraft:item_frame ~ ~ ~ {Facing:5b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":8}}}');
-    expect(commands.match(/summon minecraft:item_frame/g)).toHaveLength(24);
-    expect(commands.match(/tag @s add mapkluss_target_frame/g)).toHaveLength(4);
-    expect(commands.match(/kill @e\[type=minecraft:item_frame,tag=mapkluss_target_frame\]/g)).toHaveLength(4);
+    expect(commands).toContain('data merge entity @s {Item:{id:"minecraft:filled_map",Count:1b,tag:{map:8}}}');
+    expect(commands.match(/data merge entity/g)).toHaveLength(4);
     expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(8);
+  });
+
+  it('can still build 1.21 component commands when requested', () => {
+    const commands = buildFrameFillCommands({
+      mapGrid: { wide: 1, tall: 1 },
+      startMapId: 42,
+      minecraftVersion: '1.21.4',
+    });
+
+    expect(commands).toContain('summon minecraft:item_frame ~ ~ ~ {Facing:0b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":42}}}');
+    expect(commands).toContain('tag @s add mapkluss_target_frame');
+    expect(commands).toContain('kill @e[type=minecraft:item_frame,tag=mapkluss_target_frame]');
   });
 
   it('builds a datapack with modern and legacy function paths', () => {
@@ -40,8 +50,8 @@ describe('frame fill command export', () => {
       'data/mapkluss/function/fill_frames.mcfunction',
       'data/mapkluss/functions/fill_frames.mcfunction',
     ]);
-    expect(files[0].content).toContain('"pack_format": 48');
+    expect(files[0].content).toContain('"pack_format": 15');
     expect(files[1].content).toContain('/function mapkluss:fill_frames');
-    expect(files[1].content).toContain('"minecraft:map_id":42');
+    expect(files[1].content).toContain('tag:{map:42}');
   });
 });

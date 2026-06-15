@@ -2710,6 +2710,7 @@ export default function App() {
               adjustments={adjustments}
               bnScale={bnScale}
               platformMode={platformMode}
+              minecraftVersion={minecraftVersion}
               onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
               onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
             />

@@ -5,6 +5,7 @@ import type { MapGrid } from '../lib/types';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ImageAdjustments } from '../lib/adjustments';
 import type { PlatformMode } from '../lib/platformMode';
+import type { MinecraftVersion } from '../lib/versionPresets';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
@@ -58,6 +59,7 @@ interface Props {
   adjustments: ImageAdjustments;
   bnScale:     number;
   platformMode: PlatformMode;
+  minecraftVersion: MinecraftVersion;
   // Tracker
   onCreateTracker?: () => void;
   // GIF Project
@@ -89,6 +91,7 @@ export function ExportPanel({
   artistMode, hybridLayers, activeLayerExport,
   sourceImage, intensity, adjustments, bnScale,
   platformMode,
+  minecraftVersion,
   onCreateTracker, onExportGifPack,
 }: Props) {
   const { t } = useLocale();
@@ -190,7 +193,7 @@ export function ExportPanel({
     setBusyMapdat(true);
     try {
       captureDiagnostics('export_map_dat', src);
-      await exportMapDat(src, mapGrid, activePalette, mapStartId);
+      await exportMapDat(src, mapGrid, activePalette, mapStartId, minecraftVersion);
       trackEvent('dat_exported', {
         map_mode: mapMode,
         staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
