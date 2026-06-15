@@ -12,7 +12,7 @@ describe('frame fill command export', () => {
     expect(mapIdForBottomLeftFrame(mapGrid, 100, 2, 1)).toBe(102);
   });
 
-  it('builds one command per item frame using local coordinates', () => {
+  it('builds commands that place glowing item frames with maps', () => {
     const commands = buildFrameFillCommands({
       mapGrid: { wide: 2, tall: 2 },
       startMapId: 7,
@@ -20,11 +20,14 @@ describe('frame fill command export', () => {
 
     expect(commands).toContain('Maps: map_7.dat ... map_10.dat');
     expect(commands).toContain('anchored eyes positioned ^0 ^0 ^2');
-    expect(commands).toContain('data merge entity @s {Item:{id:"minecraft:filled_map",Count:1b,tag:{map:9}}}');
+    expect(commands).toContain('kill @e[type=minecraft:item_frame,distance=..0.8]');
+    expect(commands).toContain('kill @e[type=minecraft:glow_item_frame,distance=..0.8]');
+    expect(commands).toContain('summon minecraft:glow_item_frame ~ ~ ~ {Facing:2b,Item:{id:"minecraft:filled_map",Count:1b,tag:{map:9}}}');
     expect(commands).toContain('anchored eyes positioned ^-1 ^1 ^2');
-    expect(commands).toContain('data merge entity @s {Item:{id:"minecraft:filled_map",Count:1b,tag:{map:8}}}');
-    expect(commands.match(/data merge entity/g)).toHaveLength(4);
-    expect(commands.match(/distance=\.\.1\.45/g)).toHaveLength(8);
+    expect(commands).toContain('summon minecraft:glow_item_frame ~ ~ ~ {Facing:3b,Item:{id:"minecraft:filled_map",Count:1b,tag:{map:8}}}');
+    expect(commands.match(/summon minecraft:glow_item_frame/g)).toHaveLength(20);
+    expect(commands.match(/kill @e\[type=minecraft:item_frame,distance=\.\.0\.8\]/g)).toHaveLength(4);
+    expect(commands.match(/kill @e\[type=minecraft:glow_item_frame,distance=\.\.0\.8\]/g)).toHaveLength(4);
   });
 
   it('can still build 1.21 component commands when requested', () => {
@@ -34,9 +37,8 @@ describe('frame fill command export', () => {
       minecraftVersion: '1.21.4',
     });
 
-    expect(commands).toContain('summon minecraft:item_frame ~ ~ ~ {Facing:0b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":42}}}');
-    expect(commands).toContain('tag @s add mapkluss_target_frame');
-    expect(commands).toContain('kill @e[type=minecraft:item_frame,tag=mapkluss_target_frame]');
+    expect(commands).toContain('summon minecraft:glow_item_frame ~ ~ ~ {Facing:2b,Item:{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":42}}}');
+    expect(commands).toContain('kill @e[type=minecraft:glow_item_frame,distance=..0.8]');
   });
 
   it('builds a datapack with modern and legacy function paths', () => {

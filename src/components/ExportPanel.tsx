@@ -105,7 +105,6 @@ export function ExportPanel({
   const [busyShowcase, setBusyShowcase]   = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
-  const [mapStartId,     setMapStartId]     = useState(0);
 
   const hasPreview = (previewImageData ?? imageData) !== null;
   const hasCmp     = compareData !== null;
@@ -193,7 +192,7 @@ export function ExportPanel({
     setBusyMapdat(true);
     try {
       captureDiagnostics('export_map_dat', src);
-      await exportMapDat(src, mapGrid, activePalette, mapStartId, minecraftVersion);
+      await exportMapDat(src, mapGrid, activePalette, 0, minecraftVersion);
       trackEvent('dat_exported', {
         map_mode: mapMode,
         staircase_mode: mapMode === '3d' ? staircaseMode : undefined,
@@ -203,7 +202,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
         file_count: mapGrid.wide * mapGrid.tall,
-        start_map_id: mapStartId,
+        start_map_id: 0,
       });
     } finally {
       setBusyMapdat(false);
@@ -357,7 +356,6 @@ export function ExportPanel({
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
   const isBedrock = platformMode === 'bedrock';
   const javaOnlyReason = t('Пока доступно только для Java Edition.', 'Currently available for Java Edition only.');
-  const mapEndId = mapStartId + mapCount - 1;
 
   return (
     <section className="sidebar-section" id="tour-export">
@@ -397,30 +395,6 @@ export function ExportPanel({
           >
             <IconGlyph icon={mkIcons.map} /> {busyMapdat ? t('Сборка…', 'Building…') : mapCount > 1 ? `MAP.DAT ZIP (${mapCount})` : 'MAP.DAT ZIP'}{isBedrock ? ' · Java' : ''}
           </button>
-
-          <div className="frame-fill-export">
-            <label className="frame-fill-field">
-              <span>{t('Первый ID карты', 'First map ID')}</span>
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={mapStartId}
-                onChange={(event) => {
-                  const next = Number.parseInt(event.target.value, 10);
-                  setMapStartId(Number.isFinite(next) ? Math.max(0, next) : 0);
-                }}
-                disabled={base || isBedrock}
-                aria-label={t('Первый ID карты для MAP.DAT и команд рамок', 'First map ID for MAP.DAT and item frame commands')}
-              />
-            </label>
-            <p className="frame-fill-hint">
-              {t(
-                `В архиве будут map_${mapStartId}.dat–map_${mapEndId}.dat и .mcfunction для рамок.`,
-                `ZIP includes map_${mapStartId}.dat–map_${mapEndId}.dat and an item-frame .mcfunction.`,
-              )}
-            </p>
-          </div>
 
           {artistMode ? (<>
             <button

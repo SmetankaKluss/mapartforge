@@ -6,7 +6,6 @@ export interface FrameCommandOptions {
   startMapId: number;
   minecraftVersion?: MinecraftVersion;
   forwardOffset?: number;
-  frameSearchRadius?: number;
 }
 
 export interface DatapackFile {
@@ -15,9 +14,15 @@ export interface DatapackFile {
 }
 
 const DEFAULT_FORWARD_OFFSET = 2;
-const DEFAULT_FRAME_SEARCH_RADIUS = 1.45;
-const ITEM_FRAME_FACINGS = [0, 1, 2, 3, 4, 5] as const;
-const TARGET_FRAME_TAG = 'mapkluss_target_frame';
+const FRAME_CLEAR_RADIUS = 0.8;
+
+const PLAYER_FACING_RULES = [
+  { range: '-45..45', frameFacing: 2, label: 'south' },
+  { range: '45..135', frameFacing: 5, label: 'west' },
+  { range: '-135..-45', frameFacing: 4, label: 'east' },
+  { range: '135..180', frameFacing: 3, label: 'north+' },
+  { range: '-180..-135', frameFacing: 3, label: 'north-' },
+] as const;
 
 function usesLegacyMapItemNbt(version: MinecraftVersion | undefined): boolean {
   return version !== '1.21.4';
@@ -55,7 +60,6 @@ export function buildFrameFillCommands({
   startMapId,
   minecraftVersion,
   forwardOffset = DEFAULT_FORWARD_OFFSET,
-  frameSearchRadius = DEFAULT_FRAME_SEARCH_RADIUS,
 }: FrameCommandOptions): string {
   const firstId = clampStartMapId(startMapId);
   const lastId = firstId + mapGrid.wide * mapGrid.tall - 1;
@@ -69,11 +73,10 @@ export function buildFrameFillCommands({
     '# 1. Put the exported map_*.dat files into your world/data folder.',
     '# 2. Put the mapkluss_map_art datapack folder into your world/datapacks folder.',
     '# 3. Run /reload.',
-    '# 4. Place item frames in the same grid size.',
-    '# 5. Put your crosshair on the BOTTOM-LEFT frame.',
-    '# 6. Run /function mapkluss:fill_frames.',
+    '# 4. Put your crosshair on the BOTTOM-LEFT block position of the future art.',
+    '# 5. Run /function mapkluss:fill_frames.',
     '#',
-    'tellraw @s {"text":"MapKluss: filling item frames from your crosshair...","color":"green"}',
+    'tellraw @s {"text":"MapKluss: placing glowing item frames from your crosshair...","color":"green"}',
   ];
 
   for (let rowFromBottom = 0; rowFromBottom < mapGrid.tall; rowFromBottom++) {
@@ -83,30 +86,22 @@ export function buildFrameFillCommands({
       const up = rowFromBottom;
       const itemNbt = mapItemNbt(mapId, minecraftVersion);
       lines.push(
-        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} if entity @e[type=minecraft:item_frame,distance=..${frameSearchRadius},limit=1] run tellraw @s {"text":"MapKluss: frame ${col + 1},${rowFromBottom + 1} -> map_${mapId}","color":"dark_gray"}`,
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} run kill @e[type=minecraft:item_frame,distance=..${FRAME_CLEAR_RADIUS}]`,
       );
-      if (usesLegacyMapItemNbt(minecraftVersion)) {
-        lines.push(
-          `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run data merge entity @s {Item:${itemNbt}}`,
-        );
-        continue;
-      }
-      lines.push(`tag @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}] remove ${TARGET_FRAME_TAG}`);
       lines.push(
-        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} as @e[type=minecraft:item_frame,distance=..${frameSearchRadius},sort=nearest,limit=1] run tag @s add ${TARGET_FRAME_TAG}`,
+        `execute anchored eyes positioned ^${left} ^${up} ^${forwardOffset} run kill @e[type=minecraft:glow_item_frame,distance=..${FRAME_CLEAR_RADIUS}]`,
       );
-      for (const facing of ITEM_FRAME_FACINGS) {
+      lines.push(
+        `tellraw @s {"text":"MapKluss: frame ${col + 1},${rowFromBottom + 1} -> map_${mapId}","color":"dark_gray"}`,
+      );
+      for (const rule of PLAYER_FACING_RULES) {
         lines.push(
-          `execute as @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG},limit=1] at @s if data entity @s {Facing:${facing}b} run summon minecraft:item_frame ~ ~ ~ {Facing:${facing}b,Item:${itemNbt}}`,
+          `execute if entity @s[y_rotation=${rule.range}] anchored eyes positioned ^${left} ^${up} ^${forwardOffset} run summon minecraft:glow_item_frame ~ ~ ~ {Facing:${rule.frameFacing}b,Item:${itemNbt}}`,
         );
       }
-      lines.push(
-        `kill @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}]`,
-      );
     }
   }
 
-  lines.push(`tag @e[type=minecraft:item_frame,tag=${TARGET_FRAME_TAG}] remove ${TARGET_FRAME_TAG}`);
   lines.push('tellraw @s {"text":"MapKluss: done.","color":"green"}');
   return `${lines.join('\n')}\n`;
 }
