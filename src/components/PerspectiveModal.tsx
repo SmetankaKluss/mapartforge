@@ -353,43 +353,6 @@ function addRoomBox(scene: THREE.Scene, size: [number, number, number], center: 
   return mesh;
 }
 
-function makeGalleryBoundaryShell(center: THREE.Vector3, mapGrid: MapGrid) {
-  const shell = new THREE.Group();
-  const roomWidth = Math.max(18, mapGrid.wide + 10);
-  const roomDepth = Math.max(18, mapGrid.tall + 12);
-  const roomHeight = Math.max(8.6, mapGrid.tall + 4);
-  const floorThickness = 0.8;
-  const wallThickness = 0.8;
-  const floorY = -floorThickness / 2;
-  const ceilingY = roomHeight - floorThickness / 2;
-  const wallY = roomHeight / 2 - floorThickness / 2;
-  const wallMaterial = makeRoomSurfaceMaterial('white_concrete', roomDepth, roomHeight);
-  const floorMaterial = makeRoomSurfaceMaterial('dark_oak_planks', roomWidth, roomDepth);
-
-  addBox(shell, [roomWidth, floorThickness, roomDepth], [center.x, floorY, center.z], floorMaterial);
-  addBox(shell, [roomWidth, floorThickness, roomDepth], [center.x, ceilingY, center.z], wallMaterial);
-  addBox(
-    shell,
-    [wallThickness, roomHeight, roomDepth],
-    [center.x - roomWidth / 2 + wallThickness / 2, wallY, center.z],
-    wallMaterial,
-  );
-  addBox(
-    shell,
-    [wallThickness, roomHeight, roomDepth],
-    [center.x + roomWidth / 2 - wallThickness / 2, wallY, center.z],
-    wallMaterial,
-  );
-  addBox(
-    shell,
-    [roomWidth, roomHeight, wallThickness],
-    [center.x, wallY, center.z + roomDepth / 2 - wallThickness / 2],
-    wallMaterial,
-  );
-
-  return shell;
-}
-
 function makeFramedArtGroup(imageData: ImageData, artSize: { width: number; height: number }) {
   const artTexture = imageDataToTexture(imageData);
   const artGroup = new THREE.Group();
@@ -897,10 +860,8 @@ export function PerspectiveModal({
 
         const gridCenter = getGalleryArtGridCenter(mapGrid, gallerySceneAsset.frame);
         const sceneRoot = makeGallerySceneGroup(gallerySceneAsset);
-        const boundaryShell = makeGalleryBoundaryShell(gridCenter, mapGrid);
         const { artGroup, dispose } = makeGalleryArtGrid(imageData, mapGrid, gallerySceneAsset.frame);
         scene.add(sceneRoot);
-        scene.add(boundaryShell);
         scene.add(artGroup);
 
         camera.fov = 58;
@@ -911,7 +872,7 @@ export function PerspectiveModal({
         controls.maxDistance = 20;
         controls.minPolarAngle = 0.35;
         controls.maxPolarAngle = 1.42;
-        // Keep camera inside the gallery shell.
+        // Keep the camera focused on the gallery without adding collision walls.
         controls.minAzimuthAngle = -1.25;
         controls.maxAzimuthAngle = 1.25;
 
@@ -932,7 +893,6 @@ export function PerspectiveModal({
         return () => {
           controls.removeEventListener('change', onCameraChange);
           dispose();
-          disposeObject3DResources(boundaryShell);
           disposeObject3DResources(sceneRoot);
           disposeObject3DResources(artGroup);
         };
