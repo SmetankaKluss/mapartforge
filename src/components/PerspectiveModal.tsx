@@ -48,12 +48,6 @@ const SCENE_EDGE_MATERIAL = new THREE.LineBasicMaterial({
   depthWrite: false,
 });
 
-const GALLERY_CAMERA_BOUNDS = {
-  min: new THREE.Vector3(-4.38, 0.85, -8.95),
-  max: new THREE.Vector3(0.18, 7.15, 8.95),
-  targetMin: new THREE.Vector3(-0.25, 1.1, -3.2),
-  targetMax: new THREE.Vector3(0.5, 5.65, 3.2),
-};
 
 /** Base CDN URL for Minecraft 1.21.4 block textures (CORS-enabled, 16×16 PNGs). */
 const MC_ASSETS_CDN = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/block/';
@@ -589,27 +583,6 @@ function getGalleryArtGridCenter(mapGrid: MapGrid, frame: SceneFrameAnchor): THR
   );
 }
 
-function clampVector(vector: THREE.Vector3, min: THREE.Vector3, max: THREE.Vector3) {
-  vector.set(
-    THREE.MathUtils.clamp(vector.x, min.x, max.x),
-    THREE.MathUtils.clamp(vector.y, min.y, max.y),
-    THREE.MathUtils.clamp(vector.z, min.z, max.z),
-  );
-}
-
-function constrainGalleryCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls) {
-  clampVector(controls.target, GALLERY_CAMERA_BOUNDS.targetMin, GALLERY_CAMERA_BOUNDS.targetMax);
-  clampVector(camera.position, GALLERY_CAMERA_BOUNDS.min, GALLERY_CAMERA_BOUNDS.max);
-
-  const offset = camera.position.clone().sub(controls.target);
-  const distance = offset.length();
-  if (distance < controls.minDistance) {
-    camera.position.copy(controls.target.clone().add(offset.normalize().multiplyScalar(controls.minDistance)));
-  } else if (distance > controls.maxDistance) {
-    camera.position.copy(controls.target.clone().add(offset.normalize().multiplyScalar(controls.maxDistance)));
-  }
-  clampVector(camera.position, GALLERY_CAMERA_BOUNDS.min, GALLERY_CAMERA_BOUNDS.max);
-}
 
 function getSceneAnchor(presetId: string, artSize: { width: number; height: number }): { position: [number, number, number]; rotationY: number } {
   const y = Math.max(3, artSize.height / 2 + 0.85);
@@ -895,11 +868,12 @@ export function PerspectiveModal({
         controls.enableRotate = true;
         controls.enablePan = false;
         controls.minDistance = 3.2;
-        controls.maxDistance = 10.5;
+        controls.maxDistance = 28;
         controls.minPolarAngle = 0.28;
         controls.maxPolarAngle = 1.52;
-        controls.minAzimuthAngle = -Infinity;
-        controls.maxAzimuthAngle = Infinity;
+        // Limit azimuth so camera can't orbit behind the art wall (~85° each side).
+        controls.minAzimuthAngle = -1.5;
+        controls.maxAzimuthAngle = 1.5;
 
         const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
         const gridCenter = getGalleryArtGridCenter(mapGrid, gallerySceneAsset.frame);
@@ -911,17 +885,13 @@ export function PerspectiveModal({
         const minDistance = Math.max(viewVector.length(), artSpan * 1.45 + 4.2);
         camera.position.copy(target.clone().add(viewVector.setLength(minDistance)));
         controls.target.copy(target);
-        constrainGalleryCamera(camera, controls);
         controls.update();
-        const clampCamera = () => {
-          constrainGalleryCamera(camera, controls);
-          render();
-        };
-        controls.addEventListener('change', clampCamera);
+        const onCameraChange = () => render();
+        controls.addEventListener('change', onCameraChange);
         render();
 
         return () => {
-          controls.removeEventListener('change', clampCamera);
+          controls.removeEventListener('change', onCameraChange);
           dispose();
           disposeObject3DResources(sceneRoot);
           disposeObject3DResources(artGroup);

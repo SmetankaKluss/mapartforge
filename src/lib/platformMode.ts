@@ -11,6 +11,7 @@ const BEDROCK_UNSAFE_BLOCKS = new Set([
   'heavy_weighted_pressure_plate',
   'light_weighted_pressure_plate',
   'resin_clump',
+  'resin_block', // Java 1.21.4 Pale Garden — not yet in Bedrock
 ]);
 
 export function isBlockAvailableOnPlatform(nbtName: string, platformMode: PlatformMode): boolean {

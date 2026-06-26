@@ -12,6 +12,7 @@ import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../l
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
 import { exportSchematic, exportSchematicZip } from '../lib/exportSchematic';
 import { exportStructureNbt, exportStructureNbtZip } from '../lib/exportStructureNbt';
+import { exportMcStructure, exportMcStructureZip } from '../lib/exportMcStructure';
 import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { uploadDiagnosticCapture } from '../lib/diagnostics';
@@ -107,6 +108,7 @@ export function ExportPanel({
   const [busyShowcase, setBusyShowcase]   = useState(false);
   const [busySchematic, setBusySchematic] = useState(false);
   const [busyNbt,       setBusyNbt]       = useState(false);
+  const [busyMcStruct,  setBusyMcStruct]  = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
@@ -381,6 +383,34 @@ export function ExportPanel({
     }
   }
 
+  async function handleMcStructure() {
+    const src = compareMode ? compareData?.left ?? null : imageData;
+    if (!src) return;
+    trackExport('mcstructure');
+    const structure = mapMode === '3d' ? 'staircase' : 'flat';
+    setBusyMcStruct(true);
+    try {
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
+      if (isMultiMap) {
+        const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
+        await exportMcStructureZip(src, activePalette, blockSelection, mapGrid, structure,
+          `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}_bedrock.zip`,
+          supportForExport, supportMode, staircaseMode);
+      } else {
+        await exportMcStructure(src, activePalette, blockSelection, 'MapartForge', structure,
+          supportForExport, supportMode, staircaseMode);
+      }
+      trackEvent('mcstructure_exported', {
+        map_mode: mapMode,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        platform_mode: platformMode,
+      });
+    } finally {
+      setBusyMcStruct(false);
+    }
+  }
+
   async function handleGetLink() {
     const sourceData = compareMode ? compareData?.left ?? null : imageData;
     const preview = compareMode ? compareData?.left ?? null : (previewImageData ?? imageData);
@@ -413,7 +443,7 @@ export function ExportPanel({
   }
 
   const base        = disabled || !hasContent;
-  const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer || busySchematic || busyNbt;
+  const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer || busySchematic || busyNbt || busyMcStruct;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
   const isBedrock = platformMode === 'bedrock';
   const javaOnlyReason = t('Пока доступно только для Java Edition.', 'Currently available for Java Edition only.');
@@ -516,10 +546,20 @@ export function ExportPanel({
             <IconGlyph icon={mkIcons.download} /> {busyNbt ? t('Сборка…', 'Building…') : `NBT${isBedrock ? ' · Java' : ''}`}
           </button>
 
+          {/* .mcstructure export — Bedrock Edition */}
+          <button
+            className="export-btn"
+            onClick={handleMcStructure}
+            disabled={base || busyAnyLite || !isBedrock}
+            title={!isBedrock ? t('Только для Bedrock Edition — переключи платформу выше', 'Bedrock Edition only — switch platform above') : t('Экспорт в .mcstructure (Bedrock Edition, структурный блок)', 'Export to .mcstructure (Bedrock Edition structure block)')}
+          >
+            <IconGlyph icon={mkIcons.download} /> {busyMcStruct ? t('Сборка…', 'Building…') : `MCSTRUCTURE${!isBedrock ? ' · Bedrock' : ''}`}
+          </button>
+
         </div>
       )}
       {!collapsed && hasContent && isBedrock && (
-        <p className="export-note">{t('Bedrock сейчас работает как совместимая палитра и preview. Экспорты map.dat и litematic пока остаются Java-only.', 'Bedrock currently works as a compatible palette and preview mode. map.dat and litematic exports remain Java-only for now.')}</p>
+        <p className="export-note">{t('Bedrock: палитра совместима с Bedrock 1.20.80+. Экспорт MCSTRUCTURE работает — загрузи через структурный блок. map.dat и litematic остаются Java-only.', 'Bedrock: palette is Bedrock 1.20.80+ compatible. MCSTRUCTURE export works — load via structure block. map.dat and litematic remain Java-only.')}</p>
       )}
       {!collapsed && compareMode && hasContent && (
         <p className="export-note">{t('Режим сравнения: PNG экспортирует обе панели; остальные форматы используют левую панель.', 'Compare mode: PNG exports both panels; other formats use left panel.')}</p>
