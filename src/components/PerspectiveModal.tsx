@@ -426,28 +426,14 @@ function extractTileImageData(imageData: ImageData, col: number, row: number) {
   return out;
 }
 
+/** Invisible frame: just the map art plane filling the full 1×1 block, minimal 2px border */
 function makeGlowItemFrame(texture: THREE.Texture) {
   const frameGroup = new THREE.Group();
-  const outerMat = new THREE.MeshLambertMaterial({ color: 0x8c6a2d, emissive: 0x3a2d0d });
-  const innerMat = new THREE.MeshLambertMaterial({ color: 0x4e3418 });
-  const artMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-  const border = 0.09;
-  const depth = 0.08;
-
-  const backing = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.06), innerMat);
-  backing.position.set(0, 0, -0.005);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1, border, depth), outerMat);
-  top.position.set(0, 0.5 - border / 2, 0.02);
-  const bottom = top.clone();
-  bottom.position.set(0, -0.5 + border / 2, 0.02);
-  const left = new THREE.Mesh(new THREE.BoxGeometry(border, 1 - border * 2, depth), outerMat);
-  left.position.set(-0.5 + border / 2, 0, 0.02);
-  const right = left.clone();
-  right.position.set(0.5 - border / 2, 0, 0.02);
-  const art = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 0.86), artMat);
-  art.position.z = 0.055;
-
-  frameGroup.add(backing, top, bottom, left, right, art);
+  const artMat = new THREE.MeshBasicMaterial({ map: texture, transparent: false });
+  // Art fills the full 1×1 block exactly, flush with adjacent tiles
+  const art = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0), artMat);
+  art.position.z = 0.02;
+  frameGroup.add(art);
   return frameGroup;
 }
 
@@ -499,7 +485,10 @@ function makeGalleryBlockMaterials(
     case 'composter':
       return makeCubeMaterials('composter_side', 'composter_top', 'composter_side', materialCache, textureCache);
     case 'lectern':
-      return makeCubeMaterials('lectern_side', 'lectern_front', 'lectern_base', materialCache, textureCache);
+      // Skip lectern — render as invisible (return empty solid)
+      return makeSolidSceneMaterial('lectern_skip', materialCache, { color: 0x000000, transparent: true, opacity: 0 });
+    case 'dirt':
+      return makeTextureMaterial('oak_planks', materialCache, textureCache);
     case 'red_carpet':
       return makeTextureMaterial('red_carpet', materialCache, textureCache);
     default:
@@ -507,7 +496,7 @@ function makeGalleryBlockMaterials(
   }
 }
 
-function addBox(parent: THREE.Object3D, size: [number, number, number], center: [number, number, number], material: THREE.Material | THREE.Material[], showEdges = true) {
+function addBox(parent: THREE.Object3D, size: [number, number, number], center: [number, number, number], material: THREE.Material | THREE.Material[], showEdges = false) {
   const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
   const mesh = new THREE.Mesh(geometry, material);
   if (showEdges) {
@@ -643,14 +632,11 @@ function addSceneEnvironment(scene: THREE.Scene, presetId: string, artMesh: THRE
       const tex = ROOM_ENV_TEXTURES['gallery-wall'];
       addRoomBox(scene, [roomWidth, 0.8, 12], [0, -0.4, 0],
         makeRoomSurfaceMaterial(tex.floor, roomWidth, 12));
-      addRoomBox(scene, [roomWidth, roomHeight, 0.6], [0, roomHeight / 2 - 0.4, -4.8],
-        makeRoomSurfaceMaterial(tex.wall, roomWidth, roomHeight));
+      // No back wall — let the scene feel open behind the art
       addRoomBox(scene, [0.6, roomHeight, 12], [-roomWidth / 2 + 0.3, roomHeight / 2 - 0.4, 0],
         makeRoomSurfaceMaterial(tex.wall, 12, roomHeight));
       addRoomBox(scene, [0.6, roomHeight, 12], [roomWidth / 2 - 0.3, roomHeight / 2 - 0.4, 0],
         makeRoomSurfaceMaterial(tex.wall, 12, roomHeight));
-      addRoomBox(scene, [roomWidth, 0.5, 0.4], [0, roomHeight - 0.8, -4.45],
-        new THREE.MeshLambertMaterial({ color: 0x5c4d36 }));
       scene.add(artMesh);
       break;
     }
@@ -910,10 +896,10 @@ export function PerspectiveModal({
         controls.enablePan = false;
         controls.minDistance = 3.2;
         controls.maxDistance = 10.5;
-        controls.minPolarAngle = 0.44;
-        controls.maxPolarAngle = 1.48;
-        controls.minAzimuthAngle = -2.7;
-        controls.maxAzimuthAngle = -0.42;
+        controls.minPolarAngle = 0.28;
+        controls.maxPolarAngle = 1.52;
+        controls.minAzimuthAngle = -Infinity;
+        controls.maxAzimuthAngle = Infinity;
 
         const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
         const gridCenter = getGalleryArtGridCenter(mapGrid, gallerySceneAsset.frame);
