@@ -1,3 +1,5 @@
+import type { TextAlign } from '../lib/textRender';
+
 export type PaintTool = 'eyedropper' | 'brush' | 'fill' | 'eraser' | 'pattern' | 'text'
   | 'select-rect' | 'select-lasso' | 'select-magic' | 'select-pixel'
   | 'pattern-tile' | 'gradient' | 'move';
@@ -10,6 +12,24 @@ export interface PaintBlock {
   shade: number;
   displayName: string;
   colourName: string;
+}
+
+/**
+ * Serializable description of a text layer's editable text. Stored on the Layer
+ * so committed text can be re-selected and edited/moved later (not flattened
+ * irreversibly). The non-null shape of the text tool's editing state matches
+ * this exactly.
+ */
+export interface TextLayerMeta {
+  px: number; py: number;
+  value: string; font: string; size: number;
+  bold: boolean; italic: boolean;
+  align: TextAlign;
+  lineHeight: number; letterSpacing: number;
+  smooth: boolean;
+  fillBlock: PaintBlock | null;
+  strokeWidth: number; strokeBlock: PaintBlock | null;
+  scaleX: number; scaleY: number;
 }
 
 /** Sentinel value: painting with this block erases pixels (alpha = 0). */

@@ -5,7 +5,7 @@ import { VERSION } from './version';
 import { ImageUpload } from './components/ImageUpload';
 import type { ImageUploadHandle } from './components/ImageUpload';
 import { PreviewCanvas } from './components/PreviewCanvas';
-import type { PaintTool, PaintBlock } from './components/previewCanvasShared';
+import type { PaintTool, PaintBlock, TextLayerMeta } from './components/previewCanvasShared';
 import { BlockPickerPopup } from './components/BlockPickerPopup';
 import { SPRITE_URL } from './components/BlockCanvas';
 import { CompareView } from './components/CompareView';
@@ -1290,9 +1290,17 @@ export default function App() {
     }));
   }, []);
 
-  const handleTextCommit = useCallback((textImageData: ImageData, layerName: string) => {
+  const handleTextCommit = useCallback((textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => {
     setLayerState(prev => {
+      if (replaceActive) {
+        // Re-editing an existing text layer: replace its pixels + metadata in place.
+        const layers = prev.layers.map(l => l.id === prev.activeLayerId
+          ? { ...l, imageData: textImageData, isText: true, text: meta, isDirty: true }
+          : l);
+        return { ...prev, layers };
+      }
       const newLayer = createLayer(layerName, textImageData, true);
+      newLayer.text = meta;
       const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
       const insertAt = idx >= 0 ? idx + 1 : prev.layers.length;
       const newLayers = [...prev.layers.slice(0, insertAt), newLayer, ...prev.layers.slice(insertAt)];
@@ -2499,6 +2507,8 @@ export default function App() {
                   brushSize={brushSize}
                   textSize={textSize}
                   otherLayersData={otherLayersData}
+                  activeLayerIsText={!!activeLayer?.isText}
+                  activeTextMeta={activeLayer?.text ?? null}
                   onRemoveBlock={handleRemoveBlock}
                   onImageUpdate={handleImageUpdate}
                   onToolChange={setActiveTool}

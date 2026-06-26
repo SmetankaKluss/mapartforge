@@ -1,4 +1,5 @@
 import type { DitheringMode } from './dithering';
+import type { TextLayerMeta } from '../components/previewCanvasShared';
 
 export type LayerBuildMode = '2d' | '3d-classic' | '3d-optimized';
 
@@ -9,6 +10,8 @@ export interface Layer {
   locked: boolean;
   opacity: number;       // 0–100, default 100
   isText?: boolean;      // true for text layers
+  /** For text layers: the editable text description, so it can be re-edited/moved. */
+  text?: TextLayerMeta;
   groupId: string | null;
   imageData: ImageData | null;
   sourceImage?: HTMLImageElement;

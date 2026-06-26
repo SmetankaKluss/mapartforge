@@ -1,5 +1,6 @@
 import type { Layer } from './layers';
 import type { MapGrid } from './types';
+import type { TextLayerMeta } from '../components/previewCanvasShared';
 
 interface SerializedLayer {
   id: string;
@@ -10,6 +11,8 @@ interface SerializedLayer {
   imageDataB64: string | null; // base64-encoded raw RGBA bytes
   width: number;
   height: number;
+  isText?: boolean;
+  text?: TextLayerMeta;
 }
 
 export interface ProjectFile {
@@ -51,6 +54,8 @@ export function serializeProject(
     imageDataB64: l.imageData ? imageDataToBase64(l.imageData) : null,
     width: l.imageData?.width ?? 0,
     height: l.imageData?.height ?? 0,
+    isText: l.isText,
+    text: l.text,
   }));
 
   const project: ProjectFile = {
@@ -83,6 +88,8 @@ export function deserializeProject(json: string): {
       imageData: sl.imageDataB64 && sl.width > 0 && sl.height > 0
         ? base64ToImageData(sl.imageDataB64, sl.width, sl.height)
         : null,
+      isText: sl.isText,
+      text: sl.text,
     }));
 
     return {
@@ -130,6 +137,8 @@ export function serializeFullProject(
     imageDataB64: l.imageData ? imageDataToBase64(l.imageData) : null,
     width: l.imageData?.width ?? 0,
     height: l.imageData?.height ?? 0,
+    isText: l.isText,
+    text: l.text,
   }));
 
   const project: ProjectFile = {
@@ -165,6 +174,8 @@ export function deserializeFullProject(json: string): {
       imageData: sl.imageDataB64 && sl.width > 0 && sl.height > 0
         ? base64ToImageData(sl.imageDataB64, sl.width, sl.height)
         : null,
+      isText: sl.isText,
+      text: sl.text,
       isDirty: true,
     }));
 

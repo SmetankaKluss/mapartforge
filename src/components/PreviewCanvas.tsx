@@ -11,8 +11,8 @@ import { paintWithPatternTile, paintWithPatternStamp } from '../lib/patternTool'
 import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
-import { TEXT_FONTS, type PaintTool, type PaintBlock } from './previewCanvasShared';
-import { renderTextBitmap, scaleMask, dilateMask, type TextBitmap, type TextAlign } from '../lib/textRender';
+import { TEXT_FONTS, type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
+import { renderTextBitmap, scaleMask, dilateMask, type TextBitmap } from '../lib/textRender';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
@@ -51,17 +51,7 @@ type CanvasDrag = {
   baseW: number; baseH: number;
 };
 
-type TextState = {
-  px: number; py: number;
-  value: string; font: string; size: number;
-  bold: boolean; italic: boolean;
-  align: TextAlign;
-  lineHeight: number; letterSpacing: number;
-  smooth: boolean;
-  fillBlock: PaintBlock | null;   // text colour; null = follow active block
-  strokeWidth: number; strokeBlock: PaintBlock | null;
-  scaleX: number; scaleY: number;
-} | null;
+type TextState = TextLayerMeta | null;
 
 interface Props {
   mode: 'pixel' | 'block';
@@ -81,11 +71,15 @@ interface Props {
   brushSize: number;
   textSize: number;
   otherLayersData?: ImageData | null;
+  /** True when the active layer is an editable text layer. */
+  activeLayerIsText?: boolean;
+  /** The active text layer's editable text description (for re-editing). */
+  activeTextMeta?: TextLayerMeta | null;
   onRemoveBlock: (csId: number) => void;
   onImageUpdate: (data: ImageData) => void;
   onToolChange: (tool: PaintTool | null) => void;
   onPaintBlockChange: (block: PaintBlock) => void;
-  onTextCommit?: (textImageData: ImageData, layerName: string) => void;
+  onTextCommit?: (textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => void;
   splitPos?: number;
   onSplitPosChange?: (p: number) => void;
   selectionMask?: SelectionMask | null;
@@ -465,6 +459,7 @@ export function PreviewCanvas({
   width, height, scale, cp, blockSelection,
   activeTool, paintBlock, patternBlocks, brushSize, textSize,
   otherLayersData,
+  activeLayerIsText, activeTextMeta,
   onRemoveBlock, onImageUpdate, onToolChange, onPaintBlockChange,
   onTextCommit,
   splitPos, onSplitPosChange,
@@ -543,6 +538,9 @@ export function PreviewCanvas({
   const setTextStateRef = useRef(setTextState);
   setTextStateRef.current = setTextState;
   const textBaseRef     = useRef<ImageData | null>(null);
+  // True while the current text editing session is re-editing the active text
+  // layer (commit replaces that layer in place rather than creating a new one).
+  const editingActiveRef = useRef(false);
   // canvasDrag lives in a ref (not state) — avoids React commit-timing issues during drag
   const canvasDragRef   = useRef<CanvasDrag | null>(null);
 
@@ -671,9 +669,9 @@ export function PreviewCanvas({
   useLayoutEffect(() => {
     const canvas = canvasZoneRef.current?.querySelector('canvas');
     if (!(canvas instanceof HTMLCanvasElement)) return;
-    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
+    const { width: w, height: h, scale: s, showGrid: sg, activeTool: at, otherLayersData: oLD } = propsRef.current;
 
-    if (!textState || !textBaseRef.current) return;
+    if (!textState || !textBaseRef.current || at !== 'text') return;
     const fillBlock = textState.fillBlock ?? paintBlock;
 
     const preview = new ImageData(new Uint8ClampedArray(textBaseRef.current.data), textBaseRef.current.width, textBaseRef.current.height);
@@ -681,7 +679,8 @@ export function PreviewCanvas({
     if (textState.value.trim() && fillBlock && fillBlock.baseId !== -1) {
       stampTextBitmap(preview, bm, textState.px, textState.py, fillBlock, textState.strokeWidth, textState.strokeBlock, cp);
     }
-    drawImageData(canvas, preview, w, h, s, sg);
+    const display = oLD ? compositeTwo(oLD, preview, w, h) : preview;
+    drawImageData(canvas, display, w, h, s, sg);
 
     // Draw selection box on top of the canvas
     const ctx = canvas.getContext('2d')!;
@@ -872,6 +871,18 @@ export function PreviewCanvas({
 
   useEffect(() => {
     if (activeTool) { setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); }
+  }, [activeTool]);
+
+  // ── Finalize text when switching away from the text tool ────────────────────
+  // The committed text stays on its layer (movable via Move tool, re-editable by
+  // re-selecting the text tool and clicking it) instead of being lost.
+  const prevToolRef = useRef(activeTool);
+  useEffect(() => {
+    if (prevToolRef.current === 'text' && activeTool !== 'text' && textStateRef.current) {
+      confirmText();
+    }
+    prevToolRef.current = activeTool;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool]);
 
   // ── Escape key ──────────────────────────────────────────────────────────────
@@ -1342,12 +1353,18 @@ export function PreviewCanvas({
     if (!textState) return;
     const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
     const fillBlock = textState.fillBlock ?? paintBlock;
-    if (textState.value.trim() && fillBlock && fillBlock.baseId !== -1) {
-      // Create text-only transparent ImageData
+    const meta: TextLayerMeta = { ...textState };
+    const replaceActive = editingActiveRef.current;
+    const hasContent = !!textState.value.trim() && !!fillBlock && fillBlock.baseId !== -1;
+    if (hasContent || replaceActive) {
+      // Create text-only transparent ImageData (empty when there's no content)
       const textOnly = new ImageData(w, h);  // all transparent
-      stampTextBitmap(textOnly, scaledBitmap(textState), textState.px, textState.py, fillBlock, textState.strokeWidth, textState.strokeBlock, cp);
-      onTextCommitRef.current?.(textOnly, 'Текст');
+      if (hasContent) {
+        stampTextBitmap(textOnly, scaledBitmap(textState), textState.px, textState.py, fillBlock!, textState.strokeWidth, textState.strokeBlock, cp);
+      }
+      onTextCommitRef.current?.(textOnly, 'Текст', meta, replaceActive);
     }
+    editingActiveRef.current = false;
     setTextState(null);
     textBaseRef.current = null;
     canvasDragRef.current = null;
@@ -1359,6 +1376,7 @@ export function PreviewCanvas({
   }
 
   function cancelText() {
+    editingActiveRef.current = false;
     setTextState(null);
     textBaseRef.current = null;
     canvasDragRef.current = null;
@@ -1516,13 +1534,32 @@ export function PreviewCanvas({
             return;
           }
         }
-        // Click outside → confirm existing and create new
+        // Click outside the box → finalize the current text (stays on canvas, editable later)
         confirmText();
+        return;
       }
 
-      if (!paintBlock) return;
+      // Not currently editing. If the active layer is a text layer, clicking on
+      // its glyphs re-opens it for moving/editing.
+      if (activeLayerIsText && activeTextMeta && pos) {
+        const st: NonNullable<TextState> = { ...activeTextMeta };
+        textBmRef.current = null;
+        const scaled = scaledBitmap(st);
+        if (pos.px >= st.px && pos.px <= st.px + scaled.width && pos.py >= st.py && pos.py <= st.py + scaled.height) {
+          e.preventDefault();
+          editingActiveRef.current = true;
+          // A text layer holds only the text, so the edit backdrop is empty.
+          textBaseRef.current = new ImageData(width, height);
+          canvasDragRef.current = null;
+          textBmRef.current = null;
+          setTextState(st);
+          return;
+        }
+      }
+
       if (!pos) return;
-      // Create new text at click
+      // Create new text at click (no global block required — colour is picked in-panel)
+      editingActiveRef.current = false;
       textBaseRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       canvasDragRef.current = null;
       textBmRef.current = null;
