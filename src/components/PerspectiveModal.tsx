@@ -872,9 +872,8 @@ export function PerspectiveModal({
         controls.maxDistance = 20;
         controls.minPolarAngle = 0.35;
         controls.maxPolarAngle = 1.42;
-        // Keep the camera focused on the gallery without adding collision walls.
-        controls.minAzimuthAngle = -1.25;
-        controls.maxAzimuthAngle = 1.25;
+        controls.minAzimuthAngle = -Infinity;
+        controls.maxAzimuthAngle = Infinity;
 
         const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
         const target = new THREE.Vector3(...preset.target);
