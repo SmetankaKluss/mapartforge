@@ -21,7 +21,6 @@ import {
   type SceneLitematicAsset,
   type ScenePaletteEntry,
 } from '../lib/sceneLitematic';
-import { wikiTextureUrl } from '../lib/blockTexture';
 
 interface Props {
   imageData: ImageData | null;
@@ -56,55 +55,37 @@ const GALLERY_CAMERA_BOUNDS = {
   targetMax: new THREE.Vector3(0.5, 5.65, 3.2),
 };
 
-const TEXTURE_NAME_OVERRIDES: Record<string, string> = {
-  grass_block_top: 'Grass_Block_Top',
-  grass_block_side: 'Grass_Block_Side',
-  dirt: 'Dirt',
-  oak_planks: 'Oak_Planks',
-  white_concrete: 'White_Concrete',
-  black_concrete: 'Black_Concrete',
-  smooth_sandstone: 'Smooth_Sandstone',
-  gray_stained_glass_pane: 'Gray_Stained_Glass_Pane',
-  red_carpet: 'Red_Carpet',
-  dark_oak_planks: 'Dark_Oak_Planks',
-  spruce_planks: 'Spruce_Planks',
-  composter_side: 'Composter_Side',
-  composter_top: 'Composter_Top',
-  lectern_base: 'Lectern_Base',
-  lectern_front: 'Lectern_Front',
-  lectern_side: 'Lectern_Side',
-  cherry_leaves: 'Cherry_Leaves',
-};
+/** Base CDN URL for Minecraft 1.21.4 block textures (CORS-enabled, 16×16 PNGs). */
+const MC_ASSETS_CDN = 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/block/';
 
-const FALLBACK_TEXTURE_COLORS: Record<string, [string, string, string]> = {
-  grass_block_top: ['#5d9a3a', '#6fb148', '#44762f'],
-  grass_block_side: ['#7a5a33', '#5d9a3a', '#3f6d2b'],
-  dirt: ['#7a5436', '#8a6040', '#5f3e28'],
-  oak_planks: ['#a9834f', '#bd955d', '#725531'],
-  white_concrete: ['#d8d5cc', '#ebe7dc', '#bdb8ad'],
-  black_concrete: ['#171719', '#26262b', '#080809'],
-  smooth_sandstone: ['#c8b982', '#ddcf99', '#9f8f5f'],
-  gray_stained_glass_pane: ['#8d96a1', '#c0c8d1', '#5f6872'],
-  red_carpet: ['#a32322', '#c43632', '#691716'],
-  dark_oak_planks: ['#4a2f1c', '#604026', '#2f1e12'],
-  spruce_planks: ['#705234', '#8a6741', '#4c3722'],
-  composter_side: ['#5f4125', '#7d5a34', '#332312'],
-  composter_top: ['#4d341e', '#6b4a2a', '#26180c'],
-  lectern_base: ['#73512f', '#9b7140', '#3c2918'],
-  lectern_front: ['#8b6339', '#bd8d53', '#4a321d'],
-  lectern_side: ['#6b4a2b', '#9d7442', '#3f2b19'],
-  cherry_leaves: ['#bd6e86', '#d88aa0', '#7d4051'],
-};
+function cdnTextureUrl(blockTextureName: string): string {
+  return `${MC_ASSETS_CDN}${blockTextureName}.png`;
+}
 
-const LOCAL_ONLY_SCENE_TEXTURES = new Set([
-  'grass_block_top',
-  'grass_block_side',
-  'composter_side',
-  'composter_top',
-  'lectern_base',
-  'lectern_front',
-  'lectern_side',
-]);
+// Fallback solid colors used while CDN textures load (or if CDN fails)
+const FALLBACK_TEXTURE_COLORS: Record<string, number> = {
+  grass_block_top:        0x5d9a3a,
+  grass_block_side:       0x7a5a33,
+  dirt:                   0x7a5436,
+  oak_planks:             0xa9834f,
+  dark_oak_planks:        0x4a2f1c,
+  spruce_planks:          0x705234,
+  birch_planks:           0xd4c59a,
+  white_concrete:         0xe0ddd6,
+  black_concrete:         0x16181a,
+  smooth_sandstone:       0xcaba7e,
+  gray_stained_glass_pane:0x8d96a1,
+  red_carpet:             0xa32322,
+  composter_side:         0x5f4125,
+  composter_top:          0x4d341e,
+  lectern_base:           0x73512f,
+  lectern_front:          0x8b6339,
+  lectern_side:           0x6b4a2b,
+  cherry_leaves:          0xbd6e86,
+  netherrack:             0x772b2b,
+  nether_bricks:          0x2e1111,
+  stone_bricks:           0x7d7d7d,
+};
 
 const SUPPORT_COLORS: Record<string, number> = {
   stone: 0x8d8d8d,
@@ -242,117 +223,46 @@ function makeTopProjectionGroup(
   return root;
 }
 
-function makeBlockTexture(kind: 'gallery-wall' | 'gallery-floor' | 'nether-wall' | 'nether-floor' | 'house-wall' | 'house-floor') {
-  const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
+// Block textures for room environment surfaces (walls, floors, ceilings)
+const ROOM_ENV_TEXTURES = {
+  'gallery-wall':    { wall: 'white_concrete',  floor: 'dark_oak_planks' },
+  'nether-corridor': { wall: 'netherrack',       floor: 'nether_bricks'   },
+  'house-interior':  { wall: 'birch_planks',     floor: 'spruce_planks'   },
+} as const;
 
-  const fill = (base: string, accent: string, line: string, noisy = false) => {
-    ctx.fillStyle = base;
-    ctx.fillRect(0, 0, 32, 32);
-    for (let y = 0; y < 32; y += 8) {
-      for (let x = 0; x < 32; x += 8) {
-        ctx.fillStyle = ((x + y) / 8) % 2 === 0 ? accent : base;
-        ctx.fillRect(x, y, 8, 8);
-        if (noisy) {
-          ctx.fillStyle = line;
-          ctx.fillRect(x + 2, y + 1, 2, 2);
-          ctx.fillRect(x + 5, y + 5, 1, 1);
-        }
-      }
-    }
-    ctx.strokeStyle = line;
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 32; i += 8) {
-      ctx.beginPath();
-      ctx.moveTo(i + 0.5, 0);
-      ctx.lineTo(i + 0.5, 32);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i + 0.5);
-      ctx.lineTo(32, i + 0.5);
-      ctx.stroke();
-    }
-  };
-
-  switch (kind) {
-    case 'gallery-wall': fill('#b8ae9a', '#c6bba5', '#908773'); break;
-    case 'gallery-floor': fill('#7f5c37', '#936d44', '#5b4125'); break;
-    case 'nether-wall': fill('#6a2f2b', '#7c3c34', '#4b1e1c', true); break;
-    case 'nether-floor': fill('#3d2b2f', '#4c3438', '#211518', true); break;
-    case 'house-wall': fill('#d8ceb8', '#e4dbc8', '#ac9d83'); break;
-    case 'house-floor': fill('#9e6d3e', '#b57f49', '#734c29'); break;
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1, 1);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+/**
+ * Create a material for a room surface that loads a real block texture from the CDN.
+ * repeatU/repeatV should equal the number of block tiles on the face (1 tile = 1 block unit).
+ */
+function makeRoomSurfaceMaterial(blockName: string, repeatU: number, repeatV: number): THREE.MeshLambertMaterial {
+  const mat = new THREE.MeshLambertMaterial({
+    color: FALLBACK_TEXTURE_COLORS[blockName] ?? 0x888888,
+  });
+  new THREE.TextureLoader()
+    .setCrossOrigin('anonymous')
+    .load(
+      cdnTextureUrl(blockName),
+      tex => {
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(Math.max(1, Math.round(repeatU)), Math.max(1, Math.round(repeatV)));
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.needsUpdate = true;
+        mat.color.set(0xffffff);
+        mat.map = tex;
+        mat.needsUpdate = true;
+        renderRefGlobal?.();
+      },
+    );
+  return mat;
 }
 
-function textureFileUrl(textureName: string) {
-  const override = TEXTURE_NAME_OVERRIDES[textureName];
-  if (override) return `https://minecraft.wiki/w/Special:FilePath/${override}.png`;
-  return wikiTextureUrl(textureName);
+function textureFileUrl(textureName: string): string {
+  return cdnTextureUrl(textureName);
 }
 
-function makeFallbackBlockTexture(textureName: string) {
-  const colors = FALLBACK_TEXTURE_COLORS[textureName] ?? ['#8d8578', '#a49b8d', '#5d574f'];
-  const canvas = document.createElement('canvas');
-  canvas.width = 16;
-  canvas.height = 16;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.fillStyle = colors[0];
-  ctx.fillRect(0, 0, 16, 16);
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
-      const hash = (x * 37 + y * 53 + textureName.length * 11) % 17;
-      if (hash < 4) {
-        ctx.fillStyle = hash % 2 === 0 ? colors[1] : colors[2];
-        ctx.fillRect(x, y, 1, 1);
-      }
-    }
-  }
-
-  if (textureName.includes('planks') || textureName.includes('lectern') || textureName.includes('composter')) {
-    ctx.strokeStyle = colors[2];
-    ctx.globalAlpha = 0.7;
-    for (let y = 4; y < 16; y += 4) {
-      ctx.beginPath();
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(16, y + 0.5);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  if (textureName.includes('glass')) {
-    ctx.clearRect(0, 0, 16, 16);
-    ctx.fillStyle = 'rgba(154, 172, 190, 0.45)';
-    ctx.fillRect(0, 0, 16, 16);
-    ctx.strokeStyle = 'rgba(220, 235, 255, 0.95)';
-    ctx.strokeRect(1.5, 1.5, 13, 13);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillRect(4, 3, 2, 9);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  return texture;
-}
 
 function makeTextureMaterial(
   textureName: string,
@@ -364,43 +274,9 @@ function makeTextureMaterial(
   const cached = materialCache.get(key);
   if (cached) return cached;
 
-  let texture = textureCache.get(textureName);
-  if (!texture) {
-    const fallbackTexture = makeFallbackBlockTexture(textureName) ?? new THREE.Texture();
-    texture = fallbackTexture;
-    textureCache.set(textureName, texture);
-
-    if (!LOCAL_ONLY_SCENE_TEXTURES.has(textureName)) {
-      new THREE.TextureLoader()
-        .setCrossOrigin('anonymous')
-        .load(
-          textureFileUrl(textureName),
-          loadedTexture => {
-            loadedTexture.magFilter = THREE.NearestFilter;
-            loadedTexture.minFilter = THREE.NearestFilter;
-            loadedTexture.wrapS = THREE.RepeatWrapping;
-            loadedTexture.wrapT = THREE.RepeatWrapping;
-            loadedTexture.colorSpace = THREE.SRGBColorSpace;
-            textureCache.set(textureName, loadedTexture);
-            fallbackTexture.dispose();
-            materialCache.forEach(material => {
-              if (material instanceof THREE.MeshLambertMaterial && material.userData.textureName === textureName) {
-                material.map = loadedTexture;
-                material.needsUpdate = true;
-              }
-            });
-            renderRefGlobal?.();
-          },
-          undefined,
-          () => {
-            // Keep the generated pixel fallback if the external texture cannot load.
-          },
-        );
-    }
-  }
-
+  // Start with a solid-color fallback while the real texture loads over the network
   const material = new THREE.MeshLambertMaterial({
-    map: texture,
+    color: FALLBACK_TEXTURE_COLORS[textureName] ?? 0x8d8578,
     transparent: Boolean(options.transparent),
     opacity: options.opacity ?? 1,
     alphaTest: options.transparent ? 0.08 : 0,
@@ -408,6 +284,37 @@ function makeTextureMaterial(
   });
   material.userData.textureName = textureName;
   materialCache.set(key, material);
+
+  let cachedTexture = textureCache.get(textureName);
+  if (!cachedTexture) {
+    new THREE.TextureLoader()
+      .setCrossOrigin('anonymous')
+      .load(
+        textureFileUrl(textureName),
+        loadedTexture => {
+          loadedTexture.magFilter = THREE.NearestFilter;
+          loadedTexture.minFilter = THREE.NearestFilter;
+          loadedTexture.wrapS = THREE.RepeatWrapping;
+          loadedTexture.wrapT = THREE.RepeatWrapping;
+          loadedTexture.colorSpace = THREE.SRGBColorSpace;
+          textureCache.set(textureName, loadedTexture);
+          materialCache.forEach(mat => {
+            if (mat instanceof THREE.MeshLambertMaterial && mat.userData.textureName === textureName) {
+              mat.color.set(0xffffff);
+              mat.map = loadedTexture;
+              mat.needsUpdate = true;
+            }
+          });
+          renderRefGlobal?.();
+        },
+        undefined,
+        () => { /* keep fallback solid color on error */ },
+      );
+  } else {
+    material.color.set(0xffffff);
+    material.map = cachedTexture;
+  }
+
   return material;
 }
 
@@ -723,51 +630,70 @@ function getSceneAnchor(presetId: string, artSize: { width: number; height: numb
 }
 
 function addSceneEnvironment(scene: THREE.Scene, presetId: string, artMesh: THREE.Object3D, artSize: { width: number; height: number }) {
-  const roomWidth = Math.max(14, artSize.width + 4);
-  const roomHeight = Math.max(8, artSize.height + 2.2);
-  const corridorWidth = Math.max(8, artSize.width + 1.2);
+  const roomWidth    = Math.max(14, artSize.width + 4);
+  const roomHeight   = Math.max(8,  artSize.height + 2.2);
+  const corridorWidth  = Math.max(8, artSize.width + 1.2);
   const corridorHeight = Math.max(7, artSize.height + 1.8);
-  const houseSize = Math.max(14, artSize.width + 4, artSize.height + 4);
-  const blockMaterials = {
-    galleryWall: new THREE.MeshLambertMaterial({ map: makeBlockTexture('gallery-wall') ?? undefined }),
-    galleryFloor: new THREE.MeshLambertMaterial({ map: makeBlockTexture('gallery-floor') ?? undefined }),
-    netherWall: new THREE.MeshLambertMaterial({ map: makeBlockTexture('nether-wall') ?? undefined }),
-    netherFloor: new THREE.MeshLambertMaterial({ map: makeBlockTexture('nether-floor') ?? undefined }),
-    houseWall: new THREE.MeshLambertMaterial({ map: makeBlockTexture('house-wall') ?? undefined }),
-    houseFloor: new THREE.MeshLambertMaterial({ map: makeBlockTexture('house-floor') ?? undefined }),
-  };
+  const houseSize    = Math.max(14, artSize.width + 4, artSize.height + 4);
 
+  // Each surface gets its own material so texture tiling matches block size exactly.
+  // repeatU/V = number of 1×1 block tiles on that face dimension.
   switch (presetId) {
-    case 'gallery-wall':
-      addRoomBox(scene, [roomWidth, 0.8, 12], [0, -0.4, 0], blockMaterials.galleryFloor);
-      addRoomBox(scene, [roomWidth, roomHeight, 0.6], [0, roomHeight / 2 - 0.4, -4.8], blockMaterials.galleryWall);
-      addRoomBox(scene, [0.6, roomHeight, 12], [-roomWidth / 2 + 0.3, roomHeight / 2 - 0.4, 0], blockMaterials.galleryWall);
-      addRoomBox(scene, [0.6, roomHeight, 12], [roomWidth / 2 - 0.3, roomHeight / 2 - 0.4, 0], blockMaterials.galleryWall);
-      addRoomBox(scene, [roomWidth, 0.5, 0.4], [0, roomHeight - 0.8, -4.45], new THREE.MeshLambertMaterial({ color: 0x5c4d36 }));
+    case 'gallery-wall': {
+      const tex = ROOM_ENV_TEXTURES['gallery-wall'];
+      addRoomBox(scene, [roomWidth, 0.8, 12], [0, -0.4, 0],
+        makeRoomSurfaceMaterial(tex.floor, roomWidth, 12));
+      addRoomBox(scene, [roomWidth, roomHeight, 0.6], [0, roomHeight / 2 - 0.4, -4.8],
+        makeRoomSurfaceMaterial(tex.wall, roomWidth, roomHeight));
+      addRoomBox(scene, [0.6, roomHeight, 12], [-roomWidth / 2 + 0.3, roomHeight / 2 - 0.4, 0],
+        makeRoomSurfaceMaterial(tex.wall, 12, roomHeight));
+      addRoomBox(scene, [0.6, roomHeight, 12], [roomWidth / 2 - 0.3, roomHeight / 2 - 0.4, 0],
+        makeRoomSurfaceMaterial(tex.wall, 12, roomHeight));
+      addRoomBox(scene, [roomWidth, 0.5, 0.4], [0, roomHeight - 0.8, -4.45],
+        new THREE.MeshLambertMaterial({ color: 0x5c4d36 }));
       scene.add(artMesh);
       break;
-    case 'nether-corridor':
-      addRoomBox(scene, [corridorWidth, 0.8, 22], [0, -0.4, 0], blockMaterials.netherFloor);
-      addRoomBox(scene, [corridorWidth, 0.6, 22], [0, corridorHeight - 0.8, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [0.7, corridorHeight, 22], [-corridorWidth / 2 - 0.35, corridorHeight / 2 - 0.4, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [0.7, corridorHeight, 22], [corridorWidth / 2 + 0.35, corridorHeight / 2 - 0.4, 0], blockMaterials.netherWall);
-      addRoomBox(scene, [corridorWidth, corridorHeight, 0.8], [0, corridorHeight / 2 - 0.4, -9.8], blockMaterials.netherWall);
+    }
+    case 'nether-corridor': {
+      const tex = ROOM_ENV_TEXTURES['nether-corridor'];
+      addRoomBox(scene, [corridorWidth, 0.8, 22], [0, -0.4, 0],
+        makeRoomSurfaceMaterial(tex.floor, corridorWidth, 22));
+      addRoomBox(scene, [corridorWidth, 0.6, 22], [0, corridorHeight - 0.8, 0],
+        makeRoomSurfaceMaterial(tex.wall, corridorWidth, 22));
+      addRoomBox(scene, [0.7, corridorHeight, 22], [-corridorWidth / 2 - 0.35, corridorHeight / 2 - 0.4, 0],
+        makeRoomSurfaceMaterial(tex.wall, 22, corridorHeight));
+      addRoomBox(scene, [0.7, corridorHeight, 22], [corridorWidth / 2 + 0.35, corridorHeight / 2 - 0.4, 0],
+        makeRoomSurfaceMaterial(tex.wall, 22, corridorHeight));
+      addRoomBox(scene, [corridorWidth, corridorHeight, 0.8], [0, corridorHeight / 2 - 0.4, -9.8],
+        makeRoomSurfaceMaterial(tex.wall, corridorWidth, corridorHeight));
       for (let i = -8; i <= 8; i += 4) {
-        const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshLambertMaterial({ color: 0xe5a343, emissive: 0x8a4d12 }));
+        const lantern = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5, 0.5, 0.5),
+          new THREE.MeshLambertMaterial({ color: 0xe5a343, emissive: 0x8a4d12 }),
+        );
         lantern.position.set(0, corridorHeight - 1.5, i);
         scene.add(lantern);
       }
       scene.add(artMesh);
       break;
-    case 'house-interior':
-      addRoomBox(scene, [houseSize, 0.8, houseSize], [0, -0.4, 0], blockMaterials.houseFloor);
-      addRoomBox(scene, [houseSize, roomHeight, 0.7], [0, roomHeight / 2 - 0.4, -houseSize / 2 + 0.2], blockMaterials.houseWall);
-      addRoomBox(scene, [0.7, roomHeight, houseSize], [houseSize / 2 - 0.2, roomHeight / 2 - 0.4, 0], blockMaterials.houseWall);
-      addRoomBox(scene, [houseSize, 0.6, houseSize], [0, roomHeight - 0.4, 0], new THREE.MeshLambertMaterial({ color: 0x7d5934 }));
-      addRoomBox(scene, [2.4, 1.1, 1.2], [-3.8, 0.55, -2.2], new THREE.MeshLambertMaterial({ color: 0x6b533a }));
-      addRoomBox(scene, [2.1, 1.6, 0.9], [-3.8, 1.3, -1.4], new THREE.MeshLambertMaterial({ color: 0xb68d5b }));
+    }
+    case 'house-interior': {
+      const tex = ROOM_ENV_TEXTURES['house-interior'];
+      addRoomBox(scene, [houseSize, 0.8, houseSize], [0, -0.4, 0],
+        makeRoomSurfaceMaterial(tex.floor, houseSize, houseSize));
+      addRoomBox(scene, [houseSize, roomHeight, 0.7], [0, roomHeight / 2 - 0.4, -houseSize / 2 + 0.2],
+        makeRoomSurfaceMaterial(tex.wall, houseSize, roomHeight));
+      addRoomBox(scene, [0.7, roomHeight, houseSize], [houseSize / 2 - 0.2, roomHeight / 2 - 0.4, 0],
+        makeRoomSurfaceMaterial(tex.wall, houseSize, roomHeight));
+      addRoomBox(scene, [houseSize, 0.6, houseSize], [0, roomHeight - 0.4, 0],
+        new THREE.MeshLambertMaterial({ color: 0x7d5934 }));
+      addRoomBox(scene, [2.4, 1.1, 1.2], [-3.8, 0.55, -2.2],
+        new THREE.MeshLambertMaterial({ color: 0x6b533a }));
+      addRoomBox(scene, [2.1, 1.6, 0.9], [-3.8, 1.3, -1.4],
+        new THREE.MeshLambertMaterial({ color: 0xb68d5b }));
       scene.add(artMesh);
       break;
+    }
   }
 }
 
@@ -863,12 +789,13 @@ export function PerspectiveModal({
     controls.addEventListener('change', render);
     controlsRef.current = controls;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 1.05);
-    const key = new THREE.DirectionalLight(0xffffff, 1.2);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+    const hemi = new THREE.HemisphereLight(0xd4ecff, 0x5c3d1a, 0.45);
+    const key = new THREE.DirectionalLight(0xfff5e0, 1.3);
     key.position.set(8, 14, 12);
-    const fill = new THREE.DirectionalLight(0x87a6ff, 0.35);
+    const fill = new THREE.DirectionalLight(0x8ab4ff, 0.28);
     fill.position.set(-10, 8, 6);
-    scene.add(ambient, key, fill);
+    scene.add(ambient, hemi, key, fill);
 
     const resize = () => {
       const { clientWidth, clientHeight } = mount;
