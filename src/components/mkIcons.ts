@@ -21,6 +21,7 @@ import tablerGridDots from '@iconify-icons/tabler/grid-dots';
 import tablerHelp from '@iconify-icons/tabler/help-hexagon';
 import tablerKeyboard from '@iconify-icons/tabler/keyboard';
 import tablerLasso from '@iconify-icons/tabler/lasso';
+import tablerLetterT from '@iconify-icons/tabler/letter-t';
 import tablerMap from '@iconify-icons/tabler/map';
 import tablerPackage from '@iconify-icons/tabler/package';
 import tablerPalette from '@iconify-icons/tabler/palette';
@@ -84,6 +85,7 @@ export const mkIcons = {
   settings: tablerSettings,
   share: tablerShare,
   support: pixelHeart,
+  text: tablerLetterT,
   tourAdvanced: tablerStar,
   trash: tablerTrash,
   upload: tablerUpload,

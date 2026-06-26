@@ -536,6 +536,7 @@ export default function App() {
         case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
+        case 'KeyT': if (editorMode === 'artist') setActiveTool(t => t === 'text' ? null : 'text'); break;
         case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
         case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
         case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
@@ -2018,7 +2019,12 @@ export default function App() {
                   <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
                     <IconGlyph icon={mkIcons.eraser} />
                   </button>
-                  {/* text and pattern tools hidden — work in progress */}
+                  {editorMode === 'artist' && (
+                    <button className={`tool-btn${activeTool === 'text' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'text' ? null : 'text')} title={t('Текст (T)', 'Text (T)')}>
+                      <IconGlyph icon={mkIcons.text} />
+                    </button>
+                  )}
+                  {/* pattern tool hidden — work in progress */}
                 </div>
 
                 {/* Brush size — hidden in pattern stamp mode (size = pattern dimensions) */}
