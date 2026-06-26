@@ -12,6 +12,7 @@ import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
 import { TEXT_FONTS, type PaintTool, type PaintBlock } from './previewCanvasShared';
+import { renderTextBitmap, scaleMask, dilateMask, type TextBitmap, type TextAlign } from '../lib/textRender';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
@@ -53,6 +54,11 @@ type CanvasDrag = {
 type TextState = {
   px: number; py: number;
   value: string; font: string; size: number;
+  bold: boolean; italic: boolean;
+  align: TextAlign;
+  lineHeight: number; letterSpacing: number;
+  smooth: boolean;
+  fillBlock: PaintBlock | null;   // text colour; null = follow active block
   strokeWidth: number; strokeBlock: PaintBlock | null;
   scaleX: number; scaleY: number;
 } | null;
@@ -215,70 +221,37 @@ function paintPatternBrush(
   }
 }
 
-/** Returns unscaled text canvas dimensions. */
-function getTextBaseSize(text: string, size: number) {
-  const fs = Math.max(4, size);
-  return {
-    baseW: Math.ceil(fs * (text || ' ').length * 0.75) + fs * 2,
-    baseH: Math.ceil(fs * 1.6),
-  };
-}
-
-/** Render text onto buf at (originX, originY) using the active paintBlock color, with optional stroke and scale. */
-function stampText(
-  buf: ImageData, text: string, originX: number, originY: number,
-  textSize: number, font: string, paintBlock: PaintBlock,
-  strokeWidth: number, strokeBlock: PaintBlock | null,
-  scaleX: number, scaleY: number,
+/** Paint a pre-rendered text coverage bitmap into `buf`, mapping coverage to palette blocks. */
+function stampTextBitmap(
+  buf: ImageData, bm: TextBitmap, originX: number, originY: number,
+  fillBlock: PaintBlock, strokeWidth: number, strokeBlock: PaintBlock | null,
   cp: ComputedPalette,
 ): void {
-  if (!getTargetColor(paintBlock.shade, paintBlock.baseId, cp) && paintBlock.baseId !== -1) return;
-  const tc2d = document.createElement('canvas');
-  const fontSize = Math.max(4, textSize);
-  tc2d.width  = Math.ceil(fontSize * text.length * 0.75) + fontSize * 2;
-  tc2d.height = Math.ceil(fontSize * 1.6);
-  const ctx = tc2d.getContext('2d')!;
-  ctx.clearRect(0, 0, tc2d.width, tc2d.height);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${fontSize}px ${font}`;
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, 0, 0);
-  // Apply scale
-  const scaledW = Math.max(1, Math.round(tc2d.width * scaleX));
-  const scaledH = Math.max(1, Math.round(tc2d.height * scaleY));
-  const scaled = document.createElement('canvas');
-  scaled.width = scaledW; scaled.height = scaledH;
-  const scaledCtx = scaled.getContext('2d')!;
-  scaledCtx.imageSmoothingEnabled = false;
-  scaledCtx.drawImage(tc2d, 0, 0, scaledW, scaledH);
-  const src = scaled.getContext('2d')!.getImageData(0, 0, scaledW, scaledH);
+  const { fill, width: w, height: h } = bm;
+  if (w === 0 || h === 0) return;
 
-  // First pass: stroke dilation
-  const sw = Math.round(strokeWidth);
-  if (sw > 0 && strokeBlock && strokeBlock.baseId !== -1) {
-    for (let sy = 0; sy < src.height; sy++) {
-      for (let sx = 0; sx < src.width; sx++) {
-        if (src.data[(sy * src.width + sx) * 4 + 3] < 64) continue;
-        for (let dy = -sw; dy <= sw; dy++) {
-          for (let dx = -sw; dx <= sw; dx++) {
-            if (dx * dx + dy * dy > sw * sw) continue;
-            const bx = originX + sx + dx, by = originY + sy + dy;
-            if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
-            paintPixelInBuffer(buf, bx, by, strokeBlock.baseId, strokeBlock.shade, cp);
-          }
-        }
+  // Outline pass: dilate glyph coverage, paint only the ring outside the glyph.
+  if (strokeWidth > 0 && strokeBlock && strokeBlock.baseId !== -1) {
+    const dil = dilateMask(fill, w, h, strokeWidth);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = y * w + x;
+        if (!dil[idx] || fill[idx]) continue;
+        const bx = originX + x, by = originY + y;
+        if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
+        paintPixelInBuffer(buf, bx, by, strokeBlock.baseId, strokeBlock.shade, cp);
       }
     }
   }
 
-  // Second pass: text pixels on top
-  for (let sy = 0; sy < src.height; sy++) {
-    for (let sx = 0; sx < src.width; sx++) {
-      if (src.data[(sy * src.width + sx) * 4 + 3] < 64) continue;
-      const bx = originX + sx, by = originY + sy;
+  // Glyph fill pass on top.
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!fill[y * w + x]) continue;
+      const bx = originX + x, by = originY + y;
       if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
-      if (paintBlock.baseId === -1) erasePixelInBuffer(buf, bx, by);
-      else paintPixelInBuffer(buf, bx, by, paintBlock.baseId, paintBlock.shade, cp);
+      if (fillBlock.baseId === -1) erasePixelInBuffer(buf, bx, by);
+      else paintPixelInBuffer(buf, bx, by, fillBlock.baseId, fillBlock.shade, cp);
     }
   }
 }
@@ -563,6 +536,7 @@ export function PreviewCanvas({
   // Text tool state
   const [textState, setTextState] = useState<TextState>(null);
   const [showStrokePicker, setShowStrokePicker] = useState(false);
+  const [showFillPicker, setShowFillPicker] = useState(false);
   const [textCursor, setTextCursor] = useState<string | null>(null);
   const textStateRef    = useRef<TextState>(null);
   textStateRef.current  = textState;
@@ -571,6 +545,22 @@ export function PreviewCanvas({
   const textBaseRef     = useRef<ImageData | null>(null);
   // canvasDrag lives in a ref (not state) — avoids React commit-timing issues during drag
   const canvasDragRef   = useRef<CanvasDrag | null>(null);
+
+  // Cached glyph bitmap — recomputed only when style/value changes, not on move/scale.
+  const textBmRef = useRef<{ sig: string; bm: TextBitmap } | null>(null);
+  function baseBitmap(st: NonNullable<TextState>): TextBitmap {
+    const sig = [st.value, st.font, st.size, st.bold, st.italic, st.align, st.lineHeight, st.letterSpacing, st.smooth].join('|');
+    if (!textBmRef.current || textBmRef.current.sig !== sig) {
+      textBmRef.current = { sig, bm: renderTextBitmap(st.value || ' ', {
+        font: st.font, size: st.size, bold: st.bold, italic: st.italic,
+        align: st.align, lineHeight: st.lineHeight, letterSpacing: st.letterSpacing, smooth: st.smooth,
+      }) };
+    }
+    return textBmRef.current.bm;
+  }
+  function scaledBitmap(st: NonNullable<TextState>): TextBitmap {
+    return scaleMask(baseBitmap(st), st.scaleX, st.scaleY);
+  }
 
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
@@ -684,18 +674,19 @@ export function PreviewCanvas({
     const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
 
     if (!textState || !textBaseRef.current) return;
+    const fillBlock = textState.fillBlock ?? paintBlock;
 
     const preview = new ImageData(new Uint8ClampedArray(textBaseRef.current.data), textBaseRef.current.width, textBaseRef.current.height);
-    if (textState.value.trim() && paintBlock && paintBlock.baseId !== -1) {
-      stampText(preview, textState.value, textState.px, textState.py, textState.size, textState.font, paintBlock, textState.strokeWidth, textState.strokeBlock, textState.scaleX, textState.scaleY, cp);
+    const bm = scaledBitmap(textState);
+    if (textState.value.trim() && fillBlock && fillBlock.baseId !== -1) {
+      stampTextBitmap(preview, bm, textState.px, textState.py, fillBlock, textState.strokeWidth, textState.strokeBlock, cp);
     }
     drawImageData(canvas, preview, w, h, s, sg);
 
     // Draw selection box on top of the canvas
     const ctx = canvas.getContext('2d')!;
-    const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
-    const sw = Math.max(1, Math.round(bw * textState.scaleX));
-    const sh = Math.max(1, Math.round(bh * textState.scaleY));
+    const sw = bm.width;
+    const sh = bm.height;
     const x1 = textState.px * s, y1 = textState.py * s;
     const x2 = x1 + sw * s,     y2 = y1 + sh * s;
     ctx.save();
@@ -1350,10 +1341,11 @@ export function PreviewCanvas({
   function confirmText() {
     if (!textState) return;
     const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
-    if (textState.value.trim() && paintBlock && paintBlock.baseId !== -1) {
+    const fillBlock = textState.fillBlock ?? paintBlock;
+    if (textState.value.trim() && fillBlock && fillBlock.baseId !== -1) {
       // Create text-only transparent ImageData
       const textOnly = new ImageData(w, h);  // all transparent
-      stampText(textOnly, textState.value, textState.px, textState.py, textState.size, textState.font, paintBlock, textState.strokeWidth, textState.strokeBlock, textState.scaleX, textState.scaleY, cp);
+      stampTextBitmap(textOnly, scaledBitmap(textState), textState.px, textState.py, fillBlock, textState.strokeWidth, textState.strokeBlock, cp);
       onTextCommitRef.current?.(textOnly, 'Текст');
     }
     setTextState(null);
@@ -1496,9 +1488,10 @@ export function PreviewCanvas({
       const pos = getPixelCoords(e);
 
       if (textState) {
-        const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
-        const sw = Math.max(1, Math.round(bw * textState.scaleX));
-        const sh = Math.max(1, Math.round(bh * textState.scaleY));
+        const base = baseBitmap(textState);
+        const scaled = scaleMask(base, textState.scaleX, textState.scaleY);
+        const bw = base.width, bh = base.height;
+        const sw = scaled.width, sh = scaled.height;
         const hs = Math.max(3, Math.round(9 / scale));  // handle size in canvas pixels
 
         // Corner hit test (scale handles)
@@ -1532,7 +1525,12 @@ export function PreviewCanvas({
       // Create new text at click
       textBaseRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       canvasDragRef.current = null;
-      setTextState({ px: pos.px, py: pos.py, value: '', font: 'monospace', size: textSize, strokeWidth: 0, strokeBlock: null, scaleX: 1, scaleY: 1 });
+      textBmRef.current = null;
+      setTextState({
+        px: pos.px, py: pos.py, value: '', font: 'monospace', size: textSize,
+        bold: false, italic: false, align: 'left', lineHeight: 1, letterSpacing: 0, smooth: false,
+        fillBlock: paintBlock, strokeWidth: 0, strokeBlock: null, scaleX: 1, scaleY: 1,
+      });
       return;
     }
 
@@ -1658,9 +1656,9 @@ export function PreviewCanvas({
         const rect = canvas.getBoundingClientRect();
         const px = (e.clientX - rect.left) / scale;
         const py = (e.clientY - rect.top)  / scale;
-        const { baseW: bw, baseH: bh } = getTextBaseSize(textState.value || ' ', textState.size);
-        const sw = Math.max(1, Math.round(bw * textState.scaleX));
-        const sh = Math.max(1, Math.round(bh * textState.scaleY));
+        const scaled = scaleMask(baseBitmap(textState), textState.scaleX, textState.scaleY);
+        const sw = scaled.width;
+        const sh = scaled.height;
         const hs = Math.max(3, 9 / scale);
         const corners: Array<[string, number, number]> = [
           ['nwse-resize', textState.px,      textState.py],
@@ -1950,64 +1948,110 @@ export function PreviewCanvas({
       })()}
 
       {/* ── Text toolbar (top-center bar, visible when textState active) ── */}
-      {textState !== null && activeTool === 'text' && (
+      {textState !== null && activeTool === 'text' && (() => {
+        const ts = textState;
+        const upd = (patch: Partial<NonNullable<TextState>>) => setTextState(s => s ? { ...s, ...patch } : s);
+        const fieldStyle: React.CSSProperties = { background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.75)', borderRadius: 4, fontSize: 12, padding: '2px 4px' };
+        const toggle = (active: boolean): React.CSSProperties => ({
+          background: active ? 'rgba(87,255,110,0.22)' : '#0d0d1a',
+          border: `1px solid rgba(87,255,110,${active ? 0.6 : 0.3})`,
+          color: `rgba(87,255,110,${active ? 0.95 : 0.55})`,
+          borderRadius: 4, fontSize: 12, fontWeight: 700, lineHeight: 1,
+          padding: '3px 7px', cursor: 'pointer', minWidth: 26,
+        });
+        return (
         <div
           className="text-toolbar"
-          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', gap: 6, alignItems: 'center', background: '#1a1a2e', border: '1px solid rgba(87,255,110,0.4)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}
+          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', maxWidth: '94vw', background: '#1a1a2e', border: '1px solid rgba(87,255,110,0.4)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}
           onMouseDown={e => e.stopPropagation()}
         >
-          {/* Text input */}
-          <input
+          {/* Text input (multi-line: Shift+Enter) */}
+          <textarea
             className="text-toolbar-input"
             autoFocus
-            value={textState.value}
-            onChange={e => setTextState(s => s ? { ...s, value: e.target.value } : s)}
+            rows={1}
+            value={ts.value}
+            onChange={e => upd({ value: e.target.value })}
             onKeyDown={e => {
               if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmText(); }
             }}
-            placeholder="Введи текст…"
-            style={{ background: 'transparent', border: 'none', outline: 'none', color: 'rgba(87,255,110,0.9)', fontFamily: textState.font, fontSize: 13, minWidth: 120 }}
+            placeholder="Текст… (Shift+Enter — новая строка)"
+            style={{ background: 'transparent', border: '1px solid rgba(87,255,110,0.2)', borderRadius: 4, outline: 'none', color: 'rgba(87,255,110,0.9)', fontFamily: ts.font, fontSize: 13, minWidth: 150, maxWidth: 260, resize: 'none', lineHeight: 1.3, padding: '3px 6px' }}
           />
           {/* Font selector */}
-          <select
-            value={textState.font}
-            onChange={e => setTextState(s => s ? { ...s, font: e.target.value } : s)}
-            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, padding: '2px 4px' }}
-          >
+          <select value={ts.font} onChange={e => upd({ font: e.target.value })} title="Шрифт" style={fieldStyle}>
             {TEXT_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
           {/* Size */}
-          <input type="number" min={4} max={64} value={textState.size}
-            onChange={e => setTextState(s => s ? { ...s, size: Math.max(4, Math.min(64, +e.target.value)) } : s)}
-            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, width: 48, textAlign: 'center', padding: '2px 4px' }}
+          <input type="number" min={4} max={128} value={ts.size} title="Размер"
+            onChange={e => upd({ size: Math.max(4, Math.min(128, +e.target.value)) })}
+            style={{ ...fieldStyle, width: 50, textAlign: 'center' }}
           />
+          {/* Bold / Italic */}
+          <button title="Жирный" style={{ ...toggle(ts.bold), fontStyle: 'normal' }} onClick={() => upd({ bold: !ts.bold })}>B</button>
+          <button title="Курсив" style={{ ...toggle(ts.italic), fontStyle: 'italic' }} onClick={() => upd({ italic: !ts.italic })}>I</button>
+          {/* Alignment */}
+          <div style={{ display: 'flex', gap: 2 }}>
+            <button title="По левому краю" style={toggle(ts.align === 'left')} onClick={() => upd({ align: 'left' })}>⯇</button>
+            <button title="По центру" style={toggle(ts.align === 'center')} onClick={() => upd({ align: 'center' })}>≡</button>
+            <button title="По правому краю" style={toggle(ts.align === 'right')} onClick={() => upd({ align: 'right' })}>⯈</button>
+          </div>
+          {/* Line height */}
+          <input type="number" min={0.6} max={3} step={0.1} value={ts.lineHeight} title="Межстрочный интервал"
+            onChange={e => upd({ lineHeight: Math.max(0.6, Math.min(3, +e.target.value)) })}
+            style={{ ...fieldStyle, width: 46, textAlign: 'center' }}
+          />
+          {/* Letter spacing */}
+          <input type="number" min={-4} max={16} step={1} value={ts.letterSpacing} title="Межбуквенный интервал"
+            onChange={e => upd({ letterSpacing: Math.max(-4, Math.min(16, +e.target.value)) })}
+            style={{ ...fieldStyle, width: 46, textAlign: 'center' }}
+          />
+          {/* Smooth edges toggle */}
+          <button title="Сглаживание краёв" style={toggle(ts.smooth)} onClick={() => upd({ smooth: !ts.smooth })}>AA</button>
+          {/* Fill colour picker */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontSize: 11, color: 'rgba(87,255,110,0.5)' }}>Цвет</span>
+            {(ts.fillBlock ?? paintBlock)
+              ? <span className="paint-swatch-icon text-stroke-swatch"
+                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${(ts.fillBlock ?? paintBlock)!.blockId * 32}px -${(ts.fillBlock ?? paintBlock)!.csId * 32}px` }}
+                  title={(ts.fillBlock ?? paintBlock)!.displayName} onClick={() => setShowFillPicker(v => !v)} />
+              : <span className="paint-swatch-icon text-stroke-swatch text-stroke-swatch--none"
+                  title="Выбрать цвет текста" onClick={() => setShowFillPicker(v => !v)}>+</span>
+            }
+            {showFillPicker && (
+              <BlockPickerPopup blockSelection={blockSelection} current={ts.fillBlock ?? paintBlock}
+                onSelect={b => { upd({ fillBlock: b }); setShowFillPicker(false); }}
+                onClose={() => setShowFillPicker(false)} />
+            )}
+          </div>
           {/* Stroke width */}
-          <input type="number" min={0} max={4} value={textState.strokeWidth}
-            onChange={e => setTextState(s => s ? { ...s, strokeWidth: Math.max(0, Math.min(4, +e.target.value)) } : s)}
-            style={{ background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.7)', borderRadius: 4, fontSize: 12, width: 36, textAlign: 'center', padding: '2px 4px' }}
-            title="Обводка"
+          <input type="number" min={0} max={6} value={ts.strokeWidth} title="Толщина обводки"
+            onChange={e => upd({ strokeWidth: Math.max(0, Math.min(6, +e.target.value)) })}
+            style={{ ...fieldStyle, width: 40, textAlign: 'center' }}
           />
           {/* Stroke block picker */}
-          <div style={{ position: 'relative' }}>
-            {textState.strokeBlock
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontSize: 11, color: 'rgba(87,255,110,0.5)' }}>Обводка</span>
+            {ts.strokeBlock
               ? <span className="paint-swatch-icon text-stroke-swatch"
-                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${textState.strokeBlock.blockId * 32}px -${textState.strokeBlock.csId * 32}px` }}
-                  title={textState.strokeBlock.displayName} onClick={() => setShowStrokePicker(v => !v)} />
+                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${ts.strokeBlock.blockId * 32}px -${ts.strokeBlock.csId * 32}px` }}
+                  title={ts.strokeBlock.displayName} onClick={() => setShowStrokePicker(v => !v)} />
               : <span className="paint-swatch-icon text-stroke-swatch text-stroke-swatch--none"
                   title="Выбрать цвет обводки" onClick={() => setShowStrokePicker(v => !v)}>+</span>
             }
             {showStrokePicker && (
-              <BlockPickerPopup blockSelection={blockSelection} current={textState.strokeBlock}
-                onSelect={b => { setTextState(s => s ? { ...s, strokeBlock: b } : s); setShowStrokePicker(false); }}
+              <BlockPickerPopup blockSelection={blockSelection} current={ts.strokeBlock}
+                onSelect={b => { upd({ strokeBlock: b }); setShowStrokePicker(false); }}
                 onClose={() => setShowStrokePicker(false)} />
             )}
           </div>
           {/* Confirm / Cancel */}
-          <button onClick={confirmText} style={{ background: 'rgba(87,255,110,0.15)', border: '1px solid rgba(87,255,110,0.5)', color: 'rgba(87,255,110,0.9)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✓</button>
-          <button onClick={cancelText} style={{ background: 'rgba(60,60,60,0.3)', border: '1px solid rgba(120,120,120,0.3)', color: 'rgba(180,180,180,0.7)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
+          <button onClick={confirmText} title="Применить (Enter)" style={{ background: 'rgba(87,255,110,0.15)', border: '1px solid rgba(87,255,110,0.5)', color: 'rgba(87,255,110,0.9)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✓</button>
+          <button onClick={cancelText} title="Отмена (Esc)" style={{ background: 'rgba(60,60,60,0.3)', border: '1px solid rgba(120,120,120,0.3)', color: 'rgba(180,180,180,0.7)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
         </div>
-      )}
+        );
+      })()}
 
       {hoverInfo && !activeTool && (
         <div
