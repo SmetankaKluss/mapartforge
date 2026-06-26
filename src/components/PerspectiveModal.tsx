@@ -371,39 +371,36 @@ function collectCollidableMeshes(root: THREE.Object3D) {
 function clampSceneCameraToVisibleMeshes(
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
-  controls: OrbitControls,
+  previousPosition: THREE.Vector3,
   colliders: THREE.Object3D[],
-  collisionPadding = 0.24,
+  collisionPadding = 0.18,
 ) {
   scene.updateMatrixWorld(true);
   const meshes = colliders.flatMap(collectCollidableMeshes);
   if (meshes.length === 0) return false;
 
-  const offset = camera.position.clone().sub(controls.target);
-  const desiredDistance = offset.length();
-  if (desiredDistance <= 0.001) return false;
+  const movement = camera.position.clone().sub(previousPosition);
+  const movementDistance = movement.length();
+  if (movementDistance <= 0.0001) return false;
 
   const raycaster = new THREE.Raycaster(
-    controls.target.clone(),
-    offset.clone().normalize(),
-    0.01,
-    desiredDistance,
+    previousPosition.clone(),
+    movement.clone().normalize(),
+    0.001,
+    movementDistance,
   );
   const hit = raycaster.intersectObjects(meshes, false)[0];
   if (!hit) return false;
+  if (hit.distance >= movementDistance - 0.0001) return false;
 
-  const clampedDistance = Math.max(controls.minDistance, hit.distance - collisionPadding);
-  if (clampedDistance >= desiredDistance - 0.001) return false;
-
-  camera.position.copy(
-    controls.target.clone().add(offset.normalize().multiplyScalar(clampedDistance)),
-  );
+  const safeDistance = Math.max(0, hit.distance - collisionPadding);
+  camera.position.copy(previousPosition.clone().add(movement.normalize().multiplyScalar(safeDistance)));
   camera.updateMatrixWorld();
   return true;
 }
 
 function getReducedMaxDistance(baseMaxDistance: number) {
-  return Math.max(4, baseMaxDistance * 0.4);
+  return Math.max(6, baseMaxDistance * 0.6);
 }
 
 function makeFramedArtGroup(imageData: ImageData, artSize: { width: number; height: number }) {
@@ -940,16 +937,20 @@ export function PerspectiveModal({
         controls.update();
         let syncingCollision = false;
         const colliders = [sceneRoot, artGroup];
-        clampSceneCameraToVisibleMeshes(scene, camera, controls, colliders);
+        const lastSafeCameraPosition = camera.position.clone();
         const onCameraChange = () => {
           if (syncingCollision) {
             render();
             return;
           }
-          if (clampSceneCameraToVisibleMeshes(scene, camera, controls, colliders)) {
+          const previousPosition = lastSafeCameraPosition.clone();
+          if (clampSceneCameraToVisibleMeshes(scene, camera, previousPosition, colliders)) {
             syncingCollision = true;
             controls.update();
             syncingCollision = false;
+            lastSafeCameraPosition.copy(camera.position);
+          } else {
+            lastSafeCameraPosition.copy(camera.position);
           }
           render();
         };
@@ -986,16 +987,20 @@ export function PerspectiveModal({
       controls.update();
       let syncingCollision = false;
       const colliders = scene.children.filter(child => !child.type.includes('Light') && child !== grid);
-      clampSceneCameraToVisibleMeshes(scene, camera, controls, colliders);
+      const lastSafeCameraPosition = camera.position.clone();
       const onCameraChange = () => {
         if (syncingCollision) {
           render();
           return;
         }
-        if (clampSceneCameraToVisibleMeshes(scene, camera, controls, colliders)) {
+        const previousPosition = lastSafeCameraPosition.clone();
+        if (clampSceneCameraToVisibleMeshes(scene, camera, previousPosition, colliders)) {
           syncingCollision = true;
           controls.update();
           syncingCollision = false;
+          lastSafeCameraPosition.copy(camera.position);
+        } else {
+          lastSafeCameraPosition.copy(camera.position);
         }
         render();
       };
