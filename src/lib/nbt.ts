@@ -59,6 +59,15 @@ export class NbtWriter {
     this.push(data);
   }
 
+  tagIntArray(name: string, data: number[]) {
+    this.header(11, name);
+    this.i32(data.length);
+    const b = new Uint8Array(data.length * 4);
+    const dv = new DataView(b.buffer);
+    for (let i = 0; i < data.length; i++) dv.setInt32(i * 4, data[i], false);
+    this.push(b);
+  }
+
   tagLongArray(name: string, data: BigInt64Array) {
     this.header(12, name);
     this.i32(data.length);
@@ -120,4 +129,17 @@ export async function gzipBytes(data: Uint8Array): Promise<Uint8Array> {
   let off = 0;
   for (const c of chunks) { out.set(c, off); off += c.byteLength; }
   return out;
+}
+
+/** Encode a non-negative integer as an unsigned LEB128 varint (Sponge BlockData). */
+export function encodeVarint(value: number): number[] {
+  const bytes: number[] = [];
+  let v = value >>> 0;
+  do {
+    let b = v & 0x7f;
+    v >>>= 7;
+    if (v !== 0) b |= 0x80;
+    bytes.push(b);
+  } while (v !== 0);
+  return bytes;
 }

@@ -10,6 +10,8 @@ import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
+import { exportSchematic, exportSchematicZip, schematicVariantLabel } from '../lib/exportSchematic';
+import { exportStructureNbt, exportStructureNbtZip } from '../lib/exportStructureNbt';
 import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
 import { uploadDiagnosticCapture } from '../lib/diagnostics';
@@ -103,6 +105,8 @@ export function ExportPanel({
   const [busyLayer,    setBusyLayer]      = useState(false);
   const [busyZip,      setBusyZip]        = useState(false);
   const [busyShowcase, setBusyShowcase]   = useState(false);
+  const [busySchematic, setBusySchematic] = useState(false);
+  const [busyNbt,       setBusyNbt]       = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
@@ -320,6 +324,63 @@ export function ExportPanel({
     }
   }
 
+  async function handleSchematic() {
+    const src = compareMode ? compareData?.left ?? null : imageData;
+    if (!src) return;
+    trackExport('schematic');
+    const structure = mapMode === '3d' ? 'staircase' : 'flat';
+    setBusySchematic(true);
+    try {
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
+      if (isMultiMap) {
+        const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
+        await exportSchematicZip(src, activePalette, blockSelection, mapGrid, structure,
+          `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}.zip`,
+          supportForExport, supportMode, staircaseMode, minecraftVersion);
+      } else {
+        await exportSchematic(src, activePalette, blockSelection, 'MapartForge', structure,
+          supportForExport, supportMode, staircaseMode, minecraftVersion);
+      }
+      trackEvent('schematic_exported', {
+        map_mode: mapMode,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        mc_version: minecraftVersion,
+        platform_mode: platformMode,
+      });
+    } finally {
+      setBusySchematic(false);
+    }
+  }
+
+  async function handleNbt() {
+    const src = compareMode ? compareData?.left ?? null : imageData;
+    if (!src) return;
+    trackExport('nbt');
+    const structure = mapMode === '3d' ? 'staircase' : 'flat';
+    setBusyNbt(true);
+    try {
+      const supportForExport = structure === 'staircase' ? supportBlock : 'air';
+      if (isMultiMap) {
+        const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
+        await exportStructureNbtZip(src, activePalette, blockSelection, mapGrid, structure,
+          `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}_nbt.zip`,
+          supportForExport, supportMode, staircaseMode);
+      } else {
+        await exportStructureNbt(src, activePalette, blockSelection, 'MapartForge', structure,
+          supportForExport, supportMode, staircaseMode);
+      }
+      trackEvent('nbt_exported', {
+        map_mode: mapMode,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        platform_mode: platformMode,
+      });
+    } finally {
+      setBusyNbt(false);
+    }
+  }
+
   async function handleGetLink() {
     const sourceData = compareMode ? compareData?.left ?? null : imageData;
     const preview = compareMode ? compareData?.left ?? null : (previewImageData ?? imageData);
@@ -352,7 +413,7 @@ export function ExportPanel({
   }
 
   const base        = disabled || !hasContent;
-  const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer;
+  const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer || busySchematic || busyNbt;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
   const isBedrock = platformMode === 'bedrock';
   const javaOnlyReason = t('Пока доступно только для Java Edition.', 'Currently available for Java Edition only.');
@@ -434,6 +495,26 @@ export function ExportPanel({
               <IconGlyph icon={mkIcons.download} /> {busyZip ? t('Архивирование…', 'Archiving…') : `ZIP (${mapGrid.wide * mapGrid.tall} ${t('карт', 'maps')})${isBedrock ? ' · Java' : ''}`}
             </button>
           )}
+
+          {/* .schematic export — auto-selects legacy (1.12.2) or Sponge v2 by MC version */}
+          <button
+            className="export-btn"
+            onClick={handleSchematic}
+            disabled={base || busyAnyLite || isBedrock}
+            title={isBedrock ? javaOnlyReason : t('Экспорт в .schematic (legacy MCEdit для 1.12.2, Sponge v2 для 1.13+)', 'Export to .schematic (legacy MCEdit for 1.12.2, Sponge v2 for 1.13+)')}
+          >
+            <IconGlyph icon={mkIcons.download} /> {busySchematic ? t('Сборка…', 'Building…') : `${schematicVariantLabel(minecraftVersion)}${isBedrock ? ' · Java' : ''}`}
+          </button>
+
+          {/* .nbt structure block export */}
+          <button
+            className="export-btn"
+            onClick={handleNbt}
+            disabled={base || busyAnyLite || isBedrock}
+            title={isBedrock ? javaOnlyReason : t('Экспорт в .nbt (формат структурного блока, 1.13+)', 'Export to .nbt (vanilla structure block format, 1.13+)')}
+          >
+            <IconGlyph icon={mkIcons.download} /> {busyNbt ? t('Сборка…', 'Building…') : `NBT STRUCTURE${isBedrock ? ' · Java' : ''}`}
+          </button>
 
         </div>
       )}

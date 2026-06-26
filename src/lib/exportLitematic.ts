@@ -238,7 +238,7 @@ function packBlockStates(indices: Uint32Array, paletteSize: number): BigInt64Arr
   return longs;
 }
 
-function triggerDownload(bytes: Uint8Array, filename: string) {
+export function triggerDownload(bytes: Uint8Array, filename: string) {
   const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
   const url  = URL.createObjectURL(blob);
   const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
@@ -247,7 +247,7 @@ function triggerDownload(bytes: Uint8Array, filename: string) {
 }
 
 /** Extract a 128×128 tile from a full ImageData (col/row in tile units). */
-function extractTile(src: ImageData, col: number, row: number): ImageData {
+export function extractTile(src: ImageData, col: number, row: number): ImageData {
   const tw = 128, th = 128;
   const out = new ImageData(tw, th);
   const ox = col * tw, oy = row * th;
@@ -264,17 +264,36 @@ function extractTile(src: ImageData, col: number, row: number): ImageData {
   return out;
 }
 
-/** Core builder: returns gzipped .litematic bytes for one tile. */
-export async function buildLitematicBytes(
+/** Universal block-volume intermediate shared by all export formats. */
+export interface BlockVolume {
+  sizeX: number;
+  sizeY: number;
+  /** Z dimension including the +1 noobline row (== litematic exportSizeZ). */
+  sizeZ: number;
+  /** Volume indices into `palette`; layout: y outer, then z, then x. */
+  indices: Uint32Array;
+  /** Block palette; index 0 is always 'minecraft:air'. */
+  palette: string[];
+}
+
+/** Resolve block-state Properties for a palette entry (axis / attach faces). */
+export function blockStateProperties(name: string): Record<string, string> | undefined {
+  const faceProps = BLOCK_FACE_PROPS[name];
+  const needsAxis = LOG_AXIS_X.has(name);
+  if (!faceProps && !needsAxis) return undefined;
+  return { ...(faceProps ?? {}), ...(needsAxis ? { axis: 'x' } : {}) };
+}
+
+/** Core builder: turns image + palette into the universal block volume. */
+export function buildBlockVolume(
   imageData:        ImageData,
   cp:               ComputedPalette,
   groups:           BlockSelection,
-  name:             string,
   structure:        'flat' | 'staircase',
   supportBlockNbt?: string,
   staircaseMode:    'classic' | 'optimized' = 'classic',
   supportMode:      SupportMode = 1,
-): Promise<Uint8Array> {
+): BlockVolume {
   const { data, width, height } = imageData;
   const lookup = buildLookup(cp);
 
@@ -481,10 +500,16 @@ export async function buildLitematicBytes(
     }
   }
 
-  // ── 4. Pack block states ──────────────────────────────────────────────
+  // ── 4. Done: return the universal volume ──────────────────────────────
+  return { sizeX, sizeY, sizeZ: exportSizeZ, indices, palette: blockPalette };
+}
+
+/** Write a Litematica .litematic (gzipped) from a block volume. */
+export async function writeLitematicNbt(vol: BlockVolume, name: string): Promise<Uint8Array> {
+  const { sizeX, sizeY, sizeZ: exportSizeZ, indices, palette: blockPalette } = vol;
+
   const packedStates = packBlockStates(indices, blockPalette.length);
 
-  // ── 5. Write NBT ──────────────────────────────────────────────────────
   const now = BigInt(Date.now());
   const w   = new NbtWriter();
 
@@ -523,12 +548,10 @@ export async function buildLitematicBytes(
         w.tagListStart('BlockStatePalette', 10, blockPalette.length);
         for (const id of blockPalette) {
           w.tagString('Name', id);
-          const faceProps = BLOCK_FACE_PROPS[id];
-          const needsAxis = LOG_AXIS_X.has(id);
-          if (faceProps || needsAxis) {
+          const props = blockStateProperties(id);
+          if (props) {
             w.tagCompoundStart('Properties');
-            if (faceProps) for (const [k, v] of Object.entries(faceProps)) w.tagString(k, v);
-            if (needsAxis) w.tagString('axis', 'x');
+            for (const [k, v] of Object.entries(props)) w.tagString(k, v);
             w.tagCompoundEnd();
           }
           w.tagCompoundEnd();
@@ -547,6 +570,21 @@ export async function buildLitematicBytes(
   w.tagCompoundEnd();
 
   return gzipBytes(w.toBytes());
+}
+
+/** Core builder: returns gzipped .litematic bytes for one tile. */
+export async function buildLitematicBytes(
+  imageData:        ImageData,
+  cp:               ComputedPalette,
+  groups:           BlockSelection,
+  name:             string,
+  structure:        'flat' | 'staircase',
+  supportBlockNbt?: string,
+  staircaseMode:    'classic' | 'optimized' = 'classic',
+  supportMode:      SupportMode = 1,
+): Promise<Uint8Array> {
+  const vol = buildBlockVolume(imageData, cp, groups, structure, supportBlockNbt, staircaseMode, supportMode);
+  return writeLitematicNbt(vol, name);
 }
 
 // ── Hybrid multi-layer export ────────────────────────────────────────────────
