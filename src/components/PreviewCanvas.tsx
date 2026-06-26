@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { MapCanvas } from './MapCanvas';
 import { drawImageData } from '../lib/drawImageData';
 import { type MagicWandMatchMode, type SelectionMask, maskFromRect, maskFromPolygon, maskFromMagicWand, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
@@ -1996,7 +1997,7 @@ export function PreviewCanvas({
           borderRadius: 4, fontSize: 12, fontWeight: 700, lineHeight: 1,
           padding: '3px 7px', cursor: 'pointer', minWidth: 26,
         });
-        return (
+        return createPortal(
         <div
           className="text-toolbar"
           style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', maxWidth: '94vw', background: '#1a1a2e', border: '1px solid rgba(87,255,110,0.4)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}
@@ -2087,7 +2088,7 @@ export function PreviewCanvas({
           <button onClick={confirmText} title="Применить (Enter)" style={{ background: 'rgba(87,255,110,0.15)', border: '1px solid rgba(87,255,110,0.5)', color: 'rgba(87,255,110,0.9)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✓</button>
           <button onClick={cancelText} title="Отмена (Esc)" style={{ background: 'rgba(60,60,60,0.3)', border: '1px solid rgba(120,120,120,0.3)', color: 'rgba(180,180,180,0.7)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
         </div>
-        );
+        , document.body);
       })()}
 
       {hoverInfo && !activeTool && (
