@@ -353,6 +353,43 @@ function addRoomBox(scene: THREE.Scene, size: [number, number, number], center: 
   return mesh;
 }
 
+function makeGalleryBoundaryShell(center: THREE.Vector3, mapGrid: MapGrid) {
+  const shell = new THREE.Group();
+  const roomWidth = Math.max(18, mapGrid.wide + 10);
+  const roomDepth = Math.max(18, mapGrid.tall + 12);
+  const roomHeight = Math.max(8.6, mapGrid.tall + 4);
+  const floorThickness = 0.8;
+  const wallThickness = 0.8;
+  const floorY = -floorThickness / 2;
+  const ceilingY = roomHeight - floorThickness / 2;
+  const wallY = roomHeight / 2 - floorThickness / 2;
+  const wallMaterial = makeRoomSurfaceMaterial('white_concrete', roomDepth, roomHeight);
+  const floorMaterial = makeRoomSurfaceMaterial('dark_oak_planks', roomWidth, roomDepth);
+
+  addBox(shell, [roomWidth, floorThickness, roomDepth], [center.x, floorY, center.z], floorMaterial);
+  addBox(shell, [roomWidth, floorThickness, roomDepth], [center.x, ceilingY, center.z], wallMaterial);
+  addBox(
+    shell,
+    [wallThickness, roomHeight, roomDepth],
+    [center.x - roomWidth / 2 + wallThickness / 2, wallY, center.z],
+    wallMaterial,
+  );
+  addBox(
+    shell,
+    [wallThickness, roomHeight, roomDepth],
+    [center.x + roomWidth / 2 - wallThickness / 2, wallY, center.z],
+    wallMaterial,
+  );
+  addBox(
+    shell,
+    [roomWidth, roomHeight, wallThickness],
+    [center.x, wallY, center.z + roomDepth / 2 - wallThickness / 2],
+    wallMaterial,
+  );
+
+  return shell;
+}
+
 function makeFramedArtGroup(imageData: ImageData, artSize: { width: number; height: number }) {
   const artTexture = imageDataToTexture(imageData);
   const artGroup = new THREE.Group();
@@ -467,7 +504,7 @@ function makeGalleryBlockMaterials(
   const name = entry.name.replace(/^minecraft:/, '');
   switch (name) {
     case 'grass_block':
-      return makeCubeMaterials('grass_block_side', 'grass_block_top', 'dirt', materialCache, textureCache);
+      return makeCubeMaterials('oak_planks', 'oak_planks', 'oak_planks', materialCache, textureCache);
     case 'gray_stained_glass_pane':
       return makeSolidSceneMaterial('gray_stained_glass_pane', materialCache, { color: 0xaeb7c3, transparent: true, opacity: 0.32 });
     case 'cherry_leaves':
@@ -858,9 +895,12 @@ export function PerspectiveModal({
           return;
         }
 
+        const gridCenter = getGalleryArtGridCenter(mapGrid, gallerySceneAsset.frame);
         const sceneRoot = makeGallerySceneGroup(gallerySceneAsset);
+        const boundaryShell = makeGalleryBoundaryShell(gridCenter, mapGrid);
         const { artGroup, dispose } = makeGalleryArtGrid(imageData, mapGrid, gallerySceneAsset.frame);
         scene.add(sceneRoot);
+        scene.add(boundaryShell);
         scene.add(artGroup);
 
         camera.fov = 58;
@@ -868,15 +908,14 @@ export function PerspectiveModal({
         controls.enableRotate = true;
         controls.enablePan = false;
         controls.minDistance = 3.2;
-        controls.maxDistance = 28;
-        controls.minPolarAngle = 0.28;
-        controls.maxPolarAngle = 1.52;
-        // Limit azimuth so camera can't orbit behind the art wall (~85° each side).
-        controls.minAzimuthAngle = -1.5;
-        controls.maxAzimuthAngle = 1.5;
+        controls.maxDistance = 20;
+        controls.minPolarAngle = 0.35;
+        controls.maxPolarAngle = 1.42;
+        // Keep camera inside the gallery shell.
+        controls.minAzimuthAngle = -1.25;
+        controls.maxAzimuthAngle = 1.25;
 
         const preset = sceneCameraPresets.find(cam => cam.id === effectiveSceneCameraId) ?? sceneCameraPresets[0];
-        const gridCenter = getGalleryArtGridCenter(mapGrid, gallerySceneAsset.frame);
         const target = new THREE.Vector3(...preset.target);
         target.lerp(gridCenter, 0.72);
         const position = new THREE.Vector3(...preset.position);
@@ -893,6 +932,7 @@ export function PerspectiveModal({
         return () => {
           controls.removeEventListener('change', onCameraChange);
           dispose();
+          disposeObject3DResources(boundaryShell);
           disposeObject3DResources(sceneRoot);
           disposeObject3DResources(artGroup);
         };
