@@ -10,7 +10,7 @@ import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
 import type { SupportMode, LayerExportInfo } from '../lib/exportLitematic';
-import { exportSchematic, exportSchematicZip, schematicVariantLabel } from '../lib/exportSchematic';
+import { exportSchematic, exportSchematicZip } from '../lib/exportSchematic';
 import { exportStructureNbt, exportStructureNbtZip } from '../lib/exportStructureNbt';
 import { uploadPermalink } from '../lib/share';
 import { downloadBlob, generateShowcaseImage } from '../lib/showcase';
@@ -503,7 +503,7 @@ export function ExportPanel({
             disabled={base || busyAnyLite || isBedrock}
             title={isBedrock ? javaOnlyReason : t('Экспорт в .schematic (legacy MCEdit для 1.12.2, Sponge v2 для 1.13+)', 'Export to .schematic (legacy MCEdit for 1.12.2, Sponge v2 for 1.13+)')}
           >
-            <IconGlyph icon={mkIcons.download} /> {busySchematic ? t('Сборка…', 'Building…') : `${schematicVariantLabel(minecraftVersion)}${isBedrock ? ' · Java' : ''}`}
+            <IconGlyph icon={mkIcons.download} /> {busySchematic ? t('Сборка…', 'Building…') : `SCHEMATIC${isBedrock ? ' · Java' : ''}`}
           </button>
 
           {/* .nbt structure block export */}
@@ -513,7 +513,7 @@ export function ExportPanel({
             disabled={base || busyAnyLite || isBedrock}
             title={isBedrock ? javaOnlyReason : t('Экспорт в .nbt (формат структурного блока, 1.13+)', 'Export to .nbt (vanilla structure block format, 1.13+)')}
           >
-            <IconGlyph icon={mkIcons.download} /> {busyNbt ? t('Сборка…', 'Building…') : `NBT STRUCTURE${isBedrock ? ' · Java' : ''}`}
+            <IconGlyph icon={mkIcons.download} /> {busyNbt ? t('Сборка…', 'Building…') : `NBT${isBedrock ? ' · Java' : ''}`}
           </button>
 
         </div>
