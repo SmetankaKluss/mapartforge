@@ -25,6 +25,9 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
     { key: 'brightness', label: t('Яркость', 'Brightness')      },
     { key: 'contrast',   label: t('Контраст', 'Contrast')        },
     { key: 'saturation', label: t('Насыщенность', 'Saturation') },
+    { key: 'red',        label: t('Красный', 'Red')              },
+    { key: 'green',      label: t('Зелёный', 'Green')            },
+    { key: 'blue',       label: t('Синий', 'Blue')               },
   ];
   const thumbRef = useRef<HTMLCanvasElement>(null);
 
@@ -60,14 +63,17 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
   }
 
   function reset() {
-    const zero = { brightness: 0, contrast: 0, saturation: 0 };
+    const zero: ImageAdjustments = { brightness: 0, contrast: 0, saturation: 0, red: 0, green: 0, blue: 0 };
     onChange(zero);
     onCommit(zero);
   }
 
   const isDefault = adjustments.brightness === 0
     && adjustments.contrast   === 0
-    && adjustments.saturation === 0;
+    && adjustments.saturation === 0
+    && (adjustments.red    ?? 0) === 0
+    && (adjustments.green  ?? 0) === 0
+    && (adjustments.blue   ?? 0) === 0;
 
   return (
     <section className={`control-group${disabled ? ' adj-disabled' : ''}`}>

@@ -2,6 +2,8 @@ import { PALETTE } from './palette';
 import type { PaletteColor } from './palette';
 import { rgbToOklab, oklabDistance } from './oklab';
 import type { Lab } from './oklab';
+import { colorCoordsInto, DEFAULT_COLOR_MATCH } from './colorMatch';
+import type { ColorMatchMode } from './colorMatch';
 
 export type DitheringMode =
   | 'none'
@@ -42,9 +44,15 @@ export interface ComputedPalette {
   colors:      PaletteColor[];
   labs:        Lab[];
   exactLookup: Map<number, number>; // (r<<16|g<<8|b) → palette index
+  matchMode:   ColorMatchMode;
+  /** Palette colours embedded in `matchMode` space, 3 floats per colour. */
+  coords:      Float64Array;
 }
 
-export function buildComputedPalette(colors: PaletteColor[]): ComputedPalette {
+export function buildComputedPalette(
+  colors: PaletteColor[],
+  matchMode: ColorMatchMode = DEFAULT_COLOR_MATCH,
+): ComputedPalette {
   const exactLookup = new Map<number, number>();
   colors.forEach((c, i) => {
     const key = (c.r << 16) | (c.g << 8) | c.b;
@@ -61,7 +69,15 @@ export function buildComputedPalette(colors: PaletteColor[]): ComputedPalette {
     const key = (pc.r << 16) | (pc.g << 8) | pc.b;
     if (!exactLookup.has(key)) exactLookup.set(key, idx);
   }
-  return { colors, labs: colors.map(c => rgbToOklab(c.r, c.g, c.b)), exactLookup };
+  const coords = new Float64Array(colors.length * 3);
+  const scratch = new Float64Array(3);
+  colors.forEach((c, i) => {
+    colorCoordsInto(c.r, c.g, c.b, matchMode, scratch);
+    coords[i * 3]     = scratch[0];
+    coords[i * 3 + 1] = scratch[1];
+    coords[i * 3 + 2] = scratch[2];
+  });
+  return { colors, labs: colors.map(c => rgbToOklab(c.r, c.g, c.b)), exactLookup, matchMode, coords };
 }
 
 /** Full default palette — pre-built once at module load. */
@@ -73,11 +89,41 @@ function clamp(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
 }
 
+const COORD_SCRATCH = new Float64Array(3);
+
 function findClosestColor(
   r: number, g: number, b: number,
   cp: ComputedPalette,
 ): { color: PaletteColor; index: number; dist: number } {
-  // Fast path: exact RGB match — no OKLab needed
+  // Fast path: exact RGB match — no colour-space conversion needed
+  const cr = clamp(r), cg = clamp(g), cb = clamp(b);
+  const exactIdx = cp.exactLookup.get((cr << 16) | (cg << 8) | cb);
+  if (exactIdx !== undefined) {
+    return { color: cp.colors[exactIdx], index: exactIdx, dist: 0 };
+  }
+  colorCoordsInto(cr, cg, cb, cp.matchMode, COORD_SCRATCH);
+  const px = COORD_SCRATCH[0], py = COORD_SCRATCH[1], pz = COORD_SCRATCH[2];
+  const coords = cp.coords;
+  let minDist = Infinity;
+  let bestIndex = 0;
+  for (let i = 0; i < cp.colors.length; i++) {
+    const dx = px - coords[i * 3];
+    const dy = py - coords[i * 3 + 1];
+    const dz = pz - coords[i * 3 + 2];
+    const d = dx * dx + dy * dy + dz * dz;
+    if (d < minDist) { minDist = d; bestIndex = i; }
+  }
+  return { color: cp.colors[bestIndex], index: bestIndex, dist: minDist };
+}
+
+/**
+ * OKLab-only nearest colour. Used by KlussDither, whose thresholds are tuned in
+ * OKLab units, so it must stay independent of the selected colour-match mode.
+ */
+function findClosestOklab(
+  r: number, g: number, b: number,
+  cp: ComputedPalette,
+): { color: PaletteColor; index: number; dist: number } {
   const cr = clamp(r), cg = clamp(g), cb = clamp(b);
   const exactIdx = cp.exactLookup.get((cr << 16) | (cg << 8) | cb);
   if (exactIdx !== undefined) {
@@ -676,7 +722,7 @@ async function applyKlussDither(
         qbS = Math.max(0, Math.min(255, Math.round(qbS + (ign(x + 439, y + 251) - 0.5) * jitter)));
       }
 
-      const { color, dist: bufDist } = findClosestColor(qrS, qgS, qbS, cp);
+      const { color, dist: bufDist } = findClosestOklab(qrS, qgS, qbS, cp);
 
       out[idx * 4]     = color.r;
       out[idx * 4 + 1] = color.g;

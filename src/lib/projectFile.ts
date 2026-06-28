@@ -106,7 +106,8 @@ export interface FullProjectSettings {
   dithering: string;
   intensity: number;
   blockSelection: Record<string, number[]>;
-  adjustments: { brightness: number; contrast: number; saturation: number };
+  adjustments: { brightness: number; contrast: number; saturation: number; red?: number; green?: number; blue?: number };
+  colorMatch?: import('./colorMatch').ColorMatchMode;
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;

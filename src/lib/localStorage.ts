@@ -3,6 +3,7 @@ import type { MapGrid } from './types';
 import { COLOUR_ROWS } from './paletteBlocks';
 import type { BlockSelection } from './paletteBlocks';
 import type { ImageAdjustments } from './adjustments';
+import type { ColorMatchMode } from './colorMatch';
 import type { PlatformMode } from './platformMode';
 
 export interface SavedSettings {
@@ -11,6 +12,7 @@ export interface SavedSettings {
   mapGrid: MapGrid;
   blockSelection: BlockSelection;
   adjustments: ImageAdjustments;
+  colorMatch?: ColorMatchMode;
   mapMode: '2d' | '3d';
   staircaseMode: 'classic' | 'optimized';
   bnScale: number;

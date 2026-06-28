@@ -747,6 +747,16 @@ input, select, textarea { outline: none; }
 .custom-grid-warn { color: var(--gold); }
 
 /* Dithering — terminal menu style */
+.colormatch-row { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px 10px; border-bottom: 1px solid var(--border); }
+.colormatch-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.colormatch-select {
+  width: 100%; padding: 6px 8px; font-size: 11px; font-family: inherit;
+  background: var(--bg-input, #14181c); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; cursor: pointer;
+}
+.colormatch-select:hover:not(:disabled) { border-color: var(--accent); }
+.colormatch-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.colormatch-hint { margin: 0; font-size: 9px; line-height: 1.35; color: var(--text-muted); }
 .dither-options { display: flex; flex-direction: column; padding: 0; }
 .dither-option {
   display: grid; grid-template-columns: 14px minmax(88px, 0.72fr) minmax(0, 1fr); align-items: flex-start; padding: 8px 12px; cursor: pointer;

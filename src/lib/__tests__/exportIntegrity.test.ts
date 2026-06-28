@@ -12,6 +12,8 @@ const computedPalette: ComputedPalette = {
     [(grass.r << 16) | (grass.g << 8) | grass.b, 0],
     [(sand.r << 16) | (sand.g << 8) | sand.b, 1],
   ]),
+  matchMode: 'oklab',
+  coords: new Float64Array(0),
 };
 
 const blockSelection: BlockSelection = {

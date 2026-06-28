@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { NumInput } from './NumInput';
 import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
+import type { ColorMatchMode } from '../lib/colorMatch';
+import { COLOR_MATCH_MODES } from '../lib/colorMatch';
 import { MAP_GRID_OPTIONS, MAP_BLOCK_SIZE } from '../lib/types';
 import type { MapGrid } from '../lib/types';
 import { trackEvent } from '../lib/analytics';
@@ -9,6 +11,8 @@ import { trackEvent } from '../lib/analytics';
 interface Props {
   dithering: DitheringMode;
   onDitheringChange: (mode: DitheringMode) => void;
+  colorMatch: ColorMatchMode;
+  onColorMatchChange: (mode: ColorMatchMode) => void;
   intensity: number;
   onIntensityChange: (v: number) => void;
   onIntensityCommit: (v: number) => void;
@@ -210,8 +214,18 @@ function GridIcon({ wide, tall }: { wide: number; tall: number }) {
   );
 }
 
+function colorMatchLabel(mode: ColorMatchMode, t: (ru: string, en: string) => string): string {
+  switch (mode) {
+    case 'oklab':  return t('OKLab (по умолчанию)', 'OKLab (default)');
+    case 'hct':    return t('HCT', 'HCT');
+    case 'cielab': return t('CIELAB', 'CIELAB');
+    case 'rgb':    return t('RGB', 'RGB');
+  }
+}
+
 export function Controls({
   dithering, onDitheringChange,
+  colorMatch, onColorMatchChange,
   intensity, onIntensityChange, onIntensityCommit,
   bnScale, onBnScaleChange,
   klussParams, onKlussParamsChange,
@@ -493,6 +507,24 @@ export function Controls({
           {t('Дизеринг', 'Dithering')}
         </h2>
         <div className={`control-group-content${collapsedSections['dithering'] ? ' collapsed' : ''}`}>
+        <div className="colormatch-row">
+          <label className="colormatch-label" htmlFor="colormatch-select">{t('Подбор цвета', 'Colour matching')}</label>
+          <select
+            id="colormatch-select"
+            className="colormatch-select"
+            value={colorMatch}
+            disabled={processing}
+            onChange={e => { const m = e.target.value as ColorMatchMode; trackEvent('color_match_changed', { color_match: m }); onColorMatchChange(m); }}
+          >
+            {COLOR_MATCH_MODES.map(mode => (
+              <option key={mode} value={mode}>{colorMatchLabel(mode, t)}</option>
+            ))}
+          </select>
+          <p className="colormatch-hint">
+            {t('Пространство, в котором ищется ближайший цвет блока. HCT и CIELAB — перцептивные; RGB — как в оригинальном MapartCraft. Влияет на режимы без авто-дизеринга.',
+               'Colour space used to find the nearest block colour. HCT and CIELAB are perceptual; RGB matches the original MapartCraft. Affects the standard (non-Kluss) modes.')}
+          </p>
+        </div>
         <div className="dither-options">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
             <label

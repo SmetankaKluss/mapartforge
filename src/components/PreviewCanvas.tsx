@@ -617,7 +617,7 @@ export function PreviewCanvas({
     activeTool: null, paintBlock: null,
     patternBlocks: [],
     scale: 1, width: 128, height: 128,
-    cp: { colors: [], labs: [], exactLookup: new Map() }, colorLookup: new Map(),
+    cp: { colors: [], labs: [], exactLookup: new Map(), matchMode: 'oklab', coords: new Float64Array(0) }, colorLookup: new Map(),
     brushSize: 1, showGrid: false,
     otherLayersData: null,
     selectionMask: null,

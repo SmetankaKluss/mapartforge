@@ -25,8 +25,10 @@ import type { MinecraftVersion } from './lib/versionPresets';
 import { getVersionLabel } from './lib/versionPresets';
 import { sanitizeSelectionForPlatform } from './lib/platformMode';
 import type { PlatformMode } from './lib/platformMode';
-import { DEFAULT_ADJUSTMENTS } from './lib/adjustments';
+import { DEFAULT_ADJUSTMENTS, normalizeAdjustments } from './lib/adjustments';
 import type { ImageAdjustments } from './lib/adjustments';
+import { DEFAULT_COLOR_MATCH, coerceColorMatchMode } from './lib/colorMatch';
+import type { ColorMatchMode } from './lib/colorMatch';
 import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
 import type { SavedSettings } from './lib/localStorage';
 import { loadShare } from './lib/share';
@@ -304,7 +306,8 @@ export default function App() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [showShadeWarnings, setShowShadeWarnings] = useState(false);
   const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
-  const [adjustments, setAdjustments]   = useState<ImageAdjustments>(saved.adjustments ?? DEFAULT_ADJUSTMENTS);
+  const [adjustments, setAdjustments]   = useState<ImageAdjustments>(normalizeAdjustments(saved.adjustments));
+  const [colorMatch, setColorMatch]     = useState<ColorMatchMode>(coerceColorMatchMode(saved.colorMatch ?? DEFAULT_COLOR_MATCH));
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showWiki, setShowWiki] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -449,6 +452,7 @@ export default function App() {
   useEffect(() => { saveSettings({ mapGrid }); }, [mapGrid]);
   useEffect(() => { saveSettings({ blockSelection }); }, [blockSelection]);
   useEffect(() => { saveSettings({ adjustments }); }, [adjustments]);
+  useEffect(() => { saveSettings({ colorMatch }); }, [colorMatch]);
   useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
   useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
   useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
@@ -564,9 +568,9 @@ export default function App() {
   const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
 
   const activePalette = useMemo<ComputedPalette>(
-    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion, platformMode)),
+    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion, platformMode), colorMatch),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [blockSelection, mapMode, minecraftVersion, platformMode],
+    [blockSelection, mapMode, minecraftVersion, platformMode, colorMatch],
   );
 
 
@@ -809,9 +813,9 @@ export default function App() {
     setUndoStack([]);
     setRedoStack([]);
     const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
-    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion, platformMode));
+    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
     runProcess(img, coerceDitheringMode(newConfig.dithering), mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
-  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, minecraftVersion, platformMode, mapGrid, compareMode, compareLeft, compareRight, runProcess]);
+  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, minecraftVersion, platformMode, colorMatch, mapGrid, compareMode, compareLeft, compareRight, runProcess]);
 
   const handleGifProjectConfigChange = useCallback((index: number, partial: Partial<GifFrameConfig>) => {
     setGifProject(prev => {
@@ -835,7 +839,7 @@ export default function App() {
       const frame = gifProject.frames[i];
       const cfg = gifProject.configs[i];
       const cfgShades = cfg.mapMode === '2d' ? [1] : [0, 1, 2];
-      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion, platformMode));
+      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
       const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
@@ -852,7 +856,7 @@ export default function App() {
     const a = Object.assign(document.createElement('a'), { href: url, download: 'gif_mapart.zip' });
     a.click();
     URL.revokeObjectURL(url);
-  }, [gifProject, minecraftVersion, platformMode, mapGrid]);
+  }, [gifProject, minecraftVersion, platformMode, colorMatch, mapGrid]);
 
   const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
     setShowCropModal(false);
@@ -1007,12 +1011,12 @@ export default function App() {
     pushToHistory();
     setBlockSelection(sel);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion, platformMode));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion, platformMode), colorMatch);
     if (sourceImage) {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion, platformMode, pushToHistory, runProcess]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
 
   const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
     trackEvent('map_mode_applied', { map_mode: mode });
@@ -1022,7 +1026,7 @@ export default function App() {
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
     }));
     const shades = mode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
     if (sourceImage && activeLayerHasContent(activeLayerRef)) {
       if (activeLayerRef.current?.isDirty) {
         const img = activeLayerRef.current.imageData;
@@ -1035,7 +1039,7 @@ export default function App() {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, runProcess]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, runProcess]);
 
   const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
     trackEvent('staircase_mode_applied', { staircase_mode: mode });
@@ -1045,6 +1049,17 @@ export default function App() {
       layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, staircaseMode: mode } : l),
     }));
   }, []);
+
+  const handleColorMatchChange = useCallback((mode: ColorMatchMode) => {
+    trackEvent('color_match_changed', { color_match: mode });
+    setColorMatch(mode);
+    if (sourceImage) {
+      const shades = mapMode === '2d' ? [1] : [0, 1, 2];
+      const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), mode);
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, mapMode, blockSelection, minecraftVersion, platformMode, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, runProcess]);
 
   const handleAdjChange = useCallback((adj: ImageAdjustments) => {
     setAdjustments(adj);
@@ -1088,12 +1103,12 @@ export default function App() {
     const next: BlockSelection = { ...blockSelection, [csId]: [] };
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades, minecraftVersion, platformMode));
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades, minecraftVersion, platformMode), colorMatch);
     if (sourceImage) {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, pushToHistory, runProcess]);
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
     pushToHistory();
@@ -1422,9 +1437,10 @@ export default function App() {
     setMapGrid({ wide: 1, tall: 1 });
     setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode));
     setAdjustments(DEFAULT_ADJUSTMENTS);
+    setColorMatch(DEFAULT_COLOR_MATCH);
     setMapMode('2d');
     if (sourceImage) {
-      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1], minecraftVersion, platformMode));
+      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1], minecraftVersion, platformMode), DEFAULT_COLOR_MATCH);
       runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
     }
   }, [sourceImage, compareMode, compareLeft, compareRight, minecraftVersion, platformMode, runProcess]);
@@ -1462,7 +1478,8 @@ export default function App() {
       if (s.bnScale != null)    setBnScale(s.bnScale);
       if (s.mapGrid)         setMapGrid(s.mapGrid);
       if (s.blockSelection)  setBlockSelection(s.blockSelection);
-      if (s.adjustments)     setAdjustments(s.adjustments);
+      if (s.adjustments)     setAdjustments(normalizeAdjustments(s.adjustments));
+      if (s.colorMatch)      setColorMatch(coerceColorMatchMode(s.colorMatch));
       if (s.mapMode)         setMapMode(s.mapMode);
 
       // Load source image from storage
@@ -1476,6 +1493,7 @@ export default function App() {
         const shades = (s.mapMode ?? '2d') === '2d' ? [1] : [0, 1, 2];
         const palette = buildComputedPalette(
           buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades, minecraftVersion, platformMode),
+          coerceColorMatchMode(s.colorMatch),
         );
         runProcess(
           img,
@@ -1539,7 +1557,7 @@ export default function App() {
         } : l),
       }));
       const shades = trySettings.mapMode === '2d' ? [1] : [0, 1, 2];
-      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode));
+      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
       runProcess(
         img,
         trySettings.dithering,
@@ -1706,6 +1724,7 @@ export default function App() {
         intensity,
         blockSelection: blockSelection as Record<string, number[]>,
         adjustments,
+        colorMatch,
         mapMode,
         staircaseMode,
         bnScale,
@@ -1722,7 +1741,7 @@ export default function App() {
       console.error('Failed to save project to history', err);
       showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -1748,7 +1767,8 @@ export default function App() {
       setDithering(coerceDitheringMode(result.settings.dithering));
       setIntensity(result.settings.intensity);
       setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
-      setAdjustments(result.settings.adjustments);
+      setAdjustments(normalizeAdjustments(result.settings.adjustments));
+      setColorMatch(coerceColorMatchMode(result.settings.colorMatch));
       setMapMode(result.settings.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
@@ -1942,6 +1962,8 @@ export default function App() {
             <Controls
               dithering={dithering}
               onDitheringChange={handleDitheringChange}
+              colorMatch={colorMatch}
+              onColorMatchChange={handleColorMatchChange}
               intensity={intensity}
               onIntensityChange={handleIntensityChange}
               onIntensityCommit={handleIntensityCommit}
