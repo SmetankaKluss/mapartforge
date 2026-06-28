@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { ComputedPalette } from '../lib/dithering';
 import type { DitheringMode } from '../lib/dithering';
 import type { MapGrid } from '../lib/types';
@@ -98,7 +98,7 @@ export function ExportPanel({
   onCreateTracker, onExportGifPack,
 }: Props) {
   const { t } = useLocale();
-  const [collapsed, setCollapsed]         = useState(false);
+  const [collapsed, setCollapsed]         = useState(true);
   const [busyPng]                         = useState(false);
   const [busyMapdat,   setBusyMapdat]     = useState(false);
   const [busyLiteFlat, setBusyLiteFlat]   = useState(false);
@@ -111,6 +111,20 @@ export function ExportPanel({
   const [busyMcStruct,  setBusyMcStruct]  = useState(false);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
+  const [menuOpen,       setMenuOpen]       = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close the export dropdown on outside click / Escape
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenuOpen(false); }
+    const id = setTimeout(() => document.addEventListener('mousedown', onDown), 0);
+    document.addEventListener('keydown', onKey);
+    return () => { clearTimeout(id); document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
 
   const hasPreview = (previewImageData ?? imageData) !== null;
   const hasCmp     = compareData !== null;
@@ -457,7 +471,19 @@ export function ExportPanel({
         <p className="export-empty">{t('Загрузи изображение — экспорт появится здесь.', 'Upload an image to enable export.')}</p>
       )}
       {!collapsed && hasContent && (
-        <div className="export-buttons">
+        <div className="export-menu-wrap" ref={menuRef}>
+          <button
+            className={`export-menu-trigger${menuOpen ? ' open' : ''}`}
+            onClick={() => setMenuOpen(o => !o)}
+            disabled={base}
+            aria-expanded={menuOpen}
+            title={t('Выбрать формат экспорта', 'Choose an export format')}
+          >
+            <IconGlyph icon={mkIcons.download} /> {t('ЭКСПОРТ', 'EXPORT')}
+            <IconGlyph icon={mkIcons.chevronDown} className={`export-menu-arrow${menuOpen ? '' : ' collapsed'}`} />
+          </button>
+          {menuOpen && (
+          <div className="export-buttons export-menu-list">
           <button
             className="export-btn"
             onClick={handlePng}
@@ -558,6 +584,8 @@ export function ExportPanel({
             </button>
           )}
 
+        </div>
+          )}
         </div>
       )}
       {!collapsed && hasContent && isBedrock && (

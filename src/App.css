@@ -756,7 +756,6 @@ input, select, textarea { outline: none; }
 }
 .colormatch-select:hover:not(:disabled) { border-color: var(--accent); }
 .colormatch-select:disabled { opacity: 0.5; cursor: not-allowed; }
-.colormatch-hint { margin: 0; font-size: 9px; line-height: 1.35; color: var(--text-muted); }
 .dither-options { display: flex; flex-direction: column; padding: 0; }
 .dither-option {
   display: grid; grid-template-columns: 14px minmax(88px, 0.72fr) minmax(0, 1fr); align-items: flex-start; padding: 8px 12px; cursor: pointer;
@@ -1507,6 +1506,27 @@ input, select, textarea { outline: none; }
 .section-collapse-arrow.collapsed { transform: rotate(-90deg); }
 .export-empty { font-size: var(--text-xs); color: var(--text-muted); padding: 8px 12px; }
 .export-buttons { display: flex; flex-direction: column; gap: 5px; padding: 8px; }
+.export-menu-wrap { position: relative; padding: 8px; }
+.export-menu-trigger {
+  height: 38px; padding: 0 12px; width: 100%;
+  background: rgb(var(--terra-rgb) / 0.08); border: 1px solid rgb(var(--terra-rgb) / 0.55);
+  color: var(--terra);
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.5px;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.export-menu-trigger:hover:not(:disabled),
+.export-menu-trigger.open { border-color: var(--terra); background: var(--terra-dim); box-shadow: 0 0 8px var(--terra-glow); }
+.export-menu-trigger:disabled { opacity: 0.4; cursor: not-allowed; }
+.export-menu-arrow { margin-left: auto; transition: transform 0.2s var(--ease-out); }
+.export-menu-arrow.collapsed { transform: rotate(-90deg); }
+.export-menu-list {
+  position: absolute; top: calc(100% - 2px); left: 8px; right: 8px; z-index: 40;
+  padding: 6px; gap: 4px;
+  background: var(--bg-panel, #15181c); border: 1px solid rgb(var(--terra-rgb) / 0.55);
+  border-radius: 4px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  max-height: 60vh; overflow-y: auto;
+}
 .export-btn {
   height: 36px; padding: 0 12px;
   background: var(--bg-input); border: 1px solid rgba(200, 98, 42, 0.42);

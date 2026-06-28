@@ -520,10 +520,6 @@ export function Controls({
               <option key={mode} value={mode}>{colorMatchLabel(mode, t)}</option>
             ))}
           </select>
-          <p className="colormatch-hint">
-            {t('Пространство, в котором ищется ближайший цвет блока. HCT и CIELAB — перцептивные; RGB — как в оригинальном MapartCraft. Влияет на режимы без авто-дизеринга.',
-               'Colour space used to find the nearest block colour. HCT and CIELAB are perceptual; RGB matches the original MapartCraft. Affects the standard (non-Kluss) modes.')}
-          </p>
         </div>
         <div className="dither-options">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
