@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest an improvement for MapKluss.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should be added?
+      placeholder: I want a way to...
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Why is it useful?
+      description: Explain the Minecraft map art workflow this would improve.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Extra details
+      description: Add mockups, examples, settings, or links if useful.

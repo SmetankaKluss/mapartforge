@@ -1,0 +1,206 @@
+name: Backup Supabase PostgreSQL off-provider
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-supabase
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate configuration
+        env:
+          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
+          YC_BACKUP_KMS_KEY_ID: ${{ vars.YC_BACKUP_KMS_KEY_ID }}
+        run: |
+          test -n "$SUPABASE_DB_HOST"
+          test -n "$SUPABASE_DB_USER"
+          test -n "$YC_BACKUP_BUCKET"
+          test -n "$YC_BACKUP_KMS_KEY_ID"
+          daily_prefix="postgres/daily/$(date -u +%Y/%m/%d)"
+          monthly_prefix=
+          if [[ $(date -u +%d) == "01" ]]; then
+            monthly_prefix="postgres/monthly/$(date -u +%Y/%m)"
+          fi
+          {
+            echo "MAPKLUSS_BACKUP_DIR=${RUNNER_TEMP}/mapkluss-backup"
+            echo "MAPKLUSS_DAILY_PREFIX=$daily_prefix"
+            echo "MAPKLUSS_MONTHLY_PREFIX=$monthly_prefix"
+          } >> "$GITHUB_ENV"
+
+      - name: Create portable Supabase PostgreSQL backup
+        env:
+          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          MAPKLUSS_SUPABASE_CLI_VERSION: 2.109.1
+          MAPKLUSS_POSTGRES_IMAGE: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        run: |
+          test -n "$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          encoded_password=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' -- "$SUPABASE_DB_PASSWORD")
+          echo "::add-mask::$encoded_password"
+          supabase_db_url=$(node -e '
+            const [host, user, password] = process.argv.slice(1);
+            const encodedUser = encodeURIComponent(user);
+            const encodedPassword = encodeURIComponent(password);
+            process.stdout.write(
+              "postgresql://" + encodedUser + ":" + encodedPassword + "@" + host
+                + ":5432/postgres?sslmode=require",
+            );
+          ' "$SUPABASE_DB_HOST" "$SUPABASE_DB_USER" "$SUPABASE_DB_PASSWORD")
+          echo "::add-mask::$supabase_db_url"
+          SUPABASE_DB_URL="$supabase_db_url" ./deploy/backups/backup-postgres.sh
+
+      - name: Validate archive and checksum
+        run: |
+          archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
+          manifest="$archive.json"
+          inventory="$archive.inventory.json"
+          extract_dir="${RUNNER_TEMP}/mapkluss-backup-verify"
+          test -s "$archive"
+          test -s "$manifest"
+          test -s "$inventory"
+          node -e '
+            const value = require(process.argv[1]);
+            const failures = Object.entries(value).filter(([key, count]) => key.endsWith("_orphans") && count !== 0);
+            if (failures.length > 0) {
+              throw new Error("Source integrity violations: " + JSON.stringify(failures));
+            }
+          ' "$inventory"
+          mkdir -p "$extract_dir"
+          tar -xzf "$archive" -C "$extract_dir"
+          node deploy/backups/verify-backup.mjs "$archive" "$extract_dir"
+
+      - name: Upload to private Yandex Object Storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          AWS_PAGER: ''
+          YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
+          YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
+          command -v aws
+          aws --version
+          archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
+          inventory="$archive.inventory.json"
+          manifest="$archive.json"
+
+          upload_file() {
+            local prefix=$1
+            local file=$2
+            local content_md5 sha256 metadata_json key content_type
+            content_md5=$(openssl dgst -md5 -binary "$file" | base64 | tr -d '\n')
+            sha256=$(sha256sum "$file" | awk '{print $1}')
+            metadata_json=$(jq -nc --arg sha256 "$sha256" '{sha256: $sha256}')
+            key="${prefix}/$(basename "$file")"
+            content_type=application/json
+            if [[ "$file" == *.tar.gz ]]; then
+              content_type=application/gzip
+            fi
+            aws s3api put-object \
+              --endpoint-url "$YC_STORAGE_ENDPOINT" \
+              --bucket "$YC_BACKUP_BUCKET" \
+              --key "$key" \
+              --body "$file" \
+              --content-type "$content_type" \
+              --content-md5 "$content_md5" \
+              --metadata "$metadata_json" \
+              --no-cli-pager >/dev/null
+          }
+
+          upload_generation() {
+            local prefix=$1
+            upload_file "$prefix" "$archive"
+            upload_file "$prefix" "$inventory"
+            upload_file "$prefix" "$manifest"
+          }
+
+          upload_generation "$MAPKLUSS_DAILY_PREFIX"
+          if [[ -n "$MAPKLUSS_MONTHLY_PREFIX" ]]; then
+            upload_generation "$MAPKLUSS_MONTHLY_PREFIX"
+          fi
+
+      - name: Verify remote objects
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          AWS_PAGER: ''
+          YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
+          YC_BACKUP_KMS_KEY_ID: ${{ vars.YC_BACKUP_KMS_KEY_ID }}
+          YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: |
+          archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
+          inventory="$archive.inventory.json"
+          manifest="$archive.json"
+
+          verify_file() {
+            local prefix=$1
+            local file=$2
+            local key expected_size expected_sha metadata
+            key="${prefix}/$(basename "$file")"
+            expected_size=$(stat -c %s "$file")
+            expected_sha=$(sha256sum "$file" | awk '{print $1}')
+            metadata=$(aws s3api head-object \
+              --endpoint-url "$YC_STORAGE_ENDPOINT" \
+              --bucket "$YC_BACKUP_BUCKET" \
+              --key "$key" \
+              --no-cli-pager)
+            if ! jq -e \
+              --argjson expected_size "$expected_size" \
+              --arg expected_sha "$expected_sha" \
+              --arg expected_kms "$YC_BACKUP_KMS_KEY_ID" '
+                ([.Metadata | to_entries[] | select(.key | ascii_downcase == "sha256") | .value][0]) as $remote_sha
+                | .ContentLength == $expected_size
+                and $remote_sha == $expected_sha
+                and .ServerSideEncryption == "aws:kms"
+                and (.SSEKMSKeyId | endswith($expected_kms))
+              ' <<<"$metadata" >/dev/null; then
+              jq -c \
+                --argjson expected_size "$expected_size" \
+                --arg expected_sha "$expected_sha" \
+                --arg expected_kms "$YC_BACKUP_KMS_KEY_ID" '
+                  {
+                    content_length_match: (.ContentLength == $expected_size),
+                    metadata_keys: ([.Metadata | keys[] | ascii_downcase] | sort),
+                    metadata_sha_match: (([.Metadata | to_entries[] | select(.key | ascii_downcase == "sha256") | .value][0]) == $expected_sha),
+                    server_side_encryption: (.ServerSideEncryption // "missing"),
+                    kms_key_match: ((.SSEKMSKeyId // "") | endswith($expected_kms))
+                  }
+                ' <<<"$metadata" >&2
+              return 1
+            fi
+          }
+
+          verify_generation() {
+            local prefix=$1
+            verify_file "$prefix" "$archive"
+            verify_file "$prefix" "$inventory"
+            verify_file "$prefix" "$manifest"
+          }
+
+          verify_generation "$MAPKLUSS_DAILY_PREFIX"
+          if [[ -n "$MAPKLUSS_MONTHLY_PREFIX" ]]; then
+            verify_generation "$MAPKLUSS_MONTHLY_PREFIX"
+          fi
+
+      - name: Remove plaintext backup from runner
+        if: always()
+        run: rm -rf "$MAPKLUSS_BACKUP_DIR"

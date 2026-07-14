@@ -1,0 +1,67 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_CLARITY_PROJECT_ID: wolhmrblof
+          VITE_TELEGRAM_BOT_USERNAME: MapKlussBot
+
+      - name: Add SPA fallback for GitHub Pages
+        run: cp dist/index.html dist/404.html
+
+      - name: Deploy to gh-pages branch
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          cname: mapkluss.art
+
+      - name: Deploy staging site to Yandex Object Storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_STORAGE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_STORAGE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          YC_STORAGE_BUCKET: stage.mapkluss.art
+          YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: |
+          aws --version || python -m pip install awscli
+          aws s3 sync dist "s3://${YC_STORAGE_BUCKET}" \
+            --endpoint-url "${YC_STORAGE_ENDPOINT}" \
+            --delete \
+            --cache-control "public,max-age=3600"
+          aws s3 cp dist/assets "s3://${YC_STORAGE_BUCKET}/assets" \
+            --endpoint-url "${YC_STORAGE_ENDPOINT}" \
+            --recursive \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp dist/index.html "s3://${YC_STORAGE_BUCKET}/index.html" \
+            --endpoint-url "${YC_STORAGE_ENDPOINT}" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws s3api put-bucket-website \
+            --endpoint-url "${YC_STORAGE_ENDPOINT}" \
+            --bucket "${YC_STORAGE_BUCKET}" \
+            --website-configuration '{"IndexDocument":{"Suffix":"index.html"},"ErrorDocument":{"Key":"index.html"}}'
