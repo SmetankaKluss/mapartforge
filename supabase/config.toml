@@ -1,0 +1,16 @@
+project_id = "mapart"
+
+[functions.companion-api]
+verify_jwt = true
+
+[functions.companion-auth]
+verify_jwt = false
+
+[functions.companion-device]
+verify_jwt = false
+
+[functions.companion-mod]
+verify_jwt = false
+
+[functions.companion-lens]
+verify_jwt = false

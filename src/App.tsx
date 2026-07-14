@@ -1,0 +1,3694 @@
+import React, { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
+import { type SelectionMask, selectAllMask, invertMask, countSelected } from './lib/selectionMask';
+import type { MagicWandMatchMode } from './lib/selectionMask';
+import { VERSION } from './version';
+import { ImageUpload } from './components/ImageUpload';
+import type { ImageUploadHandle } from './components/ImageUpload';
+import { PreviewCanvas } from './components/PreviewCanvas';
+import type { PaintTool, PaintBlock, TextLayerMeta } from './components/previewCanvasShared';
+import { BlockPickerPopup } from './components/BlockPickerPopup';
+import { SPRITE_URL } from './components/BlockCanvas';
+import { CompareView } from './components/CompareView';
+import { MaterialsList } from './components/MaterialsList';
+import { Controls } from './components/Controls';
+import { Adjustments } from './components/Adjustments';
+import { PaletteEditor } from './components/PaletteEditor';
+import { ExportPanel } from './components/ExportPanel';
+import type { DitheringMode, KlussParams } from './lib/dithering';
+import { buildComputedPalette, DEFAULT_KLUSS_PARAMS } from './lib/dithering';
+import type { ComputedPalette } from './lib/dithering';
+import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
+import type { MapGrid } from './lib/types';
+import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
+import type { BlockSelection } from './lib/paletteBlocks';
+import type { MinecraftVersion } from './lib/versionPresets';
+import { getVersionLabel } from './lib/versionPresets';
+import { sanitizeSelectionForPlatform } from './lib/platformMode';
+import type { PlatformMode } from './lib/platformMode';
+import { DEFAULT_ADJUSTMENTS, normalizeAdjustments } from './lib/adjustments';
+import type { ImageAdjustments } from './lib/adjustments';
+import { DEFAULT_COLOR_MATCH, coerceColorMatchMode } from './lib/colorMatch';
+import type { ColorMatchMode } from './lib/colorMatch';
+import { saveSettings, loadSettings, clearSettings } from './lib/localStorage';
+import type { SavedSettings } from './lib/localStorage';
+import { loadShare } from './lib/share';
+import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
+import { getExampleById } from './lib/examples';
+import { downloadPng } from './lib/exportPng';
+import { exportLitematicHybrid } from './lib/exportLitematic';
+import { NumInput } from './components/NumInput';
+import { CropModal } from './components/CropModal';
+import { lazy, Suspense } from 'react';
+const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
+const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
+const GifModal = lazy(() => import('./components/GifModal').then(m => ({ default: m.GifModal })));
+import { NewCanvasModal } from './components/NewCanvasModal';
+import { LayersPanel } from './components/LayersPanel';
+import type { Layer, LayerGroup } from './lib/layers';
+import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
+import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
+import type { FullProjectSettings } from './lib/projectFile';
+import { saveProject, loadProject } from './lib/projectStorage';
+import { SaveProjectModal } from './components/SaveProjectModal';
+import { ProjectsPanel } from './components/ProjectsPanel';
+import { CloudArtsPanel } from './components/CloudArtsPanel';
+import { CloudSaveModal } from './components/CloudSaveModal';
+import { createTour, shouldAutoStart, markTourDone } from './lib/tour';
+import type { TourType } from './lib/tour';
+import { useLocale } from './lib/useLocale';
+import type { PatternDefinition } from './lib/patternTool';
+import { createDefaultPattern } from './lib/patternTool';
+import type { GradientStop } from './lib/gradientTool';
+import { PatternEditorPopup } from './components/PatternEditorPopup';
+import { importMapDat, MapDatImportError } from './lib/importMapDat';
+import { GifFilmstrip } from './components/GifFilmstrip';
+import { decodeGif } from './lib/gifDecoder';
+import type { GifFrames } from './lib/gifDecoder';
+import type { GifProject, GifFrameConfig } from './lib/gifProject';
+import { makeThumbnail, imageDataToHtmlImage } from './lib/gifProject';
+import { BuildTrackerModal } from './components/BuildTrackerModal';
+import type { SessionMaterial } from './lib/buildSession';
+import { computeSessionMaterials } from './lib/sessionMaterials';
+import { IconGlyph } from './components/IconGlyph';
+import { mkIcons } from './components/mkIcons';
+import { LensController } from './components/LensController';
+import { buildFinalPreview } from './lib/finalPreview';
+import type { PreviewMode } from './lib/preview3d';
+import { applyPageMeta } from './lib/meta';
+import { attachCompanionImportToArt, downloadCompanionArtVersionProjectJson, downloadCompanionProjectJson, getCompanionScanImport, getCurrentCompanionAuthUser, saveCompanionArt, setCompanionFavorite } from './lib/companionCloud';
+import type { ArtPrivacy } from './lib/companionTypes';
+import 'driver.js/dist/driver.css';
+import './App.css';
+import { trackEvent } from './lib/analytics';
+import {
+  MAX_CANVAS_ZOOM,
+  MIN_CANVAS_ZOOM,
+  canvasZoomFromWheel,
+  canvasZoomToSlider,
+  clampCanvasZoom,
+  sliderToCanvasZoom,
+} from './lib/canvasViewport';
+
+const ANNOUNCEMENT = {
+  id: 'mapkluss-v1.12.0-2026-07-15',
+  url: 'https://t.me/mapkluss',
+};
+
+const SHOW_PATTERN_BLOCKS = false;
+
+function readStoredFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredFlag(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? '1' : '0');
+  } catch {
+    // The editor remains fully usable when storage is blocked or unavailable.
+  }
+}
+
+// Support blocks for 3D staircase (nbt name → sprite coords + label)
+const SUPPORT_BLOCKS_PALETTE = [
+  { nbt: 'stone',        csId: 9,  blockId: 4,  label: 'Stone' },
+  { nbt: 'cobblestone',  csId: 9,  blockId: 0,  label: 'Cobble' },
+  { nbt: 'deepslate',    csId: 58, blockId: 0,  label: 'Deepslate' },
+  { nbt: 'smooth_stone', csId: 9,  blockId: 18, label: 'Smooth' },
+  { nbt: 'granite',      csId: 8,  blockId: 7,  label: 'Granite' },
+  { nbt: 'diorite',      csId: 12, blockId: 1,  label: 'Diorite' },
+  { nbt: 'andesite',     csId: 9,  blockId: 9,  label: 'Andesite' },
+  { nbt: 'dirt',         csId: 8,  blockId: 3,  label: 'Dirt' },
+  { nbt: 'oak_planks',   csId: 11, blockId: 1,  label: 'Oak' },
+  { nbt: 'netherrack',   csId: 34, blockId: 0,  label: 'Nether' },
+  { nbt: 'blackstone',   csId: 28, blockId: 9,  label: 'Blackstone' },
+] as const;
+
+const getSupportModeTitles = (t: (ru: string, en: string) => string): Record<1 | 2 | 3, string> => ({
+  1: t('1 блок только под плавающими блоками (песок, гравий, лишайник…)', '1 block under floating blocks (sand, gravel, moss…)'),
+  2: t('Зависит от оттенка: переходные оттенки получают 2, плоские — 1', 'Depends on shade: gradients get 2, flat get 1'),
+  3: t('2 блока под каждым блоком арта', '2 blocks under each art block'),
+});
+
+const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
+  1: 'Crit.',
+  2: 'Opt.',
+};
+
+const MAX_HISTORY = 20;
+
+interface HistoryEntry {
+  layerId: string;          // which layer this entry belongs to
+  imageData: ImageData | null;
+  blockSelection: BlockSelection;
+}
+
+interface LayerState {
+  layers: Layer[];
+  activeLayerId: string;
+  groups: LayerGroup[];
+}
+
+interface AppNotice {
+  message: string;
+  tone: 'info' | 'error';
+}
+
+function makeInitialLayerState(): LayerState {
+  const l = createLayer('Слой 1');
+  return { layers: [l], activeLayerId: l.id, groups: [] };
+}
+
+const DITHERING_LABELS: Record<DitheringMode, string> = {
+  'none':            'None',
+  'floyd-steinberg': 'Floyd–Steinberg',
+  'stucki':          'Stucki',
+  'jjn':             'JJN',
+  'atkinson':        'Atkinson',
+  'blue-noise':      'Blue Noise',
+  'yliluoma2':       'Yliluoma #2',
+  'kluss':           'KlussDither',
+};
+const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
+
+function coerceDitheringMode(mode: unknown): DitheringMode {
+  return ALL_MODES.includes(mode as DitheringMode) ? mode as DitheringMode : 'floyd-steinberg';
+}
+
+/** Returns true if the layer ref's imageData has at least one non-transparent pixel. */
+function activeLayerHasContent(ref: React.MutableRefObject<{ imageData: ImageData | null } | undefined>): boolean {
+  const img = ref.current?.imageData;
+  if (!img) return false;
+  for (let i = 3; i < img.data.length; i += 4) {
+    if (img.data[i] > 0) return true;
+  }
+  return false;
+}
+
+// Predefined brush sizes — all odd → half-integer radius → perfect circles, no protrusions
+const BRUSH_SIZES = [1, 3, 5, 7, 9, 11, 13, 17, 21, 25, 31, 37, 43];
+
+/** Convert ImageData to an HTMLImageElement for processing. Used to restore source from saved originalData. */
+function imageDataToSourceImage(data: ImageData): Promise<HTMLImageElement> {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = data.width;
+    canvas.height = data.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.putImageData(data, 0, 0);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img); // fallback: resolve even if load fails
+    img.src = canvas.toDataURL('image/png');
+  });
+}
+
+async function loadHtmlImage(url: string): Promise<HTMLImageElement> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load image: ${url} (${response.status})`);
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error(`Failed to decode image: ${url}`));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function imageToImageData(img: HTMLImageElement): ImageData {
+  const width = img.naturalWidth || img.width;
+  const height = img.naturalHeight || img.height;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create canvas context for image import.');
+  ctx.drawImage(img, 0, 0, width, height);
+  return ctx.getImageData(0, 0, width, height);
+}
+
+export default function App() {
+  const { lang, toggle: toggleLang, t } = useLocale();
+
+  useEffect(() => {
+    applyPageMeta({
+      title: t(
+        'Генератор Minecraft map art, Litematic и MAP.DAT | MapKluss',
+        'Minecraft Map Art Generator, Litematic & MAP.DAT Export | MapKluss',
+      ),
+      description: t(
+        'MapKluss — браузерный генератор Minecraft map art. Загружай изображения, настраивай палитру и дизеринг, проверяй 2D/3D preview и экспортируй Litematic, MAP.DAT и материалы.',
+        'MapKluss is a browser-based Minecraft map art generator. Upload images, tune palette and dithering, preview 2D or 3D stair results, and export Litematic, MAP.DAT, and materials.',
+      ),
+      url: window.location.origin,
+      image: `${window.location.origin}/og-image.png`,
+      schema: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'MapKluss',
+          url: window.location.origin,
+        },
+        {
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'MapKluss',
+          applicationCategory: 'MultimediaApplication',
+          operatingSystem: 'Web',
+          url: window.location.origin,
+          image: `${window.location.origin}/og-image.png`,
+          description: t(
+            'Браузерный генератор Minecraft map art с экспортом Litematic, MAP.DAT и списком материалов.',
+            'Browser-based Minecraft map art generator with Litematic, MAP.DAT, and materials export.',
+          ),
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'USD',
+          },
+        },
+      ],
+    });
+  }, [lang, t]);
+
+  // ── Restore persisted settings — lazy init runs exactly once on mount ─
+  const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
+
+  const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
+  const [originalData, setOriginalData] = useState<ImageData | null>(null);
+  const imageUploadRef = useRef<ImageUploadHandle>(null);
+
+  // ── Layer system ─────────────────────────────────────────────────────────────
+  const [layerState, setLayerState] = useState<LayerState>(makeInitialLayerState);
+  const layers = layerState.layers;
+  const activeLayerId = layerState.activeLayerId;
+  const activeLayer = layers.find(l => l.id === activeLayerId) ?? layers[0];
+  const layerGroups = layerState.groups;
+  // imageData = active layer's imageData (for painting tools + display in Phase 1)
+  const imageData: ImageData | null = activeLayer?.imageData ?? null;
+  // When set, runProcess result will target this layer instead of activeLayerId
+  const processTargetLayerIdRef = useRef<string | null>(null);
+
+  // setImageData wrapper — updates active layer without touching other layers
+  // dirty=true    — layer painted by user (always allowed)
+  // fromProcess=true — result from runProcess worker (blocked if target isDirty)
+  function setImageData(data: ImageData | null, dirty = false, fromProcess = false) {
+    // Capture and clear ref synchronously BEFORE setState (Strict Mode runs updaters twice)
+    const capturedTargetId = processTargetLayerIdRef.current;
+    processTargetLayerIdRef.current = null;
+    setLayerState(prev => {
+      const targetId = capturedTargetId ?? prev.activeLayerId;
+      const targetLayer = prev.layers.find(l => l.id === targetId);
+      // Never overwrite a manually-edited layer with a fresh auto-process result
+      // (dirty=true path = dithering-change with alpha mask preservation — still allowed)
+      if (fromProcess && !dirty && targetLayer?.isDirty) return prev;
+      return {
+        ...prev,
+        layers: prev.layers.map(l =>
+          l.id === targetId ? { ...l, imageData: data, isDirty: dirty } : l,
+        ),
+      };
+    });
+  }
+
+  // ── Artist mode toggle ────────────────────────────────────────────────────────
+  const [editorMode, setEditorMode] = useState<'simple' | 'artist'>(
+    () => (localStorage.getItem('mapartforge-editor-mode') as 'simple' | 'artist' | null) ?? 'simple',
+  );
+  const [splitPos, setSplitPos] = useState(50);
+  const [showSplitLine, setShowSplitLine] = useState(true);
+  const [showGrid, setShowGrid]         = useState(false);
+  const [zoom, setZoom]                 = useState(100);
+  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20','1.21.4'];
+  const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
+    VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.21.4'
+  );
+  const [platformMode, setPlatformMode] = useState<PlatformMode>(saved.platformMode ?? 'java');
+  const [compareMode, setCompareMode]   = useState(false);
+  const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
+  const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
+  const [compareData, setCompareData]   = useState<{ left: ImageData; right: ImageData } | null>(null);
+  const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
+  const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'optimized');
+  const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
+  const [dithering, setDithering]       = useState<DitheringMode>(coerceDitheringMode(saved.dithering));
+  const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
+  const [bnScale, setBnScale]           = useState(saved.bnScale ?? 2);
+  const [klussParams, setKlussParams]   = useState<KlussParams>(saved.klussParams ?? DEFAULT_KLUSS_PARAMS);
+  const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
+  const [processing, setProcessing]     = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [showShadeWarnings, setShowShadeWarnings] = useState(false);
+  const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
+  const [adjustments, setAdjustments]   = useState<ImageAdjustments>(normalizeAdjustments(saved.adjustments));
+  const [colorMatch, setColorMatch]     = useState<ColorMatchMode>(coerceColorMatchMode(saved.colorMatch ?? DEFAULT_COLOR_MATCH));
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showWiki, setShowWiki] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showTourSelector, setShowTourSelector] = useState(false);
+  const [suppressAutoTour] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(
+      params.get('cloudFolder') ||
+      params.get('companionImport') ||
+      params.get('artVersion') ||
+      params.get('art'),
+    );
+  });
+  const [showPerspective, setShowPerspective] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('schematic3d');
+  const [gifFrames, setGifFrames] = useState<GifFrames | null>(null);
+  const [gifProject, setGifProject] = useState<GifProject | null>(null);
+  const [trackerMaterials, setTrackerMaterials] = useState<SessionMaterial[] | null>(null);
+  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const [showCloudArtsPanel, setShowCloudArtsPanel] = useState(false);
+  const [showCloudSaveModal, setShowCloudSaveModal] = useState(false);
+  const [saveThumbnail, setSaveThumbnail] = useState<string | null>(null);
+  const [showAdjustments, setShowAdjustments] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [activeTool, setActiveTool]     = useState<PaintTool | null>(null);
+  const [paintBlock, setPaintBlock]     = useState<PaintBlock | null>(null);
+  const [selectionMask, setSelectionMask] = useState<SelectionMask | null>(null);
+  const [magicWandTolerance, setMagicWandTolerance] = useState<number>(0.04);
+  const [magicWandContiguous, setMagicWandContiguous] = useState(true);
+  const [magicWandMode, setMagicWandMode] = useState<MagicWandMatchMode>('similar');
+  const [patternBlocks, setPatternBlocks] = useState<PaintBlock[]>([]);
+  const [showPatternPicker, setShowPatternPicker] = useState<number | null>(null); // index of open picker
+  const [brushSize, setBrushSize]       = useState<number>(1);
+
+  // Pattern-tile tool state
+  const [savedPatterns, setSavedPatterns] = useState<PatternDefinition[]>(() => [createDefaultPattern()]);
+  const [activePatternId, setActivePatternId] = useState<string>(() => savedPatterns[0]?.id ?? '');
+  const [showPatternEditor, setShowPatternEditor] = useState(false);
+  const [patternAnchorMode, setPatternAnchorMode] = useState<'canvas' | 'brush'>('canvas');
+  const activePattern = savedPatterns.find(p => p.id === activePatternId) ?? savedPatterns[0] ?? null;
+  void setActivePatternId; // reserved for future multi-pattern selection UI
+
+  function exportPattern(p: PatternDefinition) {
+    const json = JSON.stringify(p, null, 2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = `${p.name.replace(/[^a-zа-я0-9_-]/gi, '_')}.json`;
+    a.click();
+  }
+
+  function importPattern(file: File) {
+    file.text().then(text => {
+      try {
+        const p = JSON.parse(text) as PatternDefinition;
+        if (!p.width || !p.height || !Array.isArray(p.pixels)) return;
+        const imported = { ...p, id: crypto.randomUUID() };
+        setSavedPatterns(prev => [...prev, imported]);
+        setActivePatternId(imported.id);
+      } catch { /* ignore invalid */ }
+    });
+  }
+
+  // Gradient tool state
+  const [gradientStops, setGradientStops] = useState<GradientStop[]>([]);
+  const [gradientDithering, setGradientDithering] = useState<'none' | 'ordered'>('ordered');
+  const [showGradientStopPicker, setShowGradientStopPicker] = useState<number | null>(null);
+  const [showGradientAddPicker, setShowGradientAddPicker] = useState(false);
+  const [textSize]                       = useState<number>(8);
+  const [showBlockPicker, setShowBlockPicker]   = useState(false);
+  const [viewBanner,    setViewBanner]    = useState(false);
+  const [paletteBanner, setPaletteBanner] = useState(false);
+  const [appNotice, setAppNotice] = useState<AppNotice | null>(null);
+  const [showAnnouncement, setShowAnnouncement] = useState(() => {
+    const force = new URLSearchParams(window.location.search).get('announcement') === '1';
+    return force || localStorage.getItem('mapkluss_seen_announcement') !== ANNOUNCEMENT.id;
+  });
+  const [supportBlock,  setSupportBlock]  = useState('stone');
+  const [supportMode,   setSupportMode]   = useState<1 | 2 | 3>(2);
+  const [resetDefaultsPending, setResetDefaultsPending] = useState(false);
+  const resetDefaultsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [showNewCanvasModal, setShowNewCanvasModal] = useState(false);
+  const [sourceHasAlpha, setSourceHasAlpha] = useState(false);
+  const [bgMode, setBgMode] = useState<'color' | 'transparent'>('color');
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const bgModeRef  = useRef<'color' | 'transparent'>('color');
+  const bgColorRef = useRef('#ffffff');
+  bgModeRef.current  = bgMode;
+  bgColorRef.current = bgColor;
+  // Always holds the originally-uploaded image so crop modal can re-crop from source
+  const uploadedImageRef = useRef<HTMLImageElement | null>(null);
+  // Raw file for color-accurate bitmap creation (bypasses ICC profile correction)
+  const uploadedFileRef  = useRef<File | null>(null);
+  const workerRef     = useRef<Worker | null>(null);
+  const workerJobSeqRef = useRef(0);
+  const activeWorkerJobIdRef = useRef<number | null>(null);
+  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // When re-processing a manually-edited layer, store the alpha mask here so it can
+  // be re-applied after the worker returns (preserves deletions/transparency edits).
+  const pendingAlphaMaskRef = useRef<Uint8Array | null>(null);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cloudUserEmail, setCloudUserEmail] = useState<string | null>(null);
+  const [cloudSaving, setCloudSaving] = useState(false);
+  const [cloudMenuOpen, setCloudMenuOpen] = useState(false);
+  const cloudMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [cloudMenuStyle, setCloudMenuStyle] = useState<React.CSSProperties>({});
+  const [currentCloudArtId, setCurrentCloudArtId] = useState<string | null>(null);
+  const [currentCloudImportId, setCurrentCloudImportId] = useState<string | null>(null);
+  const [currentCloudTitle, setCurrentCloudTitle] = useState<string>('');
+  const [currentCloudPrivacy, setCurrentCloudPrivacy] = useState<ArtPrivacy>('unlisted');
+
+  const showAppNotice = useCallback((message: string, tone: AppNotice['tone'] = 'info') => {
+    setAppNotice({ message, tone });
+  }, []);
+
+  useEffect(() => {
+    if (!appNotice) return;
+    const timer = window.setTimeout(() => setAppNotice(null), appNotice.tone === 'error' ? 5200 : 3200);
+    return () => window.clearTimeout(timer);
+  }, [appNotice]);
+
+  const refreshCloudUser = useCallback(async () => {
+    const user = await getCurrentCompanionAuthUser();
+    setCloudUserEmail(user?.email ?? null);
+  }, []);
+
+  useEffect(() => {
+    void refreshCloudUser();
+  }, [refreshCloudUser]);
+
+  useLayoutEffect(() => {
+    if (!cloudMenuOpen) return;
+
+    const positionMenu = () => {
+      const button = cloudMenuButtonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const margin = 8;
+      const menuWidth = Math.min(336, Math.max(190, window.innerWidth - margin * 2));
+      const left = Math.min(
+        Math.max(margin, rect.right - menuWidth),
+        Math.max(margin, window.innerWidth - menuWidth - margin),
+      );
+      const arrowX = Math.min(Math.max(rect.left + rect.width / 2 - left - 5, 12), menuWidth - 22);
+      setCloudMenuStyle({
+        top: Math.round(rect.bottom + 7),
+        left: Math.round(left),
+        width: menuWidth,
+        ['--cloud-menu-arrow-x' as string]: `${Math.round(arrowX)}px`,
+      });
+    };
+
+    positionMenu();
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [cloudMenuOpen]);
+
+  useEffect(() => {
+    const nextUrl = new URL(window.location.href);
+    if (nextUrl.searchParams.get('cloudFolder') !== '1') return;
+    nextUrl.searchParams.delete('cloudFolder');
+    window.history.replaceState(null, '', nextUrl.toString());
+    setShowCloudArtsPanel(true);
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('cloudSavePreview') !== '1') return;
+    setShowCloudSaveModal(true);
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const params = new URLSearchParams(window.location.search);
+    const previewMode = params.get('buildTrackerModalPreview');
+    if (previewMode !== '1' && previewMode !== 'done') return;
+
+    const data = new Uint8ClampedArray([
+      128, 128, 128, 255,
+      95, 140, 64, 255,
+      212, 199, 165, 255,
+      64, 64, 72, 255,
+    ]);
+    const image = new ImageData(data, 2, 2);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map((layer, index) =>
+        index === 0 ? { ...layer, imageData: image, isDirty: true } : layer,
+      ),
+    }));
+    setMapGrid({ wide: 1, tall: 1 });
+    setTrackerMaterials([
+      { nbtName: 'minecraft:stone', displayName: 'Stone', count: 2 },
+      { nbtName: 'minecraft:grass_block', displayName: 'Grass Block', count: 1 },
+      { nbtName: 'minecraft:sand', displayName: 'Sand', count: 1 },
+    ]);
+  }, []);
+
+  const previewSectionRef = useRef<HTMLElement>(null);
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const pendingZoomAnchorRef = useRef<{ clientX: number; clientY: number; xRatio: number; yRatio: number } | null>(null);
+  const canvasPanRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startScrollLeft: number;
+    startScrollTop: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressCanvasClickRef = useRef(false);
+  const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
+  const [tabletRightOpen, setTabletRightOpen] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(
+    () => readStoredFlag('mapkluss-left-panel-collapsed'),
+  );
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(
+    () => readStoredFlag('mapkluss-right-panel-collapsed'),
+  );
+  const [isCanvasPanning, setIsCanvasPanning] = useState(false);
+
+  useEffect(() => {
+    writeStoredFlag('mapkluss-left-panel-collapsed', leftPanelCollapsed);
+  }, [leftPanelCollapsed]);
+
+  useEffect(() => {
+    writeStoredFlag('mapkluss-right-panel-collapsed', rightPanelCollapsed);
+  }, [rightPanelCollapsed]);
+
+  // Ref for originalData so handleMapGridChange can scale it without adding to deps
+  const originalDataRef = useRef<ImageData | null>(null);
+  originalDataRef.current = originalData;
+
+  // Always-current ref — updated each render so callbacks never see stale state
+  const latestRef = useRef<{
+    imageData: ImageData | null;
+    blockSelection: BlockSelection;
+    layers: Layer[];
+    activeLayerId: string;
+    mapMode: '2d' | '3d';
+    staircaseMode: 'classic' | 'optimized';
+    platformMode: PlatformMode;
+  }>({
+    imageData: null,
+    blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode),
+    layers: layerState.layers,
+    activeLayerId: layerState.activeLayerId,
+    mapMode,
+    staircaseMode,
+    platformMode,
+  });
+  latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId, mapMode, staircaseMode, platformMode };
+
+  // Ref to active layer — used in callbacks to check if layer has real content
+  const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
+  activeLayerRef.current = activeLayer;
+
+  // Ref with all current state needed for export shortcuts (avoids stale closures)
+  const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode, layers: layerState.layers });
+
+
+  // ── Auto-save settings to localStorage ──────────────────────────────────
+  useEffect(() => { saveSettings({ dithering }); }, [dithering]);
+  useEffect(() => { saveSettings({ intensity }); }, [intensity]);
+  useEffect(() => { saveSettings({ mapGrid }); }, [mapGrid]);
+  useEffect(() => { saveSettings({ blockSelection }); }, [blockSelection]);
+  useEffect(() => { saveSettings({ adjustments }); }, [adjustments]);
+  useEffect(() => { saveSettings({ colorMatch }); }, [colorMatch]);
+  useEffect(() => { saveSettings({ mapMode }); }, [mapMode]);
+  useEffect(() => { saveSettings({ staircaseMode }); }, [staircaseMode]);
+  useEffect(() => { saveSettings({ bnScale }); }, [bnScale]);
+  useEffect(() => { saveSettings({ klussParams }); }, [klussParams]);
+  useEffect(() => { saveSettings({ minecraftVersion }); }, [minecraftVersion]);
+  useEffect(() => { saveSettings({ platformMode }); }, [platformMode]);
+  useEffect(() => {
+    setBlockSelection(prev => sanitizeSelectionForPlatform(prev, platformMode));
+  }, [platformMode]);
+  useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
+
+  // Per-layer settings: restore mapMode/staircaseMode/dithering when active layer changes
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
+  useEffect(() => {
+    const layer = layersRef.current.find(l => l.id === activeLayerId);
+    if (!layer) return;
+    setMapMode(layer.mapMode ?? '2d');
+    setStaircaseMode(layer.staircaseMode ?? 'optimized');
+    if (layer.dithering !== undefined) setDithering(coerceDitheringMode(layer.dithering));
+    setSelectionMask(null);
+    if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
+    if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
+    if ('sourceUploadedImage' in layer) uploadedImageRef.current = layer.sourceUploadedImage ?? null;
+  }, [activeLayerId]);
+
+  // Push current state onto undo stack before a tracked action
+  const pushToHistory = useCallback(() => {
+    const { imageData: img, blockSelection: sel, activeLayerId: lid } = latestRef.current;
+    setUndoStack(prev => {
+      const next = [...prev, { layerId: lid, imageData: img, blockSelection: sel }];
+      return next.length > MAX_HISTORY ? next.slice(1) : next;
+    });
+    setRedoStack([]);
+  // latestRef is a stable ref, setters are stable
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      const cur = latestRef.current;
+      // Save current state of the specific layer being undone (for redo)
+      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
+      setRedoStack(r => [...r, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }]);
+      // Target the correct layer, not necessarily the active one
+      processTargetLayerIdRef.current = entry.layerId;
+      setImageData(entry.imageData);
+      setBlockSelection(entry.blockSelection);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev;
+      const entry = prev[prev.length - 1];
+      const cur = latestRef.current;
+      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
+      setUndoStack(u => {
+        const next = [...u, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }];
+        return next.length > MAX_HISTORY ? next.slice(1) : next;
+      });
+      processTargetLayerIdRef.current = entry.layerId;
+      setImageData(entry.imageData);
+      setBlockSelection(entry.blockSelection);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  // Keyboard shortcuts for undo/redo + export — effect registered below,
+  // after handleExportPng/handleExportLitematic are declared.
+
+  // Stable ref so keyboard handler can call handleDeleteSelection without forward-ref TDZ
+  const handleDeleteSelectionRef = useRef<(() => void) | null>(null);
+
+  // Keyboard shortcuts for paint tools (E / B / F / Escape) + view toggles (Z / O)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (!imageData) return;
+      switch (e.code) {
+        case 'KeyE': setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper'); break;
+        case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
+        case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
+        case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
+        case 'KeyT': /* text tool hidden — to be reworked */ break;
+        case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
+        case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
+        case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
+        case 'KeyP': if (editorMode === 'artist') setActiveTool(t => t === 'pattern-tile' ? null : 'pattern-tile'); break;
+        case 'KeyG': if (editorMode === 'artist') setActiveTool(t => t === 'gradient' ? null : 'gradient'); break;
+        case 'KeyV': if (editorMode === 'artist') setActiveTool(t => t === 'move' ? null : 'move'); break;
+        case 'Delete':
+        case 'Backspace': if (editorMode === 'artist' && selectionMask) { handleDeleteSelectionRef.current?.(); } break;
+        case 'Escape':
+          if (selectionMask && editorMode === 'artist') { setSelectionMask(null); return; }
+          setActiveTool(null);
+          break;
+        case 'KeyZ': setShowGrid(g => !g); break;
+        case 'KeyO': if (!compareMode) setSplitPos(50); break;
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [imageData, compareMode, editorMode, selectionMask]);
+
+
+  const modeShades = (mapMode === '2d') ? [1] : [0, 1, 2];
+
+  // When adjustments are disabled, use zero adjustments for processing
+  const effectiveAdjustments = showAdjustments ? adjustments : DEFAULT_ADJUSTMENTS;
+
+  const activePalette = useMemo<ComputedPalette>(
+    () => buildComputedPalette(buildPaletteFromSelection(blockSelection, modeShades, minecraftVersion, platformMode), colorMatch),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [blockSelection, mapMode, minecraftVersion, platformMode, colorMatch],
+  );
+
+
+  const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
+
+  // exportRef is updated below, after compositeImageData is computed
+
+  function handleCancelProcessing() {
+    activeWorkerJobIdRef.current = null;
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+    setShowCancel(false);
+    setProcessing(false);
+    setProcessingProgress(0);
+  }
+
+  const runProcess = useCallback((
+    img: HTMLImageElement,
+    mode: DitheringMode,
+    grid: MapGrid,
+    intens: number,
+    compare: boolean,
+    cmpLeft: DitheringMode,
+    cmpRight: DitheringMode,
+    palette: ComputedPalette,
+    adj: ImageAdjustments,
+    bn: number,
+    kp: KlussParams,
+  ) => {
+    // Terminate any running worker and clear pending cancel timer
+    activeWorkerJobIdRef.current = null;
+    workerRef.current?.terminate();
+    if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+
+    setProcessing(true);
+    setProcessingProgress(0);
+    setShowCancel(false);
+
+    const w = gridPixelWidth(grid);
+    const h = gridPixelHeight(grid);
+
+    // Show cancel button after 500 ms
+    cancelTimerRef.current = setTimeout(() => setShowCancel(true), 500);
+
+    const worker = new Worker(
+      new URL('./workers/processor.worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    const jobId = ++workerJobSeqRef.current;
+    activeWorkerJobIdRef.current = jobId;
+    workerRef.current = worker;
+
+    function done() {
+      if (activeWorkerJobIdRef.current === jobId) activeWorkerJobIdRef.current = null;
+      if (cancelTimerRef.current) { clearTimeout(cancelTimerRef.current); cancelTimerRef.current = null; }
+      setShowCancel(false);
+      setProcessing(false);
+      setProcessingProgress(0);
+      if (workerRef.current === worker) workerRef.current = null;
+    }
+
+    worker.onmessage = (e: MessageEvent) => {
+      const msg = e.data;
+      if (msg.jobId !== jobId || activeWorkerJobIdRef.current !== jobId || workerRef.current !== worker) return;
+      if (msg.type === 'progress') {
+        setProcessingProgress(msg.pct as number);
+      } else if (msg.type === 'result') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
+        const processed = mk(msg.processedData);
+        // Guard: never overwrite a manually-edited (dirty) layer with processed results
+        const targetId = processTargetLayerIdRef.current ?? latestRef.current.activeLayerId;
+        const targetLayer = latestRef.current.layers.find(l => l.id === targetId);
+        if (targetLayer?.isDirty && !pendingAlphaMaskRef.current) {
+          processTargetLayerIdRef.current = null;
+          setOriginalData(mk(msg.originalData));
+          done();
+          return;
+        }
+        const alphaMask = pendingAlphaMaskRef.current;
+        pendingAlphaMaskRef.current = null;
+        if (alphaMask) {
+          // Re-apply the alpha channel from before re-processing (preserves deleted background)
+          for (let i = 0; i < alphaMask.length; i++) {
+            processed.data[i * 4 + 3] = alphaMask[i];
+          }
+          setImageData(processed, true, true);  // keep dirty — manual edits still present
+        } else {
+          setImageData(processed, false, true);  // fresh process, not dirty
+        }
+        setOriginalData(mk(msg.originalData));
+        trackEvent('map_generated', {
+          compare_mode: false,
+          output_variant: 'single',
+          map_mode: latestRef.current.mapMode,
+          staircase_mode: latestRef.current.mapMode === '3d' ? latestRef.current.staircaseMode : undefined,
+          dithering: mode,
+          map_wide: grid.wide,
+          map_tall: grid.tall,
+          intensity: intens,
+          bn_scale: bn,
+          palette_size: palette.colors.length,
+          platform_mode: latestRef.current.platformMode,
+          source_width: img.naturalWidth,
+          source_height: img.naturalHeight,
+        });
+        done();
+      } else if (msg.type === 'compare_result') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mk = (d: any) => new ImageData(new Uint8ClampedArray(d.buffer as ArrayBuffer), w, h);
+        setCompareData({ left: mk(msg.leftData), right: mk(msg.rightData) });
+        setOriginalData(mk(msg.originalData));
+        trackEvent('map_generated', {
+          compare_mode: true,
+          output_variant: 'compare',
+          map_mode: latestRef.current.mapMode,
+          staircase_mode: latestRef.current.mapMode === '3d' ? latestRef.current.staircaseMode : undefined,
+          compare_left: cmpLeft,
+          compare_right: cmpRight,
+          map_wide: grid.wide,
+          map_tall: grid.tall,
+          intensity: intens,
+          bn_scale: bn,
+          palette_size: palette.colors.length,
+          platform_mode: latestRef.current.platformMode,
+          source_width: img.naturalWidth,
+          source_height: img.naturalHeight,
+        });
+        done();
+      } else if (msg.type === 'error') {
+        console.error('Processor worker error:', msg.message);
+        showAppNotice(t('Не удалось обработать изображение.', 'Could not process the image.'), 'error');
+        done();
+      }
+    };
+    worker.onerror = () => {
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) {
+        showAppNotice(t('Не удалось обработать изображение.', 'Could not process the image.'), 'error');
+        done();
+      }
+    };
+
+    // Create transferable bitmap, then dispatch to worker.
+    // Use raw File if available to bypass ICC profile color correction.
+    const bitmapSource: ImageBitmapSource = uploadedFileRef.current ?? img;
+    createImageBitmap(bitmapSource, { colorSpaceConversion: 'none' }).then(bitmap => {
+      // If a newer runProcess call superseded this one, discard
+      if (workerRef.current !== worker || activeWorkerJobIdRef.current !== jobId) { bitmap.close(); return; }
+      if (compare) {
+        worker.postMessage(
+          { type: 'compare', jobId, bitmap, width: w, height: h, intensity: intens / 100, leftMode: cmpLeft, rightMode: cmpRight, palette, adjustments: adj, bnScale: bn, klussParams: kp },
+          [bitmap],
+        );
+      } else {
+        worker.postMessage(
+          { type: 'process', jobId, bitmap, options: { dithering: mode, width: w, height: h, intensity: intens / 100, bnScale: bn, palette, adjustments: adj, klussParams: kp, bgMode: bgModeRef.current, bgColor: bgColorRef.current } },
+          [bitmap],
+        );
+      }
+    }).catch(() => {
+      if (activeWorkerJobIdRef.current === jobId && workerRef.current === worker) {
+        showAppNotice(t('Не удалось подготовить изображение для обработки.', 'Could not prepare the image for processing.'), 'error');
+        done();
+      }
+    });
+  }, [showAppNotice, t]);
+
+  const handleImageLoaded = useCallback((img: HTMLImageElement, file?: File) => {
+    uploadedImageRef.current = img;   // save original for crop modal
+    uploadedFileRef.current  = file ?? null;
+    // Detect transparency by sampling pixels at reduced scale
+    const tc = document.createElement('canvas');
+    tc.width  = Math.min(img.naturalWidth,  64);
+    tc.height = Math.min(img.naturalHeight, 64);
+    const tctx = tc.getContext('2d')!;
+    tctx.drawImage(img, 0, 0, tc.width, tc.height);
+    const td = tctx.getImageData(0, 0, tc.width, tc.height).data;
+    let hasAlpha = false;
+    for (let i = 3; i < td.length; i += 4) { if (td[i] < 255) { hasAlpha = true; break; } }
+    setSourceHasAlpha(hasAlpha);
+    if (!hasAlpha) { setBgMode('color'); bgModeRef.current = 'color'; }
+    setOriginalData(null);
+    setCompareData(null);
+    setSourceImage(img);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: file ?? null, sourceUploadedImage: img } : l),
+    }));
+    setSplitPos(50);
+    setUndoStack([]);
+    setRedoStack([]);
+    runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  // ── GIF Project handlers ─────────────────────────────────────────────────────
+
+  const handleOpenAsGifProject = useCallback(async (frames: ImageData[], initialConfig: GifFrameConfig) => {
+    const thumbnails = frames.map(f => makeThumbnail(f, 80));
+    const configs: GifFrameConfig[] = frames.map(() => ({ ...initialConfig }));
+    setGifProject({ frames, thumbnails, currentIndex: 0, configs });
+    setGifFrames(null);
+    // Load frame 0 into editor
+    const img = await imageDataToHtmlImage(frames[0]);
+    uploadedFileRef.current = null;
+    handleImageLoaded(img);
+  }, [handleImageLoaded]);
+
+  const handleGifFrameSelect = useCallback(async (index: number) => {
+    if (!gifProject) return;
+    // Save current frame's config
+    const currentConfig: GifFrameConfig = {
+      dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection,
+    };
+    const updatedConfigs = [...gifProject.configs];
+    updatedConfigs[gifProject.currentIndex] = currentConfig;
+
+    setGifProject(prev => prev ? { ...prev, configs: updatedConfigs, currentIndex: index } : prev);
+
+    // Load new frame's config
+    const newConfig = updatedConfigs[index];
+    setDithering(coerceDitheringMode(newConfig.dithering));
+    setIntensity(newConfig.intensity);
+    setMapMode(newConfig.mapMode);
+    setStaircaseMode(newConfig.staircaseMode);
+    setAdjustments(newConfig.adjustments);
+    setBnScale(newConfig.bnScale);
+    setKlussParams(newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
+    setBlockSelection(newConfig.blockSelection);
+
+    // Load new frame into editor
+    const img = await imageDataToHtmlImage(gifProject.frames[index]);
+    uploadedFileRef.current = null;
+    uploadedImageRef.current = img;
+    setSourceImage(img);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: img, sourceFile: null, sourceUploadedImage: img } : l),
+    }));
+    setUndoStack([]);
+    setRedoStack([]);
+    const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
+    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
+    runProcess(img, coerceDitheringMode(newConfig.dithering), mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
+  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, minecraftVersion, platformMode, colorMatch, mapGrid, compareMode, compareLeft, compareRight, runProcess]);
+
+  const handleGifProjectConfigChange = useCallback((index: number, partial: Partial<GifFrameConfig>) => {
+    setGifProject(prev => {
+      if (!prev) return prev;
+      const configs = [...prev.configs];
+      configs[index] = { ...configs[index], ...partial };
+      return { ...prev, configs };
+    });
+  }, []);
+
+  const handleCloseGifProject = useCallback(() => {
+    setGifProject(null);
+  }, []);
+
+  const handleExportGifLitematicPack = useCallback(async () => {
+    if (!gifProject) return;
+    const { buildLitematicBytes } = await import('./lib/exportLitematic');
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    for (let i = 0; i < gifProject.frames.length; i++) {
+      const frame = gifProject.frames[i];
+      const cfg = gifProject.configs[i];
+      const cfgShades = cfg.mapMode === '2d' ? [1] : [0, 1, 2];
+      const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
+      const { processImage } = await import('./lib/processor');
+      const result = await processImage(bitmap, { dithering: coerceDitheringMode(cfg.dithering), width: w, height: h, intensity: cfg.intensity / 100, bnScale: cfg.bnScale, palette: pal, adjustments: cfg.adjustments, klussParams: cfg.klussParams ?? DEFAULT_KLUSS_PARAMS });
+      bitmap.close();
+      const pad = String(i + 1).padStart(3, '0');
+      const structure = cfg.mapMode === '3d' ? 'staircase' : 'flat';
+      const bytes = await buildLitematicBytes(result.processed, pal, cfg.blockSelection, `frame_${pad}`, structure, undefined, cfg.staircaseMode);
+      zip.file(`frame_${pad}.litematic`, bytes);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'gif_mapart.zip' });
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [gifProject, minecraftVersion, platformMode, colorMatch, mapGrid]);
+
+  const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {
+    setShowCropModal(false);
+    uploadedFileRef.current = null;   // use cropped image, not original file
+    uploadedImageRef.current = croppedImg;
+    setOriginalData(null);
+    setCompareData(null);
+    setSourceImage(croppedImg);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, sourceImage: croppedImg, sourceFile: null, sourceUploadedImage: croppedImg } : l),
+    }));
+    setSplitPos(50);
+    setUndoStack([]);
+    setRedoStack([]);
+    runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleCreateBlankCanvas = useCallback((
+    bg: { r: number; g: number; b: number; a: number } | null,
+    grid: MapGrid,
+  ) => {
+    trackEvent('blank_canvas_created', { map_wide: grid.wide, map_tall: grid.tall, has_background: Boolean(bg) });
+    setShowNewCanvasModal(false);
+    const width  = gridPixelWidth(grid);
+    const height = gridPixelHeight(grid);
+    const data   = new ImageData(width, height);
+    if (bg) {
+      for (let i = 0; i < data.data.length; i += 4) {
+        data.data[i]     = bg.r;
+        data.data[i + 1] = bg.g;
+        data.data[i + 2] = bg.b;
+        data.data[i + 3] = bg.a;
+      }
+    }
+    setMapGrid(grid);
+    setSourceImage(null);
+    uploadedImageRef.current = null;
+    uploadedFileRef.current  = null;
+    setOriginalData(null);
+    setCompareData(null);
+    setUndoStack([]);
+    setRedoStack([]);
+    // Reset to single fresh layer with blank canvas data
+    const newLayer = createLayer('Слой 1');
+    newLayer.imageData = data;
+    setLayerState({ layers: [newLayer], activeLayerId: newLayer.id, groups: [] });
+  }, []);
+
+  const handleDitheringChange = useCallback((mode: DitheringMode) => {
+    setDithering(mode);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, dithering: mode } : l),
+    }));
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) {
+      if (activeLayerRef.current?.isDirty) {
+        // Layer was manually edited — re-process but re-apply the current alpha mask afterwards
+        const img = activeLayerRef.current.imageData;
+        if (img) {
+          const mask = new Uint8Array(img.width * img.height);
+          for (let i = 0; i < mask.length; i++) mask[i] = img.data[i * 4 + 3];
+          pendingAlphaMaskRef.current = mask;
+        }
+      }
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, mode, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleMapGridChange = useCallback((grid: MapGrid) => {
+    setMapGrid(grid);
+    const newW = gridPixelWidth(grid);
+    const newH = gridPixelHeight(grid);
+    // Scale all layers to new dimensions before re-processing
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => {
+        if (!l.imageData) return l; // empty layers stay empty
+        return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
+      }),
+    }));
+    // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
+    setUndoStack([]);
+    setRedoStack([]);
+    // Scale originalData (compare preview) to new dimensions
+    if (originalDataRef.current) {
+      setOriginalData(scaleImageData(originalDataRef.current, newW, newH));
+    }
+    // Re-process only the ACTIVE non-dirty layer — only if one exists
+    if (sourceImage) {
+      const activeId = latestRef.current.activeLayerId;
+      const srcLayer = latestRef.current.layers.find(l => l.id === activeId && !l.isDirty);
+      if (srcLayer) {
+        processTargetLayerIdRef.current = srcLayer.id;
+        runProcess(sourceImage, dithering, grid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
+    }
+  }, [sourceImage, dithering, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleIntensityChange = useCallback((v: number) => setIntensity(v), []);
+
+  const handleIntensityCommit = useCallback((v: number) => {
+    setIntensity(v);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, v, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleBnScaleChange = useCallback((v: number) => {
+    setBnScale(v);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, v, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, klussParams, runProcess]);
+
+  const handleKlussParamsChange = useCallback((kp: KlussParams) => {
+    setKlussParams(kp);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, kp);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, runProcess]);
+
+  const handleCompareModeChange = useCallback((enabled: boolean) => {
+    setCompareMode(enabled);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, enabled, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleCompareSideChange = useCallback((side: 'left' | 'right', mode: DitheringMode) => {
+    if (side === 'left') {
+      setCompareLeft(mode);
+      if (sourceImage) {
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+        runProcess(sourceImage, dithering, mapGrid, intensity, true, mode, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
+    } else {
+      setCompareRight(mode);
+      if (sourceImage) {
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+        runProcess(sourceImage, dithering, mapGrid, intensity, true, compareLeft, mode, activePalette, effectiveAdjustments, bnScale, klussParams);
+      }
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleSelectionChange = useCallback((sel: BlockSelection) => {
+    pushToHistory();
+    setBlockSelection(sel);
+    const shades = mapMode === '2d' ? [1] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion, platformMode), colorMatch);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
+
+  const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
+    trackEvent('map_mode_applied', { map_mode: mode });
+    setMapMode(mode);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
+    }));
+    const shades = mode === '2d' ? [1] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
+    if (sourceImage && activeLayerHasContent(activeLayerRef)) {
+      if (activeLayerRef.current?.isDirty) {
+        const img = activeLayerRef.current.imageData;
+        if (img) {
+          const mask = new Uint8Array(img.width * img.height);
+          for (let i = 0; i < mask.length; i++) mask[i] = img.data[i * 4 + 3];
+          pendingAlphaMaskRef.current = mask;
+        }
+      }
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, runProcess]);
+
+  const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
+    trackEvent('staircase_mode_applied', { staircase_mode: mode });
+    setStaircaseMode(mode);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, staircaseMode: mode } : l),
+    }));
+  }, []);
+
+  const handleColorMatchChange = useCallback((mode: ColorMatchMode) => {
+    trackEvent('color_match_changed', { color_match: mode });
+    setColorMatch(mode);
+    if (sourceImage) {
+      const shades = mapMode === '2d' ? [1] : [0, 1, 2];
+      const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), mode);
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [sourceImage, mapMode, blockSelection, minecraftVersion, platformMode, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, runProcess]);
+
+  const handleAdjChange = useCallback((adj: ImageAdjustments) => {
+    setAdjustments(adj);
+  }, []);
+
+  const handleAdjCommit = useCallback((adj: ImageAdjustments) => {
+    setAdjustments(adj);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+    }
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams, runProcess]);
+
+  const handleToggleSection = useCallback((key: string) => {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const handleToggleAdjustments = useCallback(() => {
+    setShowAdjustments(prev => {
+      const next = !prev;
+      if (sourceImage) {
+        const adj = next ? adjustments : DEFAULT_ADJUSTMENTS;
+        processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+        runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, adj, bnScale, klussParams);
+      }
+      return next;
+    });
+  }, [adjustments, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, bnScale, klussParams, runProcess]);
+
+  // Reprocess when background mode or color changes
+  useEffect(() => {
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgMode, bgColor]);
+
+  const handleRemoveBlock = useCallback((csId: number) => {
+    pushToHistory();
+    const next: BlockSelection = { ...blockSelection, [csId]: [] };
+    setBlockSelection(next);
+    const shades = mapMode === '2d' ? [1] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades, minecraftVersion, platformMode), colorMatch);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
+
+  const handleImageUpdate = useCallback((data: ImageData) => {
+    pushToHistory();
+    setImageData(data, true);  // manual paint → mark dirty
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Selection operations ─────────────────────────────────────────────────────
+
+  const handleDeleteSelection = useCallback(() => {
+    if (!imageData || !selectionMask) return;
+    pushToHistory();
+    const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      buf.data[i * 4] = 0; buf.data[i * 4 + 1] = 0; buf.data[i * 4 + 2] = 0; buf.data[i * 4 + 3] = 0;
+    }
+    setImageData(buf, true);  // manual edit → dirty
+  }, [imageData, selectionMask, pushToHistory]);
+  handleDeleteSelectionRef.current = handleDeleteSelection;
+
+  const handleFillSelection = useCallback(() => {
+    if (!imageData || !selectionMask || !paintBlock || paintBlock.baseId === -1) return;
+    const color = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === paintBlock.shade)
+      ?? activePalette.colors.find(c => c.baseId === paintBlock.baseId);
+    if (!color) return;
+    pushToHistory();
+    const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      buf.data[i * 4] = color.r; buf.data[i * 4 + 1] = color.g; buf.data[i * 4 + 2] = color.b; buf.data[i * 4 + 3] = 255;
+    }
+    setImageData(buf, true);  // manual edit → dirty
+  }, [imageData, selectionMask, paintBlock, activePalette, pushToHistory]);
+
+  const handleInvertSelection = useCallback(() => {
+    if (!imageData) return;
+    setSelectionMask(prev => prev ? invertMask(prev, imageData.width, imageData.height) : selectAllMask(imageData.width, imageData.height));
+  }, [imageData]);
+
+  const handleMoveSelectionToLayer = useCallback(() => {
+    if (!imageData || !selectionMask) return;
+    pushToHistory();
+    const w = imageData.width, h = imageData.height;
+    const newLayerData = new ImageData(w, h);
+    const erasedData = new ImageData(new Uint8ClampedArray(imageData.data), w, h);
+    for (let i = 0; i < selectionMask.length; i++) {
+      if (!selectionMask[i]) continue;
+      newLayerData.data[i * 4]     = imageData.data[i * 4];
+      newLayerData.data[i * 4 + 1] = imageData.data[i * 4 + 1];
+      newLayerData.data[i * 4 + 2] = imageData.data[i * 4 + 2];
+      newLayerData.data[i * 4 + 3] = imageData.data[i * 4 + 3];
+      erasedData.data[i * 4]     = 0;
+      erasedData.data[i * 4 + 1] = 0;
+      erasedData.data[i * 4 + 2] = 0;
+      erasedData.data[i * 4 + 3] = 0;
+    }
+    const newLayer = createLayer('Выделение', newLayerData);
+    newLayer.isDirty = true;  // manually created — must not be overwritten by runProcess
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const updated = prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, imageData: erasedData, isDirty: true } : l);
+      const insertAt = idx >= 0 ? idx + 1 : updated.length;
+      const newLayers = [...updated.slice(0, insertAt), newLayer, ...updated.slice(insertAt)];
+      return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
+    });
+    setSelectionMask(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageData, selectionMask]);
+
+  // ── Layer management ─────────────────────────────────────────────────────────
+
+  const handleAddLayer = useCallback(() => {
+    setLayerState(prev => {
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const l = createLayer(`Слой ${prev.layers.length + 1}`, new ImageData(w, h));
+      return { ...prev, layers: [...prev.layers, l], activeLayerId: l.id };
+    });
+  }, [mapGrid]);
+
+  const handleDeleteLayer = useCallback((id: string) => {
+    setLayerState(prev => {
+      if (prev.layers.length <= 1) return prev; // always keep at least 1
+      const newLayers = prev.layers.filter(l => l.id !== id);
+      const newActive = prev.activeLayerId === id
+        ? (newLayers[newLayers.length - 1]?.id ?? '')
+        : prev.activeLayerId;
+      return { ...prev, layers: newLayers, activeLayerId: newActive };
+    });
+  }, []);
+
+  const handleRenameLayer = useCallback((id: string, name: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, name } : l),
+    }));
+  }, []);
+
+  const handleToggleLayerVisible = useCallback((id: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l),
+    }));
+  }, []);
+
+  const handleMoveLayerUp = useCallback((id: string) => {
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === id);
+      if (idx >= prev.layers.length - 1) return prev;
+      const next = [...prev.layers];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return { ...prev, layers: next };
+    });
+  }, []);
+
+  const handleMoveLayerDown = useCallback((id: string) => {
+    setLayerState(prev => {
+      const idx = prev.layers.findIndex(l => l.id === id);
+      if (idx <= 0) return prev;
+      const next = [...prev.layers];
+      [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+      return { ...prev, layers: next };
+    });
+  }, []);
+
+  const handleOpacityChange = useCallback((id: string, opacity: number) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, opacity } : l),
+    }));
+  }, []);
+
+  const handleToggleLock = useCallback((id: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l),
+    }));
+  }, []);
+
+  const handleMoveLayer = useCallback((fromIdx: number, toIdx: number) => {
+    setLayerState(prev => {
+      const display = [...prev.layers].reverse();
+      if (fromIdx < 0 || fromIdx >= display.length || toIdx < 0 || toIdx >= display.length) return prev;
+      const moved = display.splice(fromIdx, 1)[0];
+      display.splice(toIdx, 0, moved);
+      return { ...prev, layers: display.reverse() };
+    });
+  }, []);
+
+  const handleMergeDown = useCallback(() => {
+    setLayerState(prev => {
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const newLayers = mergeLayersDown(prev.layers, prev.activeLayerId, w, h);
+      const mergedIdx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const newActive = newLayers[Math.max(0, mergedIdx - 1)]?.id ?? newLayers[0]?.id ?? prev.activeLayerId;
+      return { ...prev, layers: newLayers, activeLayerId: newActive };
+    });
+  }, [mapGrid]);
+
+  const handleMergeVisible = useCallback(() => {
+    setLayerState(prev => {
+      const w = gridPixelWidth(mapGrid);
+      const h = gridPixelHeight(mapGrid);
+      const newLayers = mergeVisible(prev.layers, w, h);
+      const firstVisible = newLayers.find(l => l.visible && l.imageData);
+      return { ...prev, layers: newLayers, activeLayerId: firstVisible?.id ?? prev.activeLayerId };
+    });
+  }, [mapGrid]);
+
+  const handleCreateGroup = useCallback((layerIds: string[]) => {
+    const groupId = `group-${Date.now()}`;
+    const newGroup: LayerGroup = { id: groupId, name: 'Группа', visible: true, collapsed: false };
+    setLayerState(prev => ({
+      ...prev,
+      groups: [...prev.groups, newGroup],
+      layers: prev.layers.map(l => layerIds.includes(l.id) ? { ...l, groupId } : l),
+    }));
+  }, []);
+
+  const handleToggleGroupCollapse = useCallback((groupId: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      groups: prev.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g),
+    }));
+  }, []);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    setLayerState(prev => ({
+      ...prev,
+      groups: prev.groups.filter(g => g.id !== groupId),
+      layers: prev.layers.map(l => l.groupId === groupId ? { ...l, groupId: null } : l),
+    }));
+  }, []);
+
+  const handleTextCommit = useCallback((textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => {
+    setLayerState(prev => {
+      if (replaceActive) {
+        // Re-editing an existing text layer: replace its pixels + metadata in place.
+        const layers = prev.layers.map(l => l.id === prev.activeLayerId
+          ? { ...l, imageData: textImageData, isText: true, text: meta, isDirty: true }
+          : l);
+        return { ...prev, layers };
+      }
+      const newLayer = createLayer(layerName, textImageData, true);
+      newLayer.text = meta;
+      const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
+      const insertAt = idx >= 0 ? idx + 1 : prev.layers.length;
+      const newLayers = [...prev.layers.slice(0, insertAt), newLayer, ...prev.layers.slice(insertAt)];
+      return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
+    });
+  }, []);
+
+  // ── Export shortcuts (stable — uses exportRef for fresh state) ───────────
+  const handleExportPng = useCallback(() => {
+    const { imageData: img, dithering: d, mapGrid: g } = exportRef.current;
+    if (!img) return;
+    downloadPng(img, `MapartForge_${g.wide}x${g.tall}_${d}.png`);
+  }, []);
+
+  const handleExportLitematic = useCallback(() => {
+    const { activePalette: ap, blockSelection: sel, layers: exportLayers } = exportRef.current;
+    const visLayers = exportLayers.filter(l => l.visible && l.imageData);
+    if (visLayers.length === 0) return;
+    const groups: Record<number, number[]> = {};
+    for (const [k, v] of Object.entries(sel)) { groups[Number(k)] = v as number[]; }
+    exportLitematicHybrid(visLayers.map(l => ({
+      imageData: l.imageData!,
+      mapMode: l.mapMode ?? '2d',
+      staircaseMode: l.staircaseMode ?? 'optimized',
+    })), ap, groups, 'MapartForge');
+  }, []);
+
+  // ── Project save / load ──────────────────────────────────────────────────────
+
+  const handleSaveProject = useCallback(() => {
+    const json = serializeProject(layers, activeLayerId, mapGrid);
+    const name = `MapKluss_${mapGrid.wide}x${mapGrid.tall}_${new Date().toISOString().slice(0,10)}.mapkluss`;
+    downloadProject(json, name);
+  }, [layers, activeLayerId, mapGrid]);
+
+  const projectFileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleLoadProject = useCallback(() => {
+    // Create hidden file input on demand
+    if (!projectFileInputRef.current) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.mapkluss,application/json';
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        file.text().then(json => {
+          const result = deserializeProject(json);
+          if (!result) {
+            showAppNotice(t('Не удалось загрузить проект: файл повреждён или несовместим.', 'Could not load project: file is damaged or incompatible.'), 'error');
+            return;
+          }
+          setMapGrid(result.grid);
+          setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId, groups: [] });
+          setSourceImage(null);
+          setOriginalData(null);
+          setCompareData(null);
+          setUndoStack([]);
+          setRedoStack([]);
+        });
+      };
+      projectFileInputRef.current = input;
+    }
+    projectFileInputRef.current.value = '';
+    projectFileInputRef.current.click();
+  }, [showAppNotice, t]);
+
+  // Keyboard shortcuts: 1-9 select dithering, C toggles compare mode
+  // (declared here, after handleDitheringChange / handleCompareModeChange, to avoid TDZ)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.code.startsWith('Digit')) {
+        const idx = Number(e.key) - 1;
+        if (idx >= 0 && idx < ALL_MODES.length) { handleDitheringChange(ALL_MODES[idx]); return; }
+      }
+      if (!imageData) return;
+      if (e.code === 'KeyC') handleCompareModeChange(!compareMode);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [imageData, compareMode, handleDitheringChange, handleCompareModeChange]);
+
+  // Keyboard shortcuts for undo/redo + export
+  // (declared here, after handleExportPng/handleExportLitematic, to avoid TDZ)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA' && editorMode === 'artist' && imageData) {
+        e.preventDefault();
+        setSelectionMask(selectAllMask(imageData.width, imageData.height));
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD' && editorMode === 'artist') {
+        e.preventDefault();
+        setSelectionMask(null);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyI' && editorMode === 'artist' && imageData) {
+        e.preventDefault();
+        handleInvertSelection();
+        return;
+      }
+      if (!e.shiftKey && e.code === 'KeyZ') { e.preventDefault(); handleUndo(); return; }
+      if (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ')) { e.preventDefault(); handleRedo(); return; }
+      if (!e.shiftKey && e.code === 'KeyS') { e.preventDefault(); handleExportPng(); return; }
+      if (e.shiftKey && e.code === 'KeyS') { e.preventDefault(); handleExportLitematic(); return; }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [handleUndo, handleRedo, handleExportPng, handleExportLitematic, editorMode, imageData, handleInvertSelection]);
+
+  // ── Reset all settings to defaults ───────────────────────────────────────
+  const handleResetDefaults = useCallback(() => {
+    clearSettings();
+    setDithering('floyd-steinberg');
+    setIntensity(100);
+    setBnScale(2);
+    setMapGrid({ wide: 1, tall: 1 });
+    setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode));
+    setAdjustments(DEFAULT_ADJUSTMENTS);
+    setColorMatch(DEFAULT_COLOR_MATCH);
+    setMapMode('2d');
+    if (sourceImage) {
+      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1], minecraftVersion, platformMode), DEFAULT_COLOR_MATCH);
+      runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
+    }
+  }, [sourceImage, compareMode, compareLeft, compareRight, minecraftVersion, platformMode, runProcess]);
+
+  // ── Load from ?palette= URL param (runs once on mount) ───────────────────
+  // ?share= and ?example= take priority because they restore their own settings.
+  useEffect(() => {
+    const params   = new URLSearchParams(window.location.search);
+    const shareId  = params.get('share');
+    const exampleId = params.get('example');
+    const paletteQ = params.get(PALETTE_PARAM);
+    if (shareId || exampleId || params.get('companionImport') || params.get('artVersion') || params.get('art') || !paletteQ) return;
+    const sel = decodePalette(paletteQ);
+    if (!sel) return;
+    setBlockSelection(sel);
+    setPaletteBanner(true);
+  }, []);
+
+  // ── Load from ?share= URL param (runs once on mount) ──────────────────────
+  // Using a ref to prevent double-execution in React StrictMode
+  const linkLoadedRef = useRef(false);
+  useEffect(() => {
+    if (linkLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const linkId = params.get('share');
+    if (params.get('companionImport') || params.get('artVersion') || params.get('art') || !linkId) return;
+    linkLoadedRef.current = true;
+
+    loadShare(linkId).then(result => {
+      if (!result) return;
+      const s = result.settings;
+      // Restore settings
+      if (s.dithering)       setDithering(coerceDitheringMode(s.dithering));
+      if (s.intensity != null)  setIntensity(s.intensity);
+      if (s.bnScale != null)    setBnScale(s.bnScale);
+      if (s.mapGrid)         setMapGrid(s.mapGrid);
+      if (s.blockSelection)  setBlockSelection(s.blockSelection);
+      if (s.adjustments)     setAdjustments(normalizeAdjustments(s.adjustments));
+      if (s.colorMatch)      setColorMatch(coerceColorMatchMode(s.colorMatch));
+      if (s.mapMode)         setMapMode(s.mapMode);
+
+      // Load source image from storage
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        setSourceImage(img);
+        setViewBanner(true);
+        setUndoStack([]);
+        setRedoStack([]);
+        const shades = (s.mapMode ?? '2d') === '2d' ? [1] : [0, 1, 2];
+        const palette = buildComputedPalette(
+          buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades, minecraftVersion, platformMode),
+          coerceColorMatchMode(s.colorMatch),
+        );
+        runProcess(
+          img,
+          s.dithering       ?? 'floyd-steinberg',
+          s.mapGrid         ?? { wide: 1, tall: 1 },
+          s.intensity       ?? 100,
+          false,
+          'floyd-steinberg',
+          'yliluoma2',
+          palette,
+          s.adjustments     ?? DEFAULT_ADJUSTMENTS,
+          s.bnScale         ?? 2,
+          DEFAULT_KLUSS_PARAMS,
+        );
+      };
+      img.src = result.imageUrl;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Load from ?example= URL param (runs once on mount) ───────────────────
+  // Runs after ?share= priority check; examples are static and do not use Supabase.
+  const exampleLoadedRef = useRef(false);
+  useEffect(() => {
+    if (exampleLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('share') || params.get('companionImport') || params.get('artVersion') || params.get('art')) return;
+    const example = getExampleById(params.get('example'));
+    if (!example) return;
+    exampleLoadedRef.current = true;
+
+    const { trySettings } = example;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      uploadedFileRef.current = null;
+      uploadedImageRef.current = img;
+      setSourceImage(img);
+      setOriginalData(null);
+      setCompareData(null);
+      setDithering(trySettings.dithering);
+      setIntensity(trySettings.intensity);
+      setMapGrid(trySettings.mapGrid);
+      setMapMode(trySettings.mapMode);
+      setStaircaseMode(trySettings.staircaseMode);
+      setBnScale(trySettings.bnScale);
+      setViewBanner(true);
+      setUndoStack([]);
+      setRedoStack([]);
+      setLayerState(prev => ({
+        ...prev,
+        layers: prev.layers.map(l => l.id === prev.activeLayerId ? {
+          ...l,
+          sourceImage: img,
+          sourceFile: null,
+          sourceUploadedImage: img,
+          dithering: trySettings.dithering,
+          mapMode: trySettings.mapMode,
+          staircaseMode: trySettings.staircaseMode,
+          isDirty: false,
+        } : l),
+      }));
+      const shades = trySettings.mapMode === '2d' ? [1] : [0, 1, 2];
+      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
+      runProcess(
+        img,
+        trySettings.dithering,
+        trySettings.mapGrid,
+        trySettings.intensity,
+        false,
+        compareLeft,
+        compareRight,
+        palette,
+        effectiveAdjustments,
+        trySettings.bnScale,
+        klussParams,
+      );
+    };
+    img.src = example.originalUrl;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const switchTourStep = useCallback((tab: 'settings' | 'palette' | 'export') => {
+    setMobileTab(tab);
+    const tablet = window.matchMedia('(min-width: 768px) and (max-width: 1099px)').matches;
+    if (tab === 'settings') {
+      setLeftPanelCollapsed(false);
+      if (tablet) setTabletRightOpen(false);
+    } else {
+      setRightPanelCollapsed(false);
+      if (tablet) setTabletRightOpen(true);
+    }
+  }, []);
+
+  // ── Onboarding tour ───────────────────────────────────────────────────────
+  const startTour = useCallback((tourType: TourType) => {
+    markTourDone(tourType);
+    trackEvent('tutorial_opened', { tutorial_type: tourType === 'advanced' ? 'tour_advanced' : 'tour_basic', lang });
+    createTour(tourType, switchTourStep, lang).drive();
+  }, [lang, switchTourStep]);
+  useEffect(() => {
+    if (suppressAutoTour) return;
+    if (shouldAutoStart()) {
+      const timer = setTimeout(() => createTour('basic', switchTourStep, lang).drive(), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [lang, switchTourStep, suppressAutoTour]);
+
+  // ── Import map.dat ────────────────────────────────────────────────────────
+  const handleDatFile = useCallback(async (file: File) => {
+    try {
+      const importedImageData = await importMapDat(file);
+      // Set the grid to 1×1 (one map = 128×128)
+      setMapGrid({ wide: 1, tall: 1 });
+      // Put the imported imageData directly into the active layer (skip re-processing)
+      setLayerState(prev => ({
+        ...prev,
+        layers: prev.layers.map(l =>
+          l.id === prev.activeLayerId
+            ? { ...l, imageData: importedImageData, isDirty: true, sourceImage: undefined }
+            : l
+        ),
+      }));
+      setImageData(importedImageData);
+    } catch (e) {
+      const msg = e instanceof MapDatImportError ? e.message : t('Не удалось прочитать map.dat.', 'Failed to read map.dat.');
+      showAppNotice(msg, 'error');
+    }
+  }, [showAppNotice, t]);
+
+  // ── Import GIF ───────────────────────────────────────────────────────────
+  const handleGifFile = useCallback(async (file: File) => {
+    try {
+      const decoded = await decodeGif(file);
+      setGifFrames(decoded);
+    } catch (e) {
+      showAppNotice(t('Не удалось прочитать GIF.', 'Could not read GIF.') + ' ' + String(e), 'error');
+    }
+  }, [showAppNotice, t]);
+
+  const baseScale    = gridScale(mapGrid);
+  const zoomFactor   = zoom / 100;
+  const displayScale = Math.max(1, baseScale * zoomFactor);
+  const rasterScale  = Math.max(1, Math.min(8, Math.round(displayScale)));
+  const pw = gridPixelWidth(mapGrid);
+  const ph = gridPixelHeight(mapGrid);
+
+  // Composite of all visible layers — used for export and MaterialsList
+  const compositeImageData: ImageData | null = useMemo(() => {
+    const hasAny = layers.some(l => l.visible && l.imageData);
+    if (!hasAny) return null;
+    return compositeLayersToImageData(layers, pw, ph);
+  }, [layers, pw, ph]);
+  const previewLayers = useMemo(() => layers
+    .filter(layer => layer.visible && layer.imageData)
+    .map(layer => ({
+      imageData: layer.imageData!,
+      mapMode: layer.mapMode ?? '2d',
+      staircaseMode: layer.staircaseMode ?? 'optimized',
+    })), [layers]);
+
+  const finalPreview = useMemo(() => buildFinalPreview(previewLayers, activePalette), [previewLayers, activePalette]);
+  const previewImageData = finalPreview?.displayImage ?? compositeImageData;
+
+  // Composite of all visible layers EXCEPT the active one — shown as backdrop during painting
+  const otherLayersData: ImageData | null = useMemo(() => {
+    const others = layers.filter(l => l.id !== activeLayerId && l.visible && l.imageData);
+    if (others.length === 0) return null;
+    return compositeLayersToImageData(others, pw, ph);
+  }, [layers, activeLayerId, pw, ph]);
+
+  const sessionMaterials = useMemo<SessionMaterial[]>(() => {
+    if (!compositeImageData) return [];
+    return computeSessionMaterials(compositeImageData, activePalette, blockSelection, mapGrid);
+  }, [compositeImageData, activePalette, blockSelection, mapGrid]);
+
+  // Keep exportRef current (uses composite so Ctrl+Shift+S exports all visible layers)
+  exportRef.current = { imageData: previewImageData, dithering, mapGrid, activePalette, blockSelection, mapMode, staircaseMode, layers };
+
+  const hasContent = compositeImageData !== null || compareData !== null;
+
+  const updateCanvasZoom = useCallback((nextValue: number, point?: { clientX: number; clientY: number }) => {
+    const nextZoom = clampCanvasZoom(Math.round(nextValue * 10) / 10);
+    if (Math.abs(nextZoom - zoom) < 0.01) return;
+
+    const area = canvasAreaRef.current;
+    const canvas = area?.querySelector<HTMLCanvasElement>('.map-canvas');
+    if (area && canvas && hasContent) {
+      const areaRect = area.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      const clientX = point?.clientX ?? areaRect.left + area.clientWidth / 2;
+      const clientY = point?.clientY ?? areaRect.top + area.clientHeight / 2;
+      pendingZoomAnchorRef.current = {
+        clientX,
+        clientY,
+        xRatio: canvasRect.width > 0 ? (clientX - canvasRect.left) / canvasRect.width : 0.5,
+        yRatio: canvasRect.height > 0 ? (clientY - canvasRect.top) / canvasRect.height : 0.5,
+      };
+    } else {
+      pendingZoomAnchorRef.current = null;
+    }
+    setZoom(nextZoom);
+  }, [hasContent, zoom]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingZoomAnchorRef.current;
+    const area = canvasAreaRef.current;
+    if (!anchor || !area) return;
+    const canvas = area.querySelector<HTMLCanvasElement>('.map-canvas');
+    if (!canvas) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    area.scrollLeft += canvasRect.left + anchor.xRatio * canvasRect.width - anchor.clientX;
+    area.scrollTop += canvasRect.top + anchor.yRatio * canvasRect.height - anchor.clientY;
+    pendingZoomAnchorRef.current = null;
+  }, [zoom]);
+
+  const canvasWheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
+  canvasWheelHandlerRef.current = (event) => {
+    const area = canvasAreaRef.current;
+    if (!area || !hasContent || (!event.ctrlKey && !event.metaKey)) return;
+    event.preventDefault();
+    updateCanvasZoom(
+      canvasZoomFromWheel(zoom, event.deltaY, event.deltaMode, area.clientHeight),
+      { clientX: event.clientX, clientY: event.clientY },
+    );
+  };
+
+  useEffect(() => {
+    const area = canvasAreaRef.current;
+    if (!area) return;
+    const onWheel = (event: WheelEvent) => canvasWheelHandlerRef.current(event);
+    area.addEventListener('wheel', onWheel, { passive: false });
+    return () => area.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const handleCanvasPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (
+      !hasContent
+      || (!compareMode && activeTool !== null)
+      || event.pointerType === 'touch'
+      || event.button !== 0
+      || event.altKey
+      || target?.closest('.split-divider, button, input, select, textarea, a, [role="button"]')
+    ) return;
+
+    canvasPanRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      startScrollTop: event.currentTarget.scrollTop,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [activeTool, compareMode, hasContent]);
+
+  const handleCanvasPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const pan = canvasPanRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.startX;
+    const dy = event.clientY - pan.startY;
+    if (!pan.moved && Math.hypot(dx, dy) >= 3) {
+      pan.moved = true;
+      event.currentTarget.classList.add('canvas-area-panning');
+      event.currentTarget.dispatchEvent(new CustomEvent('mapkluss:viewport-pan-start'));
+      setIsCanvasPanning(true);
+    }
+    if (!pan.moved) return;
+    event.preventDefault();
+    event.currentTarget.scrollLeft = pan.startScrollLeft - dx;
+    event.currentTarget.scrollTop = pan.startScrollTop - dy;
+  }, []);
+
+  const finishCanvasPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const pan = canvasPanRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    suppressCanvasClickRef.current = pan.moved;
+    canvasPanRef.current = null;
+    event.currentTarget.classList.remove('canvas-area-panning');
+    setIsCanvasPanning(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  const handleCanvasClickCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!suppressCanvasClickRef.current) return;
+    suppressCanvasClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const buildCurrentCloudProjectJson = useCallback(() => {
+    const settings: FullProjectSettings = {
+      dithering,
+      intensity,
+      blockSelection: blockSelection as Record<string, number[]>,
+      adjustments,
+      mapMode,
+      staircaseMode,
+      bnScale,
+      klussParams,
+      originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
+      minecraftVersion,
+      platformMode,
+    };
+    return serializeFullProject(layers, activeLayerId, mapGrid, settings);
+  }, [activeLayerId, adjustments, blockSelection, bnScale, dithering, intensity, klussParams, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode]);
+
+  const handleCloudSignInFromEditor = useCallback(async () => {
+    setShowCloudArtsPanel(true);
+    showAppNotice(t('Войди в аккаунт MapKluss в папке артов.', 'Sign in to MapKluss from the arts folder.'));
+  }, [showAppNotice, t]);
+
+  const handleSaveCurrentArtToCloud = useCallback(async () => {
+    if (cloudSaving) return;
+    const outputImage = previewImageData ?? compositeImageData;
+    if (!outputImage) {
+      showAppNotice(t('Сначала загрузи или создай арт.', 'Create or load an art first.'), 'error');
+      return;
+    }
+
+    setCloudSaving(true);
+    try {
+      const user = await getCurrentCompanionAuthUser();
+      if (!user) {
+        setCloudSaving(false);
+        await handleCloudSignInFromEditor();
+        return;
+      }
+      setCloudUserEmail(user.email);
+
+      setShowCloudSaveModal(true);
+    } catch (err) {
+      console.error('Cloud save preparation failed', err);
+      showAppNotice(err instanceof Error ? err.message : t('Не удалось подготовить сохранение в облако.', 'Could not prepare Cloud save.'), 'error');
+    } finally {
+      setCloudSaving(false);
+    }
+  }, [cloudSaving, compositeImageData, handleCloudSignInFromEditor, previewImageData, showAppNotice, t]);
+
+  const handleConfirmCloudSave = useCallback(async ({ title, privacy }: { title: string; privacy: ArtPrivacy }) => {
+    if (cloudSaving) return;
+    const outputImage = previewImageData ?? compositeImageData;
+    if (!outputImage) {
+      showAppNotice(t('Сначала загрузи или создай арт.', 'Create or load an art first.'), 'error');
+      return;
+    }
+
+    setCloudSaving(true);
+    try {
+      const manifest = await saveCompanionArt({
+        artId: currentCloudArtId ?? undefined,
+        title,
+        privacy,
+        projectJson: buildCurrentCloudProjectJson(),
+        imageData: outputImage,
+        previewImageData: outputImage,
+        grid: mapGrid,
+        mode: mapMode,
+        staircaseMode,
+        supportBlock,
+        supportMode,
+        palette: activePalette,
+        blockSelection,
+        minecraftVersion,
+        dithering,
+        intensity,
+        bnScale,
+        klussParams,
+        platformMode,
+      });
+
+      await setCompanionFavorite(manifest.artId, true);
+      if (currentCloudImportId) {
+        try {
+          await attachCompanionImportToArt(currentCloudImportId, manifest.artId);
+        } catch (attachError) {
+          console.warn('Failed to attach import to saved cloud art', attachError);
+        }
+      }
+
+      setCurrentCloudArtId(manifest.artId);
+      setCurrentCloudTitle(manifest.title);
+      setCurrentCloudPrivacy(manifest.privacy);
+      setShowCloudSaveModal(false);
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete('companionImport');
+      nextUrl.searchParams.delete('artVersion');
+      nextUrl.searchParams.set('art', manifest.artId);
+      window.history.replaceState(null, '', nextUrl.toString());
+      showAppNotice(t('Арт сохранён в облако и добавлен в избранное.', 'Art saved to Cloud and added to favorites.'));
+    } catch (err) {
+      console.error('Cloud save failed', err);
+      showAppNotice(err instanceof Error ? err.message : t('Не удалось сохранить арт в облако.', 'Could not save art to Cloud.'), 'error');
+    } finally {
+      setCloudSaving(false);
+    }
+  }, [activePalette, blockSelection, bnScale, buildCurrentCloudProjectJson, cloudSaving, compositeImageData, currentCloudArtId, currentCloudImportId, dithering, intensity, klussParams, mapGrid, mapMode, minecraftVersion, platformMode, previewImageData, showAppNotice, staircaseMode, supportBlock, supportMode, t]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Control') setShowShadeWarnings(true);
+    }
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === 'Control') setShowShadeWarnings(false);
+    }
+    function handleBlur() {
+      setShowShadeWarnings(false);
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  // ── Project history (IndexedDB) ──────────────────────────────────────────────
+  // Declared after compositeImageData to avoid TDZ in the thumbnail handler.
+
+  const handleOpenSaveModal = useCallback(() => {
+    if (!compositeImageData) {
+      setSaveThumbnail(null);
+      setShowSaveModal(true);
+      return;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = compositeImageData.width;
+        tmpCanvas.height = compositeImageData.height;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        if (tmpCtx) {
+          tmpCtx.putImageData(compositeImageData, 0, 0);
+          ctx.drawImage(tmpCanvas, 0, 0, 128, 128);
+        }
+      }
+      setSaveThumbnail(canvas.toDataURL('image/png'));
+    } catch (err) {
+      console.error('Thumbnail generation failed', err);
+      setSaveThumbnail(null);
+    }
+    setShowSaveModal(true);
+  }, [compositeImageData]);
+
+  const handleSaveProjectToHistory = useCallback(async (name: string) => {
+    try {
+      const settings: FullProjectSettings = {
+        dithering,
+        intensity,
+        blockSelection: blockSelection as Record<string, number[]>,
+        adjustments,
+        colorMatch,
+        mapMode,
+        staircaseMode,
+        bnScale,
+        klussParams,
+        originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
+        minecraftVersion,
+        platformMode,
+      };
+      const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
+      const id = Date.now().toString();
+      await saveProject({ id, name, timestamp: Date.now(), thumbnail: saveThumbnail ?? '', data });
+      showAppNotice(t('Проект сохранён в истории.', 'Project saved to history.'));
+    } catch (err) {
+      console.error('Failed to save project to history', err);
+      showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
+    }
+  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
+
+  const handleLoadProjectFromHistory = useCallback(async (id: string) => {
+    try {
+      const stored = await loadProject(id);
+      if (!stored) { console.error('Project not found:', id); return; }
+      const result = deserializeFullProject(stored.data);
+      if (!result) { console.error('Failed to deserialize project', id); return; }
+      setMapGrid(result.grid);
+      // Mark all layers dirty so runProcess never overwrites restored content.
+      // Also stamp per-layer mapMode/staircaseMode/dithering so the useEffect([activeLayerId])
+      // that syncs these fields from the active layer reads the correct saved values.
+      // If originalDataB64 was saved, we can allow reprocessing (isDirty=false)
+      // Otherwise mark dirty to prevent accidental overwrites during load
+      const canReprocess = !!result.settings.originalDataB64;
+      const restoredLayers = result.layers.map(l => ({
+        ...l,
+        isDirty: !canReprocess,  // false if we can reprocess, true if we can't
+        mapMode: result.settings.mapMode,
+        staircaseMode: result.settings.staircaseMode,
+        dithering: coerceDitheringMode(result.settings.dithering),
+      }));
+      setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: [] });
+      setDithering(coerceDitheringMode(result.settings.dithering));
+      setIntensity(result.settings.intensity);
+      setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
+      setAdjustments(normalizeAdjustments(result.settings.adjustments));
+      setColorMatch(coerceColorMatchMode(result.settings.colorMatch));
+      setMapMode(result.settings.mapMode);
+      setStaircaseMode(result.settings.staircaseMode);
+      setBnScale(result.settings.bnScale);
+      setKlussParams(result.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
+      if (result.settings.minecraftVersion) {
+        setMinecraftVersion(result.settings.minecraftVersion);
+      }
+      if (result.settings.platformMode) {
+        setPlatformMode(result.settings.platformMode);
+      }
+
+      // Restore originalData (pre-dithering image) if it was saved, and create virtual sourceImage for reprocessing
+      if (result.settings.originalDataB64) {
+        const w = result.grid.wide * 128;
+        const h = result.grid.tall * 128;
+        const restoredOriginalData = base64ToImageData(result.settings.originalDataB64, w, h);
+        setOriginalData(restoredOriginalData);
+        // Create virtual source image for reprocessing when settings change
+        const sourceImg = await imageDataToSourceImage(restoredOriginalData);
+        setSourceImage(sourceImg);
+      } else {
+        setSourceImage(null);
+        setOriginalData(null);
+      }
+
+      setCompareData(null);
+      setUndoStack([]);
+      setRedoStack([]);
+      setShowProjectsPanel(false);
+      showAppNotice(t('Проект открыт из истории.', 'Project opened from history.'));
+    } catch (err) {
+      console.error('Failed to load project from history', err);
+      showAppNotice(t('Не удалось открыть проект из истории.', 'Could not open project from history.'), 'error');
+    }
+  }, [showAppNotice, t]);
+
+  const applyProjectJsonToEditor = useCallback(async (json: string, successMessage?: string) => {
+    const full = deserializeFullProject(json);
+    if (full) {
+      setMapGrid(full.grid);
+      const canReprocess = !!full.settings.originalDataB64;
+      const restoredLayers = full.layers.map(layer => ({
+        ...layer,
+        isDirty: !canReprocess,
+        mapMode: full.settings.mapMode,
+        staircaseMode: full.settings.staircaseMode,
+        dithering: coerceDitheringMode(full.settings.dithering),
+      }));
+      setLayerState({ layers: restoredLayers, activeLayerId: full.activeLayerId, groups: [] });
+      setDithering(coerceDitheringMode(full.settings.dithering));
+      setIntensity(full.settings.intensity);
+      setBlockSelection(full.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
+      setAdjustments(full.settings.adjustments);
+      setMapMode(full.settings.mapMode);
+      setStaircaseMode(full.settings.staircaseMode);
+      setBnScale(full.settings.bnScale);
+      setKlussParams(full.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
+      if (full.settings.minecraftVersion) setMinecraftVersion(full.settings.minecraftVersion);
+      if (full.settings.platformMode) setPlatformMode(full.settings.platformMode);
+
+      if (full.settings.originalDataB64) {
+        const width = full.grid.wide * 128;
+        const height = full.grid.tall * 128;
+        const restoredOriginalData = base64ToImageData(full.settings.originalDataB64, width, height);
+        setOriginalData(restoredOriginalData);
+        const sourceImg = await imageDataToSourceImage(restoredOriginalData);
+        uploadedFileRef.current = null;
+        uploadedImageRef.current = sourceImg;
+        setSourceImage(sourceImg);
+      } else {
+        uploadedFileRef.current = null;
+        uploadedImageRef.current = null;
+        setSourceImage(null);
+        setOriginalData(null);
+      }
+
+      setCompareData(null);
+      setUndoStack([]);
+      setRedoStack([]);
+      if (successMessage) showAppNotice(successMessage);
+      return true;
+    }
+
+    const basic = deserializeProject(json);
+    if (!basic) return false;
+
+    uploadedFileRef.current = null;
+    uploadedImageRef.current = null;
+    setMapGrid(basic.grid);
+    setLayerState({ layers: basic.layers, activeLayerId: basic.activeLayerId, groups: [] });
+    setSourceImage(null);
+    setOriginalData(null);
+    setCompareData(null);
+    setUndoStack([]);
+    setRedoStack([]);
+    if (successMessage) showAppNotice(successMessage);
+    return true;
+  }, [showAppNotice]);
+
+  const applyImportedImageToEditor = useCallback((
+    img: HTMLImageElement,
+    grid: MapGrid,
+    successMessage?: string,
+  ) => {
+    const importedImageData = imageToImageData(img);
+    uploadedFileRef.current = null;
+    uploadedImageRef.current = img;
+    setMapGrid(grid);
+    setSourceImage(img);
+    setOriginalData(null);
+    setCompareData(null);
+    setUndoStack([]);
+    setRedoStack([]);
+    setLayerState(prev => ({
+      ...prev,
+      layers: prev.layers.map(layer => layer.id === prev.activeLayerId ? {
+        ...layer,
+        imageData: importedImageData,
+        sourceImage: img,
+        sourceFile: null,
+        sourceUploadedImage: img,
+        isDirty: true,
+      } : layer),
+    }));
+    if (successMessage) showAppNotice(successMessage);
+  }, [showAppNotice]);
+
+  const handleCloudImport = useCallback(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const importId = params.get('companionImport');
+    const versionId = params.get('artVersion');
+    const artId = params.get('art');
+
+    if (!importId && !versionId && !artId) return;
+
+    try {
+      if (importId) {
+        const scanImport = await getCompanionScanImport(importId);
+        if (!scanImport.signedUrl) throw new Error('Scan import image is not available.');
+        const img = await loadHtmlImage(scanImport.signedUrl);
+        setCurrentCloudImportId(scanImport.importId);
+        setCurrentCloudArtId(scanImport.createdArtId ?? null);
+        setCurrentCloudTitle(scanImport.title);
+        setCurrentCloudPrivacy('unlisted');
+        applyImportedImageToEditor(
+          img,
+          scanImport.mapGrid,
+          t('Импорт из мода открыт в редакторе.', 'Companion scan import opened in the editor.'),
+        );
+        return;
+      }
+
+      if (versionId) {
+        const downloaded = await downloadCompanionArtVersionProjectJson(versionId);
+        const ok = await applyProjectJsonToEditor(
+          downloaded.projectJson,
+          t('Облачный арт открыт в редакторе.', 'Cloud art opened in the editor.'),
+        );
+        if (!ok) throw new Error('Project file is incompatible.');
+        setCurrentCloudImportId(null);
+        setCurrentCloudArtId(downloaded.version.artId);
+        setCurrentCloudTitle(downloaded.version.title);
+        setCurrentCloudPrivacy('unlisted');
+        return;
+      }
+
+      const downloaded = await downloadCompanionProjectJson(String(artId));
+      const ok = await applyProjectJsonToEditor(
+        downloaded.projectJson,
+        t('Облачный арт открыт в редакторе.', 'Cloud art opened in the editor.'),
+      );
+      if (ok) {
+        setCurrentCloudImportId(null);
+        setCurrentCloudArtId(downloaded.manifest.artId);
+        setCurrentCloudTitle(downloaded.manifest.title);
+        setCurrentCloudPrivacy(downloaded.manifest.privacy);
+        return;
+      }
+
+      if (downloaded.manifest.previewUrl) {
+        const previewImage = await loadHtmlImage(downloaded.manifest.previewUrl);
+        setCurrentCloudImportId(null);
+        setCurrentCloudArtId(downloaded.manifest.artId);
+        setCurrentCloudTitle(downloaded.manifest.title);
+        setCurrentCloudPrivacy(downloaded.manifest.privacy);
+        applyImportedImageToEditor(
+          previewImage,
+          downloaded.manifest.grid,
+          t(
+            'Project-файл недоступен, поэтому открыт preview арта.',
+            'Project data was unavailable, so the art preview was opened instead.',
+          ),
+        );
+        return;
+      }
+
+      throw new Error('Project file is incompatible.');
+    } catch (err) {
+      console.error('Failed to load cloud import into editor', err);
+      if (importId) {
+        window.location.assign(`/cloud?import=${encodeURIComponent(importId)}`);
+        return;
+      }
+      showAppNotice(t('Не удалось открыть данные из облака в редакторе.', 'Could not open cloud data in the editor.'), 'error');
+    }
+  }, [applyImportedImageToEditor, applyProjectJsonToEditor, showAppNotice, t]);
+
+  const cloudImportLoadedRef = useRef(false);
+  useEffect(() => {
+    if (cloudImportLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('companionImport') && !params.get('artVersion') && !params.get('art')) return;
+    cloudImportLoadedRef.current = true;
+    void handleCloudImport();
+  }, [handleCloudImport]);
+
+  return (
+    <>
+    <div className="app">
+        <header className={`app-header${cloudMenuOpen ? ' is-cloud-menu-open' : ''}`}>
+        <div className="header-inner">
+          <img src="/logo-opt.png" width="64" height="64" style={{ height: '32px', width: 'auto' }} alt="MapKluss" fetchPriority="high" />
+          <div className="header-titles">
+            <h1 className="app-title">MAPKLUSS</h1>
+            <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
+          </div>
+          <div className="header-spacer" />
+          <div className={`header-cloud-actions${cloudMenuOpen ? ' is-open' : ''}`} aria-label="Облако и мод MapKluss">
+            <button
+              ref={cloudMenuButtonRef}
+              className={`cloud-link-btn cloud-account-btn cloud-menu-trigger${cloudUserEmail ? ' is-signed-in' : ''}`}
+              onClick={() => setCloudMenuOpen(open => !open)}
+              title={cloudUserEmail ? cloudUserEmail : t('Войти в аккаунт MapKluss', 'Sign in to MapKluss account')}
+              aria-label={cloudUserEmail ? cloudUserEmail : t('Войти в аккаунт MapKluss', 'Sign in to MapKluss account')}
+              aria-expanded={cloudMenuOpen}
+            >
+              <IconGlyph icon={mkIcons.user} /> <span>{t('Аккаунт', 'Account')}</span>
+            </button>
+            <div className="cloud-action-menu" role="menu" style={cloudMenuStyle} hidden={!cloudMenuOpen}>
+                <button
+                  className="cloud-action-menu-item"
+                  onClick={() => {
+                    setCloudMenuOpen(false);
+                    if (cloudUserEmail) {
+                      void refreshCloudUser();
+                    } else {
+                      void handleCloudSignInFromEditor();
+                    }
+                  }}
+                  role="menuitem"
+                >
+                  <IconGlyph icon={cloudUserEmail ? mkIcons.userCheck : mkIcons.login} />
+                  <span>{cloudUserEmail ? t('Проверить аккаунт', 'Check account') : t('Войти по почте', 'Email login')}</span>
+                </button>
+                <button
+                  className="cloud-action-menu-item"
+                  onClick={() => {
+                    setCloudMenuOpen(false);
+                    void handleSaveCurrentArtToCloud();
+                  }}
+                  disabled={cloudSaving || !hasContent}
+                  title={currentCloudArtId ? t('Обновить арт в облаке', 'Update art in Cloud') : t('Сохранить арт в облако', 'Save art to Cloud')}
+                  role="menuitem"
+                >
+                  <IconGlyph icon={mkIcons.saveEditor} />
+                  <span>{cloudSaving ? t('Сохраняю...', 'Saving...') : currentCloudArtId ? t('Обновить арт', 'Update art') : t('Сохранить арт', 'Save art')}</span>
+                </button>
+                <button
+                  className="cloud-action-menu-item"
+                  onClick={() => {
+                    setCloudMenuOpen(false);
+                    setShowCloudArtsPanel(true);
+                  }}
+                  role="menuitem"
+                >
+                  <IconGlyph icon={mkIcons.projectEditor} />
+                  <span>{t('Папка артов', 'Art folder')}</span>
+                </button>
+                <a
+                  className="cloud-action-menu-item"
+                  href="/cloud"
+                  onClick={() => setCloudMenuOpen(false)}
+                  role="menuitem"
+                >
+                  <IconGlyph icon={mkIcons.cloud} />
+                  <span>{t('Облако и мод', 'Cloud and mod')}</span>
+                </a>
+                <LensController
+                  imageData={previewImageData}
+                  grid={mapGrid}
+                  mapMode={mapMode}
+                  title={currentCloudTitle.trim() || t('Без названия', 'Untitled')}
+                  processing={processing}
+                  compareMode={compareMode}
+                  t={t}
+                />
+              </div>
+          </div>
+          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
+          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
+          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang }); setShowWiki(true); }} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
+          <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
+          <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
+        </div>
+      </header>
+
+      {showAnnouncement && (
+        <div className="update-banner">
+          <div className="update-banner-main">
+            <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
+            <span className="update-banner-text">
+              {t('MapKluss v1.12.0: новые чёткие иконки во всём редакторе и более понятные кнопки.',
+                'MapKluss v1.12.0: crisp new icons across the editor and clearer controls.')}
+            </span>
+          </div>
+          <a
+            className="update-banner-link"
+            href={ANNOUNCEMENT.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              localStorage.setItem('mapkluss_seen_announcement', ANNOUNCEMENT.id);
+              setShowAnnouncement(false);
+            }}
+          >
+            {t('Читать в TG', 'Read on TG')}
+          </a>
+          <button
+            className="update-banner-close"
+            onClick={() => {
+              localStorage.setItem('mapkluss_seen_announcement', ANNOUNCEMENT.id);
+              setShowAnnouncement(false);
+            }}
+            title={t('Закрыть', 'Close')}
+          >
+            <IconGlyph icon={mkIcons.close} size={14} />
+          </button>
+        </div>
+      )}
+
+      {viewBanner && (
+        <div className="view-banner">
+          <span><i className="status-dot" aria-hidden="true" /> {t('ЗАГРУЖЕНО ПО ССЫЛКЕ', 'LOADED FROM LINK')}</span>
+          <button className="view-banner-dismiss" onClick={() => setViewBanner(false)} title={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} size={14} /></button>
+        </div>
+      )}
+
+      {paletteBanner && (
+        <div className="view-banner palette-banner">
+          <span><IconGlyph icon={mkIcons.paletteEditor} /> {t('ПАЛИТРА ЗАГРУЖЕНА ПО ССЫЛКЕ', 'PALETTE LOADED FROM LINK')}</span>
+          <button className="view-banner-dismiss" onClick={() => setPaletteBanner(false)} title={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} size={14} /></button>
+        </div>
+      )}
+
+      {appNotice && (
+        <div
+          className={`app-notice app-notice--${appNotice.tone}`}
+          role={appNotice.tone === 'error' ? 'alert' : 'status'}
+          aria-live={appNotice.tone === 'error' ? 'assertive' : 'polite'}
+        >
+          <span>{appNotice.message}</span>
+          <button
+            className="app-notice-close"
+            onClick={() => setAppNotice(null)}
+            aria-label={t('Закрыть уведомление', 'Close notification')}
+            title={t('Закрыть', 'Close')}
+          >
+            <IconGlyph icon={mkIcons.close} size={14} />
+          </button>
+        </div>
+      )}
+
+      <div
+        className={`app-body${leftPanelCollapsed ? ' left-panel-collapsed' : ''}${rightPanelCollapsed ? ' right-panel-collapsed' : ''}`}
+        data-tab={mobileTab}
+      >
+        {/* ── LEFT PANEL ── */}
+        <aside id="editor-settings-panel" className="panel panel-left">
+          <div className="panel-scroll">
+            <ImageUpload ref={imageUploadRef} onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} onGifFile={handleGifFile} />
+            <div className="new-canvas-row">
+              <button
+                className="new-canvas-btn"
+                onClick={() => { trackEvent('new_canvas_clicked'); setShowNewCanvasModal(true); }}
+                disabled={processing}
+                title={t('Создать пустой холст для рисования с нуля', 'Create blank canvas to draw from scratch')}
+              >{t('Новый холст', 'New canvas')}</button>
+              <button
+                className="canvas-icon-btn"
+                onClick={() => { trackEvent('save_project_clicked'); handleOpenSaveModal(); }}
+                title={t('Сохранить проект', 'Save project')}
+              ><IconGlyph icon={mkIcons.save} /></button>
+              <button
+                className="canvas-icon-btn"
+                onClick={() => { trackEvent('projects_panel_opened'); setShowProjectsPanel(true); }}
+                title={t('Мои проекты', 'My projects')}
+              ><IconGlyph icon={mkIcons.project} /></button>
+            </div>
+            {sourceHasAlpha && (
+              <div className="alpha-controls">
+                <span className="alpha-label">{t('Прозрачность', 'Transparency')}</span>
+                <div className="alpha-mode-btns">
+                  <button
+                    className={`alpha-mode-btn${bgMode === 'color' ? ' active' : ''}`}
+                    onClick={() => setBgMode('color')}
+                    title={t('Заполнить прозрачные области фоновым цветом', 'Fill transparent areas with background color')}
+                  >{t('Фон', 'BG')}</button>
+                  <button
+                    className={`alpha-mode-btn${bgMode === 'transparent' ? ' active' : ''}`}
+                    onClick={() => setBgMode('transparent')}
+                    title={t('Оставить прозрачные области пустыми (воздух в экспорте)', 'Keep transparent areas empty (air in export)')}
+                  >{t('Прозрачно', 'Transparent')}</button>
+                  {bgMode === 'color' && (
+                    <input
+                      type="color"
+                      className="alpha-color-picker"
+                      value={bgColor}
+                      onChange={e => setBgColor(e.target.value)}
+                      title={t('Цвет заливки фона', 'Background fill color')}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+            {uploadedImageRef.current && (
+              <div className="crop-section">
+                <button
+                  className="crop-tool-btn"
+                  onClick={() => { trackEvent('crop_tool_opened', { map_wide: mapGrid.wide, map_tall: mapGrid.tall }); setShowCropModal(true); }}
+                  disabled={processing}
+                  title={t(`Обрезать изображение под пропорции карты ${pw}×${ph}`, `Crop image to map ratio ${pw}×${ph}`)}
+                ><IconGlyph icon={mkIcons.crop} /> {t('Обрезать', 'Crop')}</button>
+                <span className="crop-ratio-hint">{mapGrid.wide}:{mapGrid.tall}</span>
+              </div>
+            )}
+            <Controls
+              dithering={dithering}
+              onDitheringChange={handleDitheringChange}
+              colorMatch={colorMatch}
+              onColorMatchChange={handleColorMatchChange}
+              intensity={intensity}
+              onIntensityChange={handleIntensityChange}
+              onIntensityCommit={handleIntensityCommit}
+              bnScale={bnScale}
+              onBnScaleChange={handleBnScaleChange}
+              klussParams={klussParams}
+              onKlussParamsChange={handleKlussParamsChange}
+              mapGrid={mapGrid}
+              onMapGridChange={handleMapGridChange}
+              mapMode={mapMode}
+              onMapModeChange={handleMapModeChange}
+              staircaseMode={staircaseMode}
+              onStaircaseModeChange={handleStaircaseModeChange}
+              processing={processing}
+              isBlankCanvas={false}
+              collapsedSections={collapsedSections}
+              onToggleSection={handleToggleSection}
+              t={t}
+            />
+            <div className="panel-section">
+              <Adjustments
+                adjustments={adjustments}
+                sourceImage={sourceImage}
+                onChange={handleAdjChange}
+                onCommit={handleAdjCommit}
+                disabled={processing || !showAdjustments}
+                showAdjustments={showAdjustments}
+                onToggleAdjustments={handleToggleAdjustments}
+                collapsed={!!collapsedSections['adjustments']}
+                onToggle={() => handleToggleSection('adjustments')}
+              />
+            </div>
+          </div>
+          <div className="panel-footer">
+            <button
+              className={`reset-defaults-btn${resetDefaultsPending ? ' pending' : ''}`}
+              disabled={processing}
+              title={resetDefaultsPending ? t('Нажми ещё раз для подтверждения', 'Click again to confirm reset') : t('Сбросить все настройки', 'Reset all settings to defaults')}
+              onClick={() => {
+                if (!resetDefaultsPending) {
+                  setResetDefaultsPending(true);
+                  resetDefaultsTimerRef.current = setTimeout(() => setResetDefaultsPending(false), 2000);
+                } else {
+                  if (resetDefaultsTimerRef.current) clearTimeout(resetDefaultsTimerRef.current);
+                  setResetDefaultsPending(false);
+                  handleResetDefaults();
+                }
+              }}
+            >
+              <IconGlyph icon={mkIcons.reset} className="reset-icon" /> {resetDefaultsPending ? t('Точно?', 'Sure?') : t('Сбросить всё', 'Reset All')}
+            </button>
+          </div>
+        </aside>
+
+        {/* ── CENTER PANEL ── */}
+        <main className="panel panel-center" ref={previewSectionRef}>
+          <button
+            className="panel-collapse-toggle panel-collapse-toggle-left"
+            onClick={() => setLeftPanelCollapsed(value => !value)}
+            title={leftPanelCollapsed
+              ? t('Развернуть панель настроек', 'Expand settings panel')
+              : t('Свернуть панель настроек', 'Collapse settings panel')}
+            aria-label={leftPanelCollapsed
+              ? t('Развернуть панель настроек', 'Expand settings panel')
+              : t('Свернуть панель настроек', 'Collapse settings panel')}
+            aria-expanded={!leftPanelCollapsed}
+            aria-controls="editor-settings-panel"
+          >
+            <IconGlyph icon={leftPanelCollapsed ? mkIcons.chevronRight : mkIcons.chevronLeft} />
+          </button>
+          <button
+            className="panel-collapse-toggle panel-collapse-toggle-right"
+            onClick={() => setRightPanelCollapsed(value => !value)}
+            title={rightPanelCollapsed
+              ? t('Развернуть панель палитры', 'Expand palette panel')
+              : t('Свернуть панель палитры', 'Collapse palette panel')}
+            aria-label={rightPanelCollapsed
+              ? t('Развернуть панель палитры', 'Expand palette panel')
+              : t('Свернуть панель палитры', 'Collapse palette panel')}
+            aria-expanded={!rightPanelCollapsed}
+            aria-controls="editor-palette-panel"
+          >
+            <IconGlyph icon={rightPanelCollapsed ? mkIcons.chevronLeft : mkIcons.chevronRight} />
+          </button>
+          <div className="toolbar">
+
+            {/* LEFT: undo/redo — always visible */}
+            <div className="toolbar-group">
+              <button className="tool-btn" onClick={handleUndo} disabled={!hasContent || undoStack.length === 0} title={t('Отменить (Ctrl+Z)', 'Undo (Ctrl+Z)')} aria-label={t('Отменить', 'Undo')}><IconGlyph icon={mkIcons.undo} /></button>
+              <button className="tool-btn" onClick={handleRedo} disabled={!hasContent || redoStack.length === 0} title={t('Повторить (Ctrl+Y)', 'Redo (Ctrl+Y)')}><IconGlyph icon={mkIcons.redo} /></button>
+            </div>
+            <div className="toolbar-sep" />
+
+            {/* TOOLS: select / eyedropper / brush / fill — only when image loaded */}
+            {!compareMode && imageData && (
+              <div className="toolbar-paint-tools">
+                {/* Tool buttons */}
+                <div className="toolbar-group">
+                  <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Курсор / перемещение холста (Esc)', 'Cursor / pan canvas (Esc)')}>
+                    <IconGlyph icon={mkIcons.select} />
+                  </button>
+                  <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')}>
+                    <IconGlyph icon={mkIcons.eyedropper} />
+                  </button>
+                  <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')}>
+                    <IconGlyph icon={mkIcons.brush} />
+                  </button>
+                  <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')}>
+                    <IconGlyph icon={mkIcons.fill} />
+                  </button>
+                  <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
+                    <IconGlyph icon={mkIcons.eraser} />
+                  </button>
+                  {/* text tool hidden — to be reworked */}
+                  {/* pattern tool hidden — work in progress */}
+                </div>
+
+                {/* Brush size — hidden in pattern stamp mode (size = pattern dimensions) */}
+                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || (activeTool === 'pattern-tile' && patternAnchorMode !== 'brush')) && (
+                  <div className="toolbar-group brush-size-group">
+                    <input type="range" min={0} max={BRUSH_SIZES.length - 1} step={1}
+                      value={Math.max(0, BRUSH_SIZES.indexOf(brushSize))}
+                      className="brush-size-slider"
+                      onChange={e => setBrushSize(BRUSH_SIZES[Number(e.target.value)])}
+                      title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
+                    <span className="brush-size-label">{brushSize}px</span>
+                  </div>
+                )}
+
+                {/* Pattern blocks — hidden while text/pattern tools are WIP */}
+                {SHOW_PATTERN_BLOCKS && editorMode === 'artist' && activeTool === 'pattern' && (
+                  <div className="toolbar-group pattern-blocks-group" style={{ position: 'relative', flexWrap: 'wrap', gap: 3 }}>
+                    {patternBlocks.map((pb, idx) => (
+                      <div key={idx} className="pattern-block-chip" style={{ position: 'relative' }}>
+                        {pb.baseId === -1 ? (
+                          <span className="paint-swatch-icon block-picker-icon-transparent pattern-chip-swatch" onClick={() => setShowPatternPicker(idx)} title={t('Сменить блок', 'Change block')} />
+                        ) : (
+                          <span className="paint-swatch-icon pattern-chip-swatch" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${pb.blockId * 32}px -${pb.csId * 32}px` }} onClick={() => setShowPatternPicker(idx)} title={pb.displayName} />
+                        )}
+                        <button className="pattern-chip-remove" onClick={() => setPatternBlocks(prev => prev.filter((_, i) => i !== idx))} disabled={patternBlocks.length <= 1} title={t('Удалить', 'Remove')} aria-label={t('Удалить', 'Remove')}><IconGlyph icon={mkIcons.close} /></button>
+                        {showPatternPicker === idx && (
+                          <BlockPickerPopup
+                            blockSelection={blockSelection}
+                            current={pb}
+                            onSelect={b => { setPatternBlocks(prev => prev.map((x, i) => i === idx ? b : x)); setShowPatternPicker(null); }}
+                            onClose={() => setShowPatternPicker(null)}
+                            mapMode={mapMode}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <div style={{ position: 'relative' }}>
+                      <button className="tool-btn" title={t('Добавить блок', 'Add block')} aria-label={t('Добавить блок', 'Add block')} onClick={() => setShowPatternPicker(-1)}><IconGlyph icon={mkIcons.plus} /></button>
+                      {showPatternPicker === -1 && (
+                        <BlockPickerPopup
+                          blockSelection={blockSelection}
+                          current={null}
+                          onSelect={b => { setPatternBlocks(prev => [...prev, b]); setShowPatternPicker(null); }}
+                          onClose={() => setShowPatternPicker(null)}
+                          mapMode={mapMode}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Shade selector (3D mode, brush/fill) */}
+                {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
+                  <div className="toolbar-group shade-selector">
+                    {([0, 1, 2] as const).map(sh => {
+                      const shadeLabel = [t('Тёмный', 'Dark'), t('Средний', 'Mid'), t('Светлый', 'Bright')];
+                      const sc = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === sh);
+                      const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
+                      return (
+                        <button key={sh} className={`shade-btn${paintBlock.shade === sh ? ' active' : ''}`} style={{ '--shade-color': bg } as React.CSSProperties} title={shadeLabel[sh]} onClick={() => setPaintBlock(pb => pb ? { ...pb, shade: sh } : pb)} />
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Main paint block picker */}
+                <div className="toolbar-group paint-swatch-wrapper">
+                  <div className="paint-active-swatch">
+                    {paintBlock && paintBlock.baseId === -1 ? (
+                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span><span className="paint-swatch-name">{t('Прозрачный', 'Transparent')}</span></>
+                    ) : paintBlock ? (
+                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span><span className="paint-swatch-name">{paintBlock.displayName}</span></>
+                    ) : (
+                      <span className="paint-no-block">{t('нет блока', 'no block')}</span>
+                    )}
+                  </div>
+                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}><IconGlyph icon={mkIcons.chevronDown} /></button>
+                  {showBlockPicker && (
+                    <BlockPickerPopup
+                      blockSelection={blockSelection}
+                      current={paintBlock}
+                      onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
+                      onClose={() => setShowBlockPicker(false)}
+                      mapMode={mapMode}
+                    />
+                  )}
+                </div>
+                {editorMode === 'artist' && (
+                  <>
+                    <div className="toolbar-sep" />
+                    <div className="toolbar-group">
+                      <button
+                        className={`tool-btn${activeTool === 'move' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'move' ? null : 'move')}
+                        title={t('Переместить слой (V)', 'Move layer (V)')}
+                      ><IconGlyph icon={mkIcons.move} /></button>
+                      <button
+                        className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
+                        title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
+                      ><IconGlyph icon={mkIcons.selectRect} /></button>
+                      <button
+                        className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
+                        title={t('Лассо (L)', 'Lasso (L)')}
+                      ><IconGlyph icon={mkIcons.lasso} /></button>
+                      <button
+                        className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
+                        title={t('Волшебная палочка (W)', 'Magic wand (W)')}
+                      ><IconGlyph icon={mkIcons.wand} /></button>
+                    </div>
+                    {activeTool === 'select-magic' && (
+                      <div className="toolbar-group wand-controls">
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'similar' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('similar')}
+                          title={t('Сравнивать по близости цвета', 'Match by color similarity')}
+                        >
+                          {t('Похоже', 'Similar')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'exact' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('exact')}
+                          title={t('Искать только точное совпадение цвета', 'Match only exact color')}
+                        >
+                          {t('Точно', 'Exact')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandMode === 'alpha' ? ' active' : ''}`}
+                          onClick={() => setMagicWandMode('alpha')}
+                          title={t('Сравнивать только прозрачность и пустые области', 'Match transparency only')}
+                        >
+                          {t('Прозр.', 'Alpha')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${magicWandContiguous ? ' active' : ''}`}
+                          onClick={() => setMagicWandContiguous(true)}
+                          title={t('Выделять только связанную область', 'Select only the connected area')}
+                        >
+                          {t('Смежные', 'Contiguous')}
+                        </button>
+                        <button
+                          className={`wand-mode-btn${!magicWandContiguous ? ' active' : ''}`}
+                          onClick={() => setMagicWandContiguous(false)}
+                          title={t('Искать похожие пиксели по всему слою', 'Find similar pixels across the whole layer')}
+                        >
+                          {t('Везде', 'Global')}
+                        </button>
+                        {magicWandMode === 'similar' && (
+                          <label className="wand-tolerance">
+                            <span>{t('Чувств.', 'Tol.')}</span>
+                            <input
+                              type="range"
+                              min={0.005}
+                              max={0.12}
+                              step={0.005}
+                              value={magicWandTolerance}
+                              onChange={(e) => setMagicWandTolerance(Number(e.target.value))}
+                            />
+                            <span className="wand-tolerance-value">{magicWandTolerance.toFixed(3)}</span>
+                          </label>
+                        )}
+                      </div>
+                    )}
+                    {selectionMask && (
+                      <div className="toolbar-group selection-ops">
+                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><IconGlyph icon={mkIcons.trash} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><IconGlyph icon={mkIcons.fill} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><IconGlyph icon={mkIcons.invert} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><IconGlyph icon={mkIcons.layer} /></button>
+                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><IconGlyph icon={mkIcons.deselect} /></button>
+                        <span className="selection-count">{selectedPixelCount}px</span>
+                      </div>
+                    )}
+                    {/* Pattern-tile tool */}
+                    <div className="toolbar-sep" />
+                    <div className="toolbar-group">
+                      <button
+                        className={`tool-btn${activeTool === 'pattern-tile' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
+                        title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
+                      ><IconGlyph icon={mkIcons.pattern} /></button>
+                      {activeTool === 'pattern-tile' && (<>
+                        <button
+                          className="tool-btn"
+                          onClick={() => setShowPatternEditor(true)}
+                          title={t('Редактировать паттерн', 'Edit pattern')}
+                        ><IconGlyph icon={mkIcons.settings} /></button>
+                        <button
+                          className={`tool-btn${patternAnchorMode === 'brush' ? ' active' : ''}`}
+                          onClick={() => setPatternAnchorMode(m => m === 'brush' ? 'canvas' : 'brush')}
+                          title={patternAnchorMode === 'brush'
+                            ? t('Якорь: от кисти (кликни для холста)', 'Anchor: brush start (click for canvas)')
+                            : t('Якорь: холст (кликни для кисти)', 'Anchor: canvas (click for brush)')}
+                        ><IconGlyph icon={mkIcons.anchor} /></button>
+                        <button
+                          className="tool-btn"
+                          onClick={() => activePattern && exportPattern(activePattern)}
+                          title={t('Экспорт паттерна в JSON', 'Export pattern as JSON')}
+                        ><IconGlyph icon={mkIcons.export} /></button>
+                        <label className="tool-btn" title={t('Импорт паттерна из JSON', 'Import pattern from JSON')} style={{ cursor: 'pointer' }}>
+                          <IconGlyph icon={mkIcons.import} />
+                          <input type="file" accept=".json" style={{ display: 'none' }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) importPattern(f); e.target.value = ''; }}
+                          />
+                        </label>
+                      </>)}
+                    </div>
+
+                    {/* Gradient tool */}
+                    <div className="toolbar-group" style={{ position: 'relative' }}>
+                      <button
+                        className={`tool-btn${activeTool === 'gradient' ? ' active' : ''}`}
+                        onClick={() => setActiveTool(prev => prev === 'gradient' ? null : 'gradient')}
+                        title={t('Градиент (G)', 'Gradient (G)')}
+                      ><IconGlyph icon={mkIcons.gradient} /></button>
+                    </div>
+                    {activeTool === 'gradient' && (
+                      <div className="toolbar-group gradient-stops-bar">
+                        {(() => {
+                          const sorted = [...gradientStops.map((stop, origIdx) => ({ stop, origIdx }))].sort((a, b) => a.stop.t - b.stop.t);
+                          return sorted.map(({ stop, origIdx }, sortedPos) => {
+                          const c = activePalette.colors.find(col => col.baseId === stop.block.baseId && col.shade === stop.block.shade)
+                            ?? activePalette.colors.find(col => col.baseId === stop.block.baseId);
+                          const bg = c ? `rgb(${c.r},${c.g},${c.b})` : '#888';
+                          const isFirst = sortedPos === 0;
+                          const isLast = sortedPos === gradientStops.length - 1;
+                          const swapBlocks = (posA: number, posB: number) => {
+                            const idxA = sorted[posA].origIdx;
+                            const idxB = sorted[posB].origIdx;
+                            setGradientStops(prev => {
+                              const next = [...prev];
+                              const tmp = next[idxA].block;
+                              next[idxA] = { ...next[idxA], block: next[idxB].block };
+                              next[idxB] = { ...next[idxB], block: tmp };
+                              return next;
+                            });
+                          };
+                          return (
+                            <div key={origIdx} className="gradient-stop-chip" style={{ position: 'relative' }}>
+                              {!isFirst && (
+                                <button className="gradient-stop-move" title="Переместить влево" aria-label="Переместить влево" onClick={() => swapBlocks(sortedPos, sortedPos - 1)}><IconGlyph icon={mkIcons.chevronLeft} /></button>
+                              )}
+                              <button
+                                className={`gradient-stop-swatch${showGradientStopPicker === origIdx ? ' active' : ''}`}
+                                style={{ background: bg }}
+                                title={`${stop.block.displayName} (${Math.round(stop.t * 100)}%)`}
+                                onClick={() => setShowGradientStopPicker(prev => prev === origIdx ? null : origIdx)}
+                              />
+                              {!isLast && (
+                                <button className="gradient-stop-move" title="Переместить вправо" aria-label="Переместить вправо" onClick={() => swapBlocks(sortedPos, sortedPos + 1)}><IconGlyph icon={mkIcons.chevronRight} /></button>
+                              )}
+                              {!isFirst && !isLast && (
+                                <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== origIdx))} aria-label={t('Удалить цвет', 'Remove color')}><IconGlyph icon={mkIcons.close} /></button>
+                              )}
+                              {showGradientStopPicker === origIdx && (
+                                <BlockPickerPopup
+                                  blockSelection={blockSelection}
+                                  current={stop.block}
+                                  onSelect={b => {
+                                    setGradientStops(prev => prev.map((s, j) => j === origIdx ? { ...s, block: b } : s));
+                                    setShowGradientStopPicker(null);
+                                  }}
+                                  onClose={() => setShowGradientStopPicker(null)}
+                                  mapMode={mapMode}
+                                />
+                              )}
+                            </div>
+                          );
+                        });
+                        })()}
+                        {gradientStops.length < 6 && (
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              className="tool-btn gradient-add-stop"
+                              title={t('Добавить цвет', 'Add color')}
+                              onClick={() => setShowGradientAddPicker(v => !v)}
+                            ><IconGlyph icon={mkIcons.plus} /></button>
+                            {showGradientAddPicker && (
+                              <BlockPickerPopup
+                                blockSelection={blockSelection}
+                                current={null}
+                                onSelect={b => {
+                                  setGradientStops(prev => {
+                                    // Place first stop at 0, second at 1, subsequent ones bisect the widest gap
+                                    let newT: number;
+                                    if (prev.length === 0) {
+                                      newT = 0;
+                                    } else if (prev.length === 1) {
+                                      newT = 1;
+                                    } else {
+                                      // Find the widest gap between consecutive stops
+                                      const sorted = [...prev].sort((a, b) => a.t - b.t);
+                                      let maxGap = 0, gapStart = 0;
+                                      for (let i = 0; i < sorted.length - 1; i++) {
+                                        const gap = sorted[i + 1].t - sorted[i].t;
+                                        if (gap > maxGap) { maxGap = gap; gapStart = sorted[i].t; }
+                                      }
+                                      newT = gapStart + maxGap / 2;
+                                    }
+                                    return [...prev, { t: newT, block: b }];
+                                  });
+                                  setShowGradientAddPicker(false);
+                                }}
+                                onClose={() => setShowGradientAddPicker(false)}
+                                mapMode={mapMode}
+                              />
+                            )}
+                          </div>
+                        )}
+                        <button
+                          className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
+                          title={t('Дизеринг (упорядоченный Байер)', 'Ordered dithering (Bayer)')}
+                          onClick={() => setGradientDithering(d => d === 'ordered' ? 'none' : 'ordered')}
+                        ><IconGlyph icon={mkIcons.grid} /></button>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="toolbar-sep" />
+              </div>
+            )}
+
+            {/* SPACER */}
+            <div className="toolbar-spacer" />
+
+            {/* ZOOM — only when content */}
+            {hasContent && (
+              <div className="toolbar-group">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={canvasZoomToSlider(zoom)}
+                  className="zoom-slider"
+                  onChange={event => updateCanvasZoom(sliderToCanvasZoom(Number(event.target.value)))}
+                  title={t('Масштаб (Ctrl/⌘ + колесо)', 'Zoom (Ctrl/⌘ + wheel)')}
+                  aria-label={t('Масштаб холста', 'Canvas zoom')}
+                />
+                <NumInput
+                  value={zoom}
+                  min={MIN_CANVAS_ZOOM}
+                  max={MAX_CANVAS_ZOOM}
+                  step={0.1}
+                  decimals={1}
+                  onCommit={updateCanvasZoom}
+                  ariaLabel={t('Масштаб холста в процентах', 'Canvas zoom percentage')}
+                />
+                <span className="toolbar-label-unit">%</span>
+              </div>
+            )}
+
+            {/* VIEW TOGGLES — only when content */}
+            {hasContent && (
+              <>
+                <div className="toolbar-sep" />
+                <div className="toolbar-group">
+                  <button
+                    className="tool-btn tool-btn-zoom-reset"
+                    title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
+                    onClick={() => updateCanvasZoom(100)}
+                  ><IconGlyph icon={mkIcons.zoomReset} /></button>
+                  <button
+                    className={`tool-btn${showSplitLine ? ' active' : ''}`}
+                    title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
+                    onClick={() => setShowSplitLine(v => !v)}
+                  ><IconGlyph icon={mkIcons.compare} /></button>
+                  <button
+                    className="tool-btn"
+                    title={t('Сбросить разделитель', 'Reset split to center')}
+                    onClick={() => setSplitPos(50)}
+                  ><IconGlyph icon={mkIcons.layoutCenter} /></button>
+                  {!compareMode && (
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')}><IconGlyph icon={mkIcons.blockTextures} />{t('Блоки', 'Blocks')}</button>
+                  )}
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}><IconGlyph icon={mkIcons.grid} />{t('Сетка', 'Grid')}</button>
+                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}><IconGlyph icon={mkIcons.view} /></button>
+                </div>
+              </>
+            )}
+
+            {/* TABLET DRAWER TOGGLE */}
+            <div className="toolbar-sep tablet-right-sep" />
+            <button
+              className={`tool-btn tablet-right-toggle${tabletRightOpen ? ' active' : ''}`}
+              onClick={() => setTabletRightOpen(v => !v)}
+              title={t('Палитра и экспорт', 'Palette & Export')}
+              aria-label={t('Палитра и экспорт', 'Palette & Export')}
+              aria-expanded={tabletRightOpen}
+              aria-controls="editor-palette-panel"
+            ><IconGlyph icon={mkIcons.package} /></button>
+
+            {/* SHORTCUTS */}
+            <div className="toolbar-sep" />
+            <div className="toolbar-group shortcuts-wrap">
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}><IconGlyph icon={mkIcons.keyboard} /></button>
+              {showShortcuts && (
+                <div className="shortcuts-panel">
+                  <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
+                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>{t('Отменить', 'Undo')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>{t('Повторить', 'Redo')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>{t('Экспорт PNG', 'Export PNG')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>{t('Экспорт .litematic', 'Export .litematic')}</span></div>
+                  <div className="shortcuts-divider" />
+                  <div className="shortcut-row"><kbd>Z</kbd><span>{t('Сетка', 'Grid')}</span></div>
+                  <div className="shortcut-row"><kbd>O</kbd><span>{t('Сброс разделителя', 'Reset split')}</span></div>
+                  <div className="shortcut-row"><kbd>C</kbd><span>{t('Режим сравнения', 'Compare mode')}</span></div>
+                  <div className="shortcut-row"><kbd>1 – 9</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
+                  <div className="shortcuts-divider" />
+                  <div className="shortcut-row"><kbd>E</kbd><span>{t('Пипетка', 'Eyedropper')}</span></div>
+                  <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
+                  <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
+                  <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
+                  <div className="shortcut-row"><kbd>L</kbd><span>{t('Линия', 'Line')}</span></div>
+                  <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
+                  <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
+                  <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
+                </div>
+              )}
+            </div>
+            <div className="toolbar-sep" />
+            <div className="toolbar-group">
+              <button
+                className={`tool-btn artist-toolbar-toggle${editorMode === 'artist' ? ' active' : ''}`}
+                onClick={() => setEditorMode(m => {
+                  const next = m === 'simple' ? 'artist' : 'simple';
+                  trackEvent('artist_mode_toggled', { enabled: next === 'artist' });
+                  return next;
+                })}
+                title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
+                aria-label={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника', 'Artist mode')}
+              >
+                <IconGlyph icon={mkIcons.artist} />
+              </button>
+            </div>
+          </div>
+
+          {compareMode && hasContent && (
+            <div className="compare-selectors">
+              <div className="compare-selector">
+                <label className="compare-selector-label">{t('ЛЕВЫЙ', 'LEFT')}</label>
+                <select
+                  className="compare-selector-select"
+                  value={compareLeft}
+                  onChange={e => handleCompareSideChange('left', e.target.value as DitheringMode)}
+                  disabled={processing}
+                >
+                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                </select>
+              </div>
+              <span className="compare-vs">VS</span>
+              <div className="compare-selector">
+                <label className="compare-selector-label">{t('ПРАВЫЙ', 'RIGHT')}</label>
+                <select
+                  className="compare-selector-select"
+                  value={compareRight}
+                  onChange={e => handleCompareSideChange('right', e.target.value as DitheringMode)}
+                  disabled={processing}
+                >
+                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <div
+            ref={canvasAreaRef}
+            className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}${hasContent && (compareMode || activeTool === null) ? ' canvas-area-pan-ready' : ''}${isCanvasPanning ? ' canvas-area-panning' : ''}`}
+            onClick={!hasContent ? () => imageUploadRef.current?.openPicker() : undefined}
+            onClickCapture={handleCanvasClickCapture}
+            onPointerDownCapture={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={finishCanvasPan}
+            onPointerCancel={finishCanvasPan}
+            onLostPointerCapture={event => {
+              canvasPanRef.current = null;
+              event.currentTarget.classList.remove('canvas-area-panning');
+              setIsCanvasPanning(false);
+            }}
+            onKeyDown={!hasContent ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                imageUploadRef.current?.openPicker();
+              }
+            } : undefined}
+            role={!hasContent ? 'button' : undefined}
+            tabIndex={!hasContent ? 0 : undefined}
+            aria-label={!hasContent ? t('Открыть выбор изображения', 'Open image picker') : undefined}
+          >
+            <span className="corner corner-tl" />
+            <span className="corner corner-tr" />
+            <span className="corner corner-bl" />
+            <span className="corner corner-br" />
+            {!compareMode && editorMode === 'artist' && finalPreview?.has3D && finalPreview.shadeWarnings.some(Boolean) && (
+              <div className={`shade-warning-hint${showShadeWarnings ? ' active' : ''}`}>
+                {t('Ctrl: показать проблемные пиксели', 'Ctrl: show shade problem pixels')}
+              </div>
+            )}
+
+            <div className="canvas-inner">
+              {compareMode ? (
+                <CompareView
+                  leftData={compareData?.left   ?? null}
+                  rightData={compareData?.right ?? null}
+                  leftLabel={DITHERING_LABELS[compareLeft]}
+                  rightLabel={DITHERING_LABELS[compareRight]}
+                  width={pw} height={ph} scale={rasterScale} viewScale={displayScale} showGrid={showGrid}
+                  splitPos={splitPos} onSplitPosChange={setSplitPos}
+                />
+              ) : (
+                <PreviewCanvas
+                  mode={textureMode}
+                  imageData={previewImageData ?? imageData} paintData={imageData} originalData={originalData}
+                  showOriginal={false} showGrid={showGrid}
+                  width={pw} height={ph} scale={rasterScale} viewScale={displayScale}
+                  cp={activePalette} blockSelection={blockSelection}
+                  activeTool={activeTool}
+                  paintBlock={paintBlock}
+                  patternBlocks={patternBlocks}
+                  brushSize={brushSize}
+                  textSize={textSize}
+                  otherLayersData={otherLayersData}
+                  activeLayerIsText={!!activeLayer?.isText}
+                  activeTextMeta={activeLayer?.text ?? null}
+                  onRemoveBlock={handleRemoveBlock}
+                  onImageUpdate={handleImageUpdate}
+                  onToolChange={setActiveTool}
+                  onPaintBlockChange={setPaintBlock}
+                  onTextCommit={handleTextCommit}
+                  splitPos={imageData && originalData && showSplitLine ? splitPos : undefined}
+                  onSplitPosChange={setSplitPos}
+                  selectionMask={selectionMask}
+                  onSelectionChange={setSelectionMask}
+                  magicWandTolerance={magicWandTolerance}
+                  magicWandContiguous={magicWandContiguous}
+                  magicWandMode={magicWandMode}
+                  activePattern={activePattern}
+                  patternAnchorMode={patternAnchorMode}
+                  gradientStops={gradientStops}
+                  gradientDithering={gradientDithering}
+                  warningMask={finalPreview?.shadeWarnings ?? null}
+                  showWarningMask={editorMode === 'artist' && showShadeWarnings}
+                  viewportPanning={isCanvasPanning}
+                />
+              )}
+            </div>
+
+            {processing && (
+              <div className="processing-overlay">
+                <div className="processing-overlay-inner">
+                  <div className="processing-spinner" />
+                  <span className="processing-label">{t('ОБРАБОТКА…', 'PROCESSING…')} {DITHERING_LABELS[dithering].toUpperCase()}</span>
+                  <span className="processing-pct">{processingProgress}%</span>
+                  {showCancel && (
+                    <button className="processing-cancel-btn" onClick={handleCancelProcessing}><IconGlyph icon={mkIcons.close} size={14} /> {t('ОТМЕНА', 'CANCEL')}</button>
+                  )}
+                </div>
+                <div className="processing-bar-track">
+                  <div className="processing-bar-fill" style={{ width: `${processingProgress}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+        </main>
+
+        {showPatternEditor && activePattern && (
+          <PatternEditorPopup
+            pattern={activePattern}
+            paintBlock={paintBlock}
+            cp={activePalette}
+            blockSelection={blockSelection}
+            mapMode={mapMode}
+            onSave={p => setSavedPatterns(prev => prev.map(x => x.id === p.id ? p : x))}
+            onClose={() => setShowPatternEditor(false)}
+          />
+        )}
+
+        {/* ── RIGHT PANEL ── */}
+        {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
+        <aside id="editor-palette-panel" className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`}>
+          <div className="panel-scroll">
+            {editorMode === 'artist' && (
+              <>
+                <LayersPanel
+                  layers={layers}
+                  activeLayerId={activeLayerId}
+                  onSetActive={id => setLayerState(prev => ({ ...prev, activeLayerId: id }))}
+                  onToggleVisible={handleToggleLayerVisible}
+                  onAdd={handleAddLayer}
+                  onDelete={handleDeleteLayer}
+                  onRename={handleRenameLayer}
+                  onMoveUp={handleMoveLayerUp}
+                  onMoveDown={handleMoveLayerDown}
+                  onOpacityChange={handleOpacityChange}
+                  onToggleLock={handleToggleLock}
+                  onMoveLayer={handleMoveLayer}
+                  onMergeDown={handleMergeDown}
+                  onMergeVisible={handleMergeVisible}
+                  groups={layerGroups}
+                  onCreateGroup={handleCreateGroup}
+                  onDeleteGroup={handleDeleteGroup}
+                  onToggleGroupCollapse={handleToggleGroupCollapse}
+                />
+                <div className="project-btns">
+                  <button className="project-btn" onClick={handleSaveProject} title={t('Скачать проект (.mapkluss)', 'Download project (.mapkluss)')}>
+                    <IconGlyph icon={mkIcons.saveEditor} /> {t('Сохранить проект', 'Save project')}
+                  </button>
+                  <button className="project-btn" onClick={handleLoadProject} title={t('Загрузить проект (.mapkluss)', 'Load project (.mapkluss)')}>
+                    <IconGlyph icon={mkIcons.uploadEditor} /> {t('Загрузить проект', 'Load project')}
+                  </button>
+                </div>
+              </>
+            )}
+            <div className="mobile-palette-content">
+              <div className="version-selector-row">
+                <span className="version-selector-label">{t('Версия', 'Version')}</span>
+                <select
+                  className="version-selector-select"
+                  value={minecraftVersion}
+                  onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode)); }}
+                >
+                  {VALID_VERSIONS.map(v => (
+                    <option key={v} value={v}>{getVersionLabel(v)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="version-selector-row">
+                <span className="version-selector-label">{t('Платформа', 'Platform')}</span>
+                <select
+                  className="version-selector-select"
+                  value={platformMode}
+                  onChange={e => setPlatformMode(e.target.value as PlatformMode)}
+                >
+                  <option value="java">Java</option>
+                  <option value="bedrock">Bedrock</option>
+                </select>
+              </div>
+              <PaletteEditor
+                blockSelection={blockSelection}
+                onSelectionChange={handleSelectionChange}
+                paletteSize={activePalette.colors.length}
+                disabled={processing}
+                minecraftVersion={minecraftVersion}
+                platformMode={platformMode}
+              />
+              <div className="panel-divider"></div>
+              {mapMode === '3d' && (
+                <div className="support-block-section">
+                  <div className="support-block-section-title">{t('Опорный блок (3D)', 'Support block (3D)')}</div>
+                  <div className="support-block-grid">
+                    {SUPPORT_BLOCKS_PALETTE.map(b => (
+                      <button
+                        key={b.nbt}
+                        className={`support-block-item${supportBlock === b.nbt ? ' active' : ''}`}
+                        onClick={() => setSupportBlock(b.nbt)}
+                        title={b.label}
+                      >
+                        <span
+                          className="support-block-sprite"
+                          style={{
+                            backgroundImage: `url(${SPRITE_URL})`,
+                            backgroundPosition: `-${b.blockId * 32}px -${b.csId * 32}px`,
+                          }}
+                        />
+                        <span className="support-block-item-label">{b.label}</span>
+                      </button>
+                    ))}
+                    {/* None + Depth — spans 4 cells together */}
+                    <div className="support-none-depth">
+                      <button
+                        className={`support-block-item support-none-btn${supportBlock === 'air' ? ' active' : ''}`}
+                        onClick={() => setSupportBlock('air')}
+                        title={t('Без опорных блоков', 'No support blocks')}
+                      >
+                        <span className="support-block-no-icon">∅</span>
+                        <span className="support-block-item-label">{t('Нет', 'None')}</span>
+                      </button>
+                      <div className={`support-depth-group${supportBlock === 'air' ? ' disabled' : ''}`}>
+                        <span className="support-mode-label">{t('Глубина', 'Depth')}</span>
+                        {([1, 2] as const).map(m => (
+                          <button
+                            key={m}
+                            className={`support-mode-btn${supportMode === m ? ' active' : ''}`}
+                            onClick={() => setSupportMode(m)}
+                            title={getSupportModeTitles(t)[m]}
+                            disabled={supportBlock === 'air'}
+                          >{SUPPORT_MODE_LABELS[m]}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mobile-export-content">
+              <MaterialsList
+                imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
+                cp={activePalette}
+                blockSelection={blockSelection}
+                mapGrid={mapGrid}
+                mapMode={mapMode}
+                staircaseMode={staircaseMode}
+                supportBlock={supportBlock}
+                supportMode={supportMode}
+              />
+            </div>
+          </div>
+          <div className="panel-footer mobile-export-content">
+            <ExportPanel
+              imageData={compositeImageData}
+              previewImageData={previewImageData}
+              compareData={compareData}
+              compareMode={compareMode}
+              dithering={dithering}
+              compareLeft={compareLeft}
+              compareRight={compareRight}
+              mapGrid={mapGrid}
+              mapMode={mapMode}
+              staircaseMode={staircaseMode}
+              activePalette={activePalette}
+              blockSelection={blockSelection}
+              disabled={processing}
+              supportBlock={supportBlock}
+              supportMode={supportMode}
+              artistMode={editorMode === 'artist'}
+              hybridLayers={layers.filter(l => l.visible && l.imageData).map(l => ({
+                imageData: l.imageData!,
+                mapMode: l.mapMode ?? '2d',
+                staircaseMode: l.staircaseMode ?? 'optimized',
+              }))}
+              activeLayerExport={activeLayer?.imageData ? {
+                imageData: activeLayer.imageData,
+                mapMode: activeLayer.mapMode ?? '2d',
+                staircaseMode: activeLayer.staircaseMode ?? 'optimized',
+              } : undefined}
+              sourceImage={sourceImage}
+              intensity={intensity}
+              adjustments={adjustments}
+              bnScale={bnScale}
+              platformMode={platformMode}
+              minecraftVersion={minecraftVersion}
+              onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
+              onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
+            />
+          </div>
+        </aside>
+
+        {/* ── MOBILE TAB BAR ── */}
+        <div className="mobile-tab-bar">
+          <button className={`mobile-tab-btn${mobileTab === 'settings' ? ' active' : ''}`} onClick={() => setMobileTab('settings')}>
+            <IconGlyph icon={mkIcons.sliders} className="mobile-tab-icon" />
+            <span className="mobile-tab-label">{t('Настройки', 'Settings')}</span>
+          </button>
+          <button className={`mobile-tab-btn${mobileTab === 'palette' ? ' active' : ''}`} onClick={() => setMobileTab('palette')}>
+            <IconGlyph icon={mkIcons.palette} className="mobile-tab-icon" />
+            <span className="mobile-tab-label">{t('Палитра', 'Palette')}</span>
+          </button>
+          <button className={`mobile-tab-btn${mobileTab === 'export' ? ' active' : ''}`} onClick={() => setMobileTab('export')}>
+            <IconGlyph icon={mkIcons.download} className="mobile-tab-icon" />
+            <span className="mobile-tab-label">{t('Экспорт', 'Export')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── STATUS BAR ── */}
+      <div className="status-bar">
+        <span><i className="status-dot" aria-hidden="true" /> {DITHERING_LABELS[dithering].toUpperCase()}</span>
+        <span><i className="status-dot" aria-hidden="true" /> {mapGrid.wide}×{mapGrid.tall} MAPS</span>
+        <span><i className="status-dot" aria-hidden="true" /> {activePalette.colors.length} COLORS</span>
+        <span><i className="status-dot" aria-hidden="true" /> {mapMode.toUpperCase()}</span>
+        <span><i className="status-dot" aria-hidden="true" /> {zoom}%</span>
+        {hasContent && <span><i className="status-dot" aria-hidden="true" /> {pw}×{ph}px</span>}
+        <span className="status-spacer" />
+        <span className="status-credit">Made by SmetankaKluss</span>
+        <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="#57FF6E" aria-hidden="true">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-1.97 9.269c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 14.173l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.496.413z"/>
+          </svg>
+          @SmetankaKluss
+        </a>
+      </div>
+    </div>
+
+    {/* ── Crop modal ── */}
+    {showCropModal && uploadedImageRef.current && (
+      <CropModal
+        sourceImage={uploadedImageRef.current}
+        targetW={pw} targetH={ph}
+        onApply={handleCropApply}
+        onCancel={() => setShowCropModal(false)}
+      />
+    )}
+
+    {/* ── New Canvas modal ── */}
+    {showNewCanvasModal && (
+      <NewCanvasModal
+        currentGrid={mapGrid}
+        paletteColors={activePalette.colors}
+        onConfirm={handleCreateBlankCanvas}
+        onClose={() => setShowNewCanvasModal(false)}
+      />
+    )}
+
+    {/* ── Wiki modal ── */}
+    {showWiki && <Suspense fallback={null}><WikiModal onClose={() => setShowWiki(false)} /></Suspense>}
+
+    {/* ── Save project modal ── */}
+    {showSaveModal && (
+      <SaveProjectModal
+        thumbnail={saveThumbnail}
+        defaultName={`${mapGrid.wide}×${mapGrid.tall} — ${new Date().toLocaleDateString()}`}
+        onSave={(name) => { handleSaveProjectToHistory(name); setShowSaveModal(false); }}
+        onClose={() => setShowSaveModal(false)}
+      />
+    )}
+
+    {/* ── Projects panel ── */}
+    {showProjectsPanel && (
+      <ProjectsPanel
+        onLoad={(id) => handleLoadProjectFromHistory(id)}
+        onClose={() => setShowProjectsPanel(false)}
+      />
+    )}
+
+    {/* ── Cloud arts folder ── */}
+    {showCloudArtsPanel && (
+      <CloudArtsPanel
+        onClose={() => setShowCloudArtsPanel(false)}
+        defaultEmail={cloudUserEmail}
+        onOpenArt={(artId) => {
+          setShowCloudArtsPanel(false);
+          const nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.delete('companionImport');
+          nextUrl.searchParams.delete('artVersion');
+          nextUrl.searchParams.set('art', artId);
+          window.history.replaceState(null, '', nextUrl.toString());
+          cloudImportLoadedRef.current = false;
+          void handleCloudImport();
+        }}
+      />
+    )}
+
+    {showCloudSaveModal && (
+      <CloudSaveModal
+        defaultTitle={currentCloudTitle || `MapKluss_${mapGrid.wide}x${mapGrid.tall}_${new Date().toISOString().slice(0, 10)}`}
+        defaultPrivacy={currentCloudPrivacy}
+        isUpdate={Boolean(currentCloudArtId)}
+        mapGrid={mapGrid}
+        busy={cloudSaving}
+        onSave={(input) => void handleConfirmCloudSave(input)}
+        onClose={() => { if (!cloudSaving) setShowCloudSaveModal(false); }}
+      />
+    )}
+
+    {/* ── Perspective preview modal ── */}
+    {showPerspective && (
+      <Suspense fallback={null}>
+        <PerspectiveModal
+          imageData={compareMode ? (compareData?.left ?? previewImageData) : (previewImageData ?? compositeImageData)}
+          cp={activePalette}
+          blockSelection={blockSelection}
+          mapMode={mapMode}
+          staircaseMode={staircaseMode}
+          supportMode={supportMode}
+          supportBlock={supportBlock}
+          mapGrid={mapGrid}
+          previewMode={previewMode}
+          onPreviewModeChange={setPreviewMode}
+          onClose={() => setShowPerspective(false)}
+        />
+      </Suspense>
+    )}
+
+    {/* ── Build tracker modal ── */}
+    {trackerMaterials && compositeImageData && (
+      <BuildTrackerModal
+        materials={trackerMaterials}
+        imageData={compositeImageData}
+        previewImageData={previewImageData ?? undefined}
+        mapGrid={mapGrid}
+        cp={exportRef.current.activePalette}
+        blockGroups={exportRef.current.blockSelection as BlockSelection}
+        onClose={() => setTrackerMaterials(null)}
+      />
+    )}
+
+    {/* ── GIF export modal ── */}
+    {gifFrames && (
+      <Suspense fallback={null}>
+        <GifModal
+          gifFrames={gifFrames}
+          mapGrid={mapGrid}
+          palette={activePalette}
+          dithering={dithering}
+          intensity={intensity}
+          klussParams={klussParams}
+          adjustments={effectiveAdjustments}
+          bnScale={bnScale}
+          blockSelection={blockSelection}
+          onClose={() => setGifFrames(null)}
+          onOpenAsProject={handleOpenAsGifProject}
+        />
+      </Suspense>
+    )}
+
+    {/* ── GIF Filmstrip ── */}
+    {gifProject && (
+      <GifFilmstrip
+        project={gifProject}
+        onFrameSelect={handleGifFrameSelect}
+        onConfigChange={handleGifProjectConfigChange}
+        onClose={handleCloseGifProject}
+      />
+    )}
+
+    {/* ── Tour selector modal ── */}
+    {showTourSelector && (
+      <div className="tour-selector-overlay" onClick={() => setShowTourSelector(false)}>
+        <div className="tour-selector-modal" onClick={e => e.stopPropagation()}>
+          <button className="tour-selector-close" onClick={() => setShowTourSelector(false)}><IconGlyph icon={mkIcons.close} size={15} /></button>
+          <div className="tour-selector-title"><IconGlyph icon={mkIcons.guide} /> {t('ВЫБЕРИ ТУР', 'SELECT A TOUR')}</div>
+          <div className="tour-selector-desc">{t(
+            'Выбери уровень — тур покажет только нужные функции.',
+            'Choose a level — the tour shows only relevant features.',
+          )}</div>
+          <div className="tour-selector-btns">
+            <button
+              className="tour-selector-btn tour-selector-btn--basic"
+              onClick={() => { setShowTourSelector(false); startTour('basic'); }}
+            >
+              <IconGlyph icon={mkIcons.play} className="tour-selector-btn-icon" />
+              <span className="tour-selector-btn-body">
+                <span className="tour-selector-btn-title">{t('БАЗОВЫЙ', 'BASIC')}</span>
+                <span className="tour-selector-btn-sub">{t(
+                  'Загрузка, сетка, дизеринг, экспорт',
+                  'Upload, grid, dithering, export',
+                )}</span>
+              </span>
+            </button>
+            <button
+              className="tour-selector-btn tour-selector-btn--advanced"
+              onClick={() => { setShowTourSelector(false); startTour('advanced'); }}
+            >
+              <IconGlyph icon={mkIcons.tourAdvanced} className="tour-selector-btn-icon" />
+              <span className="tour-selector-btn-body">
+                <span className="tour-selector-btn-title">{t('ПРОДВИНУТЫЙ', 'ADVANCED')}</span>
+                <span className="tour-selector-btn-sub">{t(
+                  'Режим художника, слои, выделение, паттерны, градиент',
+                  'Artist mode, layers, selection, patterns, gradient',
+                )}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}

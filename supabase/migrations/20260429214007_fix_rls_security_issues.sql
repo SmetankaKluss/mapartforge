@@ -1,0 +1,2 @@
+-- Historical migration already applied on the remote Supabase project.
+-- Kept locally so Supabase CLI can reconcile migration history before newer changes.
