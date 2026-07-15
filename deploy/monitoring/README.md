@@ -4,12 +4,16 @@
 
 - gateway process health;
 - cached upstream readiness and freshness;
+- gateway Auth, REST, Storage, Edge Functions, and Realtime WebSocket data plane;
+- production and Yandex staging application shells;
 - Yandex staging root and SPA fallback for `/cloud`, `/device`, and dynamic `/art/:id` routes;
-- TLS validity with at least 14 days remaining.
+- TLS validity for production, staging, and gateway with at least 14 days remaining.
 
 Yandex Object Storage returns the configured SPA error document with HTTP `404` for object keys that do not exist. Route checks therefore accept only `200`, or `404` when the response is HTML and still contains the React root. A plain provider 404, missing application shell, redirect, or other status remains a monitoring failure.
 
-The GitHub Actions monitor runs twice per hour and can be run manually. GitHub Actions failure notifications are the initial alert channel; a provider-independent uptime service can be added after the production endpoint and alert destination are finalized.
+The GitHub Actions monitor runs twice per hour and can be run manually. A failed check opens or refreshes one public actionable issue; the next healthy run closes it. `monitor-backups.yml` independently checks that the latest KMS-encrypted daily generation is no older than 36 hours and that a disposable restore drill has passed within 35 days.
+
+These workflows provide an actionable interim alert path, but GitHub cannot alert when its own scheduler stops. Keep the provider-independent uptime/heartbeat monitor as a required follow-up before infrastructure work is considered complete.
 
 The monitor intentionally does not use user sessions, database credentials, service-role keys, or mutating API requests.
 

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: monitor-public
@@ -21,4 +22,16 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      - run: node deploy/monitoring/public-smoke.mjs
+      - name: Run public infrastructure smoke
+        id: smoke
+        continue-on-error: true
+        env:
+          MAPKLUSS_ANON_KEY: ${{ vars.MAPKLUSS_ANON_KEY }}
+        run: |
+          test -n "$MAPKLUSS_ANON_KEY"
+          node deploy/monitoring/public-smoke.mjs
+      - name: Report or close actionable alert
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node deploy/monitoring/report-alert.mjs public '${{ steps.smoke.outcome }}'

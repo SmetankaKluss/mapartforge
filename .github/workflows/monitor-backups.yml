@@ -1,0 +1,43 @@
+name: Monitor MapKluss backups and restore drills
+
+on:
+  schedule:
+    - cron: '41 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitor-backups
+  cancel-in-progress: true
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Check backup objects and restore freshness
+        id: freshness
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          AWS_PAGER: ''
+          GITHUB_TOKEN: ${{ github.token }}
+          YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
+          YC_BACKUP_KMS_KEY_ID: ${{ vars.YC_BACKUP_KMS_KEY_ID }}
+          YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: node deploy/monitoring/check-backup-freshness.mjs
+      - name: Report or close actionable alert
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node deploy/monitoring/report-alert.mjs backups '${{ steps.freshness.outcome }}'
