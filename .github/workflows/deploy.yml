@@ -41,6 +41,8 @@ jobs:
           cname: mapkluss.art
 
       - name: Deploy staging site to Yandex Object Storage
+        # Staging is controlled by explicit candidate/rollback dispatches and must survive routine main pushes.
+        if: github.event_name == 'workflow_dispatch'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.YC_STORAGE_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_STORAGE_SECRET_ACCESS_KEY }}
