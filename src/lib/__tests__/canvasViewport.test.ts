@@ -4,6 +4,7 @@ import {
   MIN_CANVAS_ZOOM,
   canvasZoomFromWheel,
   canvasZoomToSlider,
+  hasCanvasPanStarted,
   sliderToCanvasZoom,
 } from '../canvasViewport';
 
@@ -25,5 +26,11 @@ describe('canvas viewport zoom', () => {
     expect(canvasZoomFromWheel(100, 10, 0)).toBeLessThan(100);
     expect(canvasZoomFromWheel(MAX_CANVAS_ZOOM, -120, 0)).toBe(MAX_CANVAS_ZOOM);
     expect(canvasZoomFromWheel(MIN_CANVAS_ZOOM, 120, 0)).toBe(MIN_CANVAS_ZOOM);
+  });
+
+  it('keeps a short cursor press as a click and starts panning at the drag threshold', () => {
+    expect(hasCanvasPanStarted(100, 100, 102, 101)).toBe(false);
+    expect(hasCanvasPanStarted(100, 100, 103, 100)).toBe(true);
+    expect(hasCanvasPanStarted(100, 100, 98, 98)).toBe(false);
   });
 });

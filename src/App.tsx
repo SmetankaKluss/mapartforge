@@ -86,11 +86,12 @@ import {
   canvasZoomFromWheel,
   canvasZoomToSlider,
   clampCanvasZoom,
+  hasCanvasPanStarted,
   sliderToCanvasZoom,
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.13.2-2026-07-15',
+  id: 'mapkluss-v1.13.3-2026-07-15',
   url: 'https://t.me/mapkluss',
 };
 
@@ -569,6 +570,7 @@ export default function App() {
     moved: boolean;
   } | null>(null);
   const suppressCanvasClickRef = useRef(false);
+  const suppressCanvasClickTimerRef = useRef<number | null>(null);
   const [undoStack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [mobileTab, setMobileTab] = useState<'settings' | 'palette' | 'export'>('settings');
@@ -1905,6 +1907,11 @@ export default function App() {
   }, []);
 
   const handleCanvasPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (suppressCanvasClickTimerRef.current !== null) {
+      window.clearTimeout(suppressCanvasClickTimerRef.current);
+      suppressCanvasClickTimerRef.current = null;
+    }
+    suppressCanvasClickRef.current = false;
     const target = event.target instanceof Element ? event.target : null;
     if (
       !hasContent
@@ -1923,7 +1930,6 @@ export default function App() {
       startScrollTop: event.currentTarget.scrollTop,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   }, [activeTool, compareMode, hasContent]);
 
   const handleCanvasPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -1931,8 +1937,11 @@ export default function App() {
     if (!pan || pan.pointerId !== event.pointerId) return;
     const dx = event.clientX - pan.startX;
     const dy = event.clientY - pan.startY;
-    if (!pan.moved && Math.hypot(dx, dy) >= 3) {
+    if (!pan.moved && hasCanvasPanStarted(pan.startX, pan.startY, event.clientX, event.clientY)) {
       pan.moved = true;
+      // Capturing on pointerdown retargets an ordinary click to the viewport;
+      // wait until this gesture is definitely a pan so block clicks still pin.
+      event.currentTarget.setPointerCapture(event.pointerId);
       event.currentTarget.classList.add('canvas-area-panning');
       event.currentTarget.dispatchEvent(new CustomEvent('mapkluss:viewport-pan-start'));
       setIsCanvasPanning(true);
@@ -1947,6 +1956,17 @@ export default function App() {
     const pan = canvasPanRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     suppressCanvasClickRef.current = pan.moved;
+    if (pan.moved) {
+      event.currentTarget.dispatchEvent(new CustomEvent('mapkluss:viewport-pan-end', {
+        detail: { clientX: event.clientX, clientY: event.clientY },
+      }));
+      // Some browsers omit click after a drag. Bound the suppression so it can
+      // never swallow the user's next deliberate click.
+      suppressCanvasClickTimerRef.current = window.setTimeout(() => {
+        suppressCanvasClickRef.current = false;
+        suppressCanvasClickTimerRef.current = null;
+      }, 250);
+    }
     canvasPanRef.current = null;
     event.currentTarget.classList.remove('canvas-area-panning');
     setIsCanvasPanning(false);
@@ -1958,6 +1978,10 @@ export default function App() {
   const handleCanvasClickCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!suppressCanvasClickRef.current) return;
     suppressCanvasClickRef.current = false;
+    if (suppressCanvasClickTimerRef.current !== null) {
+      window.clearTimeout(suppressCanvasClickTimerRef.current);
+      suppressCanvasClickTimerRef.current = null;
+    }
     event.preventDefault();
     event.stopPropagation();
   }, []);
@@ -3206,11 +3230,7 @@ export default function App() {
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={finishCanvasPan}
             onPointerCancel={finishCanvasPan}
-            onLostPointerCapture={event => {
-              canvasPanRef.current = null;
-              event.currentTarget.classList.remove('canvas-area-panning');
-              setIsCanvasPanning(false);
-            }}
+            onLostPointerCapture={finishCanvasPan}
             onKeyDown={!hasContent ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();

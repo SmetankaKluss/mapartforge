@@ -14,6 +14,7 @@ import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
 import { TEXT_FONTS, type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
 import { renderTextBitmap, scaleMask, dilateMask, type TextBitmap } from '../lib/textRender';
+import { CANVAS_PAN_THRESHOLD } from '../lib/canvasViewport';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
@@ -490,6 +491,7 @@ export function PreviewCanvas({
   // frame so the tooltip can't lag behind the cursor during fast movement.
   const hoverRafRef                   = useRef<number | null>(null);
   const lastMoveRef                   = useRef<{ x: number; y: number } | null>(null);
+  const resumeHoverAfterPanRef         = useRef<{ x: number; y: number } | null>(null);
   const tooltipRef                    = useRef<HTMLDivElement>(null);
   const prevHoverKeyRef               = useRef<string>('');
   const [showRepaint, setShowRepaint]       = useState(false);
@@ -1340,9 +1342,23 @@ export function PreviewCanvas({
   useEffect(() => {
     const area = canvasZoneRef.current?.closest('.canvas-area');
     if (!area) return;
-    const onPanStart = () => dismissHoverForViewportPan();
+    const onPanStart = () => {
+      resumeHoverAfterPanRef.current = null;
+      dismissHoverForViewportPan();
+    };
+    const onPanEnd = (event: Event) => {
+      const detail = (event as CustomEvent<{ clientX: number; clientY: number }>).detail;
+      resumeHoverAfterPanRef.current = detail
+        ? { x: detail.clientX, y: detail.clientY }
+        : lastClientRef.current;
+      dismissHoverForViewportPan();
+    };
     area.addEventListener('mapkluss:viewport-pan-start', onPanStart);
-    return () => area.removeEventListener('mapkluss:viewport-pan-start', onPanStart);
+    area.addEventListener('mapkluss:viewport-pan-end', onPanEnd);
+    return () => {
+      area.removeEventListener('mapkluss:viewport-pan-start', onPanStart);
+      area.removeEventListener('mapkluss:viewport-pan-end', onPanEnd);
+    };
     // The listener is attached once to the stable canvas viewport.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1783,6 +1799,14 @@ export function PreviewCanvas({
   // ── Tooltip handlers ────────────────────────────────────────────────────────
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const panRelease = resumeHoverAfterPanRef.current;
+    if (panRelease) {
+      if (Math.hypot(e.clientX - panRelease.x, e.clientY - panRelease.y) < CANVAS_PAN_THRESHOLD) {
+        dismissHoverForViewportPan();
+        return;
+      }
+      resumeHoverAfterPanRef.current = null;
+    }
     if (isViewportPanActive()) {
       dismissHoverForViewportPan();
       return;

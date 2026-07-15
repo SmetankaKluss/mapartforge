@@ -21,9 +21,11 @@ body {
 }
 
 .public-shell {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
 }
@@ -155,7 +157,8 @@ body {
 
 .public-content-page,
 .public-shell > .companion-page,
-.public-shell > .bt-page {
+.public-shell > .bt-page,
+.public-shell > .public-not-found {
   min-height: 0;
   flex: 1;
   overflow-x: clip;

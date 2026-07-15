@@ -1,5 +1,6 @@
 export const MIN_CANVAS_ZOOM = 50;
 export const MAX_CANVAS_ZOOM = 800;
+export const CANVAS_PAN_THRESHOLD = 3;
 
 const ZOOM_RANGE = MAX_CANVAS_ZOOM / MIN_CANVAS_ZOOM;
 
@@ -17,6 +18,16 @@ export function sliderToCanvasZoom(sliderValue: number): number {
 export function canvasZoomToSlider(zoom: number): number {
   const clamped = clampCanvasZoom(zoom);
   return Math.log(clamped / MIN_CANVAS_ZOOM) / Math.log(ZOOM_RANGE) * 100;
+}
+
+/** Keep a click a click until the pointer has moved far enough to be a pan. */
+export function hasCanvasPanStarted(
+  startX: number,
+  startY: number,
+  clientX: number,
+  clientY: number,
+): boolean {
+  return Math.hypot(clientX - startX, clientY - startY) >= CANVAS_PAN_THRESHOLD;
 }
 
 /**
