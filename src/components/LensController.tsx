@@ -47,6 +47,11 @@ type LensPhase = 'idle' | 'connecting' | 'live' | 'publishing' | 'offline' | 'er
 
 const LENS_NETWORK_RETRY_BASE_MS = 2_000;
 const LENS_NETWORK_RETRY_MAX_MS = 30_000;
+const LENS_STATUS_INTERVAL_MS = 30_000;
+
+function isTerminalSession(session: LensSession): boolean {
+  return session.status === 'closed' || session.status === 'expired';
+}
 
 function lensErrorMessage(error: unknown, t: LensControllerProps['t']): string {
   if (error instanceof CompanionLensError) {
@@ -70,12 +75,15 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
   const workerRef = useRef<Worker | null>(null);
   const workerIdRef = useRef(0);
   const workerJobsRef = useRef(new Map<number, { resolve: (result: WorkerResult) => void; reject: (error: Error) => void }>());
+  const queueRef = useRef<LensPublishQueue<PreviewJob> | null>(null);
   const sessionRef = useRef<LensSession | null>(null);
   const ownerUserIdRef = useRef<string | null>(null);
   const enabledRef = useRef(false);
   const lastPublishKeyRef = useRef<string | null>(null);
   const publisherLeaseRef = useRef<string | null>(null);
   const networkRetryPendingRef = useRef(false);
+  const lifecycleEpochRef = useRef(0);
+  const statusRequestPendingRef = useRef(false);
   const translateRef = useRef(t);
   translateRef.current = t;
 
@@ -88,30 +96,59 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
     sessionRef.current = session;
   }, [session]);
 
-  const preparePreview = useCallback((job: PreviewJob): Promise<WorkerResult> => {
-    const worker = workerRef.current;
-    if (!worker) return Promise.reject(new Error('preview_worker_unavailable'));
+  const ensureWorker = useCallback((): Worker => {
+    if (workerRef.current) return workerRef.current;
+    const worker = new Worker(new URL('../workers/lensPreview.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    worker.onmessage = (event: MessageEvent<WorkerResult>) => {
+      const pending = workerJobsRef.current.get(event.data.id);
+      if (!pending) return;
+      workerJobsRef.current.delete(event.data.id);
+      if (event.data.error) pending.reject(new Error(event.data.error));
+      else pending.resolve(event.data);
+    };
+    worker.onerror = () => {
+      for (const pending of workerJobsRef.current.values()) pending.reject(new Error('preview_worker_failed'));
+      workerJobsRef.current.clear();
+      worker.terminate();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
+    return worker;
+  }, []);
+
+  const preparePreview = useCallback(async (job: PreviewJob): Promise<WorkerResult> => {
+    const worker = ensureWorker();
     const id = ++workerIdRef.current;
-    const pixels = new Uint8ClampedArray(job.imageData.data);
+    const bitmap = await createImageBitmap(job.imageData);
     return new Promise((resolve, reject) => {
       workerJobsRef.current.set(id, { resolve, reject });
-      worker.postMessage({
-        id,
-        pixels: pixels.buffer,
-        width: job.imageData.width,
-        height: job.imageData.height,
-        grid: job.grid,
-        tileResolution: chooseLensTileResolution(job.grid),
-      }, [pixels.buffer]);
+      try {
+        worker.postMessage({
+          id,
+          bitmap,
+          grid: job.grid,
+          tileResolution: chooseLensTileResolution(job.grid),
+        }, [bitmap]);
+      } catch (error) {
+        workerJobsRef.current.delete(id);
+        bitmap.close();
+        reject(error instanceof Error ? error : new Error('preview_worker_unavailable'));
+      }
     });
-  }, []);
+  }, [ensureWorker]);
 
   const publishJob = useCallback(async (job: PreviewJob) => {
     const activeSession = sessionRef.current;
     const publisherLease = publisherLeaseRef.current;
     if (!enabledRef.current || !activeSession || !publisherLease) return;
+    const epoch = lifecycleEpochRef.current;
+    const stillCurrent = () => epoch === lifecycleEpochRef.current
+      && enabledRef.current
+      && sessionRef.current?.sessionId === activeSession.sessionId
+      && publisherLeaseRef.current === publisherLease;
     setPhase('publishing');
     const prepared = await preparePreview(job);
+    if (!stillCurrent()) return;
     if (!prepared.blob || !prepared.sha256 || !prepared.tileResolution) {
       throw new Error(prepared.error || 'preview_failed');
     }
@@ -144,17 +181,17 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
     } catch (error) {
       if (!(error instanceof CompanionLensError) || error.code !== 'revision_conflict') throw error;
       const refreshed = await getLensSessionStatus(activeSession.sessionId, publisherLease);
+      if (!stillCurrent() || isTerminalSession(refreshed.session)) return;
       adoptSession(refreshed.session);
       response = await publish(refreshed.session.revision);
     }
+    if (!stillCurrent() || isTerminalSession(response.session)) return;
     lastPublishKeyRef.current = publishKey;
     networkRetryPendingRef.current = false;
     adoptSession(response.session);
     setPhase('live');
     setErrorMessage('');
   }, [adoptSession, preparePreview]);
-
-  const queueRef = useRef<LensPublishQueue<PreviewJob> | null>(null);
 
   useEffect(() => {
     const queue = new LensPublishQueue<PreviewJob>({
@@ -190,24 +227,20 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
   }, [publishJob]);
 
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/lensPreview.worker.ts', import.meta.url), { type: 'module' });
-    workerRef.current = worker;
-    worker.onmessage = (event: MessageEvent<WorkerResult>) => {
-      const pending = workerJobsRef.current.get(event.data.id);
-      if (!pending) return;
-      workerJobsRef.current.delete(event.data.id);
-      if (event.data.error) pending.reject(new Error(event.data.error));
-      else pending.resolve(event.data);
-    };
-    worker.onerror = () => {
-      for (const pending of workerJobsRef.current.values()) pending.reject(new Error('preview_worker_failed'));
-      workerJobsRef.current.clear();
-    };
+    const workerJobs = workerJobsRef.current;
     return () => {
+      const activeSession = sessionRef.current;
+      const publisherLease = publisherLeaseRef.current;
+      if (enabledRef.current && activeSession && publisherLease) {
+        void closeLensSession(activeSession.sessionId, publisherLease).catch(() => undefined);
+      }
+      lifecycleEpochRef.current += 1;
       queueRef.current?.clear();
       enabledRef.current = false;
-      worker.terminate();
+      workerRef.current?.terminate();
       workerRef.current = null;
+      for (const pending of workerJobs.values()) pending.reject(new Error('preview_worker_stopped'));
+      workerJobs.clear();
     };
   }, []);
 
@@ -222,6 +255,7 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
       const nextUser = authSession?.user ?? null;
       setUser(nextUser);
       if (!nextUser || (ownerUserIdRef.current && ownerUserIdRef.current !== nextUser.id)) {
+        lifecycleEpochRef.current += 1;
         enabledRef.current = false;
         queueRef.current?.clear();
         adoptSession(null);
@@ -238,13 +272,41 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
     queueRef.current?.enqueue({ imageData, grid, mapMode, title });
   }, [compareMode, grid, imageData, mapMode, processing, title]);
 
+  useEffect(() => {
+    if (imageData || useMockLens) return;
+    const activeSession = sessionRef.current;
+    const publisherLease = publisherLeaseRef.current;
+    if (!activeSession || !publisherLease) return;
+    lifecycleEpochRef.current += 1;
+    enabledRef.current = false;
+    queueRef.current?.clear();
+    adoptSession(null);
+    publisherLeaseRef.current = null;
+    lastPublishKeyRef.current = null;
+    setPhase('idle');
+    void closeLensSession(activeSession.sessionId, publisherLease).catch(() => undefined);
+  }, [adoptSession, imageData, useMockLens]);
+
   const refreshStatus = useCallback(async () => {
     const activeSession = sessionRef.current;
-    if (!enabledRef.current || !activeSession) return;
+    const publisherLease = publisherLeaseRef.current;
+    if (!enabledRef.current || !activeSession || !publisherLease || document.hidden || statusRequestPendingRef.current) return;
+    const epoch = lifecycleEpochRef.current;
+    statusRequestPendingRef.current = true;
     try {
-      const publisherLease = publisherLeaseRef.current;
-      if (!publisherLease) return;
       const response = await getLensSessionStatus(activeSession.sessionId, publisherLease);
+      if (epoch !== lifecycleEpochRef.current || sessionRef.current?.sessionId !== activeSession.sessionId) return;
+      if (isTerminalSession(response.session)) {
+        lifecycleEpochRef.current += 1;
+        enabledRef.current = false;
+        queueRef.current?.clear();
+        adoptSession(null);
+        publisherLeaseRef.current = null;
+        lastPublishKeyRef.current = null;
+        setPhase('idle');
+        setErrorMessage(t('Сессия Lens завершена.', 'The Lens session has ended.'));
+        return;
+      }
       adoptSession(response.session);
       setPhase('live');
       setErrorMessage('');
@@ -257,6 +319,7 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
       ) {
         try {
           const response = await reacquireLensSession(activeSession.sessionId);
+          if (epoch !== lifecycleEpochRef.current || isTerminalSession(response.session)) return;
           if (!response.publisherLease) throw new Error('publisher_lease_missing');
           ownerUserIdRef.current = user.id;
           publisherLeaseRef.current = response.publisherLease;
@@ -292,31 +355,47 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
       }
       setPhase(navigator.onLine ? 'error' : 'offline');
       setErrorMessage(lensErrorMessage(statusError, t));
+    } finally {
+      statusRequestPendingRef.current = false;
     }
   }, [adoptSession, compareMode, grid, imageData, mapMode, processing, t, title, user]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void refreshStatus(), 15_000);
+    const timer = window.setInterval(() => void refreshStatus(), LENS_STATUS_INTERVAL_MS);
     const reconnect = () => {
       if (networkRetryPendingRef.current) queueRef.current?.retryNow();
       void refreshStatus();
     };
     const focus = () => void refreshStatus();
+    const visibility = () => {
+      if (!document.hidden) void refreshStatus();
+    };
     window.addEventListener('online', reconnect);
     window.addEventListener('focus', focus);
+    document.addEventListener('visibilitychange', visibility);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('online', reconnect);
       window.removeEventListener('focus', focus);
+      document.removeEventListener('visibilitychange', visibility);
     };
   }, [refreshStatus]);
 
   const start = useCallback(async () => {
     if (!user || !imageData || processing || compareMode) return;
+    const epoch = lifecycleEpochRef.current + 1;
+    lifecycleEpochRef.current = epoch;
+    queueRef.current?.clear();
     setPhase('connecting');
     setErrorMessage('');
     try {
       const response = await startLensSession({ title, grid, mapMode });
+      if (epoch !== lifecycleEpochRef.current) {
+        if (response.publisherLease) {
+          void closeLensSession(response.session.sessionId, response.publisherLease).catch(() => undefined);
+        }
+        return;
+      }
       if (!response.publisherLease) throw new Error('publisher_lease_missing');
       ownerUserIdRef.current = user.id;
       publisherLeaseRef.current = response.publisherLease;
@@ -325,6 +404,7 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
       setPhase('live');
       queueRef.current?.enqueue({ imageData, grid, mapMode, title });
     } catch (error) {
+      if (epoch !== lifecycleEpochRef.current) return;
       setPhase('error');
       setErrorMessage(lensErrorMessage(error, t));
     }
@@ -332,15 +412,17 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
 
   const stop = useCallback(async () => {
     const activeSession = sessionRef.current;
+    const publisherLease = publisherLeaseRef.current;
+    lifecycleEpochRef.current += 1;
     enabledRef.current = false;
     queueRef.current?.clear();
     setPhase('idle');
     adoptSession(null);
     lastPublishKeyRef.current = null;
     publisherLeaseRef.current = null;
-    if (activeSession) {
+    if (activeSession && publisherLease) {
       try {
-        await closeLensSession(activeSession.sessionId);
+        await closeLensSession(activeSession.sessionId, publisherLease);
       } catch (error) {
         setErrorMessage(lensErrorMessage(error, t));
       }
@@ -348,14 +430,18 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
   }, [adoptSession, t]);
 
   const rotate = useCallback(async () => {
-    if (!session) return;
+    const publisherLease = publisherLeaseRef.current;
+    if (!session || !publisherLease) return;
+    const epoch = lifecycleEpochRef.current;
     setPhase('connecting');
     try {
-      const response = await rotateLensSessionCode(session.sessionId);
+      const response = await rotateLensSessionCode(session.sessionId, publisherLease);
+      if (epoch !== lifecycleEpochRef.current || sessionRef.current?.sessionId !== session.sessionId) return;
       adoptSession(response.session);
       setPhase('live');
       setCopied(false);
     } catch (error) {
+      if (epoch !== lifecycleEpochRef.current) return;
       setPhase('error');
       setErrorMessage(lensErrorMessage(error, t));
     }

@@ -3,9 +3,7 @@ import { LENS_MAX_PREVIEW_BYTES, nextLensTileResolution } from '../lib/lensPrevi
 
 interface BuildMessage {
   id: number;
-  pixels: ArrayBuffer;
-  width: number;
-  height: number;
+  bitmap: ImageBitmap;
   grid: LensGrid;
   tileResolution: LensTileResolution;
 }
@@ -25,15 +23,6 @@ function hexDigest(bytes: ArrayBuffer): string {
 }
 
 async function encodeAtlas(message: BuildMessage, resolution: LensTileResolution): Promise<BuildResult> {
-  const source = new OffscreenCanvas(message.width, message.height);
-  const sourceContext = source.getContext('2d');
-  if (!sourceContext) throw new Error('canvas_unavailable');
-  sourceContext.putImageData(
-    new ImageData(new Uint8ClampedArray(message.pixels), message.width, message.height),
-    0,
-    0,
-  );
-
   const width = message.grid.wide * resolution;
   const height = message.grid.tall * resolution;
   const atlas = new OffscreenCanvas(width, height);
@@ -41,7 +30,7 @@ async function encodeAtlas(message: BuildMessage, resolution: LensTileResolution
   if (!context) throw new Error('canvas_unavailable');
   context.imageSmoothingEnabled = false;
   context.clearRect(0, 0, width, height);
-  context.drawImage(source, 0, 0, width, height);
+  context.drawImage(message.bitmap, 0, 0, width, height);
   const blob = await atlas.convertToBlob({ type: 'image/png' });
   const sha256 = hexDigest(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()));
   return { id: message.id, blob, sha256, tileResolution: resolution, width, height };
@@ -63,5 +52,6 @@ self.onmessage = (event: MessageEvent<BuildMessage>) => {
     .catch((error: unknown) => self.postMessage({
       id: event.data.id,
       error: error instanceof Error ? error.message : 'preview_failed',
-    } satisfies BuildResult));
+    } satisfies BuildResult))
+    .finally(() => event.data.bitmap.close());
 };

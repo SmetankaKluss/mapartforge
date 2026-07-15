@@ -132,12 +132,18 @@ export async function reacquireLensSession(sessionId: string): Promise<LensSessi
   return invokeJson<LensSessionResponse>({ action: 'session_reacquire', sessionId });
 }
 
-export async function rotateLensSessionCode(sessionId: string): Promise<LensSessionResponse> {
-  return invokeJson<LensSessionResponse>({ action: 'session_rotate_code', sessionId });
+export async function rotateLensSessionCode(
+  sessionId: string,
+  publisherLease: string,
+): Promise<LensSessionResponse> {
+  return invokeJson<LensSessionResponse>({ action: 'session_rotate_code', sessionId, publisherLease });
 }
 
-export async function closeLensSession(sessionId: string): Promise<{ apiVersion: 1 }> {
-  return invokeJson<{ apiVersion: 1 }>({ action: 'session_close', sessionId });
+export async function closeLensSession(
+  sessionId: string,
+  publisherLease: string,
+): Promise<{ apiVersion: 1; stale?: boolean }> {
+  return invokeJson<{ apiVersion: 1; stale?: boolean }>({ action: 'session_close', sessionId, publisherLease });
 }
 
 export async function publishLensPreview(input: {

@@ -180,4 +180,35 @@ describe('LensPublishQueue', () => {
     expect(published).toEqual([1, 3, 4]);
     expect(attempts).toEqual([0, 1]);
   });
+
+  it('invalidates an in-flight publish when the session is cleared', async () => {
+    vi.useFakeTimers();
+    let rejectOld: ((error: Error) => void) | undefined;
+    const published: number[] = [];
+    const errors: unknown[] = [];
+    const queue = new LensPublishQueue<number>({
+      debounceMs: 0,
+      minIntervalMs: 0,
+      publish: value => {
+        published.push(value);
+        if (value === 1) return new Promise<void>((_resolve, reject) => { rejectOld = reject; });
+        return Promise.resolve();
+      },
+      onError: error => errors.push(error),
+      retryDelay: () => 1000,
+    });
+
+    queue.enqueue(1);
+    await vi.advanceTimersByTimeAsync(0);
+    queue.clear();
+    queue.enqueue(2);
+    rejectOld?.(new Error('stale session'));
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(errors).toEqual([]);
+    expect(published).toEqual([1, 2]);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(published).toEqual([1, 2]);
+  });
 });

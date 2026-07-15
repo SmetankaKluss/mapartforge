@@ -49,12 +49,20 @@ export function applyPageMeta(meta: PageMeta): void {
   upsertMeta('robots', meta.robots ?? 'index,follow');
   upsertMeta('og:title', meta.title, 'property');
   upsertMeta('og:description', meta.description, 'property');
+  upsertMeta('twitter:card', 'summary_large_image');
+  upsertMeta('twitter:title', meta.title);
+  upsertMeta('twitter:description', meta.description);
 
   const canonical = meta.canonical ?? meta.url ?? window.location.href;
   upsertCanonical(canonical);
 
   if (meta.url) upsertMeta('og:url', meta.url, 'property');
-  if (meta.image) upsertMeta('og:image', meta.image, 'property');
+  if (meta.image) {
+    upsertMeta('og:image', meta.image, 'property');
+    upsertMeta('og:image:alt', meta.title, 'property');
+    upsertMeta('twitter:image', meta.image);
+    upsertMeta('twitter:image:alt', meta.title);
+  }
 
   upsertSchema(meta.schema);
 }

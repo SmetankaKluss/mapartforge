@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_CANVAS_ZOOM,
   MIN_CANVAS_ZOOM,
+  canStartCanvasPan,
   canvasZoomFromWheel,
   canvasZoomToSlider,
   hasCanvasPanStarted,
@@ -33,4 +34,12 @@ describe('canvas viewport zoom', () => {
     expect(hasCanvasPanStarted(100, 100, 103, 100)).toBe(true);
     expect(hasCanvasPanStarted(100, 100, 98, 98)).toBe(false);
   });
+
+  it('allows Space to temporarily pan while a paint tool is active', () => {
+    expect(canStartCanvasPan(true, false, false)).toBe(false);
+    expect(canStartCanvasPan(true, false, true)).toBe(true);
+    expect(canStartCanvasPan(false, false, false)).toBe(true);
+    expect(canStartCanvasPan(true, true, false)).toBe(true);
+  });
+
 });

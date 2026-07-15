@@ -38,6 +38,7 @@ export class LensPublishQueue<T> {
   private lastStartedAt = Number.NEGATIVE_INFINITY;
   private retryAttempt = 0;
   private retryScheduled = false;
+  private generation = 0;
   private readonly now: () => number;
   private readonly options: LensPublishQueueOptions<T>;
 
@@ -61,6 +62,7 @@ export class LensPublishQueue<T> {
   }
 
   clear(): void {
+    this.generation += 1;
     this.pending = null;
     this.retryAttempt = 0;
     this.retryScheduled = false;
@@ -85,6 +87,7 @@ export class LensPublishQueue<T> {
     }
 
     const value = this.pending;
+    const generation = this.generation;
     this.pending = null;
     this.retryScheduled = false;
     this.publishing = true;
@@ -92,18 +95,20 @@ export class LensPublishQueue<T> {
     let retryDelay: number | null = null;
     try {
       await this.options.publish(value);
-      this.retryAttempt = 0;
+      if (generation === this.generation) this.retryAttempt = 0;
     } catch (error) {
-      this.options.onError?.(error);
-      retryDelay = this.options.retryDelay?.(error, this.retryAttempt) ?? null;
-      if (retryDelay !== null) {
-        if (this.pending === null) this.pending = value;
-        this.retryAttempt += 1;
-        this.retryScheduled = true;
+      if (generation === this.generation) {
+        this.options.onError?.(error);
+        retryDelay = this.options.retryDelay?.(error, this.retryAttempt) ?? null;
+        if (retryDelay !== null) {
+          if (this.pending === null) this.pending = value;
+          this.retryAttempt += 1;
+          this.retryScheduled = true;
+        }
       }
     } finally {
       this.publishing = false;
-      if (this.pending !== null) this.arm(retryDelay ?? 0);
+      if (this.pending !== null) this.arm(generation === this.generation ? (retryDelay ?? 0) : 0);
     }
   }
 }

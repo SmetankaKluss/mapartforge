@@ -7,17 +7,20 @@ const API_VERSION = 1;
 const BUCKET = "mapkluss-lens";
 const MAX_PREVIEW_BYTES = 8 * 1024 * 1024;
 const SIGNED_URL_SECONDS = 60;
-const SESSION_OFFLINE_MS = 45_000;
+const SESSION_OFFLINE_MS = 90_000;
 const SESSION_EXPIRES_MS = 120_000;
 const LEASE_EXPIRES_MS = 120_000;
-const PLACEMENT_LIVE_MS = 20_000;
+const PLACEMENT_LIVE_MS = 90_000;
 const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const ORPHAN_SWEEP_PAGE_SIZE = 100;
-const ORPHAN_SWEEP_OWNER_PAGES = 2;
-const ORPHAN_SWEEP_SESSION_PAGE_SIZE = 1000;
-const ORPHAN_SWEEP_MAX_OBJECTS = 1000;
+const ORPHAN_SWEEP_PAGE_SIZE = 25;
+const ORPHAN_SWEEP_OWNER_PAGES = 1;
+const ORPHAN_SWEEP_SESSION_PAGE_SIZE = 100;
+const ORPHAN_SWEEP_MAX_OBJECTS = 100;
+const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+const MAX_DEVICE_SESSIONS = 20;
+const CLEANUP_SESSION_BATCH_SIZE = 50;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -244,6 +247,7 @@ type Database = {
           p_owner_id: string;
           p_session_code_hash: string;
           p_realtime_topic: string;
+          p_expected_publisher_lease_hash: string;
         };
         Returns: LensSessionRow[];
       };
@@ -267,7 +271,6 @@ type Principal =
   | { kind: "website"; userId: string; tokenHash: string }
   | { kind: "device"; userId: string; tokenHash: string }
   | { kind: "server"; userId: null; tokenHash: string };
-type DevicePrincipal = Extract<Principal, { kind: "device" }>;
 type JsonRecord = Record<string, unknown>;
 
 class LensError extends Error {
@@ -574,6 +577,7 @@ async function mapSession(
   row: LensSessionRow,
   sessionCode?: string,
   viewerUserId?: string | null,
+  includeViewerCount = false,
 ): Promise<JsonRecord> {
   return {
     sessionId: row.id,
@@ -585,7 +589,7 @@ async function mapSession(
     tileResolution: row.tile_resolution ?? 16,
     previewWidth: row.preview_width ?? 0,
     previewHeight: row.preview_height ?? 0,
-    viewerCount: await viewerCount(admin, row),
+    viewerCount: includeViewerCount ? await viewerCount(admin, row) : 0,
     editorLastSeenAt: row.last_editor_seen_at,
     expiresAt: row.expires_at,
     ...(sessionCode ? { sessionCode } : {}),
@@ -653,10 +657,19 @@ async function refreshSessionState(
     .update({ status: nextStatus, updated_at: nowIso() })
     .eq("id", row.id)
     .in("status", ["active", "offline"])
+    .eq("last_editor_seen_at", row.last_editor_seen_at)
+    .eq("expires_at", row.expires_at)
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return data ?? { ...row, status: nextStatus };
+  if (data) return data;
+  const { data: current, error: currentError } = await admin
+    .from("companion_lens_sessions")
+    .select("*")
+    .eq("id", row.id)
+    .maybeSingle();
+  if (currentError) throw currentError;
+  return current ?? { ...row, status: nextStatus };
 }
 
 async function signedPreviewUrl(
@@ -777,15 +790,14 @@ async function trimOldRevisions(
   admin: AdminClient,
   session: LensSessionRow,
 ): Promise<void> {
-  const keep = new Set([
-    Number(session.revision),
-    Math.max(0, Number(session.revision) - 1),
-  ]);
+  const oldestRetainedRevision = Math.max(0, Number(session.revision) - 1);
   const listed = await listSessionPaths(admin, session);
   if (listed.failed) return;
   const stale = listed.paths.filter((path) => {
-    const match = /\/(\d+)\.png$/.exec(path);
-    return !match || !keep.has(Number(match[1]));
+    const match = /\/(\d+)(?:-[a-f0-9]{64})?\.png$/.exec(path);
+    // A future revision can already be uploaded while its DB compare-and-swap
+    // is still in flight. Never delete it from a stale cleanup snapshot.
+    return !!match && Number(match[1]) < oldestRetainedRevision;
   });
   await removePathsBestEffort(admin, stale);
 }
@@ -823,31 +835,13 @@ async function getGroupSubscription(
   return !!data;
 }
 
-async function upsertSubscriber(
-  admin: AdminClient,
-  principal: DevicePrincipal,
-  sessionId: string,
-  groupGeneration: number,
-): Promise<void> {
-  const timestamp = nowIso();
-  const { error } = await admin.from("companion_lens_subscribers").upsert({
-    session_id: sessionId,
-    user_id: principal.userId,
-    device_token_hash: principal.tokenHash,
-    subscription_kind: "group",
-    group_generation: groupGeneration,
-    last_seen_at: timestamp,
-    updated_at: timestamp,
-  }, { onConflict: "session_id,device_token_hash,subscription_kind" });
-  if (error) throw error;
-}
-
 async function rotateGroupGeneration(
   admin: AdminClient,
   sessionId: string,
   ownerId: string,
   sessionCodeHash: string,
   realtimeTopic: string,
+  expectedPublisherLeaseHash: string,
 ): Promise<LensSessionRow | null> {
   const { data, error } = await admin.rpc(
     "companion_lens_rotate_group_generation",
@@ -856,6 +850,7 @@ async function rotateGroupGeneration(
       p_owner_id: ownerId,
       p_session_code_hash: sessionCodeHash,
       p_realtime_topic: realtimeTopic,
+      p_expected_publisher_lease_hash: expectedPublisherLeaseHash,
     },
   );
   if (error) throw error;
@@ -887,12 +882,12 @@ function capabilities(): JsonRecord {
     timing: {
       publishDebounceMs: 350,
       publishMinimumIntervalMs: 1000,
-      editorHeartbeatMs: 15000,
+      editorHeartbeatMs: 30000,
       editorOfflineMs: SESSION_OFFLINE_MS,
       sessionExpiresMs: SESSION_EXPIRES_MS,
-      placementHeartbeatMs: 5000,
+      placementHeartbeatMs: 30000,
       placementOfflineMs: PLACEMENT_LIVE_MS,
-      recoveryPollMs: 5000,
+      recoveryPollMs: 60000,
     },
   };
 }
@@ -963,7 +958,6 @@ async function handleSessionStart(
 ) {
   requireKind(principal, "website", "publisher_required");
   await consumeRateLimit(admin, principal, "session_start", 20, 60);
-  scheduleOpportunisticCleanup(admin);
   const ownerId = principal.userId!;
   const title = requiredString(payload, "title", 120);
   const grid = gridFrom(payload);
@@ -971,6 +965,7 @@ async function handleSessionStart(
   const ownerKey = await sha256Hex(`lens-owner-v1:${ownerId}`);
   const sessionCode = randomCode();
   const publisherLease = randomHex(32);
+  const publisherLeaseHash = await sha256Hex(publisherLease);
   const capabilityValues = {
     session_code_hash: await sha256Hex(sessionCode),
     realtime_topic: `lens:${randomHex(24)}`,
@@ -979,7 +974,7 @@ async function handleSessionStart(
     owner_key: ownerKey,
     title,
     status: "active" as const,
-    publisher_lease_hash: await sha256Hex(publisherLease),
+    publisher_lease_hash: publisherLeaseHash,
     publisher_lease_expires_at: futureIso(LEASE_EXPIRES_MS),
     last_editor_seen_at: nowIso(),
     expires_at: futureIso(SESSION_EXPIRES_MS),
@@ -1014,6 +1009,7 @@ async function handleSessionStart(
       ownerId,
       capabilityValues.session_code_hash,
       capabilityValues.realtime_topic,
+      publisherLeaseHash,
     ) ?? fail("session_gone", 410);
   } else {
     const { data, error } = await admin
@@ -1033,7 +1029,13 @@ async function handleSessionStart(
   }
 
   return json({
-    session: await mapSession(admin, session, sessionCode, principal.userId),
+    session: await mapSession(
+      admin,
+      session,
+      sessionCode,
+      principal.userId,
+      true,
+    ),
     publisherLease,
   });
 }
@@ -1068,6 +1070,7 @@ async function handleSessionPublish(
   }
   const clientHash = hash64(payload, "sha256");
   const publisherLease = requiredString(payload, "publisherLease", 128);
+  const publisherLeaseHash = await sha256Hex(publisherLease);
   const bytes = new Uint8Array(await preview.arrayBuffer());
   const width = grid.wide * tileResolution;
   const height = grid.tall * tileResolution;
@@ -1086,7 +1089,7 @@ async function handleSessionPublish(
     fail("session_gone", 410);
   }
   if (
-    session.publisher_lease_hash !== await sha256Hex(publisherLease) ||
+    session.publisher_lease_hash !== publisherLeaseHash ||
     new Date(session.publisher_lease_expires_at).getTime() <= Date.now()
   ) {
     fail("publisher_required", 403);
@@ -1112,30 +1115,52 @@ async function handleSessionPublish(
       })
       .eq("id", sessionId)
       .eq("owner_id", principal.userId)
+      .eq("publisher_lease_hash", publisherLeaseHash)
       .eq("revision", baseRevision)
       .select("*")
       .maybeSingle();
     if (error) throw error;
-    if (!data) fail("revision_conflict", 409);
+    if (!data) {
+      const current = await loadSession(admin, sessionId);
+      if (current.publisher_lease_hash !== publisherLeaseHash) {
+        fail("publisher_required", 403);
+      }
+      fail("revision_conflict", 409);
+    }
     return json({
       changed: false,
-      session: await mapSession(admin, data, undefined, principal.userId),
+      session: await mapSession(admin, data, undefined, principal.userId, true),
     });
   }
 
   const nextRevision = baseRevision + 1;
-  const path = `${principal.userId}/${sessionId}/${nextRevision}.png`;
+  const path =
+    `${principal.userId}/${sessionId}/${nextRevision}-${serverHash}.png`;
   const { error: uploadError } = await admin.storage.from(BUCKET).upload(
     path,
     new Blob([bytes], { type: "image/png" }),
     { contentType: "image/png", upsert: false, cacheControl: "60" },
   );
+  let uploadedByThisRequest = !uploadError;
   if (uploadError) {
     const current = await loadSession(admin, sessionId);
+    if (current.publisher_lease_hash !== publisherLeaseHash) {
+      fail("publisher_required", 403);
+    }
     if (Number(current.revision) !== baseRevision) {
       fail("revision_conflict", 409);
     }
-    throw uploadError;
+    // A previous invocation may have uploaded the immutable object and then
+    // stopped before the DB compare-and-swap. Reuse only a byte-identical file.
+    const { data: existing, error: downloadError } = await admin.storage.from(
+      BUCKET,
+    ).download(path);
+    if (downloadError || !existing) throw uploadError;
+    const existingHash = await sha256Hex(
+      new Uint8Array(await existing.arrayBuffer()),
+    );
+    if (existingHash !== serverHash) throw uploadError;
+    uploadedByThisRequest = false;
   }
 
   const timestamp = nowIso();
@@ -1161,6 +1186,7 @@ async function handleSessionPublish(
     })
     .eq("id", sessionId)
     .eq("owner_id", principal.userId)
+    .eq("publisher_lease_hash", publisherLeaseHash)
     .eq("revision", baseRevision)
     .in("status", ["active", "offline"])
     .select("*")
@@ -1169,7 +1195,8 @@ async function handleSessionPublish(
     const current = await loadSession(admin, sessionId);
     if (
       Number(current.revision) === nextRevision &&
-      current.preview_sha256 === serverHash
+      current.preview_sha256 === serverHash &&
+      current.publisher_lease_hash === publisherLeaseHash
     ) {
       session = current;
       await Promise.allSettled([
@@ -1178,14 +1205,26 @@ async function handleSessionPublish(
       ]);
       return json({
         changed: true,
-        session: await mapSession(admin, session, undefined, principal.userId),
+        session: await mapSession(
+          admin,
+          session,
+          undefined,
+          principal.userId,
+          true,
+        ),
       });
     }
-    if (Number(current.revision) === baseRevision) {
+    const currentUsesUploadedObject =
+      Number(current.revision) === nextRevision &&
+      current.preview_sha256 === serverHash;
+    if (uploadedByThisRequest && !currentUsesUploadedObject) {
       await removePathsBestEffort(admin, [path]);
     }
     if (Number(current.revision) !== baseRevision) {
       fail("revision_conflict", 409);
+    }
+    if (current.publisher_lease_hash !== publisherLeaseHash) {
+      fail("publisher_required", 403);
     }
     throw error ?? new Error("Lens publish update failed.");
   }
@@ -1196,7 +1235,13 @@ async function handleSessionPublish(
   ]);
   return json({
     changed: true,
-    session: await mapSession(admin, session, undefined, principal.userId),
+    session: await mapSession(
+      admin,
+      session,
+      undefined,
+      principal.userId,
+      true,
+    ),
   });
 }
 
@@ -1232,7 +1277,7 @@ async function handleSessionReacquire(
   if (error) throw error;
   if (!data) fail("session_gone", 410);
   return json({
-    session: await mapSession(admin, data, undefined, principal.userId),
+    session: await mapSession(admin, data, undefined, principal.userId, true),
     publisherLease,
   });
 }
@@ -1246,17 +1291,24 @@ async function handleSessionStatus(
   await consumeRateLimit(admin, principal, "session_status", 120, 60);
   const sessionId = uuid(payload, "sessionId");
   const publisherLease = requiredString(payload, "publisherLease", 128);
+  const publisherLeaseHash = await sha256Hex(publisherLease);
   const session = await loadSession(admin, sessionId);
   if (session.owner_id !== principal.userId) fail("not_found", 404);
   if (
-    session.publisher_lease_hash !== await sha256Hex(publisherLease) ||
+    session.publisher_lease_hash !== publisherLeaseHash ||
     new Date(session.publisher_lease_expires_at).getTime() <= Date.now()
   ) {
     fail("publisher_required", 403);
   }
   if (session.status === "closed" || session.status === "expired") {
     return json({
-      session: await mapSession(admin, session, undefined, principal.userId),
+      session: await mapSession(
+        admin,
+        session,
+        undefined,
+        principal.userId,
+        true,
+      ),
     });
   }
   const timestamp = nowIso();
@@ -1271,11 +1323,13 @@ async function handleSessionStatus(
     })
     .eq("id", sessionId)
     .eq("owner_id", principal.userId)
+    .eq("publisher_lease_hash", publisherLeaseHash)
     .select("*")
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) fail("publisher_required", 403);
   return json({
-    session: await mapSession(admin, data, undefined, principal.userId),
+    session: await mapSession(admin, data, undefined, principal.userId, true),
   });
 }
 
@@ -1288,6 +1342,8 @@ async function handleRotateCode(
   requireKind(principal, "website", "publisher_required");
   await consumeRateLimit(admin, principal, "session_rotate_code", 10, 60);
   const sessionId = uuid(payload, "sessionId");
+  const publisherLease = requiredString(payload, "publisherLease", 128);
+  const publisherLeaseHash = await sha256Hex(publisherLease);
   const current = await loadSession(admin, sessionId);
   if (current.owner_id !== principal.userId) fail("not_found", 404);
   if (current.status === "closed" || current.status === "expired") {
@@ -1300,8 +1356,9 @@ async function handleRotateCode(
     principal.userId!,
     await sha256Hex(sessionCode),
     `lens:${randomHex(24)}`,
+    publisherLeaseHash,
   );
-  if (!data) fail("session_gone", 410);
+  if (!data) fail("publisher_required", 403);
   await Promise.allSettled([
     broadcastRevision(serviceKey, {
       ...data,
@@ -1310,7 +1367,7 @@ async function handleRotateCode(
     broadcastRevision(serviceKey, data),
   ]);
   return json({
-    session: await mapSession(admin, data, sessionCode, principal.userId),
+    session: await mapSession(admin, data, sessionCode, principal.userId, true),
   });
 }
 
@@ -1323,25 +1380,39 @@ async function handleSessionClose(
   requireKind(principal, "website", "publisher_required");
   await consumeRateLimit(admin, principal, "session_close", 20, 60);
   const sessionId = uuid(payload, "sessionId");
-  const { data: session, error: findError } = await admin
+  const publisherLease = requiredString(payload, "publisherLease", 128);
+  const publisherLeaseHash = await sha256Hex(publisherLease);
+  const { data: closedSession, error: closeError } = await admin
     .from("companion_lens_sessions")
-    .select("*")
+    .update({
+      status: "closed",
+      updated_at: nowIso(),
+      expires_at: futureIso(1),
+    })
     .eq("id", sessionId)
     .eq("owner_id", principal.userId)
+    .eq("publisher_lease_hash", publisherLeaseHash)
+    .in("status", ["active", "offline"])
+    .select("*")
     .maybeSingle();
-  if (findError) throw findError;
-  if (!session) return json({ ok: true, sessionId });
-  if (session.status !== "closed") {
-    const { error } = await admin
+  if (closeError) throw closeError;
+
+  let session = closedSession;
+  if (!session) {
+    const { data: current, error: findError } = await admin
       .from("companion_lens_sessions")
-      .update({
-        status: "closed",
-        updated_at: nowIso(),
-        expires_at: futureIso(1),
-      })
+      .select("*")
       .eq("id", sessionId)
-      .eq("owner_id", principal.userId);
-    if (error) throw error;
+      .eq("owner_id", principal.userId)
+      .maybeSingle();
+    if (findError) throw findError;
+    if (
+      !current || current.publisher_lease_hash !== publisherLeaseHash ||
+      (current.status !== "closed" && current.status !== "expired")
+    ) {
+      return json({ ok: true, sessionId, stale: true });
+    }
+    session = current;
   }
   const [placementsDelete, subscribersDelete] = await Promise.all([
     admin.from("companion_lens_placements").delete().eq(
@@ -1358,7 +1429,6 @@ async function handleSessionClose(
   await broadcastRevision(serviceKey, {
     ...session,
     status: "closed",
-    updated_at: nowIso(),
   });
   await clearClosedSessionStorage(admin, session);
   return json({ ok: true, sessionId });
@@ -1372,17 +1442,20 @@ async function handleSessionList(admin: AdminClient, principal: Principal) {
     .select("*")
     .eq("owner_id", principal.userId)
     .in("status", ["active", "offline"])
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(MAX_DEVICE_SESSIONS);
   if (ownedError) throw ownedError;
   const { data: subscriptions, error: subscriptionError } = await admin
     .from("companion_lens_subscribers")
     .select("session_id,group_generation")
     .eq("device_token_hash", principal.tokenHash)
-    .eq("subscription_kind", "group");
+    .eq("subscription_kind", "group")
+    .order("updated_at", { ascending: false })
+    .limit(100);
   if (subscriptionError) throw subscriptionError;
   const joinedIds = Array.from(
     new Set((subscriptions ?? []).map((row) => row.session_id)),
-  );
+  ).slice(0, MAX_DEVICE_SESSIONS);
   const joinedGenerations = new Map(
     (subscriptions ?? []).map((row) => [
       String(row.session_id),
@@ -1403,7 +1476,9 @@ async function handleSessionList(admin: AdminClient, principal: Principal) {
     );
   }
   const unique = new Map<string, LensSessionRow>();
-  for (const row of [...(owned ?? []), ...joined]) {
+  for (
+    const row of [...(owned ?? []), ...joined].slice(0, MAX_DEVICE_SESSIONS)
+  ) {
     const refreshed = await refreshSessionState(admin, row);
     if (refreshed.status === "active" || refreshed.status === "offline") {
       unique.set(refreshed.id, refreshed);
@@ -1535,22 +1610,13 @@ async function handleSessionPoll(
   }
 
   const isOwner = session.owner_id === principal.userId;
-  const groupJoined = await getGroupSubscription(
+  const groupJoined = !isOwner && await getGroupSubscription(
     admin,
     sessionId,
     principal.tokenHash,
     Number(session.group_generation),
   );
   if (!isOwner && !groupJoined) fail("not_joined", 403);
-  if (groupJoined) {
-    await upsertSubscriber(
-      admin,
-      principal,
-      sessionId,
-      Number(session.group_generation),
-    );
-  }
-  await touchModSession(admin, sessionId);
 
   const changed = knownRevision !== Number(session.revision);
   const placements = await sessionPlacements(
@@ -1564,7 +1630,7 @@ async function handleSessionPoll(
   return json({
     changed,
     session: await mapSession(admin, session, undefined, principal.userId),
-    ...(changed
+    ...(changed && placements.length > 0
       ? { signedPreviewUrl: await signedPreviewUrl(admin, session) }
       : {}),
     placements,
@@ -1657,7 +1723,7 @@ async function handlePlacementUpsert(
     const { count, error: countError } = await admin
       .from("companion_lens_placements")
       .select("*", { count: "exact", head: true })
-      .eq("owner_id", principal.userId);
+      .eq("session_id", sessionId);
     if (countError) throw countError;
     if ((count ?? 0) >= 8) fail("placement_limit", 409);
     const { data, error } = await admin
@@ -1775,34 +1841,23 @@ async function handlePresenceHeartbeat(
           Number(row.group_generation)
       ).map((row) => String(row.id));
     }
-    const authorizedSessionIds = Array.from(
-      new Set([
-        ...currentSubscriberIds,
-        ...ownerSessionIds,
-      ]),
-    );
-    if (authorizedSessionIds.length) {
+    if (currentSubscriberIds.length) {
       const { error } = await admin
         .from("companion_lens_subscribers")
         .update({ last_seen_at: timestamp, updated_at: timestamp })
         .eq("device_token_hash", principal.tokenHash)
-        .in("session_id", authorizedSessionIds);
+        .in("session_id", currentSubscriberIds);
       if (error) throw error;
-      const { error: sessionError } = await admin
+    }
+    if (ownerSessionIds.length) {
+      const { error: ownerHeartbeatError } = await admin
         .from("companion_lens_sessions")
-        .update({ last_mod_seen_at: timestamp })
-        .in("id", authorizedSessionIds);
-      if (sessionError) throw sessionError;
-      if (ownerSessionIds.length) {
-        const { error: ownerHeartbeatError } = await admin
-          .from("companion_lens_sessions")
-          .update({
-            last_mod_seen_at: timestamp,
-            owner_device_token_hash: principal.tokenHash,
-          })
-          .in("id", ownerSessionIds);
-        if (ownerHeartbeatError) throw ownerHeartbeatError;
-      }
+        .update({
+          last_mod_seen_at: timestamp,
+          owner_device_token_hash: principal.tokenHash,
+        })
+        .in("id", ownerSessionIds);
+      if (ownerHeartbeatError) throw ownerHeartbeatError;
     }
   }
   if (placementIds.length) {
@@ -1817,9 +1872,12 @@ async function handlePresenceHeartbeat(
       new Set((data ?? []).map((row) => row.session_id)),
     );
     if (touchedSessionIds.length) {
-      await admin.from("companion_lens_sessions")
+      const { error: touchedSessionError } = await admin.from(
+        "companion_lens_sessions",
+      )
         .update({ last_mod_seen_at: timestamp })
         .in("id", touchedSessionIds);
+      if (touchedSessionError) throw touchedSessionError;
     }
   }
   return json({ ok: true, seenAt: timestamp });
@@ -1879,10 +1937,15 @@ async function sweepOrphanedLensPrefixes(
 ): Promise<number> {
   const { data: cleanupState, error: cleanupStateError } = await admin
     .from("companion_lens_cleanup_state")
-    .select("owner_offset")
+    .select("owner_offset,updated_at")
     .eq("id", 1)
     .maybeSingle();
   if (cleanupStateError) throw cleanupStateError;
+  if (
+    cleanupState?.updated_at &&
+    new Date(cleanupState.updated_at).getTime() >=
+      Date.now() - ORPHAN_SWEEP_INTERVAL_MS
+  ) return 0;
   const ownerOffset = Math.max(0, Number(cleanupState?.owner_offset ?? 0));
   const ownerIds: string[] = [];
   let listedOwners = 0;
@@ -1976,13 +2039,16 @@ async function handleMaintenanceCleanup(
   const { data: sessions, error } = await admin
     .from("companion_lens_sessions")
     .select("*")
+    .or(
+      `status.in.(closed,expired),expires_at.lte.${nowIso()}`,
+    )
     .order("updated_at", { ascending: true })
-    .limit(1000);
+    .limit(CLEANUP_SESSION_BATCH_SIZE);
   if (error) throw error;
   let expiredSessions = 0;
   let deletedSessions = 0;
   let removedObjects = 0;
-  let trimmedObjects = 0;
+  const trimmedObjects = 0;
   for (const original of sessions ?? []) {
     const session = await refreshSessionState(admin, original);
     if (session.status === "closed" || session.status === "expired") {
@@ -2012,13 +2078,6 @@ async function handleMaintenanceCleanup(
         if (deleteError) throw deleteError;
         deletedSessions += 1;
       }
-    } else {
-      const before = await listSessionPaths(admin, session);
-      await trimOldRevisions(admin, session);
-      const after = await listSessionPaths(admin, session);
-      if (!before.failed && !after.failed) {
-        trimmedObjects += Math.max(0, before.paths.length - after.paths.length);
-      }
     }
   }
   const orphanedObjects = await sweepOrphanedLensPrefixes(admin);
@@ -2037,53 +2096,6 @@ async function handleMaintenanceCleanup(
     trimmedObjects,
     orphanedObjects,
   });
-}
-
-function scheduleOpportunisticCleanup(admin: AdminClient): void {
-  const sample = crypto.getRandomValues(new Uint8Array(1))[0];
-  if (sample >= 16) return;
-  const task = cleanupStaleLensStorage(admin).catch((error) => {
-    console.warn("Lens opportunistic cleanup failed", error);
-  });
-  const runtime = (globalThis as typeof globalThis & {
-    EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void };
-  }).EdgeRuntime;
-  if (runtime) runtime.waitUntil(task);
-}
-
-async function cleanupStaleLensStorage(admin: AdminClient): Promise<void> {
-  const { data, error } = await admin
-    .from("companion_lens_sessions")
-    .select("*")
-    .or(`status.in.(closed,expired),expires_at.lt.${nowIso()}`)
-    .order("updated_at", { ascending: true })
-    .limit(50);
-  if (error) throw error;
-  for (const original of data ?? []) {
-    const session = await refreshSessionState(admin, original);
-    if (session.status !== "closed" && session.status !== "expired") continue;
-    await Promise.allSettled([
-      admin.from("companion_lens_placements").delete().eq(
-        "session_id",
-        session.id,
-      ),
-      admin.from("companion_lens_subscribers").delete().eq(
-        "session_id",
-        session.id,
-      ),
-    ]);
-    const storage = await clearClosedSessionStorage(admin, session);
-    if (
-      storage.clean &&
-      new Date(session.updated_at).getTime() < Date.now() - 10 * 60 * 1000
-    ) {
-      const { error: deleteError } = await admin
-        .from("companion_lens_sessions")
-        .delete()
-        .eq("id", session.id);
-      if (deleteError) throw deleteError;
-    }
-  }
 }
 
 Deno.serve(async (req) => {

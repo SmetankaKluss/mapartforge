@@ -623,6 +623,18 @@ input, select, textarea { outline: none; }
   z-index: 1;
 }
 
+.app-logo,
+img[src="/logo-opt.png"] {
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(87, 255, 110, 0.18));
+}
+
+.app-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+}
+
 .app-title {
   font-family: var(--font-pixel);
   font-size: 10px;
@@ -1493,6 +1505,9 @@ input, select, textarea { outline: none; }
 }
 .canvas-area-pan-ready .preview-hover-zone,
 .canvas-area-pan-ready .split-canvas-container { cursor: grab !important; }
+.canvas-area-space-pan-ready,
+.canvas-area-space-pan-ready .preview-hover-zone,
+.canvas-area-space-pan-ready .split-canvas-container { cursor: grab !important; }
 .canvas-area-panning,
 .canvas-area-panning .preview-hover-zone,
 .canvas-area-panning .split-canvas-container {
@@ -2170,6 +2185,12 @@ input, select, textarea { outline: none; }
 /* ── Status Bar ────────────────────────────────────────────────────────── */
 .status-bar { display: flex; align-items: center; height: var(--status-h); padding: 0 12px; background: var(--bg-panel); border-top: 1px solid var(--border); font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); flex-shrink: 0; overflow: hidden; gap: 16px; letter-spacing: 0.05em; }
 .status-bar span { white-space: nowrap; }
+.status-autosave-saved,
+.status-autosave-restored { color: var(--accent); }
+.status-autosave-pending,
+.status-autosave-saving { color: var(--gold); }
+.status-autosave-error,
+.status-autosave-too-large { color: var(--red); }
 .status-segment { padding: 0 12px; border-right: 1px solid rgba(87,255,110,0.12); white-space: nowrap; text-transform: uppercase; }
 .status-segment:first-child { padding-left: 0; }
 .status-segment:last-child { border-right: none; }
@@ -2609,7 +2630,7 @@ input, select, textarea { outline: none; }
   .app-header { padding: 0 8px; overflow: visible; }
   .header-inner { gap: 8px; min-width: 0; }
   .logo-svg,
-  .header-inner > img { width: 30px !important; height: 30px !important; flex-shrink: 0; }
+  .header-inner > img { width: 32px !important; height: 32px !important; flex-shrink: 0; }
   .header-titles { min-width: 0; flex-shrink: 1; }
   .app-title { font-size: 9px; max-width: 82px; overflow: hidden; text-overflow: ellipsis; }
   .app-tagline { display: none; }

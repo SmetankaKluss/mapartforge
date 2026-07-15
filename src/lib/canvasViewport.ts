@@ -30,6 +30,14 @@ export function hasCanvasPanStarted(
   return Math.hypot(clientX - startX, clientY - startY) >= CANVAS_PAN_THRESHOLD;
 }
 
+export function canStartCanvasPan(
+  activeToolSelected: boolean,
+  compareMode: boolean,
+  forcedBySpace: boolean,
+): boolean {
+  return forcedBySpace || compareMode || !activeToolSelected;
+}
+
 /**
  * Convert wheel motion into a continuous multiplicative zoom step.
  * Trackpads keep their fine-grained deltas while large mouse-wheel notches are

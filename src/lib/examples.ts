@@ -38,7 +38,7 @@ export const EXAMPLES: ExampleProject[] = [
     titleEn: 'Logo: clean edges at 1×1',
     descriptionRu: 'Собственный логотип MapKluss показывает, когда лучше отключить дизеринг и сохранить крупные формы.',
     descriptionEn: 'The MapKluss logo shows when disabling dithering preserves bold shapes and clean edges.',
-    originalUrl: '/logo-opt.png',
+    originalUrl: '/examples/mapkluss-logo/source.png',
     previewUrl: '/examples/mapkluss-logo/result.png',
     sourceNameRu: 'Оригинальный логотип MapKluss',
     sourceNameEn: 'Original MapKluss logo',

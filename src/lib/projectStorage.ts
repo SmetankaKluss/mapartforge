@@ -1,6 +1,8 @@
 const DB_NAME = 'mapartforge-projects-v1';
 const STORE_NAME = 'projects';
-const DB_VERSION = 1;
+const AUTOSAVE_STORE_NAME = 'autosave';
+const DB_VERSION = 2;
+const AUTOSAVE_ID = 'current';
 
 export interface StoredProjectMeta {
   id: string;
@@ -13,6 +15,14 @@ export interface StoredProject extends StoredProjectMeta {
   data: string;
 }
 
+export interface AutosaveRecord {
+  id: typeof AUTOSAVE_ID;
+  savedAt: number;
+  appVersion: string;
+  estimatedBytes: number;
+  data: string;
+}
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -22,9 +32,50 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('timestamp', 'timestamp', { unique: false });
       }
+      if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
+        db.createObjectStore(AUTOSAVE_STORE_NAME, { keyPath: 'id' });
+      }
     };
     req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
     req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveAutosave(record: Omit<AutosaveRecord, 'id'>): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+    const req = tx.objectStore(AUTOSAVE_STORE_NAME).put({ ...record, id: AUTOSAVE_ID });
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function loadAutosave(): Promise<AutosaveRecord | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    let result: AutosaveRecord | null = null;
+    const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readonly');
+    const req = tx.objectStore(AUTOSAVE_STORE_NAME).get(AUTOSAVE_ID);
+    req.onsuccess = () => { result = (req.result as AutosaveRecord) ?? null; };
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => { db.close(); resolve(result); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function deleteAutosave(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+    const req = tx.objectStore(AUTOSAVE_STORE_NAME).delete(AUTOSAVE_ID);
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.onabort = () => { db.close(); reject(tx.error); };
   });
 }
 

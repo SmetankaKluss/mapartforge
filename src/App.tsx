@@ -49,6 +49,7 @@ import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible,
 import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
 import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
+import { estimateAutosaveSnapshotBytes, useEditorAutosave } from './lib/editorAutosave';
 import { SaveProjectModal } from './components/SaveProjectModal';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { CloudArtsPanel } from './components/CloudArtsPanel';
@@ -83,6 +84,7 @@ import { trackEvent } from './lib/analytics';
 import {
   MAX_CANVAS_ZOOM,
   MIN_CANVAS_ZOOM,
+  canStartCanvasPan,
   canvasZoomFromWheel,
   canvasZoomToSlider,
   clampCanvasZoom,
@@ -91,7 +93,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.15.0-2026-07-15',
+  id: 'mapkluss-v1.16.2-2026-07-16',
   url: 'https://t.me/mapkluss',
 };
 
@@ -111,6 +113,11 @@ function writeStoredFlag(key: string, value: boolean): void {
   } catch {
     // The editor remains fully usable when storage is blocked or unavailable.
   }
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"], [role="button"]'));
 }
 
 // Support blocks for 3D staircase (nbt name → sprite coords + label)
@@ -568,6 +575,7 @@ export default function App() {
     startScrollLeft: number;
     startScrollTop: number;
     moved: boolean;
+    forcedBySpace: boolean;
   } | null>(null);
   const suppressCanvasClickRef = useRef(false);
   const suppressCanvasClickTimerRef = useRef<number | null>(null);
@@ -582,6 +590,8 @@ export default function App() {
     () => readStoredFlag('mapkluss-right-panel-collapsed'),
   );
   const [isCanvasPanning, setIsCanvasPanning] = useState(false);
+  const [isSpacePanActive, setIsSpacePanActive] = useState(false);
+  const spacePanRef = useRef(false);
 
   useEffect(() => {
     writeStoredFlag('mapkluss-left-panel-collapsed', leftPanelCollapsed);
@@ -1906,6 +1916,31 @@ export default function App() {
     return () => area.removeEventListener('wheel', onWheel);
   }, []);
 
+  useEffect(() => {
+    const stopSpacePan = () => {
+      spacePanRef.current = false;
+      setIsSpacePanActive(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || !hasContent || isInteractiveKeyboardTarget(event.target)) return;
+      event.preventDefault();
+      if (spacePanRef.current) return;
+      spacePanRef.current = true;
+      setIsSpacePanActive(true);
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') stopSpacePan();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', stopSpacePan);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', stopSpacePan);
+    };
+  }, [hasContent]);
+
   const handleCanvasPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (suppressCanvasClickTimerRef.current !== null) {
       window.clearTimeout(suppressCanvasClickTimerRef.current);
@@ -1913,14 +1948,20 @@ export default function App() {
     }
     suppressCanvasClickRef.current = false;
     const target = event.target instanceof Element ? event.target : null;
+    const forcedBySpace = spacePanRef.current;
     if (
       !hasContent
-      || (!compareMode && activeTool !== null)
+      || !canStartCanvasPan(activeTool !== null, compareMode, forcedBySpace)
       || event.pointerType === 'touch'
       || event.button !== 0
       || event.altKey
       || target?.closest('.split-divider, button, input, select, textarea, a, [role="button"]')
     ) return;
+
+    if (forcedBySpace) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
     canvasPanRef.current = {
       pointerId: event.pointerId,
@@ -1929,12 +1970,14 @@ export default function App() {
       startScrollLeft: event.currentTarget.scrollLeft,
       startScrollTop: event.currentTarget.scrollTop,
       moved: false,
+      forcedBySpace,
     };
   }, [activeTool, compareMode, hasContent]);
 
   const handleCanvasPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const pan = canvasPanRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
+    if (pan.forcedBySpace) event.stopPropagation();
     const dx = event.clientX - pan.startX;
     const dy = event.clientY - pan.startY;
     if (!pan.moved && hasCanvasPanStarted(pan.startX, pan.startY, event.clientX, event.clientY)) {
@@ -1955,6 +1998,7 @@ export default function App() {
   const finishCanvasPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const pan = canvasPanRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
+    if (pan.forcedBySpace) event.stopPropagation();
     suppressCanvasClickRef.current = pan.moved;
     if (pan.moved) {
       event.currentTarget.dispatchEvent(new CustomEvent('mapkluss:viewport-pan-end', {
@@ -1992,6 +2036,7 @@ export default function App() {
       intensity,
       blockSelection: blockSelection as Record<string, number[]>,
       adjustments,
+      colorMatch,
       mapMode,
       staircaseMode,
       bnScale,
@@ -2000,8 +2045,8 @@ export default function App() {
       minecraftVersion,
       platformMode,
     };
-    return serializeFullProject(layers, activeLayerId, mapGrid, settings);
-  }, [activeLayerId, adjustments, blockSelection, bnScale, dithering, intensity, klussParams, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode]);
+    return serializeFullProject(layers, activeLayerId, mapGrid, settings, layerGroups);
+  }, [activeLayerId, adjustments, blockSelection, bnScale, colorMatch, dithering, intensity, klussParams, layerGroups, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode]);
 
   const handleCloudSignInFromEditor = useCallback(async () => {
     setShowCloudArtsPanel(true);
@@ -2162,7 +2207,7 @@ export default function App() {
         minecraftVersion,
         platformMode,
       };
-      const data = serializeFullProject(layers, activeLayerId, mapGrid, settings);
+      const data = serializeFullProject(layers, activeLayerId, mapGrid, settings, layerGroups);
       const id = Date.now().toString();
       await saveProject({ id, name, timestamp: Date.now(), thumbnail: saveThumbnail ?? '', data });
       showAppNotice(t('Проект сохранён в истории.', 'Project saved to history.'));
@@ -2170,7 +2215,7 @@ export default function App() {
       console.error('Failed to save project to history', err);
       showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
     }
-  }, [layers, activeLayerId, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
+  }, [layers, activeLayerId, layerGroups, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -2187,12 +2232,12 @@ export default function App() {
       const canReprocess = !!result.settings.originalDataB64;
       const restoredLayers = result.layers.map(l => ({
         ...l,
-        isDirty: !canReprocess,  // false if we can reprocess, true if we can't
-        mapMode: result.settings.mapMode,
-        staircaseMode: result.settings.staircaseMode,
-        dithering: coerceDitheringMode(result.settings.dithering),
+        isDirty: l.isDirty ?? !canReprocess,
+        mapMode: l.mapMode ?? result.settings.mapMode,
+        staircaseMode: l.staircaseMode ?? result.settings.staircaseMode,
+        dithering: coerceDitheringMode(l.dithering ?? result.settings.dithering),
       }));
-      setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: [] });
+      setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: result.groups });
       setDithering(coerceDitheringMode(result.settings.dithering));
       setIntensity(result.settings.intensity);
       setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
@@ -2241,16 +2286,17 @@ export default function App() {
       const canReprocess = !!full.settings.originalDataB64;
       const restoredLayers = full.layers.map(layer => ({
         ...layer,
-        isDirty: !canReprocess,
-        mapMode: full.settings.mapMode,
-        staircaseMode: full.settings.staircaseMode,
-        dithering: coerceDitheringMode(full.settings.dithering),
+        isDirty: layer.isDirty ?? !canReprocess,
+        mapMode: layer.mapMode ?? full.settings.mapMode,
+        staircaseMode: layer.staircaseMode ?? full.settings.staircaseMode,
+        dithering: coerceDitheringMode(layer.dithering ?? full.settings.dithering),
       }));
-      setLayerState({ layers: restoredLayers, activeLayerId: full.activeLayerId, groups: [] });
+      setLayerState({ layers: restoredLayers, activeLayerId: full.activeLayerId, groups: full.groups });
       setDithering(coerceDitheringMode(full.settings.dithering));
       setIntensity(full.settings.intensity);
       setBlockSelection(full.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
-      setAdjustments(full.settings.adjustments);
+      setAdjustments(normalizeAdjustments(full.settings.adjustments));
+      setColorMatch(coerceColorMatchMode(full.settings.colorMatch));
       setMapMode(full.settings.mapMode);
       setStaircaseMode(full.settings.staircaseMode);
       setBnScale(full.settings.bnScale);
@@ -2296,6 +2342,36 @@ export default function App() {
     if (successMessage) showAppNotice(successMessage);
     return true;
   }, [showAppNotice]);
+
+  const estimateCurrentAutosaveBytes = useCallback(
+    () => estimateAutosaveSnapshotBytes(layers, originalDataRef.current),
+    [layers],
+  );
+  const autosaveState = useEditorAutosave({
+    hasContent,
+    processing,
+    serializeProject: buildCurrentCloudProjectJson,
+    estimateBytes: estimateCurrentAutosaveBytes,
+    restoreProject: applyProjectJsonToEditor,
+    notify: showAppNotice,
+  });
+  const autosaveLabel = useMemo(() => {
+    const time = autosaveState.savedAt
+      ? new Date(autosaveState.savedAt).toLocaleTimeString(lang === 'ru' ? 'ru-RU' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      : '';
+    switch (autosaveState.status) {
+      case 'pending': return t('АВТОСОХРАНЕНИЕ ОЖИДАЕТ', 'AUTOSAVE PENDING');
+      case 'saving': return t('СОХРАНЕНИЕ…', 'SAVING…');
+      case 'saved': return t(`СОХРАНЕНО ${time}`, `SAVED ${time}`);
+      case 'restored': return t(`ВОССТАНОВЛЕНО ${time}`, `RESTORED ${time}`);
+      case 'too-large': return t('АВТОСОХРАНЕНИЕ НЕДОСТУПНО', 'AUTOSAVE UNAVAILABLE');
+      case 'error': return t('ОШИБКА АВТОСОХРАНЕНИЯ', 'AUTOSAVE ERROR');
+      default: return '';
+    }
+  }, [autosaveState.savedAt, autosaveState.status, lang, t]);
 
   const applyImportedImageToEditor = useCallback((
     img: HTMLImageElement,
@@ -2419,7 +2495,7 @@ export default function App() {
     <div className="app">
         <header className={`app-header${cloudMenuOpen ? ' is-cloud-menu-open' : ''}`}>
         <div className="header-inner">
-          <img src="/logo-opt.png" width="64" height="64" style={{ height: '32px', width: 'auto' }} alt="MapKluss" fetchPriority="high" />
+          <img className="app-logo" src="/logo-opt.png" width="128" height="128" alt="MapKluss" fetchPriority="high" />
           <div className="header-titles">
             <h1 className="app-title">MAPKLUSS</h1>
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
@@ -2509,8 +2585,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('Пустой холст ожил: теперь он показывает, как арт превращается в пиксельную карту.',
-                'The empty canvas is alive: it now shows art becoming a pixel map.')}
+              {t('Lens стал стабильнее, а у MapKluss появился новый логотип.',
+                'Lens is more stable, and MapKluss has a new logo.')}
             </span>
           </div>
           <a
@@ -3172,6 +3248,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>L</kbd><span>{t('Линия', 'Line')}</span></div>
                   <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
                   <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
+                  <div className="shortcut-row"><kbd>Space + ЛКМ</kbd><span>{t('Временно перемещать холст', 'Temporarily pan canvas')}</span></div>
                   <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
                 </div>
               )}
@@ -3223,7 +3300,7 @@ export default function App() {
 
           <div
             ref={canvasAreaRef}
-            className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}${hasContent && (compareMode || activeTool === null) ? ' canvas-area-pan-ready' : ''}${isCanvasPanning ? ' canvas-area-panning' : ''}`}
+            className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}${hasContent && (compareMode || activeTool === null) ? ' canvas-area-pan-ready' : ''}${hasContent && isSpacePanActive ? ' canvas-area-space-pan-ready' : ''}${isCanvasPanning ? ' canvas-area-panning' : ''}`}
             onClickCapture={handleCanvasClickCapture}
             onPointerDownCapture={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
@@ -3523,6 +3600,14 @@ export default function App() {
         <span><i className="status-dot" aria-hidden="true" /> {mapMode.toUpperCase()}</span>
         <span><i className="status-dot" aria-hidden="true" /> {zoom}%</span>
         {hasContent && <span><i className="status-dot" aria-hidden="true" /> {pw}×{ph}px</span>}
+        {autosaveLabel && (
+          <span
+            className={`status-autosave status-autosave-${autosaveState.status}`}
+            role={autosaveState.status === 'error' || autosaveState.status === 'too-large' ? 'alert' : 'status'}
+          >
+            <i className="status-dot" aria-hidden="true" /> {autosaveLabel}
+          </span>
+        )}
         <span className="status-spacer" />
         <span className="status-credit">Made by SmetankaKluss</span>
         <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noopener noreferrer">
