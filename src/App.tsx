@@ -91,7 +91,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.13.3-2026-07-15',
+  id: 'mapkluss-v1.14.0-2026-07-15',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2509,8 +2509,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('Улучшили приближение арта, добавили перемещение изображения с зажатой ЛКМ и обновили иконки.',
-                'Improved art zoom, added click-and-drag panning, and refreshed the icons.')}
+              {t('Интерфейс стал плавнее: ожили панели, меню, подсказки, действия и прогресс.',
+                'The interface is smoother: panels, menus, hints, actions, and progress now feel alive.')}
             </span>
           </div>
           <a

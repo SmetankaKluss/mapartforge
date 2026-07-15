@@ -1,0 +1,483 @@
+/* MapKluss motion layer
+ *
+ * Motion communicates hierarchy, state, and direct manipulation. Keep it
+ * quick enough for long editor sessions and avoid animating the artwork or
+ * layout-driving properties inside the canvas itself.
+ */
+
+:root {
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-base: 200ms;
+  --motion-slow: 280ms;
+  --motion-progress: 420ms;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Workspace assembly ──────────────────────────────────────────────── */
+
+.app-header {
+  animation: mk-header-in var(--motion-slow) var(--ease-out-expo) both;
+}
+
+.panel-left {
+  animation: mk-panel-left-in var(--motion-slow) var(--ease-out-expo) backwards;
+}
+
+.panel-right {
+  animation: mk-panel-right-in var(--motion-slow) var(--ease-out-expo) backwards;
+}
+
+.panel-center {
+  animation: mk-canvas-in var(--motion-slow) var(--ease-out-quart) 35ms both;
+}
+
+@keyframes mk-header-in {
+  from { opacity: 0.72; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mk-panel-left-in {
+  from { opacity: 0.7; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mk-panel-right-in {
+  from { opacity: 0.7; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mk-canvas-in {
+  from { opacity: 0.84; }
+  to { opacity: 1; }
+}
+
+/* Section headers should feel stable after the workspace is assembled. */
+.section-header,
+.control-title,
+.pe-section-title {
+  animation: none;
+}
+
+@media (min-width: 1100px) {
+  .app-body {
+    transition: grid-template-columns var(--motion-slow) var(--ease-out-expo);
+  }
+
+  .panel-left,
+  .panel-right {
+    transition:
+      opacity var(--motion-fast) var(--ease-out-quart),
+      transform var(--motion-base) var(--ease-out-expo),
+      visibility 0s linear 0s;
+  }
+
+  .app-body.left-panel-collapsed .panel-left {
+    transform: translateX(-10px);
+    transition:
+      opacity var(--motion-fast) var(--ease-out-quart),
+      transform var(--motion-base) var(--ease-out-expo),
+      visibility 0s linear var(--motion-base);
+  }
+
+  .app-body.right-panel-collapsed .panel-right {
+    transform: translateX(10px);
+    transition:
+      opacity var(--motion-fast) var(--ease-out-quart),
+      transform var(--motion-base) var(--ease-out-expo),
+      visibility 0s linear var(--motion-base);
+  }
+}
+
+.panel-collapse-toggle {
+  transition:
+    color var(--motion-fast) var(--ease-out-quart),
+    border-color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart),
+    transform var(--motion-base) var(--ease-out-expo),
+    box-shadow var(--motion-fast) var(--ease-out-quart);
+}
+
+.panel-collapse-toggle:hover .mk-icon {
+  transform: translateX(var(--motion-chevron-shift, 0));
+}
+
+.panel-collapse-toggle-left { --motion-chevron-shift: 2px; }
+.panel-collapse-toggle-right { --motion-chevron-shift: -2px; }
+
+.panel-collapse-toggle .mk-icon,
+.section-arrow .mk-icon {
+  transition: transform var(--motion-base) var(--ease-out-expo);
+}
+
+/* ── Direct feedback ─────────────────────────────────────────────────── */
+
+:where(
+  .tool-btn,
+  .mobile-tab-btn,
+  .canvas-icon-btn,
+  .adj-step-btn,
+  .mode-btn,
+  .map-mode-btn,
+  .alpha-mode-btn,
+  .bn-scale-btn,
+  .brush-size-btn,
+  .palette-item,
+  .palette-entry,
+  .export-btn,
+  .cloud-link-btn,
+  .cloud-action-menu-item,
+  .header-icon-btn,
+  .lang-toggle-btn,
+  .support-btn,
+  .tour-btn,
+  .modal-btn,
+  .public-action,
+  .public-site-nav__link,
+  .public-site-language,
+  .companion-action-link,
+  .companion-primary-download,
+  .bt-btn,
+  .bt-switch-btn,
+  .bt-per-map-btn,
+  .bt-row-sub-btn,
+  .bt-row-add-btn
+) {
+  transform-origin: center;
+  transition:
+    color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart),
+    border-color var(--motion-fast) var(--ease-out-quart),
+    box-shadow var(--motion-fast) var(--ease-out-quart),
+    opacity var(--motion-fast) var(--ease-out-quart),
+    transform var(--motion-instant) var(--ease-out-quart);
+}
+
+:where(
+  .tool-btn,
+  .mobile-tab-btn,
+  .canvas-icon-btn,
+  .adj-step-btn,
+  .mode-btn,
+  .map-mode-btn,
+  .alpha-mode-btn,
+  .bn-scale-btn,
+  .brush-size-btn,
+  .export-btn,
+  .cloud-link-btn,
+  .cloud-action-menu-item,
+  .header-icon-btn,
+  .lang-toggle-btn,
+  .support-btn,
+  .tour-btn,
+  .modal-btn,
+  .public-action,
+  .public-site-nav__link,
+  .public-site-language,
+  .companion-action-link,
+  .companion-primary-download,
+  .bt-btn,
+  .bt-switch-btn,
+  .bt-per-map-btn,
+  .bt-row-sub-btn,
+  .bt-row-add-btn
+):active:not(:disabled) {
+  transform: translateY(1px) scale(0.975);
+  transition-duration: var(--motion-instant);
+}
+
+.tool-btn.active,
+.mobile-tab-btn.active,
+.mode-btn.active,
+.map-mode-btn.active,
+.alpha-mode-btn.active,
+.bn-scale-btn.active,
+.brush-size-btn.active,
+.bt-per-map-btn--active {
+  animation: mk-state-lock var(--motion-base) var(--ease-out-expo);
+}
+
+@keyframes mk-state-lock {
+  0% { box-shadow: inset 0 0 0 0 rgb(var(--accent-rgb) / 0); }
+  52% { box-shadow: inset 0 0 0 2px rgb(var(--accent-rgb) / 0.38); }
+  100% { box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.14); }
+}
+
+.tool-btn.active .mk-icon,
+.mobile-tab-btn.active .mk-icon,
+.mode-btn.active .mk-icon,
+.map-mode-btn.active .mk-icon {
+  animation: mk-icon-lock var(--motion-base) var(--ease-out-expo);
+}
+
+@keyframes mk-icon-lock {
+  0% { transform: scale(0.82); opacity: 0.72; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(
+    .public-action,
+    .companion-action-link,
+    .companion-primary-download,
+    .bt-download-lite,
+    .bt-switch-btn
+  ):hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  :where(
+    .public-action,
+    .companion-action-link,
+    .companion-primary-download,
+    .bt-download-lite,
+    .bt-switch-btn
+  ):hover .mk-icon {
+    transform: translateX(2px);
+  }
+
+  .public-site-brand:hover img {
+    transform: translateY(-1px) scale(1.035);
+    filter: brightness(1.08);
+  }
+}
+
+.public-site-brand img,
+:where(.public-action, .companion-action-link, .companion-primary-download, .bt-download-lite, .bt-switch-btn) .mk-icon {
+  transition:
+    transform var(--motion-base) var(--ease-out-expo),
+    filter var(--motion-base) var(--ease-out-quart);
+}
+
+input,
+select,
+textarea,
+.num-input,
+.bt-row-add-input {
+  transition:
+    color var(--motion-fast) var(--ease-out-quart),
+    background-color var(--motion-fast) var(--ease-out-quart),
+    border-color var(--motion-fast) var(--ease-out-quart),
+    box-shadow var(--motion-fast) var(--ease-out-quart);
+}
+
+/* Range thumbs respond immediately without moving the surrounding layout. */
+:where(.zoom-slider, .intensity-slider, .layer-opacity-slider):active::-webkit-slider-thumb {
+  transform: scale(1.28);
+}
+
+:where(.zoom-slider, .intensity-slider, .layer-opacity-slider)::-webkit-slider-thumb {
+  transition:
+    transform var(--motion-fast) var(--ease-out-expo),
+    box-shadow var(--motion-fast) var(--ease-out-quart);
+}
+
+/* ── Menus, notices, and focused overlays ────────────────────────────── */
+
+.cloud-action-menu:not([hidden]),
+.hover-tooltip,
+.repaint-picker,
+.processing-overlay,
+.app-notice {
+  animation: mk-popover-in var(--motion-base) var(--ease-out-expo) both;
+  transform-origin: top center;
+}
+
+@keyframes mk-popover-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+:where(
+  .tour-selector-overlay,
+  .persp-overlay,
+  .save-project-modal,
+  .gif-overlay,
+  .bt-overlay,
+  .bt-confirm-overlay
+) {
+  animation: mk-backdrop-in var(--motion-base) var(--ease-out-quart) both;
+}
+
+:where(
+  .tour-selector-modal,
+  .persp-modal,
+  .save-project-modal .modal-box,
+  .gif-modal,
+  .bt-modal,
+  .bt-confirm-modal
+) {
+  animation: mk-dialog-in var(--motion-slow) var(--ease-out-expo) both;
+  transform-origin: center;
+}
+
+@keyframes mk-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mk-dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.global-drop-overlay {
+  animation: mk-backdrop-in var(--motion-fast) var(--ease-out-quart) both;
+}
+
+.global-drop-inner {
+  animation: mk-drop-target-in var(--motion-base) var(--ease-out-expo) both;
+}
+
+@keyframes mk-drop-target-in {
+  from { opacity: 0.5; transform: scale(0.975); clip-path: inset(12px); }
+  to { opacity: 1; transform: scale(1); clip-path: inset(0); }
+}
+
+/* ── Route and list rhythm ───────────────────────────────────────────── */
+
+:where(
+  .public-content-page,
+  .public-shell > .companion-page,
+  .public-shell > .bt-page,
+  .public-shell > .public-not-found
+) {
+  animation: mk-route-in var(--motion-slow) var(--ease-out-quart) both;
+}
+
+@keyframes mk-route-in {
+  from { opacity: 0.78; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+:where(
+  .example-card,
+  .companion-library-art,
+  .companion-import-list-item,
+  .bt-row
+) {
+  animation: mk-list-settle var(--motion-base) var(--ease-out-quart) both;
+}
+
+:where(.example-card, .companion-library-art, .companion-import-list-item, .bt-row):nth-child(2) { animation-delay: 24ms; }
+:where(.example-card, .companion-library-art, .companion-import-list-item, .bt-row):nth-child(3) { animation-delay: 48ms; }
+:where(.example-card, .companion-library-art, .companion-import-list-item, .bt-row):nth-child(4) { animation-delay: 72ms; }
+:where(.example-card, .companion-library-art, .companion-import-list-item, .bt-row):nth-child(5) { animation-delay: 96ms; }
+:where(.example-card, .companion-library-art, .companion-import-list-item, .bt-row):nth-child(n + 6) { animation-delay: 120ms; }
+
+@keyframes mk-list-settle {
+  from { transform: translateY(5px); }
+  to { transform: translateY(0); }
+}
+
+.companion-art-thumb,
+.example-comparison figure,
+.companion-preview-stage {
+  overflow: hidden;
+}
+
+.companion-art-thumb img,
+.example-comparison img,
+.companion-preview-stage img {
+  transition:
+    transform var(--motion-slow) var(--ease-out-expo),
+    filter var(--motion-slow) var(--ease-out-quart);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .companion-art-thumb:hover img,
+  .example-comparison figure:hover img,
+  .companion-preview-stage:hover img {
+    transform: scale(1.025);
+    filter: brightness(1.045);
+  }
+}
+
+/* Data changes should visibly travel to their new value. */
+.bt-bar-fill,
+.bt-stats-bar-fill,
+.processing-bar-fill {
+  transition:
+    width var(--motion-progress) var(--ease-out-expo),
+    transform var(--motion-progress) var(--ease-out-expo),
+    background-color var(--motion-base) var(--ease-out-quart);
+}
+
+.bt-row-check {
+  animation: mk-check-in var(--motion-base) var(--ease-out-expo) both;
+}
+
+@keyframes mk-check-in {
+  from { opacity: 0; transform: scale(0.6) rotate(-10deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* Loading movement is compact and linear enough to read as progress. */
+.route-bootstrap__track::after {
+  animation-duration: 900ms;
+  animation-timing-function: var(--ease-out-quart);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+    .app-header,
+    .panel-left,
+    .panel-right,
+    .panel-center,
+    .cloud-action-menu,
+    .hover-tooltip,
+    .repaint-picker,
+    .processing-overlay,
+    .app-notice,
+    .tour-selector-overlay,
+    .persp-overlay,
+    .save-project-modal,
+    .gif-overlay,
+    .bt-overlay,
+    .bt-confirm-overlay,
+    .tour-selector-modal,
+    .persp-modal,
+    .save-project-modal .modal-box,
+    .gif-modal,
+    .bt-modal,
+    .bt-confirm-modal,
+    .global-drop-overlay,
+    .global-drop-inner,
+    .public-content-page,
+    .public-shell > .companion-page,
+    .public-shell > .bt-page,
+    .public-shell > .public-not-found,
+    .example-card,
+    .companion-library-art,
+    .companion-import-list-item,
+    .bt-row,
+    .bt-row-check
+  ) {
+    animation: none !important;
+  }
+
+  :where(
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    .panel-left,
+    .panel-right,
+    .public-site-brand img,
+    .companion-art-thumb img,
+    .example-comparison img,
+    .companion-preview-stage img
+  ) {
+    transition: none !important;
+  }
+
+  :where(button, a):active,
+  :where(button, a):hover,
+  .app-body.left-panel-collapsed .panel-left,
+  .app-body.right-panel-collapsed .panel-right {
+    transform: none !important;
+  }
+}
