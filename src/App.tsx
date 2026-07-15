@@ -90,7 +90,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.12.0-2026-07-15',
+  id: 'mapkluss-v1.13.0-2026-07-15',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2485,8 +2485,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('MapKluss v1.12.0: новые чёткие иконки во всём редакторе и более понятные кнопки.',
-                'MapKluss v1.12.0: crisp new icons across the editor and clearer controls.')}
+              {t('MapKluss v1.13.0: все страницы получили единый workshop-дизайн, а галерея — проверенные примеры.',
+                'MapKluss v1.13.0: every page now shares one workshop design, and the gallery uses verified examples.')}
             </span>
           </div>
           <a

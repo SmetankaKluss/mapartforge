@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { createCompanionCollection, deleteCompanionArt, getCompanionArtManifest, getCompanionArtOverview, getCompanionTrackerForArt, setCompanionCollectionItem, setCompanionFavorite, updateCompanionArtMetadata } from '../lib/companionCloud';
 import { normalizeEditableArtPrivacy, type ArtPrivacy, type CompanionArtifactManifestEntry, type CompanionArtManifest, type CompanionArtVersionSummary, type CompanionCollection, type CompanionProfileSummary } from '../lib/companionTypes';
 import { useLocale } from '../lib/useLocale';
+import { applyPageMeta } from '../lib/meta';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 interface Props {
   artId: string;
@@ -188,6 +190,16 @@ export function CompanionArtPage({ artId }: Props) {
   const deleteConfirmValid = ['УДАЛИТЬ', 'DELETE'].includes(deleteConfirmText.trim().toLocaleUpperCase('ru-RU'));
 
   useEffect(() => {
+    applyPageMeta({
+      title: manifest?.title ? `${manifest.title} | MapKluss` : t('Арт MapKluss', 'MapKluss art'),
+      description: manifest
+        ? t(`Арт ${manifest.grid.wide}×${manifest.grid.tall}, файлы, версии и настройки доступа.`, `${manifest.grid.wide}×${manifest.grid.tall} art, files, versions, and privacy settings.`)
+        : t('Страница облачного арта MapKluss.', 'MapKluss cloud art page.'),
+      robots: 'noindex,nofollow',
+    });
+  }, [manifest, t]);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
       setBusy(true);
@@ -273,7 +285,7 @@ export function CompanionArtPage({ artId }: Props) {
     if (!manifest || creatingCollection) return;
     const name = newCollectionName.trim();
     if (!name) {
-      setError('Введите название коллекции.');
+      setError(t('Введи название коллекции.', 'Enter a collection name.'));
       return;
     }
     setCreatingCollection(true);
@@ -298,7 +310,7 @@ export function CompanionArtPage({ artId }: Props) {
     if (!manifest || metadataBusy) return;
     const nextTitle = titleDraft.trim();
     if (!nextTitle) {
-      setError('Введите название арта.');
+      setError(t('Введи название арта.', 'Enter an art title.'));
       return;
     }
     setMetadataBusy(true);
@@ -372,10 +384,16 @@ export function CompanionArtPage({ artId }: Props) {
   }
 
   return (
-    <main className="companion-page companion-art-detail-page">
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggle} />
+      <main className="companion-page companion-art-detail-page">
       <header className="companion-header companion-detail-header">
-        <a href="/" className="companion-back">MapKluss</a>
         <div>
+          <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
+            <a href="/cloud">{t('Облако', 'Cloud')}</a>
+            <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+            <span aria-current="page">{manifest?.title ?? t('Арт', 'Art')}</span>
+          </nav>
           <h1>{manifest?.title ?? t('Арт MapKluss', 'MapKluss art')}</h1>
           <p>{manifest ? `${manifest.grid.wide}x${manifest.grid.tall} / ${modeLabel(manifest.mode)} / ${privacyLabel(manifest.privacy, t)}` : artId}</p>
           {owner && (
@@ -384,11 +402,10 @@ export function CompanionArtPage({ artId }: Props) {
             </p>
           )}
         </div>
-        <button className="lang-toggle-btn" onClick={toggle} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
       </header>
 
-      {busy && <p className="companion-muted">{t('Загрузка...', 'Loading...')}</p>}
-      {error && <p className="companion-error">{error}</p>}
+      {busy && <p className="companion-status" role="status" aria-live="polite">{t('Загружаю арт…', 'Loading art…')}</p>}
+      {error && <p className="companion-status companion-status--error" role="alert">{error}</p>}
 
       {manifest && (
         <>
@@ -427,7 +444,7 @@ export function CompanionArtPage({ artId }: Props) {
               </div>
             </div>
             <div className="companion-primary-actions">
-              <button onClick={() => void toggleFavorite()} disabled={favoriteBusy}>
+              <button onClick={() => void toggleFavorite()} disabled={favoriteBusy} aria-pressed={manifest.isFavorite}>
                 {manifest.isFavorite ? t('Убрать из избранного', 'Remove from favorites') : t('В избранное', 'Add to favorites')}
               </button>
               <button onClick={() => void openTracker()} disabled={trackerBusy}>
@@ -556,17 +573,15 @@ export function CompanionArtPage({ artId }: Props) {
 
           <div className="companion-panel">
             <h2>{t('Коллекции', 'Collections')}</h2>
-            <div className="companion-inline-form">
-              <input
-                value={newCollectionName}
-                onChange={event => setNewCollectionName(event.target.value)}
-                placeholder={t('Новая коллекция', 'New collection')}
-                maxLength={80}
-              />
-              <button onClick={() => void createCollectionForArt()} disabled={creatingCollection || !newCollectionName.trim()}>
-                {creatingCollection ? t('Создаю...', 'Creating...') : t('Создать + добавить', 'Create + add')}
-              </button>
-            </div>
+            <label className="companion-field">
+              <span>{t('Новая коллекция', 'New collection')}</span>
+              <div className="companion-inline-form">
+                <input value={newCollectionName} onChange={event => setNewCollectionName(event.target.value)} placeholder={t('Например, стены сервера', 'For example, server walls')} maxLength={80} />
+                <button onClick={() => void createCollectionForArt()} disabled={creatingCollection || !newCollectionName.trim()}>
+                  {creatingCollection ? t('Создаю...', 'Creating...') : t('Создать + добавить', 'Create + add')}
+                </button>
+              </div>
+            </label>
             {collections.length === 0 ? (
               <p className="companion-muted">{t('Коллекций пока нет. Создай коллекцию здесь, и арт сразу добавится в неё.', 'There are no collections yet. Create one here and the art will be added to it.')}</p>
             ) : collections.map(collection => {
@@ -577,7 +592,7 @@ export function CompanionArtPage({ artId }: Props) {
                     <strong>{collection.name}</strong>
                     <span>{t('артов', 'arts')}: {collection.itemCount ?? 0}</span>
                   </div>
-                  <button onClick={() => void toggleCollection(collection.id)} disabled={collectionBusy === collection.id}>
+                  <button onClick={() => void toggleCollection(collection.id)} disabled={collectionBusy === collection.id} aria-pressed={selected}>
                     {selected ? t('Убрать', 'Remove') : t('Добавить', 'Add')}
                   </button>
                 </article>
@@ -587,6 +602,7 @@ export function CompanionArtPage({ artId }: Props) {
         </section>
         </>
       )}
-    </main>
+      </main>
+    </div>
   );
 }

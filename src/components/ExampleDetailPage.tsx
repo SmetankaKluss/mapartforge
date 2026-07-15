@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { buildTrackedHref } from '../lib/analytics';
-import { getExampleById, EXAMPLES, type ExampleProject } from '../lib/examples';
+import type { ExampleProject } from '../lib/examples';
 import { useLocale } from '../lib/useLocale';
 import { applyPageMeta } from '../lib/meta';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 interface Props {
   example: ExampleProject;
@@ -10,13 +11,14 @@ interface Props {
 
 export function ExampleDetailPage({ example }: Props) {
   const { lang, toggle, t } = useLocale();
+  const modeLabel = example.mode === '3d' ? '3D Stair' : '2D Flat';
 
   useEffect(() => {
     applyPageMeta({
-      title: `${lang === 'ru' ? example.titleRu : example.titleEn} | Minecraft Map Art Example | MapKluss`,
+      title: `${lang === 'ru' ? example.titleRu : example.titleEn} | MapKluss`,
       description: lang === 'ru'
-        ? `${example.titleRu} — пример Minecraft map art в MapKluss. Размер ${example.size}, режим ${example.mode === '3d' ? '3D Stair' : '2D Flat'}, ${example.colors} цветов и настройки для повторения результата.`
-        : `${example.titleEn} is a Minecraft map art example made with MapKluss. ${example.size} size, ${example.mode === '3d' ? '3D Stair' : '2D Flat'} mode, ${example.colors} colors, and repeatable settings.`,
+        ? `${example.titleRu}: проверенное сравнение исходника и результата MapKluss. Размер ${example.size}, ${modeLabel}, дизеринг ${example.trySettings.dithering}.`
+        : `${example.titleEn}: a verified source-to-MapKluss comparison at ${example.size}, ${modeLabel}, using ${example.trySettings.dithering} dithering.`,
       url: `${window.location.origin}/examples/${example.id}`,
       image: `${window.location.origin}${example.previewUrl}`,
       schema: [
@@ -39,127 +41,118 @@ export function ExampleDetailPage({ example }: Props) {
         },
       ],
     });
-  }, [example, lang]);
-
-  const modeLabel = example.mode === '3d' ? '3D Stair' : '2D Flat';
-  const bestUseRu = example.mode === '3d'
-    ? 'лучше подходит для иллюстраций, фото и сцен, где важны дополнительные оттенки и более мягкие переходы.'
-    : 'лучше подходит для логотипов, пиксель-арта и чистых форм, где важны простота и предсказуемые материалы.';
-  const bestUseEn = example.mode === '3d'
-    ? 'works best for illustrations, photos, and scenes where extra shades and smoother transitions matter.'
-    : 'works best for logos, pixel art, and cleaner shapes where simplicity and predictable materials matter most.';
+  }, [example, lang, modeLabel]);
 
   return (
-    <main className="examples-page">
-      <header className="examples-topbar">
-        <a className="examples-brand" href={buildTrackedHref('/')}>
-          <img src="/logo-opt.png" alt="MapKluss" />
-          <span>
-            <strong>MAPKLUSS</strong>
-            <small>MINECRAFT MAP ART GENERATOR</small>
-          </span>
-        </a>
-        <nav className="examples-nav">
-          <a href={buildTrackedHref('/examples')}>{t('Все примеры', 'All examples')}</a>
-          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
-          <button onClick={toggle}>{lang === 'ru' ? 'EN' : 'RU'}</button>
-        </nav>
-      </header>
+    <div className="public-shell">
+      <PublicSiteHeader active="examples" lang={lang} onToggleLanguage={toggle} />
+      <main className="examples-page public-content-page">
+        <section className="examples-hero example-detail-hero">
+          <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
+            <a href={buildTrackedHref('/')}>MapKluss</a>
+            <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+            <a href={buildTrackedHref('/examples')}>{t('Примеры', 'Examples')}</a>
+            <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+            <span aria-current="page">{t(example.titleRu, example.titleEn)}</span>
+          </nav>
+          <div className="example-detail-intro">
+            <div>
+              <h1>{t(example.titleRu, example.titleEn)}</h1>
+              <p>{t(example.descriptionRu, example.descriptionEn)}</p>
+            </div>
+            <div className="examples-hero-actions">
+              <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть сценарий', 'Open workflow')}</a>
+              <a href={buildTrackedHref('/examples')}>{t('Все примеры', 'All examples')}</a>
+            </div>
+          </div>
+        </section>
 
-      <section className="examples-hero">
-        <p className="examples-kicker">{t('Пример', 'Example')}</p>
-        <h1>{t(example.titleRu, example.titleEn)}</h1>
-        <p>{t(example.descriptionRu, example.descriptionEn)}</p>
-        <div className="examples-hero-actions">
-          <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
-          <a href={buildTrackedHref('/examples')}>{t('Назад к галерее', 'Back to gallery')}</a>
-        </div>
-      </section>
-
-      <section className="examples-insight-section">
-        <div className="examples-section-head">
-          <h2>{t('Что это за пример', 'What this example shows')}</h2>
-          <p>
-            {t(
-              `${t(example.titleRu, example.titleEn)} — это кейс, который ${bestUseRu}`,
-              `${t(example.titleRu, example.titleEn)} is a case that ${bestUseEn}`,
-            )}
+        <section className="examples-insight-section example-detail-workbench" aria-labelledby="example-comparison-title">
+          <div className="examples-section-head">
+            <h2 id="example-comparison-title">{t('Исходник и результат', 'Source and result')}</h2>
+            <p>{t('Это настоящий PNG, экспортированный из текущей версии MapKluss с указанными ниже настройками.', 'This is a real PNG exported by the current MapKluss build with the settings shown below.')}</p>
+          </div>
+          <div className="example-comparison example-comparison--detail">
+            <figure>
+              <img src={example.originalUrl} alt={t(`${example.titleRu}: исходник`, `${example.titleEn}: source image`)} />
+              <figcaption>{t('Исходник', 'Source')}</figcaption>
+            </figure>
+            <figure>
+              <img src={example.previewUrl} alt={t(`${example.titleRu}: результат MapKluss`, `${example.titleEn}: MapKluss result`)} />
+              <figcaption>{t('Результат MapKluss', 'MapKluss result')}</figcaption>
+            </figure>
+          </div>
+          <p className="example-source-line">
+            <span>{t('Источник:', 'Source:')} </span>
+            {example.sourcePageUrl
+              ? <a href={example.sourcePageUrl} target="_blank" rel="noopener noreferrer">{t(example.sourceNameRu, example.sourceNameEn)}</a>
+              : <strong>{t(example.sourceNameRu, example.sourceNameEn)}</strong>}
+            <span aria-hidden="true"> · </span>
+            {example.licenseUrl
+              ? <a href={example.licenseUrl} target="_blank" rel="noopener noreferrer">{t(example.licenseLabelRu, example.licenseLabelEn)}</a>
+              : <span>{t(example.licenseLabelRu, example.licenseLabelEn)}</span>}
           </p>
-        </div>
-        <div className="example-triptych example-triptych-detail">
-          <figure>
-            <img src={example.originalUrl} alt={t(`${example.titleRu}: исходник`, `${example.titleEn}: original image`)} loading="lazy" />
-            <figcaption>{t('Исходник', 'Original')}</figcaption>
-          </figure>
-          <figure>
-            <img src={example.previewUrl} alt={t(`${example.titleRu}: результат MapKluss`, `${example.titleEn}: MapKluss result`)} loading="lazy" />
-            <figcaption>{t('MapKluss', 'MapKluss')}</figcaption>
-          </figure>
-          <figure>
-            <img src={example.minecraftUrl} alt={t(`${example.titleRu}: скрин в Minecraft`, `${example.titleEn}: Minecraft screenshot`)} loading="lazy" />
-            <figcaption>{t('Minecraft', 'Minecraft')}</figcaption>
-          </figure>
-        </div>
-      </section>
+        </section>
 
-      <section className="examples-insight-section">
-        <div className="examples-section-head">
-          <h2>{t('Настройки и характеристики', 'Settings and characteristics')}</h2>
-        </div>
-        <div className="examples-checklist-grid">
-          <article className="examples-check-card">
-            <h3>{t('Режим', 'Mode')}</h3>
-            <p>{modeLabel}</p>
-          </article>
-          <article className="examples-check-card">
-            <h3>{t('Размер', 'Size')}</h3>
-            <p>{example.size} {t('карт', 'maps')}</p>
-          </article>
-          <article className="examples-check-card">
-            <h3>{t('Цвета', 'Colors')}</h3>
-            <p>{example.colors}</p>
-          </article>
-          <article className="examples-check-card">
-            <h3>{t('Дизеринг', 'Dithering')}</h3>
-            <p>{example.trySettings.dithering}</p>
-          </article>
-          <article className="examples-check-card">
-            <h3>{t('Интенсивность', 'Intensity')}</h3>
-            <p>{example.trySettings.intensity}%</p>
-          </article>
-          <article className="examples-check-card">
-            <h3>{t('Лестницы', 'Staircase')}</h3>
-            <p>{example.trySettings.staircaseMode}</p>
-          </article>
-        </div>
-      </section>
+        <section className="examples-insight-section example-detail-settings" aria-labelledby="example-settings-title">
+          <div className="examples-section-head">
+            <h2 id="example-settings-title">{t('Проверенные настройки', 'Verified settings')}</h2>
+            <p>{t('Открой сценарий — редактор загрузит этот же исходник и применит значения автоматически.', 'Open the workflow and the editor will load the same source with these values applied automatically.')}</p>
+          </div>
+          <dl className="example-spec-table">
+            <div><dt>{t('Сетка карт', 'Map grid')}</dt><dd>{example.size}</dd></div>
+            <div><dt>{t('Режим', 'Mode')}</dt><dd>{modeLabel}</dd></div>
+            <div><dt>{t('Доступных оттенков', 'Available shades')}</dt><dd>{example.colors}</dd></div>
+            <div><dt>{t('Дизеринг', 'Dithering')}</dt><dd>{example.trySettings.dithering}</dd></div>
+            <div><dt>{t('Интенсивность', 'Intensity')}</dt><dd>{example.trySettings.intensity}%</dd></div>
+            <div><dt>{t('Лестницы', 'Staircase')}</dt><dd>{example.trySettings.staircaseMode}</dd></div>
+          </dl>
+          <div className="example-palette-guide">
+            <strong>{t('Цветовой ориентир', 'Palette guide')}</strong>
+            <div className="example-materials example-materials-detail">
+              {example.paletteHints.map(material => <span key={material}>{material}</span>)}
+            </div>
+            <p>{t('Это ориентир по заметным семействам блоков, а не полный расчёт материалов. Точный список зависит от выбранных блоков палитры.', 'This is a guide to prominent block families, not a complete bill of materials. The exact list depends on your selected palette blocks.')}</p>
+          </div>
+        </section>
 
-      <section className="examples-insight-section">
-        <div className="examples-section-head">
-          <h2>{t('Основные материалы', 'Main materials')}</h2>
-          <p>{t('Это не полный расчёт, а быстрый ориентир по ключевым блокам в этом примере.', 'This is not the full bill of materials, just a quick orientation around the main blocks used in this example.')}</p>
-        </div>
-        <div className="example-materials example-materials-detail">
-          {example.materials.map(material => <span key={material}>{material}</span>)}
-        </div>
-      </section>
-
-      <section className="examples-cta-band">
-        <div>
-          <p className="examples-kicker">{t('Повторить результат', 'Recreate this result')}</p>
-          <h2>{t('Открой пример в редакторе и меняй палитру, размер и экспорт под свою задачу', 'Open the example in the editor and adapt palette, size, and export to your own goal')}</h2>
-        </div>
-        <div className="examples-cta-actions">
-          <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
-          <a href={buildTrackedHref('/minecraft-map-art-generator')}>{t('Читать про генератор', 'Read about the generator')}</a>
-        </div>
-      </section>
-    </main>
+        <section className="examples-cta-band">
+          <div>
+            <h2>{t('Повтори настройки или замени исходник своим', 'Reuse the settings or replace the source')}</h2>
+            <p>{t('Сценарий открывается сразу в рабочем редакторе — без регистрации и без загрузки изображения на сервер.', 'The workflow opens directly in the editor, with no account required and no server-side image upload.')}</p>
+          </div>
+          <div className="examples-cta-actions">
+            <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
 
 export function ExampleDetailNotFound() {
-  const fallback = getExampleById(EXAMPLES[0]?.id ?? null);
-  if (!fallback) return null;
-  return <ExampleDetailPage example={fallback} />;
+  const { lang, toggle, t } = useLocale();
+
+  useEffect(() => {
+    applyPageMeta({
+      title: t('Пример не найден | MapKluss', 'Example not found | MapKluss'),
+      description: t('Запрошенный пример MapKluss не найден.', 'The requested MapKluss example could not be found.'),
+      robots: 'noindex,nofollow',
+    });
+  }, [t]);
+
+  return (
+    <div className="public-shell">
+      <PublicSiteHeader active="examples" lang={lang} onToggleLanguage={toggle} />
+      <main className="public-not-found">
+        <img src="/logo-opt.png" alt="" width="72" height="72" />
+        <h1>{t('Такого примера нет', 'Example not found')}</h1>
+        <p>{t('Возможно, ссылка устарела. Открой актуальный каталог или начни свой арт.', 'The link may be outdated. Open the current catalogue or start your own art.')}</p>
+        <div className="public-action-row">
+          <a className="public-action public-action--primary" href={buildTrackedHref('/examples')}>{t('Все примеры', 'All examples')}</a>
+          <a className="public-action" href={buildTrackedHref('/')}>{t('Редактор', 'Editor')}</a>
+        </div>
+      </main>
+    </div>
+  );
 }

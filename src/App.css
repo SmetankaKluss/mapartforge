@@ -5820,22 +5820,6 @@ input, select, textarea { outline: none; }
   margin-top: 24px;
 }
 .examples-hero-actions a:last-child { color: var(--gold); border-color: rgba(255,215,0,0.38); background: var(--gold-dim); }
-.examples-related-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-}
-.examples-related-links a {
-  color: var(--text-muted);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255,255,255,0.16);
-  padding-bottom: 2px;
-}
-.examples-related-links a:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
 .examples-grid {
   width: min(1380px, calc(100% - 48px));
   margin: 0 auto;

@@ -65,7 +65,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Choose map size, 2D/3D mode, and a dithering algorithm.',
       'Check the preview, materials, and export the build file you need.',
     ],
-    exampleIds: ['anime-portrait', 'anime-illustration'],
+    exampleIds: ['pearl-portrait', 'starry-night'],
     faq: [
       {
         questionRu: 'Подходит ли MapKluss для Litematic?',
@@ -124,7 +124,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Check which export formats you actually need.',
       'See how MapKluss gets you from image to finished build workflow.',
     ],
-    exampleIds: ['logo-flat', 'large-showcase'],
+    exampleIds: ['mapkluss-logo', 'starry-night'],
     faq: [
       {
         questionRu: 'Чем MapKluss отличается от старых map art генераторов?',
@@ -183,7 +183,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Preview how complex the result will be in 2D or 3D.',
       'Export the `.litematic` and open it in Litematica.',
     ],
-    exampleIds: ['anime-illustration', 'large-showcase'],
+    exampleIds: ['starry-night', 'great-wave'],
     faq: [
       {
         questionRu: 'Что лучше для схематики: 2D или 3D?',
@@ -242,7 +242,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Check the final color distribution and materials.',
       'Export `MAP.DAT` for one map or an entire grid.',
     ],
-    exampleIds: ['anime-portrait', 'pixel-art'],
+    exampleIds: ['pearl-portrait', 'mapkluss-logo'],
     faq: [
       {
         questionRu: 'Когда MAP.DAT лучше, чем Litematic?',
@@ -301,7 +301,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Tune the palette and dithering, then compare 2D Flat and 3D Stair output.',
       'Review materials, preview the result, and export Litematic, MAP.DAT, or PNG.',
     ],
-    exampleIds: ['anime-portrait', 'logo-flat'],
+    exampleIds: ['pearl-portrait', 'mapkluss-logo'],
     faq: [
       {
         questionRu: 'Что лучше для первого арта: 2D или 3D?',
@@ -360,7 +360,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Switch between modes and watch where clean edges disappear or extra noise starts to dominate.',
       'Compare by preview, materials, and how readable the build will feel in Minecraft.',
     ],
-    exampleIds: ['anime-illustration', 'pixel-art'],
+    exampleIds: ['starry-night', 'mapkluss-logo'],
     faq: [
       {
         questionRu: 'Когда лучше отключать дизеринг полностью?',
@@ -419,7 +419,7 @@ export const SEO_PAGES: SeoPageDefinition[] = [
       'Then switch to 3D Stair and evaluate whether the extra shades actually improve the art.',
       'Open the 3D preview and inspect how complex the schematic becomes before exporting.',
     ],
-    exampleIds: ['large-showcase', 'anime-illustration'],
+    exampleIds: ['great-wave', 'starry-night'],
     faq: [
       {
         questionRu: 'Когда 2D лучше 3D?',

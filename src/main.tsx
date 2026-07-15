@@ -1,15 +1,8 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
+import './App.css'
+import './publicPages.css'
 import { LocaleProvider } from './lib/LocaleProvider'
-import { BuildTracker } from './components/BuildTracker.tsx'
-import { ExamplesPage } from './components/ExamplesPage.tsx'
-import { ExampleDetailPage, ExampleDetailNotFound } from './components/ExampleDetailPage.tsx'
-import { SeoLandingPage } from './components/SeoLandingPage.tsx'
-import { CompanionCloudPage } from './components/CompanionCloudPage.tsx'
-import { DeviceApprovalPage } from './components/DeviceApprovalPage.tsx'
-import { CompanionArtPage } from './components/CompanionArtPage.tsx'
-import { CompanionCollectionPage } from './components/CompanionCollectionPage.tsx'
 import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
 import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
@@ -41,57 +34,124 @@ trackEvent('app_route_opened', {
   page_type: pageType,
 });
 
-const root = document.getElementById('root')!;
+const rootElement = document.getElementById('root')!;
+const root = createRoot(rootElement);
 
-if (buildMatch) {
-  const sessionId = buildMatch[1];
-  createRoot(root).render(<BuildTracker sessionId={sessionId} />);
-} else if (path === '/examples') {
-  createRoot(root).render(
-    <LocaleProvider>
-      <ExamplesPage />
-    </LocaleProvider>,
-  );
-} else if (path.startsWith('/examples/')) {
-  createRoot(root).render(
-    <LocaleProvider>
-      {examplePage ? <ExampleDetailPage example={examplePage} /> : <ExampleDetailNotFound />}
-    </LocaleProvider>,
-  );
-} else if (path === '/cloud') {
-  createRoot(root).render(
-    <LocaleProvider>
-      <CompanionCloudPage />
-    </LocaleProvider>,
-  );
-} else if (path === '/device') {
-  createRoot(root).render(
-    <LocaleProvider>
-      <DeviceApprovalPage />
-    </LocaleProvider>,
-  );
-} else if (companionArtMatch) {
-  createRoot(root).render(
-    <LocaleProvider>
-      <CompanionArtPage artId={companionArtMatch[1]} />
-    </LocaleProvider>,
-  );
-} else if (companionCollectionMatch) {
-  createRoot(root).render(
-    <LocaleProvider>
-      <CompanionCollectionPage collectionId={companionCollectionMatch[1]} />
-    </LocaleProvider>,
-  );
-} else if (seoPage) {
-  createRoot(root).render(
-    <LocaleProvider>
-      <SeoLandingPage page={seoPage} />
-    </LocaleProvider>,
-  );
-} else {
-  createRoot(root).render(
-    <LocaleProvider>
-      <App />
-    </LocaleProvider>,
-  );
+const routeLabels: Record<string, string> = {
+  build_tracker: 'Открываю трекер стройки…',
+  companion_art: 'Открываю арт…',
+  companion_collection: 'Открываю коллекцию…',
+  cloud: 'Подключаю облако MapKluss…',
+  device: 'Готовлю вход мода…',
+  examples: 'Открываю примеры…',
+  example_detail: 'Открываю пример…',
+  seo: 'Открываю руководство…',
+  editor: 'Запускаю редактор…',
+};
+
+const routeBootstrap = (
+  <main className="route-bootstrap" aria-busy="true" aria-live="polite">
+    <div className="route-bootstrap__status" role="status">
+      <div className="route-bootstrap__brand">
+        <img src="/logo-opt.png" width="64" height="64" alt="" />
+        <span>MAPKLUSS</span>
+      </div>
+      <div className="route-bootstrap__track" aria-hidden="true" />
+      <p className="route-bootstrap__copy">{routeLabels[pageType]}</p>
+    </div>
+  </main>
+);
+
+const routeLoadError = (
+  <main className="route-bootstrap">
+    <div className="route-bootstrap__status" role="alert">
+      <div className="route-bootstrap__brand">
+        <img src="/logo-opt.png" width="64" height="64" alt="" />
+        <span>MAPKLUSS</span>
+      </div>
+      <p className="route-bootstrap__copy">Не удалось открыть страницу. Проверь соединение и обнови вкладку.</p>
+      <a className="public-action public-action--primary" href={window.location.href}>Обновить</a>
+    </div>
+  </main>
+);
+
+root.render(routeBootstrap);
+
+async function initializeBackend() {
+  await import('./lib/supabase.ts');
 }
+
+async function renderApplication() {
+  if (buildMatch) {
+    await initializeBackend();
+    const { BuildTracker } = await import('./components/BuildTracker.tsx');
+    const sessionId = buildMatch[1];
+    root.render(<BuildTracker sessionId={sessionId} />);
+  } else if (path === '/examples') {
+    const { ExamplesPage } = await import('./components/ExamplesPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <ExamplesPage />
+      </LocaleProvider>,
+    );
+  } else if (path.startsWith('/examples/')) {
+    const { ExampleDetailPage, ExampleDetailNotFound } = await import('./components/ExampleDetailPage.tsx');
+    root.render(
+      <LocaleProvider>
+        {examplePage ? <ExampleDetailPage example={examplePage} /> : <ExampleDetailNotFound />}
+      </LocaleProvider>,
+    );
+  } else if (path === '/cloud') {
+    await initializeBackend();
+    const { CompanionCloudPage } = await import('./components/CompanionCloudPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <CompanionCloudPage />
+      </LocaleProvider>,
+    );
+  } else if (path === '/device') {
+    await initializeBackend();
+    const { DeviceApprovalPage } = await import('./components/DeviceApprovalPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <DeviceApprovalPage />
+      </LocaleProvider>,
+    );
+  } else if (companionArtMatch) {
+    await initializeBackend();
+    const { CompanionArtPage } = await import('./components/CompanionArtPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <CompanionArtPage artId={companionArtMatch[1]} />
+      </LocaleProvider>,
+    );
+  } else if (companionCollectionMatch) {
+    await initializeBackend();
+    const { CompanionCollectionPage } = await import('./components/CompanionCollectionPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <CompanionCollectionPage collectionId={companionCollectionMatch[1]} />
+      </LocaleProvider>,
+    );
+  } else if (seoPage) {
+    const { SeoLandingPage } = await import('./components/SeoLandingPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <SeoLandingPage page={seoPage} />
+      </LocaleProvider>,
+    );
+  } else {
+    await initializeBackend();
+    const { default: App } = await import('./App.tsx');
+    root.render(
+      <LocaleProvider>
+        <App />
+      </LocaleProvider>,
+    );
+  }
+}
+
+void renderApplication().catch((error) => {
+  console.error('MapKluss route initialization failed.', error);
+  root.render(routeLoadError);
+});

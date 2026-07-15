@@ -412,3 +412,246 @@ html, body { height: auto !important; overflow: auto !important; min-height: 100
   align-items: center;
   gap: 6px;
 }
+
+/* Public tracker route: align with the shared MapKluss workshop shell. */
+.public-shell > .bt-page {
+  min-height: 0;
+  flex: 1;
+  overflow-x: clip;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.public-shell .bt-page--loading,
+.public-shell .bt-page--error {
+  min-height: 0;
+  color: var(--public-text-secondary);
+}
+
+.bt-loading-mark {
+  width: min(280px, calc(100vw - 48px));
+  height: 3px;
+  overflow: hidden;
+  background: var(--border-soft);
+}
+
+.bt-loading-mark::after {
+  content: '';
+  display: block;
+  width: 42%;
+  height: 100%;
+  background: var(--accent);
+  animation: bt-loading-scan 900ms cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+@keyframes bt-loading-scan {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(240%); }
+}
+
+.bt-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bt-error-actions button,
+.bt-error-actions a {
+  min-height: 36px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text);
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bt-topbar {
+  background: var(--bg-panel);
+  border-bottom-color: var(--border);
+}
+
+.bt-topbar-title,
+.bt-project-title,
+.bt-confirm-title {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+
+.bt-topbar-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bt-project-title {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.bt-meta-label,
+.bt-stats-title,
+.bt-table-toolbar-title,
+.bt-th {
+  color: var(--public-text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.bt-meta-value,
+.bt-stats-sub,
+.bt-stats-progress-label,
+.bt-stats-done-count,
+.bt-table-count,
+.bt-row-need,
+.bt-bar-pct {
+  color: var(--public-text-secondary);
+}
+
+.bt-project-card,
+.bt-table-toolbar,
+.bt-table-head {
+  border-color: var(--border-strong);
+}
+
+.bt-row {
+  border-color: var(--border);
+}
+
+.bt-download-lite,
+.bt-switch-btn,
+.bt-per-map-btn,
+.bt-row-sub-btn,
+.bt-row-add-btn,
+.bt-btn,
+.bt-back-link {
+  min-height: 36px;
+}
+
+.bt-row-add-input {
+  min-height: 32px;
+}
+
+.bt-download-lite:focus-visible,
+.bt-switch-btn:focus-visible,
+.bt-per-map-btn:focus-visible,
+.bt-row-sub-btn:focus-visible,
+.bt-row-add-btn:focus-visible,
+.bt-row-add-input:focus-visible,
+.bt-btn:focus-visible,
+.bt-back-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bt-confirm-overlay {
+  z-index: 80;
+}
+
+.bt-confirm-modal {
+  border-color: rgb(var(--gold-rgb) / 0.48);
+  padding: 22px;
+}
+
+.bt-confirm-title {
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bt-confirm-desc {
+  color: var(--public-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .bt-topbar {
+    min-height: 48px;
+    height: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .bt-topbar-title {
+    flex: 1;
+    font-size: 12px;
+  }
+
+  .bt-topbar-spacer { display: none; }
+  .bt-project-card { margin: 12px; }
+  .bt-project-main,
+  .bt-project-stats { padding: 16px; }
+  .bt-switch-wrap,
+  .bt-table-section { margin-left: 12px; margin-right: 12px; }
+  .bt-table-toolbar { flex-wrap: wrap; padding: 10px; }
+  .bt-toolbar-spacer { display: none; }
+  .bt-per-map-btn { width: 100%; }
+  .bt-table-head { display: none; }
+
+  .bt-row {
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr);
+    padding: 10px;
+    gap: 10px 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+    background: var(--bg-panel) !important;
+  }
+
+  .bt-cell {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bt-cell:first-child,
+  .bt-controls-cell {
+    grid-column: 1 / -1;
+  }
+
+  .bt-cell:nth-child(2) {
+    display: flex;
+    align-items: end;
+  }
+
+  .bt-cell:nth-child(2)::before,
+  .bt-bar-cell::before,
+  .bt-controls-cell::before {
+    content: attr(data-label);
+    display: block;
+    margin-right: auto;
+    color: var(--public-text-tertiary);
+    font-family: var(--font-ui);
+    font-size: 10px;
+  }
+
+  .bt-bar-cell { justify-content: end; }
+  .bt-controls-cell { flex-wrap: wrap; }
+  .bt-row-total { margin-left: auto; }
+  .bt-row-add-input { flex: 1 1 80px; width: auto; min-height: 44px; }
+  .bt-row-sub-btn,
+  .bt-row-add-btn { min-width: 44px; min-height: 44px; }
+  .bt-download-lite,
+  .bt-switch-btn,
+  .bt-per-map-btn,
+  .bt-btn,
+  .bt-back-link { min-height: 44px; }
+  .bt-error-actions button,
+  .bt-error-actions a { min-height: 44px; }
+  .bt-confirm-btns { flex-direction: column-reverse; }
+  .bt-confirm-modal { width: min(100% - 24px, 380px); padding: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bt-loading-mark::after { animation: none; width: 100%; opacity: 0.72; }
+  .bt-row,
+  .bt-download-lite,
+  .bt-switch-btn,
+  .bt-per-map-btn,
+  .bt-row-sub-btn,
+  .bt-row-add-btn,
+  .bt-btn { transition: none; }
+}

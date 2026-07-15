@@ -138,7 +138,7 @@ export function CloudArtsPanel({ onClose, onOpenArt, defaultEmail }: CloudArtsPa
             mode: '2d',
             privacy: 'unlisted',
             favorite: true,
-            previewUrl: '/examples/logo-flat/mapkluss.png',
+            previewUrl: '/examples/mapkluss-logo/result.png',
             minutesAgo: 16,
           }),
           mockCloudArt({

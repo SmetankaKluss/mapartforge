@@ -3,6 +3,7 @@ import { EXAMPLES } from '../lib/examples';
 import { applyPageMeta } from '../lib/meta';
 import { useLocale } from '../lib/useLocale';
 import { buildTrackedHref } from '../lib/analytics';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 function downloadImage(url: string, filename: string): void {
   const a = Object.assign(document.createElement('a'), { href: url, download: filename });
@@ -19,27 +20,18 @@ export function ExamplesPage() {
       titleEn: 'Logos and server emblems',
       bodyRu: 'Обычно лучше заходят в 2D Flat с чистой палитрой и слабым дизерингом или вообще без него.',
       bodyEn: 'These usually work best in 2D Flat with a cleaner palette and lighter dithering or none at all.',
-      href: '/best-dithering-for-minecraft-map-art',
-      labelRu: 'Как выбирать дизеринг',
-      labelEn: 'How to choose dithering',
     },
     {
-      titleRu: 'Аниме, иллюстрации и яркие арты',
-      titleEn: 'Anime, illustrations, and bright artwork',
+      titleRu: 'Иллюстрации, живопись и яркие арты',
+      titleEn: 'Illustrations, paintings, and vivid artwork',
       bodyRu: 'Часто выигрывают от 3D Stair, потому что дополнительные оттенки помогают сохранить объём и мягкие переходы.',
       bodyEn: 'These often benefit from 3D Stair because the extra shades preserve volume and softer transitions.',
-      href: '/2d-vs-3d-stair-map-art',
-      labelRu: '2D vs 3D Stair',
-      labelEn: '2D vs 3D Stair',
     },
     {
       titleRu: 'Первые проекты и survival-постройки',
       titleEn: 'First projects and survival builds',
       bodyRu: 'Если важны простота и предсказуемые материалы, начинай с 1x1 или 2x2 и смотри на материалы до экспорта.',
       bodyEn: 'If simplicity and predictable materials matter most, start with 1x1 or 2x2 and check materials before exporting.',
-      href: '/how-to-make-minecraft-map-art',
-      labelRu: 'Полный гайд',
-      labelEn: 'Full guide',
     },
   ]), []);
 
@@ -108,48 +100,44 @@ export function ExamplesPage() {
   }, [faqs, lang]);
 
   return (
-    <main className="examples-page">
-      <header className="examples-topbar">
-        <a className="examples-brand" href={buildTrackedHref('/')}>
-          <img src="/logo-opt.png" alt="MapKluss" />
-          <span>
-            <strong>MAPKLUSS</strong>
-            <small>MINECRAFT MAP ART GENERATOR</small>
-          </span>
-        </a>
-        <nav className="examples-nav">
-          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
-          <button onClick={toggle}>{lang === 'ru' ? 'EN' : 'RU'}</button>
-        </nav>
-      </header>
+    <div className="public-shell">
+      <PublicSiteHeader active="examples" lang={lang} onToggleLanguage={toggle} />
+      <main className="examples-page public-content-page">
 
       <section className="examples-hero">
-        <p className="examples-kicker">{t('Галерея', 'Gallery')}</p>
-        <h1>{t('Примеры Minecraft мап-арта', 'Minecraft Map Art Examples')}</h1>
-        <p>
-          {t(
-            'Посмотри, как MapKluss превращает исходные изображения в 2D и 3D Minecraft map art с Litematic, MAP.DAT, материалами и трекером постройки.',
-            'See how MapKluss turns source images into 2D and 3D Minecraft map art with Litematic, MAP.DAT, materials, and build tracking.',
-          )}
-        </p>
-        <p className="examples-hero-subline">
-          {t(
-            `Здесь ${exampleCount} реальных примеров: логотипы, аниме, фото, пиксель-арт и большие multi-map проекты.`,
-            `You can inspect ${exampleCount} real examples here: logos, anime, photos, pixel art, and larger multi-map builds.`,
-          )}
-        </p>
-        <div className="examples-hero-actions">
-          <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
-          <a href="#examples-grid">{t('Смотреть примеры', 'Browse examples')}</a>
-        </div>
-        <div className="examples-related-links">
-          <a href={buildTrackedHref('/minecraft-map-art-generator')}>{t('Генератор map art', 'Map art generator')}</a>
-          <a href={buildTrackedHref('/minecraft-litematic-map-art-generator')}>{t('Litematic export', 'Litematic export')}</a>
-          <a href={buildTrackedHref('/minecraft-map-dat-generator')}>{t('MAP.DAT export', 'MAP.DAT export')}</a>
-          <a href={buildTrackedHref('/how-to-make-minecraft-map-art')}>{t('Как сделать map art', 'How to make map art')}</a>
-          <a href={buildTrackedHref('/best-dithering-for-minecraft-map-art')}>{t('Гайд по дизерингу', 'Dithering guide')}</a>
-          <a href={buildTrackedHref('/2d-vs-3d-stair-map-art')}>{t('2D vs 3D Stair', '2D vs 3D Stair')}</a>
-          <a href={buildTrackedHref('/mapartcraft-alternative')}>{t('Альтернатива MapartCraft', 'MapartCraft alternative')}</a>
+        <div className="examples-hero-layout">
+          <div>
+            <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
+              <a href={buildTrackedHref('/')}>MapKluss</a>
+              <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+              <span aria-current="page">{t('Примеры', 'Examples')}</span>
+            </nav>
+            <h1>{t('Примеры и рабочие сценарии', 'Examples and working patterns')}</h1>
+            <p>
+              {t(
+                'Сравни режимы, размеры и настройки обработки, а затем открой подходящий сценарий прямо в редакторе MapKluss.',
+                'Compare modes, sizes, and processing settings, then open the closest working pattern directly in the MapKluss editor.',
+              )}
+            </p>
+            <p className="examples-hero-subline">
+              {t(
+                `Сейчас в каталоге ${exampleCount} демонстрационных сценариев. Галерея настоящих пользовательских построек будет добавлена отдельно после проверки исходников и Minecraft-скриншотов.`,
+                `The catalogue currently contains ${exampleCount} demonstration workflows. A verified gallery of real user builds will be added separately once source files and Minecraft screenshots are checked.`,
+              )}
+            </p>
+            <div className="examples-hero-actions">
+              <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
+              <a href="#examples-grid">{t('Смотреть сценарии', 'Browse workflows')}</a>
+            </div>
+          </div>
+          <aside className="examples-flow-key" aria-label={t('Как читать сценарий', 'How to read a workflow')}>
+            <strong>{t('Как читать сценарий', 'How to read a workflow')}</strong>
+            <ol>
+              <li>{t('Определи тип изображения и желаемый размер.', 'Identify the image type and target size.')}</li>
+              <li>{t('Сравни 2D Flat и 3D Stair по сложности и оттенкам.', 'Compare 2D Flat and 3D Stair by complexity and shade range.')}</li>
+              <li>{t('Открой сценарий в редакторе и замени изображение своим.', 'Open the workflow in the editor and replace the image with your own.')}</li>
+            </ol>
+          </aside>
         </div>
       </section>
 
@@ -168,7 +156,6 @@ export function ExamplesPage() {
             <article className="examples-insight-card" key={item.titleEn}>
               <h3>{t(item.titleRu, item.titleEn)}</h3>
               <p>{t(item.bodyRu, item.bodyEn)}</p>
-              <a href={buildTrackedHref(item.href)}>{t(item.labelRu, item.labelEn)}</a>
             </article>
           ))}
         </div>
@@ -187,20 +174,27 @@ export function ExamplesPage() {
               </span>
             </div>
 
-            <div className="example-triptych">
+            <div className="example-comparison">
               <figure>
                 <img src={example.originalUrl} alt={t(`${example.titleRu}: исходник`, `${example.titleEn}: original image`)} loading="lazy" />
                 <figcaption>{t('Исходник', 'Original')}</figcaption>
               </figure>
               <figure>
                 <img src={example.previewUrl} alt={t(`${example.titleRu}: результат MapKluss`, `${example.titleEn}: MapKluss result`)} loading="lazy" />
-                <figcaption>{t('MapKluss', 'MapKluss')}</figcaption>
-              </figure>
-              <figure>
-                <img src={example.minecraftUrl} alt={t(`${example.titleRu}: скрин в Minecraft`, `${example.titleEn}: Minecraft screenshot`)} loading="lazy" />
-                <figcaption>{t('Minecraft', 'Minecraft')}</figcaption>
+                <figcaption>{t('Результат MapKluss', 'MapKluss result')}</figcaption>
               </figure>
             </div>
+
+            <p className="example-source-line">
+              <span>{t('Источник:', 'Source:')} </span>
+              {example.sourcePageUrl
+                ? <a href={example.sourcePageUrl} target="_blank" rel="noopener noreferrer">{t(example.sourceNameRu, example.sourceNameEn)}</a>
+                : <strong>{t(example.sourceNameRu, example.sourceNameEn)}</strong>}
+              <span aria-hidden="true"> · </span>
+              {example.licenseUrl
+                ? <a href={example.licenseUrl} target="_blank" rel="noopener noreferrer">{t(example.licenseLabelRu, example.licenseLabelEn)}</a>
+                : <span>{t(example.licenseLabelRu, example.licenseLabelEn)}</span>}
+            </p>
 
             <dl className="example-meta">
               <div>
@@ -217,15 +211,15 @@ export function ExamplesPage() {
               </div>
             </dl>
 
-            <div className="example-materials">
-              {example.materials.map(material => <span key={material}>{material}</span>)}
+            <div className="example-materials" aria-label={t('Цветовой ориентир', 'Palette guide')}>
+              {example.paletteHints.map(material => <span key={material}>{material}</span>)}
             </div>
 
             <div className="example-actions">
-              <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Попробовать этот пример', 'Try this example')}</a>
-              <a href={buildTrackedHref(`/examples/${example.id}`)}>{t('Подробнее', 'Read details')}</a>
+              <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)} aria-label={t(`Открыть сценарий «${example.titleRu}» в редакторе`, `Open “${example.titleEn}” workflow in the editor`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
+              <a href={buildTrackedHref(`/examples/${example.id}`)} aria-label={t(`Подробнее о сценарии «${example.titleRu}»`, `Read details about “${example.titleEn}”`)}>{t('Подробнее', 'Read details')}</a>
               <button onClick={() => downloadImage(example.previewUrl, `mapkluss_${example.id}.png`)}>
-                {t('Скачать preview', 'Download preview')}
+                {t('Скачать превью', 'Download preview')}
               </button>
             </div>
           </article>
@@ -257,18 +251,17 @@ export function ExamplesPage() {
           <h2>{t('Частые вопросы', 'Frequently asked questions')}</h2>
         </div>
         <div className="examples-faq-list">
-          {faqs.map(item => (
-            <article className="examples-faq-item" key={item.questionEn}>
-              <h3>{t(item.questionRu, item.questionEn)}</h3>
+          {faqs.map((item, index) => (
+            <details className="examples-faq-item" key={item.questionEn} open={index === 0}>
+              <summary>{t(item.questionRu, item.questionEn)}</summary>
               <p>{t(item.answerRu, item.answerEn)}</p>
-            </article>
+            </details>
           ))}
         </div>
       </section>
 
       <section className="examples-cta-band">
         <div>
-          <p className="examples-kicker">{t('Следующий шаг', 'Next step')}</p>
           <h2>{t('Открой редактор и прогони свою картинку через те же режимы', 'Open the editor and run your own image through the same workflow')}</h2>
           <p>
             {t(
@@ -279,9 +272,9 @@ export function ExamplesPage() {
         </div>
         <div className="examples-cta-actions">
           <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open Editor')}</a>
-          <a href={buildTrackedHref('/minecraft-map-art-generator')}>{t('Читать про генератор', 'Read about the generator')}</a>
         </div>
       </section>
-    </main>
+      </main>
+    </div>
   );
 }

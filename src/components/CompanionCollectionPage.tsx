@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { deleteCompanionCollection, getCompanionCollectionOverview, getCompanionTrackerForArt, setCompanionCollectionItem, updateCompanionCollection } from '../lib/companionCloud';
 import type { CompanionCollection, CompanionLibraryItem } from '../lib/companionTypes';
 import { useLocale } from '../lib/useLocale';
+import { applyPageMeta } from '../lib/meta';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 interface Props {
   collectionId: string;
@@ -49,7 +51,7 @@ function mockCollectionItem(input: {
     privacy: input.privacy,
     grid: { wide: input.wide, tall: input.tall },
     mode: input.mode,
-    previewUrl: null,
+    previewUrl: input.artId.includes('rabbit') ? '/examples/starry-night/result.png' : '/examples/mapkluss-logo/result.png',
     updatedAt: mockDate(input.minutesAgo),
     isFavorite: Boolean(input.favorite),
   };
@@ -121,6 +123,14 @@ export function CompanionCollectionPage({ collectionId }: Props) {
     ].join(' ').toLowerCase().includes(normalized);
   });
 
+  useEffect(() => {
+    applyPageMeta({
+      title: collection?.name ? `${collection.name} | MapKluss` : t('Коллекция MapKluss', 'MapKluss collection'),
+      description: t('Коллекция облачных артов MapKluss.', 'A collection of MapKluss cloud arts.'),
+      robots: 'noindex,nofollow',
+    });
+  }, [collection, t]);
+
   const reload = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -150,7 +160,7 @@ export function CompanionCollectionPage({ collectionId }: Props) {
     setRemovingArtId(artId);
     setError(null);
     try {
-      const stillSelected = await setCompanionCollectionItem(collectionId, artId, false);
+      const stillSelected = useMockCollection ? false : await setCompanionCollectionItem(collectionId, artId, false);
       if (!stillSelected) {
         setItems(current => current.filter(item => item.artId !== artId));
         setCollection(current => current ? {
@@ -176,7 +186,7 @@ export function CompanionCollectionPage({ collectionId }: Props) {
     setSavingName(true);
     setError(null);
     try {
-      const updated = await updateCompanionCollection(collection.id, nextName);
+      const updated = useMockCollection ? { ...collection, name: nextName, updatedAt: new Date().toISOString() } : await updateCompanionCollection(collection.id, nextName);
       setCollection(updated);
       setNameDraft(updated.name);
     } catch (err) {
@@ -226,16 +236,26 @@ export function CompanionCollectionPage({ collectionId }: Props) {
   }
 
   return (
-    <main className="companion-page">
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggle} />
+      <main className="companion-page companion-collection-page">
       <header className="companion-header">
-        <a href="/cloud" className="companion-back">{t('Облако', 'Cloud')}</a>
         <div>
+          <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
+            <a href="/cloud">{t('Облако', 'Cloud')}</a>
+            <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+            <span aria-current="page">{collection?.name ?? t('Коллекция', 'Collection')}</span>
+          </nav>
           <h1>{collection?.name ?? t('Коллекция', 'Collection')}</h1>
           <p>{t('артов', 'arts')}: {collection?.itemCount ?? items.length}</p>
         </div>
-        <button className="lang-toggle-btn" onClick={toggle} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
       </header>
 
+      {busy && <p className="companion-status" role="status" aria-live="polite">{t('Загружаю коллекцию…', 'Loading collection…')}</p>}
+      {error && <p className="companion-status companion-status--error" role="alert">{error}</p>}
+
+      {collection && (
+      <>
       <section className="companion-panel companion-row">
         <div>
           <h2>{collection?.name ?? collectionId}</h2>
@@ -245,9 +265,6 @@ export function CompanionCollectionPage({ collectionId }: Props) {
         </div>
         <button onClick={() => void reload()} disabled={busy}>{t('Обновить', 'Refresh')}</button>
       </section>
-
-      {busy && <p className="companion-muted">{t('Загрузка...', 'Loading...')}</p>}
-      {error && <p className="companion-error">{error}</p>}
 
       <section className="companion-panel">
         <h2>{t('Настройки', 'Settings')}</h2>
@@ -265,21 +282,22 @@ export function CompanionCollectionPage({ collectionId }: Props) {
 
       <section className="companion-panel">
         <h2>{t('Арты', 'Arts')}</h2>
-        <div className="companion-inline-form">
-          <input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder={t('Поиск по названию, размеру, режиму', 'Search by title, size, or mode')}
-            maxLength={80}
-          />
-          {query && <button onClick={() => setQuery('')}>{t('Очистить', 'Clear')}</button>}
-        </div>
+        <label className="companion-field">
+          <span>{t('Поиск по коллекции', 'Search collection')}</span>
+          <div className="companion-inline-form">
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Название, размер или режим', 'Title, size, or mode')} maxLength={80} type="search" />
+            {query && <button onClick={() => setQuery('')}>{t('Очистить', 'Clear')}</button>}
+          </div>
+        </label>
         {items.length === 0 && !busy ? (
           <p className="companion-muted">{t('В этой коллекции пока нет артов.', 'There are no arts in this collection yet.')}</p>
         ) : filteredItems.length === 0 ? (
           <p className="companion-muted">{t('Под этот поиск ничего не подходит.', 'Nothing matches this search.')}</p>
         ) : filteredItems.map(art => (
-          <article className="companion-art" key={art.artId}>
+          <article className="companion-art companion-library-art" key={art.artId}>
+            <a className="companion-art-thumb" href={`/art/${art.artId}`} aria-label={t(`Открыть арт ${art.title}`, `Open art ${art.title}`)}>
+              {art.previewUrl ? <img src={art.previewUrl} alt="" /> : <span>{art.grid.wide}×{art.grid.tall}</span>}
+            </a>
             <div className="companion-import-copy">
               <strong>{art.title}</strong>
               <div className="companion-art-meta" aria-label={t('Параметры арта', 'Art details')}>
@@ -347,6 +365,9 @@ export function CompanionCollectionPage({ collectionId }: Props) {
           </div>
         )}
       </section>
-    </main>
+      </>
+      )}
+      </main>
+    </div>
   );
 }

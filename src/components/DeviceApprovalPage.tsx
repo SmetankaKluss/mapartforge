@@ -3,6 +3,8 @@ import { COMPANION_EMAIL_COOLDOWN_MS, TELEGRAM_LOGIN_BOT_USERNAME, isCompanionEm
 import type { TelegramAuthPayload } from '../lib/companionTypes';
 import { getSupabaseClient } from '../lib/supabase';
 import { useLocale } from '../lib/useLocale';
+import { applyPageMeta } from '../lib/meta';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 declare global {
   interface Window {
@@ -10,7 +12,9 @@ declare global {
   }
 }
 
-async function describeSupabaseError(error: unknown): Promise<string> {
+type Translator = (ru: string, en: string) => string;
+
+async function describeSupabaseError(error: unknown, t: Translator): Promise<string> {
   if (error && typeof error === 'object') {
     const maybeError = error as {
       message?: unknown;
@@ -23,8 +27,8 @@ async function describeSupabaseError(error: unknown): Promise<string> {
     if (context?.json) {
       try {
         const payload = await context.json() as { error?: unknown; message?: unknown };
-        if (typeof payload?.error === 'string' && payload.error.trim()) return normalizeDeviceApprovalMessage(payload.error);
-        if (typeof payload?.message === 'string' && payload.message.trim()) return normalizeDeviceApprovalMessage(payload.message);
+        if (typeof payload?.error === 'string' && payload.error.trim()) return normalizeDeviceApprovalMessage(payload.error, t);
+        if (typeof payload?.message === 'string' && payload.message.trim()) return normalizeDeviceApprovalMessage(payload.message, t);
       } catch {
         // Fall through to text/message handling.
       }
@@ -32,39 +36,39 @@ async function describeSupabaseError(error: unknown): Promise<string> {
     if (context?.text) {
       try {
         const text = await context.text();
-        if (text.trim()) return normalizeDeviceApprovalMessage(text);
+        if (text.trim()) return normalizeDeviceApprovalMessage(text, t);
       } catch {
         // Fall through to generic message handling.
       }
     }
     if (typeof maybeError.message === 'string' && maybeError.message.trim()) {
-      return normalizeDeviceApprovalMessage(maybeError.message);
+      return normalizeDeviceApprovalMessage(maybeError.message, t);
     }
   }
-  return normalizeDeviceApprovalMessage(String(error));
+  return normalizeDeviceApprovalMessage(String(error), t);
 }
 
-function normalizeDeviceApprovalMessage(raw: string): string {
+function normalizeDeviceApprovalMessage(raw: string, t: Translator): string {
   const text = raw.trim();
   const normalized = text.toLowerCase();
-  if (!normalized) return 'Не удалось подтвердить вход мода.';
+  if (!normalized) return t('Не удалось подтвердить вход мода.', 'Could not approve the mod login.');
   if (normalized.includes('missing authorization header') || normalized === 'unauthorized') {
-    return 'Сначала войди на этой странице, потом подтверди код.';
+    return t('Сначала войди на этой странице, потом подтверди код.', 'Sign in on this page before approving the code.');
   }
   if (normalized.includes('missing_user_code')) {
-    return 'Сначала введи код из Minecraft.';
+    return t('Сначала введи код из Minecraft.', 'Enter the code shown in Minecraft first.');
   }
   if (normalized.includes('code_not_found_or_already_used')) {
-    return 'Код не найден, уже использован или истёк. Запусти вход в моде заново.';
+    return t('Код не найден, уже использован или истёк. Запусти вход в моде заново.', 'The code was not found, was already used, or expired. Start mod login again.');
   }
   if (normalized.includes('dev_approve_localhost_only')) {
-    return 'Dev-подтверждение работает только с localhost или 127.0.0.1.';
+    return t('Dev-подтверждение работает только с localhost или 127.0.0.1.', 'Dev approval only works on localhost or 127.0.0.1.');
   }
   if (normalized.includes('dev_approve_disabled')) {
-    return 'Dev-\u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435 \u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d\u043e. \u0412\u043e\u0439\u0434\u0438 \u0447\u0435\u0440\u0435\u0437 \u043f\u043e\u0447\u0442\u0443 \u0438\u043b\u0438 Telegram.';
+    return t('Dev-подтверждение выключено. Войди через почту или Telegram.', 'Dev approval is disabled. Sign in with email or Telegram.');
   }
   if (normalized.includes('non-2xx')) {
-    return 'Сервер отклонил запрос. Войди заново или создай новый код в Minecraft.';
+    return t('Сервер отклонил запрос. Войди заново или создай новый код в Minecraft.', 'The server rejected the request. Sign in again or create a new code in Minecraft.');
   }
   return text;
 }
@@ -94,6 +98,14 @@ export function DeviceApprovalPage() {
   const autoApproveAttemptedRef = useRef(false);
   const localDevPage = useMemo(() => isLocalDevPage(), []);
   const devApprovalEnabled = localDevPage && import.meta.env.DEV && import.meta.env.VITE_ALLOW_DEV_DEVICE_APPROVE === 'true';
+
+  useEffect(() => {
+    applyPageMeta({
+      title: t('Вход MapKluss Companion | MapKluss', 'MapKluss Companion login | MapKluss'),
+      description: t('Подтверждение кода входа MapKluss Companion из Minecraft.', 'Approve a MapKluss Companion login code from Minecraft.'),
+      robots: 'noindex,nofollow',
+    });
+  }, [t]);
 
   useEffect(() => {
     if (!emailCooldownActive) return;
@@ -132,7 +144,7 @@ export function DeviceApprovalPage() {
       setEmailCooldownUntil(nextCooldown);
       setEmailCooldownNow(Date.now());
       setStatus('idle');
-      setMessage('Проверь почту, открой ссылку для входа, затем подтверди код.');
+      setMessage(t('Проверь почту, открой ссылку для входа, затем подтверди код.', 'Check your inbox, open the sign-in link, then approve the code.'));
     } catch (err) {
       if (isCompanionEmailRateLimitError(err)) {
         const nextCooldown = Date.now() + COMPANION_EMAIL_COOLDOWN_MS;
@@ -140,7 +152,7 @@ export function DeviceApprovalPage() {
         setEmailCooldownNow(Date.now());
       }
       setStatus('error');
-      setMessage(isCompanionEmailRateLimitError(err) ? normalizeCompanionEmailError(err) : await describeSupabaseError(err));
+      setMessage(isCompanionEmailRateLimitError(err) ? normalizeCompanionEmailError(err) : await describeSupabaseError(err, t));
     }
   }
 
@@ -152,7 +164,7 @@ export function DeviceApprovalPage() {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         setStatus('error');
-        setMessage('Сначала войди, потом подтверди код.');
+        setMessage(t('Сначала войди, потом подтверди код.', 'Sign in before approving the code.'));
         return;
       }
       const { error } = await supabase.functions.invoke('companion-device', {
@@ -161,12 +173,12 @@ export function DeviceApprovalPage() {
       });
       if (error) throw error;
       setStatus('done');
-      setMessage('Вход мода подтверждён. Можно вернуться в Minecraft.');
+      setMessage(t('Вход мода подтверждён. Можно вернуться в Minecraft.', 'Mod login approved. You can return to Minecraft.'));
     } catch (err) {
       setStatus('error');
-      setMessage(await describeSupabaseError(err));
+      setMessage(await describeSupabaseError(err, t));
     }
-  }, [code]);
+  }, [code, t]);
 
   async function approveDev() {
     if (!devApprovalEnabled) return;
@@ -183,11 +195,11 @@ export function DeviceApprovalPage() {
       });
       if (error) throw error;
       setStatus('done');
-      setMessage('Вход мода подтверждён в local dev режиме. Можно вернуться в Minecraft.');
+      setMessage(t('Вход мода подтверждён в local dev режиме. Можно вернуться в Minecraft.', 'Mod login approved in local dev mode. You can return to Minecraft.'));
       await refreshSessionLabel();
     } catch (err) {
       setStatus('error');
-      setMessage(await describeSupabaseError(err));
+      setMessage(await describeSupabaseError(err, t));
     }
   }
 
@@ -229,13 +241,13 @@ export function DeviceApprovalPage() {
         await approve();
       } else {
         setStatus('done');
-        setMessage('Вход через Telegram выполнен. Введи код из Minecraft и подтверди вход мода.');
+        setMessage(t('Вход через Telegram выполнен. Введи код из Minecraft и подтверди вход мода.', 'Telegram sign-in complete. Enter the Minecraft code and approve the mod login.'));
       }
     } catch (err) {
       setStatus('error');
-      setMessage(await describeSupabaseError(err));
+      setMessage(await describeSupabaseError(err, t));
     }
-  }, [approve, code, refreshSessionLabel]);
+  }, [approve, code, refreshSessionLabel, t]);
 
   useEffect(() => {
     if (!TELEGRAM_LOGIN_BOT_USERNAME || signedIn || !telegramDomainAllowed) return;
@@ -260,68 +272,97 @@ export function DeviceApprovalPage() {
   }, [handleTelegramLogin, signedIn, telegramDomainAllowed]);
 
   return (
-    <main className="companion-page companion-device-page">
-      <header className="companion-header companion-detail-header companion-device-header">
-        <a href="/" className="companion-back">MapKluss</a>
-        <div>
-          <h1>{t('Вход мода', 'Mod login')}</h1>
-          <p>{t('Подтверди MapKluss Companion в Minecraft.', 'Approve MapKluss Companion in Minecraft.')}</p>
-        </div>
-        <button className="lang-toggle-btn" onClick={toggle} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
-      </header>
-
-      <section className="companion-panel companion-device-panel">
-        <h2>{t('Код из мода', 'Code from mod')}</h2>
-        <p className="companion-muted">{sessionLabel}</p>
-        <div className="companion-auth-methods companion-device-methods">
-          <article>
-            <strong>{t('Почта', 'Email')}</strong>
-            <span>{t('Войди и подтверди код', 'Sign in and approve the code')}</span>
-          </article>
-          <article className={TELEGRAM_LOGIN_BOT_USERNAME ? '' : 'is-muted'}>
-            <strong>Telegram</strong>
-            <span>{TELEGRAM_LOGIN_BOT_USERNAME ? t('Привязан в облаке', 'Linked in Cloud') : t('Нужна настройка бота', 'Bot setup required')}</span>
-          </article>
-        </div>
-        {!signedIn && TELEGRAM_LOGIN_BOT_USERNAME && telegramDomainAllowed && (
-          <div className="companion-device-telegram-login">
-            <div id="mapkluss-telegram-device-widget" className="companion-telegram-widget" />
-            <p className="companion-muted">{t('Если Telegram уже привязан, он сразу войдёт на сайт и подтвердит код.', 'If Telegram is already linked, it will sign in and approve the code immediately.')}</p>
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggle} />
+      <main className="companion-page companion-device-page">
+        <header className="companion-header companion-detail-header companion-device-header">
+          <div>
+            <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
+              <a href="/cloud">{t('Облако и мод', 'Cloud & mod')}</a>
+              <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
+              <span aria-current="page">{t('Вход мода', 'Mod login')}</span>
+            </nav>
+            <h1>{t('Подключение MapKluss Companion', 'Connect MapKluss Companion')}</h1>
+            <p>{t('Два шага: войди в аккаунт и подтверди одноразовый код из Minecraft.', 'Two steps: sign in, then approve the one-time code shown in Minecraft.')}</p>
           </div>
-        )}
-        <input
-          className="companion-code"
-          value={code}
-          onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="ABCDEFGH"
-          maxLength={12}
-        />
-        <div className="companion-actions">
-          <button onClick={approve} disabled={status === 'busy' || code.trim().length < 4}>{t('Подтвердить', 'Approve')}</button>
-          {devApprovalEnabled && (
-            <button onClick={() => void approveDev()} disabled={status === 'busy' || code.trim().length < 4}>
-              {t('Dev-подтв.', 'Dev approve')}
-            </button>
-          )}
-        </div>
-        <div className="companion-inline-form companion-device-email-form">
-          <input
-            value={email}
-            onChange={event => setEmail(event.target.value)}
-            onKeyDown={event => { if (event.key === 'Enter' && !emailCooldownActive) void signInEmail(); }}
-            placeholder="email@example.com"
-            type="email"
-          />
-          <button onClick={() => void signInEmail()} disabled={status === 'busy' || !email.trim() || emailCooldownActive}>
-            {emailCooldownActive ? t(`Повтор через ${emailCooldownRemaining}с`, `Retry in ${emailCooldownRemaining}s`) : t('Ссылка на почту', 'Email link')}
-          </button>
-        </div>
-        {devApprovalEnabled && (
-          <p className="companion-dev-note">{t('Только localhost: Dev-подтверждение привязывает код к локальному тестовому аккаунту без OAuth.', 'Localhost only: dev approval links the code to a local test account without OAuth.')}</p>
-        )}
-        {status === 'busy' && !message && <p className="companion-muted">{t('Проверяю вход и подтверждаю мод...', 'Checking sign-in and approving the mod...')}</p>}
-        {message && <p className={status === 'error' ? 'companion-error' : 'companion-muted'}>{message}</p>}
-      </section>
-    </main>
+          <span className={signedIn ? 'companion-session-badge is-ready' : 'companion-session-badge'}>{sessionLabel}</span>
+        </header>
+
+        <section className="companion-panel companion-device-panel">
+          <div className="companion-device-step">
+            <span className="companion-device-step__index" aria-hidden="true">01</span>
+            <div className="companion-device-step__body">
+              <div>
+                <h2>{t('Войди в MapKluss', 'Sign in to MapKluss')}</h2>
+                <p className="companion-muted">{signedIn ? t('Готово. Этот аккаунт будет подключён к моду.', 'Ready. This account will be connected to the mod.') : t('Используй почту или Telegram — тот же аккаунт работает в редакторе и облаке.', 'Use email or Telegram—the same account works in the editor and Cloud.')}</p>
+              </div>
+              {!signedIn && (
+                <>
+                  <label className="companion-field">
+                    <span>{t('Электронная почта', 'Email address')}</span>
+                    <div className="companion-inline-form companion-device-email-form">
+                      <input
+                        value={email}
+                        onChange={event => setEmail(event.target.value)}
+                        onKeyDown={event => { if (event.key === 'Enter' && !emailCooldownActive) void signInEmail(); }}
+                        placeholder="email@example.com"
+                        type="email"
+                        autoComplete="email"
+                      />
+                      <button onClick={() => void signInEmail()} disabled={status === 'busy' || !email.trim() || emailCooldownActive}>
+                        {emailCooldownActive ? t(`Повтор через ${emailCooldownRemaining}с`, `Retry in ${emailCooldownRemaining}s`) : t('Отправить ссылку', 'Send sign-in link')}
+                      </button>
+                    </div>
+                  </label>
+                  {TELEGRAM_LOGIN_BOT_USERNAME && telegramDomainAllowed && (
+                    <div className="companion-device-telegram-login">
+                      <div id="mapkluss-telegram-device-widget" className="companion-telegram-widget" />
+                      <p className="companion-muted">{t('Telegram выполнит вход; код всё равно останется видимым для проверки.', 'Telegram signs you in; the code remains visible so you can verify it.')}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="companion-device-step">
+            <span className="companion-device-step__index" aria-hidden="true">02</span>
+            <div className="companion-device-step__body">
+              <div>
+                <h2>{t('Подтверди код из Minecraft', 'Approve the Minecraft code')}</h2>
+                <p className="companion-muted">{t('Сверь код с экраном мода. Он одноразовый и истекает автоматически.', 'Match this code with the mod screen. It is single-use and expires automatically.')}</p>
+              </div>
+              <label className="companion-field">
+                <span>{t('Код подключения', 'Connection code')}</span>
+                <input
+                  className="companion-code"
+                  value={code}
+                  onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                  placeholder="ABCD-EFGH"
+                  maxLength={12}
+                  autoComplete="one-time-code"
+                  inputMode="text"
+                  spellCheck={false}
+                />
+              </label>
+              <div className="companion-actions">
+                <button onClick={approve} disabled={!signedIn || status === 'busy' || code.trim().length < 4}>
+                  {status === 'busy' ? t('Подтверждаю…', 'Approving…') : t('Подключить мод', 'Connect mod')}
+                </button>
+                {devApprovalEnabled && (
+                  <button onClick={() => void approveDev()} disabled={status === 'busy' || code.trim().length < 4}>{t('Локальный тест', 'Local test')}</button>
+                )}
+              </div>
+              {!signedIn && <p className="companion-muted">{t('Кнопка станет доступна после входа на первом шаге.', 'The button becomes available after sign-in in step one.')}</p>}
+            </div>
+          </div>
+
+          {devApprovalEnabled && <p className="companion-dev-note">{t('Локальный тест доступен только на localhost и не используется на основном сайте.', 'Local testing is available only on localhost and is not used on the production site.')}</p>}
+          <div className={`companion-status${status === 'error' ? ' companion-status--error' : ''}`} aria-live="polite" role={status === 'error' ? 'alert' : 'status'}>
+            {status === 'busy' && !message ? t('Проверяю вход и подтверждаю мод…', 'Checking sign-in and approving the mod…') : message || sessionLabel}
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }

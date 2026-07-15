@@ -9,6 +9,7 @@ import '../buildTracker.css';
 import { base64ToBytes } from '../lib/base64';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { PublicSiteHeader } from './PublicSiteHeader';
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
 type Lang = 'ru' | 'en';
@@ -42,6 +43,8 @@ const T = {
   confirmYes:   { ru: 'Да, начать', en: 'Yes, start' },
   switching:    { ru: 'Переключение…', en: 'Switching…' },
   switchError:  { ru: 'Не удалось переключить режим. Попробуйте ещё раз.', en: 'Could not switch mode. Try again.' },
+  saveError:    { ru: 'Не удалось сохранить изменение. Проверь соединение и повтори.', en: 'Could not save the change. Check your connection and try again.' },
+  retry:        { ru: 'Обновить страницу', en: 'Reload page' },
   downloadLite: { ru: 'Схематика (.litematic)', en: 'Schematic (.litematic)' },
 } as const;
 
@@ -125,9 +128,9 @@ function MaterialRow({ mat, value, onChange, accentColor, lang, perMapTarget }: 
   }
 
   return (
-    <div className={`bt-row${done ? ' bt-row--done' : ''}`}>
+    <div className={`bt-row${done ? ' bt-row--done' : ''}`} role="row">
       {/* Name + icon */}
-      <div className="bt-cell">
+      <div className="bt-cell" role="cell">
         <img
           className="bt-block-icon"
           src={blockIconUrl(mat.nbtName)}
@@ -140,29 +143,30 @@ function MaterialRow({ mat, value, onChange, accentColor, lang, perMapTarget }: 
       </div>
 
       {/* Need */}
-      <div className="bt-cell">
+      <div className="bt-cell" role="cell" data-label={t('colNeed', lang)}>
         <span className="bt-row-need">{fmtStacks(perMapTarget, lang)}</span>
       </div>
 
       {/* Progress bar */}
-      <div className="bt-cell bt-bar-cell">
+      <div className="bt-cell bt-bar-cell" role="cell" data-label={t('colProgress', lang)}>
         <div className="bt-bar-top">
           <span className="bt-bar-gathered">{value.toLocaleString()}</span>
           <span className="bt-bar-pct">{Math.round(pct)}%</span>
         </div>
-        <div className="bt-bar">
+        <div className="bt-bar" role="progressbar" aria-label={`${mat.displayName}: ${t('progress', lang)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
           <div className="bt-bar-fill" style={{ width: `${pct}%`, background: accentColor }} />
         </div>
       </div>
 
       {/* Controls */}
-      <div className="bt-cell bt-controls-cell">
+      <div className="bt-cell bt-controls-cell" role="cell" data-label={t('colAction', lang)}>
         <span className="bt-row-total">{value}</span>
         <input
           className="bt-row-add-input"
           type="number"
           placeholder="N"
           value={addVal}
+          aria-label={lang === 'ru' ? `Изменение количества: ${mat.displayName}` : `Amount change: ${mat.displayName}`}
           onChange={e => setAddVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
         />
@@ -193,10 +197,26 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   const [gathered,    setGathered]    = useState<Record<string, number>>({});
   const [placed,      setPlaced]      = useState<Record<string, number>>({});
   const [lang, setLang] = useState<Lang>(() =>
-    (localStorage.getItem('bt_lang') as Lang) ?? 'ru'
+    (() => {
+      try { return (localStorage.getItem('bt_lang') as Lang) ?? 'ru'; }
+      catch { return 'ru'; }
+    })()
   );
 
   const [perMapMode, setPerMapMode] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  useEffect(() => {
+    if (!showConfirm) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !switching) setShowConfirm(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [showConfirm, switching]);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
@@ -207,7 +227,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   function toggleLang() {
     const next: Lang = lang === 'ru' ? 'en' : 'ru';
     setLang(next);
-    localStorage.setItem('bt_lang', next);
+    try { localStorage.setItem('bt_lang', next); } catch { /* Language still changes without storage. */ }
   }
 
   function initCanvas(src: string) {
@@ -255,10 +275,10 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   const debounceSave = useCallback((g: Record<string, number>, p: Record<string, number>, mode: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      if (mode === 'gathering') updateGathered(sessionId, g).catch(console.error);
-      else updatePlaced(sessionId, p).catch(console.error);
+      const request = mode === 'gathering' ? updateGathered(sessionId, g) : updatePlaced(sessionId, p);
+      request.then(() => setActionError(''), () => setActionError(t('saveError', lang)));
     }, 500);
-  }, [sessionId]);
+  }, [lang, sessionId]);
 
   function handleGatheredChange(nbtName: string, val: number) {
     const next = { ...gathered, [nbtName]: val };
@@ -301,15 +321,24 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   }
 
   if (loading) return (
-    <div className="bt-page bt-page--loading">
-      <div className="bt-spinner" />
-      <p>{t('loading', lang)}</p>
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
+      <main className="bt-page bt-page--loading" aria-busy="true">
+        <div className="bt-loading-mark" aria-hidden="true" />
+        <p role="status">{t('loading', lang)}</p>
+      </main>
     </div>
   );
   if (error) return (
-    <div className="bt-page bt-page--error">
-      <p><IconGlyph icon={mkIcons.alert} /> {t('notFound', lang)}</p>
-      <a href="/" className="bt-back-link"><IconGlyph icon={mkIcons.arrowLeft} /> {t('back', lang)}</a>
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
+      <main className="bt-page bt-page--error">
+        <p role="alert"><IconGlyph icon={mkIcons.alert} /> {t('notFound', lang)}</p>
+        <div className="bt-error-actions">
+          <button type="button" onClick={() => window.location.reload()}>{t('retry', lang)}</button>
+          <a href="/" className="bt-back-link"><IconGlyph icon={mkIcons.arrowLeft} /> {t('back', lang)}</a>
+        </div>
+      </main>
     </div>
   );
 
@@ -330,16 +359,16 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
   const info   = s.info ?? {};
 
   return (
-    <div className="bt-page">
+    <div className="public-shell">
+      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
+      <main className="bt-page">
       {/* Top bar */}
-      <div className="bt-topbar">
+      <header className="bt-topbar">
         <a href="/" className="bt-back-link"><IconGlyph icon={mkIcons.arrowLeft} /> {t('back', lang)}</a>
         <div className="bt-topbar-title">{t('tracker', lang)}</div>
         <div className="bt-topbar-spacer" />
-        <button className="bt-lang-btn" onClick={toggleLang}>
-          {lang === 'ru' ? 'EN' : 'RU'}
-        </button>
-      </div>
+        <span className={`bt-tag bt-tag--mode-${mode}`}><IconGlyph icon={mode === 'gathering' ? mkIcons.pickaxe : mkIcons.hammer} /> {t(mode, lang)}</span>
+      </header>
 
       {/* Project card */}
       <div className="bt-project-card">
@@ -406,7 +435,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
               <span>{t('progress', lang)}</span>
               <span className="bt-stats-pct" style={{ color: accent }}>{Math.round(pctDone)}%</span>
             </div>
-            <div className="bt-stats-bar">
+            <div className="bt-stats-bar" role="progressbar" aria-label={t('progress', lang)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}>
               <div
                 className={`bt-stats-bar-fill bt-stats-bar-fill--${mode}`}
                 style={{ width: `${pctDone}%` }}
@@ -439,6 +468,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
           <div className="bt-toolbar-spacer" />
           <button
             className={`bt-per-map-btn${perMapMode ? ' bt-per-map-btn--active' : ''}`}
+            aria-pressed={perMapMode}
             title={lang === 'ru'
               ? `Показать нужное количество на 1 карту из ${s.map_grid.wide * s.map_grid.tall}`
               : `Show needed amount for 1 map out of ${s.map_grid.wide * s.map_grid.tall}`}
@@ -447,13 +477,14 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
             {perMapMode ? (lang === 'ru' ? 'Все карты' : 'All maps') : `${t('perMap', lang)} (1/${s.map_grid.wide * s.map_grid.tall})`}
           </button>
         </div>
-        <div className="bt-table-head">
-          <div className="bt-th">{t('colBlock', lang)}</div>
-          <div className="bt-th">{t('colNeed', lang)}</div>
-          <div className="bt-th">{t('colProgress', lang)}</div>
-          <div className="bt-th">{mode === 'gathering' ? t('colAction', lang) : t('colActionB', lang)}</div>
+        <div className="bt-table" role="table" aria-label={t('tableTitle', lang)}>
+        <div className="bt-table-head" role="row">
+          <div className="bt-th" role="columnheader">{t('colBlock', lang)}</div>
+          <div className="bt-th" role="columnheader">{t('colNeed', lang)}</div>
+          <div className="bt-th" role="columnheader">{t('colProgress', lang)}</div>
+          <div className="bt-th" role="columnheader">{mode === 'gathering' ? t('colAction', lang) : t('colActionB', lang)}</div>
         </div>
-        <div className="bt-table-body">
+        <div className="bt-table-body" role="rowgroup">
           {s.materials.map(mat => {
             const totalMaps = s.map_grid.wide * s.map_grid.tall;
             const perMapTarget = perMapMode ? Math.ceil(mat.count / totalMaps) : mat.count;
@@ -470,16 +501,17 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
             );
           })}
         </div>
+        </div>
       </div>
 
       {/* Confirm */}
       {showConfirm && (
         <div className="bt-confirm-overlay" onClick={() => setShowConfirm(false)}>
-          <div className="bt-confirm-modal" onClick={e => e.stopPropagation()}>
-            <p className="bt-confirm-title">{t('confirmTitle', lang)}</p>
+          <div className="bt-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bt-confirm-title" onClick={e => e.stopPropagation()}>
+            <p className="bt-confirm-title" id="bt-confirm-title">{t('confirmTitle', lang)}</p>
             <p className="bt-confirm-desc">{t('confirmDesc', lang)}</p>
             <div className="bt-confirm-btns">
-              <button className="bt-btn bt-btn--cancel" onClick={() => setShowConfirm(false)}>
+              <button className="bt-btn bt-btn--cancel" onClick={() => setShowConfirm(false)} autoFocus>
                 {t('cancel', lang)}
               </button>
               <button className="bt-btn bt-btn--confirm" onClick={handleSwitch} disabled={switching}>
@@ -489,6 +521,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 }
