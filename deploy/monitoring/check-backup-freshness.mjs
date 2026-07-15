@@ -32,7 +32,9 @@ for (const key of [latest.Key, `${latest.Key}.json`, `${latest.Key}.inventory.js
   assert(Number(metadata.ContentLength) > 0, 'A backup generation object is empty');
   assert(metadata.ServerSideEncryption === 'aws:kms', 'A backup generation object is not KMS encrypted');
   assert(String(metadata.SSEKMSKeyId || '').endsWith(kmsKeyId), 'A backup generation object uses an unexpected KMS key');
-  assert(/^[a-f0-9]{64}$/i.test(String(metadata.Metadata?.sha256 || '')), 'A backup generation object is missing its SHA-256 metadata');
+  const remoteSha256 = Object.entries(metadata.Metadata || {})
+    .find(([name]) => name.toLowerCase() === 'sha256')?.[1];
+  assert(/^[a-f0-9]{64}$/i.test(String(remoteSha256 || '')), 'A backup generation object is missing its SHA-256 metadata');
 }
 
 const manifestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mapkluss-backup-monitor-'));
