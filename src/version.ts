@@ -50,5 +50,6 @@
  *            действия, прогресс и доступный режим уменьшенного движения
  *   1.15.0 — Remotion-анимация пустого холста: арт превращается в пиксельную карту,
  *            есть пауза и статичный кадр для reduced motion
+ *   1.15.0+gateway.1 — staging-only gateway-first transport with direct fallback
  */
-export const VERSION = 'v1.15.0';
+export const VERSION = 'v1.15.0+gateway.1';

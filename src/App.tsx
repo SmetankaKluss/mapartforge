@@ -91,7 +91,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.15.0-2026-07-15',
+  id: 'mapkluss-v1.15.0-gateway.1-2026-07-15',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2509,8 +2509,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('Пустой холст ожил: теперь он показывает, как арт превращается в пиксельную карту.',
-                'The empty canvas is alive: it now shows art becoming a pixel map.')}
+              {t('На staging проверяем более устойчивое подключение к облаку с безопасным запасным маршрутом.',
+                'Staging now tests a more resilient cloud connection with a safe fallback route.')}
             </span>
           </div>
           <a

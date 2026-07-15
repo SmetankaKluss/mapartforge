@@ -1,6 +1,11 @@
 MapKluss — Changelog
 ====================
 
+v1.15.0+gateway.1 (staging only)
+--------------------------------
+- Gateway-first transport with bounded readiness probing and direct Supabase fallback
+- Existing browser auth storage namespace is preserved across both routes
+
 v1.15.0
 -------
 - Пустой холст получил красивую Remotion-анимацию превращения изображения в пиксельную карту
