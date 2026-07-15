@@ -91,7 +91,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.14.0-2026-07-15',
+  id: 'mapkluss-v1.15.0-2026-07-15',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2509,8 +2509,8 @@ export default function App() {
           <div className="update-banner-main">
             <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
             <span className="update-banner-text">
-              {t('Интерфейс стал плавнее: ожили панели, меню, подсказки, действия и прогресс.',
-                'The interface is smoother: panels, menus, hints, actions, and progress now feel alive.')}
+              {t('Пустой холст ожил: теперь он показывает, как арт превращается в пиксельную карту.',
+                'The empty canvas is alive: it now shows art becoming a pixel map.')}
             </span>
           </div>
           <a
@@ -3224,23 +3224,21 @@ export default function App() {
           <div
             ref={canvasAreaRef}
             className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}${hasContent && (compareMode || activeTool === null) ? ' canvas-area-pan-ready' : ''}${isCanvasPanning ? ' canvas-area-panning' : ''}`}
-            onClick={!hasContent ? () => imageUploadRef.current?.openPicker() : undefined}
             onClickCapture={handleCanvasClickCapture}
             onPointerDownCapture={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={finishCanvasPan}
             onPointerCancel={finishCanvasPan}
             onLostPointerCapture={finishCanvasPan}
-            onKeyDown={!hasContent ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                imageUploadRef.current?.openPicker();
-              }
-            } : undefined}
-            role={!hasContent ? 'button' : undefined}
-            tabIndex={!hasContent ? 0 : undefined}
-            aria-label={!hasContent ? t('Открыть выбор изображения', 'Open image picker') : undefined}
           >
+            {!hasContent && (
+              <button
+                type="button"
+                className="canvas-empty-upload-target"
+                onClick={() => imageUploadRef.current?.openPicker()}
+                aria-label={t('Открыть выбор изображения', 'Open image picker')}
+              />
+            )}
             <span className="corner corner-tl" />
             <span className="corner corner-tr" />
             <span className="corner corner-bl" />
