@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '23 2 * * *'
   workflow_dispatch:
+    inputs:
+      restore_drill:
+        description: Restore the uploaded archive into a disposable local Supabase stack
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -15,7 +21,7 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -25,6 +31,7 @@ jobs:
           SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
           YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
           YC_BACKUP_KMS_KEY_ID: ${{ vars.YC_BACKUP_KMS_KEY_ID }}
+          RESTORE_DRILL_INPUT: ${{ inputs.restore_drill }}
         run: |
           test -n "$SUPABASE_DB_HOST"
           test -n "$SUPABASE_DB_USER"
@@ -35,10 +42,19 @@ jobs:
           if [[ $(date -u +%d) == "01" ]]; then
             monthly_prefix="postgres/monthly/$(date -u +%Y/%m)"
           fi
+          run_restore_drill=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$RESTORE_DRILL_INPUT" == "true" ]]; then
+            run_restore_drill=true
+          elif [[ "$GITHUB_EVENT_NAME" == "schedule" && $(date -u +%d) == "01" ]]; then
+            run_restore_drill=true
+          fi
           {
             echo "MAPKLUSS_BACKUP_DIR=${RUNNER_TEMP}/mapkluss-backup"
             echo "MAPKLUSS_DAILY_PREFIX=$daily_prefix"
             echo "MAPKLUSS_MONTHLY_PREFIX=$monthly_prefix"
+            echo "MAPKLUSS_RUN_RESTORE_DRILL=$run_restore_drill"
+            echo "MAPKLUSS_RESTORE_DIR=${RUNNER_TEMP}/mapkluss-restore-download"
+            echo "MAPKLUSS_RESTORE_PROJECT=${RUNNER_TEMP}/mapkluss-restore-project"
           } >> "$GITHUB_ENV"
 
       - name: Create portable Supabase PostgreSQL backup
@@ -200,6 +216,130 @@ jobs:
           if [[ -n "$MAPKLUSS_MONTHLY_PREFIX" ]]; then
             verify_generation "$MAPKLUSS_MONTHLY_PREFIX"
           fi
+
+      - name: Download and verify uploaded restore candidate
+        if: env.MAPKLUSS_RUN_RESTORE_DRILL == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          AWS_PAGER: ''
+          YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
+          YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: |
+          install -d -m 700 "$MAPKLUSS_RESTORE_DIR"
+          source_archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
+
+          download_file() {
+            local source_file=$1
+            local key destination
+            key="${MAPKLUSS_DAILY_PREFIX}/$(basename "$source_file")"
+            destination="${MAPKLUSS_RESTORE_DIR}/$(basename "$source_file")"
+            aws s3api get-object \
+              --endpoint-url "$YC_STORAGE_ENDPOINT" \
+              --bucket "$YC_BACKUP_BUCKET" \
+              --key "$key" \
+              "$destination" \
+              --no-cli-pager >/dev/null
+            chmod 600 "$destination"
+          }
+
+          download_file "$source_archive"
+          download_file "$source_archive.inventory.json"
+          download_file "$source_archive.json"
+
+          archive="${MAPKLUSS_RESTORE_DIR}/$(basename "$source_archive")"
+          extract_dir="${RUNNER_TEMP}/mapkluss-restore-verify"
+          install -d -m 700 "$extract_dir"
+          tar -xzf "$archive" -C "$extract_dir"
+          node deploy/backups/verify-backup.mjs "$archive" "$extract_dir"
+
+      - name: Restore into disposable Supabase and compare inventory
+        if: env.MAPKLUSS_RUN_RESTORE_DRILL == 'true'
+        env:
+          MAPKLUSS_SUPABASE_CLI_VERSION: 2.109.1
+          MAPKLUSS_POSTGRES_IMAGE: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        run: |
+          install -d -m 700 "$MAPKLUSS_RESTORE_PROJECT"
+          start_log="${RUNNER_TEMP}/mapkluss-supabase-start.log"
+          status_env="${RUNNER_TEMP}/mapkluss-supabase-status.env"
+
+          npx --yes "supabase@${MAPKLUSS_SUPABASE_CLI_VERSION}" init \
+            --workdir "$MAPKLUSS_RESTORE_PROJECT" \
+            --yes >/dev/null
+
+          if ! npx --yes "supabase@${MAPKLUSS_SUPABASE_CLI_VERSION}" start \
+            --workdir "$MAPKLUSS_RESTORE_PROJECT" \
+            --exclude analytics,edge-runtime,functions,imgproxy,inbucket,meta,studio,vector \
+            --yes >"$start_log" 2>&1; then
+            echo "Disposable Supabase stack failed to start; private startup output was not published" >&2
+            exit 1
+          fi
+
+          npx --yes "supabase@${MAPKLUSS_SUPABASE_CLI_VERSION}" status \
+            --workdir "$MAPKLUSS_RESTORE_PROJECT" \
+            --output env >"$status_env"
+          chmod 600 "$start_log" "$status_env"
+          db_url=$(node -e '
+            const fs = require("node:fs");
+            const line = fs.readFileSync(process.argv[1], "utf8")
+              .split(/\r?\n/)
+              .find((value) => value.startsWith("DB_URL="));
+            if (!line) process.exit(1);
+            const encoded = line.slice("DB_URL=".length).trim();
+            process.stdout.write(encoded.startsWith("\"") ? JSON.parse(encoded) : encoded);
+          ' "$status_env")
+          echo "::add-mask::$db_url"
+          node -e '
+            const target = new URL(process.argv[1]);
+            if (!["127.0.0.1", "localhost"].includes(target.hostname) || target.pathname !== "/postgres") {
+              throw new Error("Disposable stack returned an unexpected restore target");
+            }
+          ' "$db_url"
+
+          pg_bin="${RUNNER_TEMP}/mapkluss-pg17-bin"
+          install -d -m 700 "$pg_bin"
+          cat >"$pg_bin/psql" <<'PSQL_WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker run --rm --network host \
+            --volume /tmp:/tmp \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --workdir "$PWD" \
+            "$MAPKLUSS_POSTGRES_IMAGE" psql "$@"
+          PSQL_WRAPPER
+          chmod 700 "$pg_bin/psql"
+
+          PATH="$pg_bin:$PATH" psql "$db_url" \
+            -X -v ON_ERROR_STOP=1 \
+            -c "comment on database postgres is 'mapkluss-disposable-restore-target'" >/dev/null
+
+          archive=$(find "$MAPKLUSS_RESTORE_DIR" -name '*.tar.gz' -type f -print -quit)
+          PATH="$pg_bin:$PATH" \
+            MAPKLUSS_RESTORE_DB_URL="$db_url" \
+            MAPKLUSS_RESTORE_MODE=supabase-base \
+            MAPKLUSS_ALLOW_DESTRUCTIVE_RESTORE=disposable-only \
+            MAPKLUSS_ALLOW_MARKED_LOCAL_POSTGRES=disposable-stack \
+            ./deploy/backups/restore-drill.sh "$archive"
+
+      - name: Stop and remove disposable restore environment
+        if: ${{ always() && env.MAPKLUSS_RUN_RESTORE_DRILL == 'true' }}
+        env:
+          MAPKLUSS_SUPABASE_CLI_VERSION: 2.109.1
+        run: |
+          if [[ -f "$MAPKLUSS_RESTORE_PROJECT/supabase/config.toml" ]]; then
+            npx --yes "supabase@${MAPKLUSS_SUPABASE_CLI_VERSION}" stop \
+              --workdir "$MAPKLUSS_RESTORE_PROJECT" \
+              --no-backup >/dev/null 2>&1 || true
+          fi
+          rm -rf \
+            "$MAPKLUSS_RESTORE_DIR" \
+            "$MAPKLUSS_RESTORE_PROJECT" \
+            "${RUNNER_TEMP}/mapkluss-restore-verify" \
+            "${RUNNER_TEMP}/mapkluss-pg17-bin" \
+            "${RUNNER_TEMP}/mapkluss-supabase-start.log" \
+            "${RUNNER_TEMP}/mapkluss-supabase-status.env"
 
       - name: Remove plaintext backup from runner
         if: always()

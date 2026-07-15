@@ -33,7 +33,13 @@ fi
 
 database_name=$(node -e 'console.log(new URL(process.argv[1]).pathname.slice(1))' "$target_url")
 database_host=$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$target_url")
-if [[ ! "$database_name" =~ (_restore_drill|_migration_rehearsal)$ ]]; then
+allow_marked_local_postgres=false
+if [[ "$database_name" == "postgres" \
+  && ( "$database_host" == "127.0.0.1" || "$database_host" == "localhost" ) \
+  && "${MAPKLUSS_ALLOW_MARKED_LOCAL_POSTGRES:-}" == "disposable-stack" ]]; then
+  allow_marked_local_postgres=true
+fi
+if [[ ! "$database_name" =~ (_restore_drill|_migration_rehearsal)$ && "$allow_marked_local_postgres" != true ]]; then
   echo "Refusing target database without _restore_drill or _migration_rehearsal suffix" >&2
   exit 1
 fi

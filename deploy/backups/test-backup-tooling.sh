@@ -135,6 +135,13 @@ PATH="$bin_dir:$PATH" \
   "$script_dir/backup-postgres.sh" >/dev/null
 
 archive_path="$backup_dir/mapkluss-postgres-test-fixture.tar.gz"
+if MAPKLUSS_RESTORE_DB_URL="postgresql://postgres@127.0.0.1:${port}/postgres" \
+  MAPKLUSS_ALLOW_DESTRUCTIVE_RESTORE=disposable-only \
+  "$script_dir/restore-drill.sh" "$archive_path" >/dev/null 2>&1; then
+  echo "Restore safety guard accepted the postgres database without disposable-stack acknowledgement" >&2
+  exit 1
+fi
+
 MAPKLUSS_RESTORE_DB_URL="$target_url" \
   MAPKLUSS_ALLOW_DESTRUCTIVE_RESTORE=disposable-only \
   "$script_dir/restore-drill.sh" "$archive_path" >/dev/null
