@@ -6,7 +6,7 @@ import { LocaleProvider } from './lib/LocaleProvider'
 import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
 import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
-import { getExampleByPath } from './lib/examples.ts'
+import { getExampleByPath, isExamplesIndexPath } from './lib/examples.ts'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
 const searchParams = new URLSearchParams(window.location.search);
@@ -24,7 +24,8 @@ const companionArtMatch = path.match(/^\/art\/([0-9a-f-]{36})$/i);
 const companionCollectionMatch = path.match(/^\/collection\/([0-9a-f-]{36})$/i);
 const seoPage = getSeoPageByPath(path);
 const examplePage = getExampleByPath(path);
-const pageType = buildMatch ? 'build_tracker' : companionArtMatch ? 'companion_art' : companionCollectionMatch ? 'companion_collection' : examplePage ? 'example_detail' : path === '/examples' ? 'examples' : path === '/cloud' ? 'cloud' : path === '/device' ? 'device' : seoPage ? 'seo' : 'editor';
+const examplesIndex = isExamplesIndexPath(path);
+const pageType = buildMatch ? 'build_tracker' : companionArtMatch ? 'companion_art' : companionCollectionMatch ? 'companion_collection' : examplePage ? 'example_detail' : examplesIndex ? 'examples' : path === '/cloud' ? 'cloud' : path === '/device' ? 'device' : seoPage ? 'seo' : 'editor';
 
 initAnalyticsContext();
 initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
@@ -87,7 +88,7 @@ async function renderApplication() {
     const { BuildTracker } = await import('./components/BuildTracker.tsx');
     const sessionId = buildMatch[1];
     root.render(<BuildTracker sessionId={sessionId} />);
-  } else if (path === '/examples') {
+  } else if (examplesIndex) {
     const { ExamplesPage } = await import('./components/ExamplesPage.tsx');
     root.render(
       <LocaleProvider>

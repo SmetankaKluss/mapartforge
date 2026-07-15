@@ -145,7 +145,11 @@ export function getExampleById(id: string | null): ExampleProject | undefined {
   return EXAMPLES.find(example => example.id === id);
 }
 
+export function isExamplesIndexPath(path: string): boolean {
+  return /^\/examples\/?$/i.test(path);
+}
+
 export function getExampleByPath(path: string): ExampleProject | undefined {
-  const match = path.match(/^\/examples\/([a-z0-9-]+)$/i);
+  const match = path.match(/^\/examples\/([a-z0-9-]+)\/?$/i);
   return getExampleById(match?.[1] ?? null);
 }
