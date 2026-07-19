@@ -2,6 +2,7 @@ import { VERSION } from '../version';
 import type { Lang } from '../lib/localeContext';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { ThemeSelector } from './ThemeSelector';
 
 type PublicSection = 'editor' | 'examples' | 'cloud';
 
@@ -79,6 +80,7 @@ export function PublicSiteHeader({ active, lang, onToggleLanguage }: PublicSiteH
         >
           {isRussian ? 'EN' : 'RU'}
         </button>
+        <ThemeSelector lang={lang} />
         <a
           className="public-site-version"
           href="https://t.me/mapkluss"

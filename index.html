@@ -5,6 +5,35 @@
  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
  <meta name="theme-color" content="#111116" />
+ <script>
+  (function applySavedMapKlussTheme() {
+   var allowedThemes = ['classic', 'deep-ocean', 'ember-forge', 'amethyst', 'acid-grove', 'cobalt-pulse', 'signal-white', 'cobalt-print', 'solar-punch', 'rose-oxide'];
+   var themeColors = {
+    classic: '#111116',
+    'deep-ocean': '#07141b',
+    'ember-forge': '#15100f',
+    amethyst: '#100e18',
+    'acid-grove': '#07100a',
+    'cobalt-pulse': '#080b1a',
+    'signal-white': '#dfe3e1',
+    'cobalt-print': '#cbd7f0',
+    'solar-punch': '#e7d84c',
+    'rose-oxide': '#d9a5b5'
+   };
+   var lightThemes = ['signal-white', 'cobalt-print', 'solar-punch', 'rose-oxide'];
+   var theme = 'classic';
+   try {
+    var savedTheme = localStorage.getItem('mapkluss_ui_theme');
+    if (allowedThemes.indexOf(savedTheme) !== -1) theme = savedTheme;
+   } catch (_) {
+    // Local storage can be unavailable in hardened/private browser contexts.
+   }
+   document.documentElement.dataset.theme = theme;
+   document.documentElement.style.colorScheme = lightThemes.indexOf(theme) !== -1 ? 'light' : 'dark';
+   var meta = document.querySelector('meta[name="theme-color"]');
+   if (meta) meta.setAttribute('content', themeColors[theme]);
+  }());
+ </script>
  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
  <title>Minecraft Map Art Generator, Litematic & MAP.DAT Export | MapKluss</title>
  <meta name="description" content="MapKluss is a browser-based Minecraft map art generator. Convert images into 2D or 3D map art, tune dithering and palette, then export Litematic, MAP.DAT, PNG, and materials." />

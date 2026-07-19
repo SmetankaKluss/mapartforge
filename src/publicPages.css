@@ -6,12 +6,12 @@
   --public-header-h: 48px;
   --public-control-h: 36px;
   --public-touch-h: 44px;
-  --public-text-secondary: oklch(80% 0.03 80 / 0.82);
-  --public-text-tertiary: oklch(76% 0.03 80 / 0.72);
-  --public-success: var(--accent);
-  --public-warning: var(--gold);
-  --public-info: var(--cyan);
-  --public-error: var(--danger);
+  --public-text-secondary: var(--color-text-secondary);
+  --public-text-tertiary: var(--color-text-secondary);
+  --public-success: var(--color-success);
+  --public-warning: var(--color-warning);
+  --public-info: var(--color-info);
+  --public-error: var(--color-error);
   --z-public-sticky: 30;
 }
 
@@ -28,6 +28,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-border-rgb) / 0.14);
 }
 
 .public-shell.companion-cloud-shell {
@@ -51,6 +52,7 @@ body {
   background: var(--bg-panel);
   color: var(--text);
   font-family: var(--font-ui);
+  box-shadow: var(--theme-header-shadow);
 }
 
 .public-site-header__inner {
@@ -130,7 +132,7 @@ body {
 .public-site-nav__link:hover,
 .public-site-language:hover,
 .public-site-version:hover,
-.public-site-nav__link.is-active {
+:root:not([data-theme='classic']) .public-site-nav__link.is-active {
   border-color: rgb(var(--accent-rgb) / 0.64);
   background: var(--accent-dim);
   color: var(--accent);
@@ -1801,4 +1803,26 @@ body {
   .public-site-language,
   .public-site-version,
   .public-action { transition: none; }
+}
+
+/* Semantic theme hierarchy for account and public routes. */
+.public-site-nav__link.is-active {
+  border-color: var(--color-control-selected-border);
+  background: var(--color-control-selected-bg);
+  color: var(--color-control-selected-text);
+  box-shadow: var(--control-selected-shadow);
+}
+
+:root:not([data-theme='classic']) .public-shell :is(input, select, textarea) {
+  color: var(--color-value);
+  background-color: var(--color-value-surface);
+}
+
+:root:not([data-theme='classic']) :is(
+  .public-shell .example-meta dd,
+  .public-shell .seo-doc-meta dd,
+  .companion-shell .companion-mod-grid article strong,
+  .companion-shell .companion-summary-card strong
+) {
+  color: var(--color-value);
 }

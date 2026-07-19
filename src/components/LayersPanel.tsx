@@ -69,7 +69,7 @@ function LayerThumbnail({ layer }: { layer: Layer }) {
       ref={canvasRef}
       width={40}
       height={40}
-      style={{ width: 40, height: 40, flexShrink: 0, imageRendering: 'pixelated', border: '1px solid rgba(87,255,110,0.12)' }}
+      style={{ width: 40, height: 40, flexShrink: 0, imageRendering: 'pixelated', border: '1px solid var(--color-border)' }}
     />
   );
 }

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './theme.css'
 import './App.css'
 import './publicPages.css'
 import './motion.css'

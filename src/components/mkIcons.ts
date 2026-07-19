@@ -123,7 +123,6 @@ export const mkIcons = {
   unlock: radix(LockOpen1Icon),
   minus: radix(MinusIcon),
   plus: radix(PlusIcon),
-
   // Tabler editor and application actions
   adjustments: tabler(IconAdjustmentsHorizontal),
   alert: tabler(IconAlertTriangle),

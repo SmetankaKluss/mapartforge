@@ -40,7 +40,7 @@ export function LinkModal({ url, onClose }: Props) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.85)',
+        background: 'var(--overlay-backdrop)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
@@ -54,9 +54,9 @@ export function LinkModal({ url, onClose }: Props) {
         style={{
           position: 'relative',
           width: 480,
-          background: '#0f0f1a',
-          border: '2px solid #57FF6E',
-          boxShadow: '0 0 40px rgba(87,255,110,0.3)',
+          background: 'var(--color-surface-primary)',
+          border: '2px solid var(--color-accent)',
+          boxShadow: '0 0 40px rgb(var(--color-accent-rgb) / 0.3)',
           padding: 32,
         }}
       >
@@ -70,7 +70,7 @@ export function LinkModal({ url, onClose }: Props) {
             right: 12,
             background: 'transparent',
             border: 'none',
-            color: 'rgba(255,255,255,0.45)',
+            color: 'var(--color-text-secondary)',
             fontFamily: 'inherit',
             fontSize: 14,
             cursor: 'pointer',
@@ -84,7 +84,7 @@ export function LinkModal({ url, onClose }: Props) {
         <div style={{
           fontFamily: "'Press Start 2P', monospace",
           fontSize: 12,
-          color: '#57FF6E',
+          color: 'var(--color-accent)',
           letterSpacing: '0.08em',
           marginBottom: 12,
         }}>
@@ -95,7 +95,7 @@ export function LinkModal({ url, onClose }: Props) {
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 12,
-          color: 'rgba(255,255,255,0.5)',
+          color: 'var(--color-text-secondary)',
           marginBottom: 20,
         }}>
           {t('Любой человек с этой ссылкой может просмотреть твой арт карты', 'Anyone with this link can view your map art')}
@@ -113,9 +113,9 @@ export function LinkModal({ url, onClose }: Props) {
             boxSizing: 'border-box',
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
-            color: '#57FF6E',
-            background: '#080810',
-            border: '1px solid #57FF6E',
+            color: 'var(--color-accent)',
+            background: 'var(--color-field-bg)',
+            border: '1px solid var(--color-accent)',
             padding: '10px 12px',
             marginBottom: 16,
             outline: 'none',
@@ -129,9 +129,9 @@ export function LinkModal({ url, onClose }: Props) {
             style={{
               flex: 1,
               height: 36,
-              background: 'rgba(87,255,110,0.12)',
-              border: '1px solid rgba(87,255,110,0.6)',
-              color: '#57FF6E',
+              background: 'rgb(var(--color-accent-rgb) / 0.12)',
+              border: '1px solid rgb(var(--color-accent-rgb) / 0.6)',
+              color: 'var(--color-accent)',
               fontFamily: "'Press Start 2P', monospace",
               fontSize: 8,
               cursor: 'pointer',
@@ -147,8 +147,8 @@ export function LinkModal({ url, onClose }: Props) {
               height: 36,
               padding: '0 20px',
               background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: 'rgba(255,255,255,0.5)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 12,
               cursor: 'pointer',

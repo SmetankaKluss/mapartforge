@@ -214,7 +214,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
               <tr className="mat-row mat-row-support">
                 <td className="mat-col-block">
                   <div className="mat-block-cell">
-                    <span className="mat-name" style={{ color: 'rgba(87,255,110,0.6)', fontStyle: 'italic' }}>
+                    <span className="mat-name" style={{ color: 'var(--color-success)', fontStyle: 'italic' }}>
                       {t('Опорные блоки', 'Support blocks')} ({supportBlock})
                     </span>
                   </div>

@@ -2135,18 +2135,18 @@ export function PreviewCanvas({
       {textState !== null && activeTool === 'text' && (() => {
         const ts = textState;
         const upd = (patch: Partial<NonNullable<TextState>>) => setTextState(s => s ? { ...s, ...patch } : s);
-        const fieldStyle: React.CSSProperties = { background: '#0d0d1a', border: '1px solid rgba(87,255,110,0.3)', color: 'rgba(87,255,110,0.75)', borderRadius: 4, fontSize: 12, padding: '2px 4px' };
+        const fieldStyle: React.CSSProperties = { background: 'var(--color-field-bg)', border: '1px solid rgb(var(--color-accent-rgb) / 0.42)', color: 'var(--color-accent)', borderRadius: 4, fontSize: 12, padding: '2px 4px' };
         const toggle = (active: boolean): React.CSSProperties => ({
-          background: active ? 'rgba(87,255,110,0.22)' : '#0d0d1a',
-          border: `1px solid rgba(87,255,110,${active ? 0.6 : 0.3})`,
-          color: `rgba(87,255,110,${active ? 0.95 : 0.55})`,
+          background: active ? 'rgb(var(--color-accent-rgb) / 0.22)' : 'var(--color-field-bg)',
+          border: `1px solid rgb(var(--color-accent-rgb) / ${active ? 0.6 : 0.42})`,
+          color: 'var(--color-accent)',
           borderRadius: 4, fontSize: 12, fontWeight: 700, lineHeight: 1,
           padding: '3px 7px', cursor: 'pointer', minWidth: 26,
         });
         return createPortal(
         <div
           className="text-toolbar"
-          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', maxWidth: '94vw', background: '#1a1a2e', border: '1px solid rgba(87,255,110,0.4)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}
+          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', maxWidth: '94vw', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border-strong)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgb(var(--color-shadow-rgb) / 0.6)' }}
           onMouseDown={e => e.stopPropagation()}
         >
           {/* Text input (multi-line: Shift+Enter) */}
@@ -2161,7 +2161,7 @@ export function PreviewCanvas({
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmText(); }
             }}
             placeholder="Текст… (Shift+Enter — новая строка)"
-            style={{ background: 'transparent', border: '1px solid rgba(87,255,110,0.2)', borderRadius: 4, outline: 'none', color: 'rgba(87,255,110,0.9)', fontFamily: ts.font, fontSize: 13, minWidth: 150, maxWidth: 260, resize: 'none', lineHeight: 1.3, padding: '3px 6px' }}
+            style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 4, outline: 'none', color: 'var(--color-text-primary)', fontFamily: ts.font, fontSize: 13, minWidth: 150, maxWidth: 260, resize: 'none', lineHeight: 1.3, padding: '3px 6px' }}
           />
           {/* Font selector */}
           <select value={ts.font} onChange={e => upd({ font: e.target.value })} title="Шрифт" style={fieldStyle}>
@@ -2195,7 +2195,7 @@ export function PreviewCanvas({
           <button title="Сглаживание краёв" style={toggle(ts.smooth)} onClick={() => upd({ smooth: !ts.smooth })}>AA</button>
           {/* Fill colour picker */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 11, color: 'rgba(87,255,110,0.5)' }}>Цвет</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Цвет</span>
             {(ts.fillBlock ?? paintBlock)
               ? <span className="paint-swatch-icon text-stroke-swatch"
                   style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${(ts.fillBlock ?? paintBlock)!.blockId * 32}px -${(ts.fillBlock ?? paintBlock)!.csId * 32}px` }}
@@ -2216,7 +2216,7 @@ export function PreviewCanvas({
           />
           {/* Stroke block picker */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 11, color: 'rgba(87,255,110,0.5)' }}>Обводка</span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Обводка</span>
             {ts.strokeBlock
               ? <span className="paint-swatch-icon text-stroke-swatch"
                   style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${ts.strokeBlock.blockId * 32}px -${ts.strokeBlock.csId * 32}px` }}
@@ -2231,8 +2231,8 @@ export function PreviewCanvas({
             )}
           </div>
           {/* Confirm / Cancel */}
-          <button onClick={confirmText} title="Применить (Enter)" aria-label="Применить" style={{ background: 'rgba(87,255,110,0.15)', border: '1px solid rgba(87,255,110,0.5)', color: 'rgba(87,255,110,0.9)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.check} /></button>
-          <button onClick={cancelText} title="Отмена (Esc)" aria-label="Отмена" style={{ background: 'rgba(60,60,60,0.3)', border: '1px solid rgba(120,120,120,0.3)', color: 'rgba(180,180,180,0.7)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.close} /></button>
+          <button onClick={confirmText} title="Применить (Enter)" aria-label="Применить" style={{ background: 'rgb(var(--color-accent-rgb) / 0.15)', border: '1px solid rgb(var(--color-accent-rgb) / 0.5)', color: 'var(--color-accent)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.check} /></button>
+          <button onClick={cancelText} title="Отмена (Esc)" aria-label="Отмена" style={{ background: 'var(--color-control-hover)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.close} /></button>
         </div>
         , document.body);
       })()}

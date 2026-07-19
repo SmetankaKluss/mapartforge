@@ -88,6 +88,7 @@ import { computeSessionMaterials } from './lib/sessionMaterials';
 import { IconGlyph } from './components/IconGlyph';
 import { mkIcons } from './components/mkIcons';
 import { LensController } from './components/LensController';
+import { ThemeSelector } from './components/ThemeSelector';
 import { buildFinalPreview } from './lib/finalPreview';
 import type { PreviewMode } from './lib/preview3d';
 import { applyPageMeta } from './lib/meta';
@@ -108,7 +109,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.21.2-companion-guide-2026-07-19',
+  id: 'mapkluss-v1.22.0-companion-themes-2026-07-20',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2776,6 +2777,7 @@ export default function App() {
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang }); setShowWiki(true); }} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
+          <ThemeSelector lang={lang} />
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
         </div>
@@ -2785,7 +2787,7 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новость MapKluss Companion', 'MapKluss Companion announcement')}
+          aria-label={t('Новости MapKluss Companion и темы интерфейса', 'MapKluss Companion and interface themes announcement')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
@@ -2798,15 +2800,15 @@ export default function App() {
                 <span className="update-banner-segment" key={copy}>
                   <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
                   <i />
-                  <span>{t('ГАЙД И ВСЕ ПОДРОБНОСТИ В TELEGRAM', 'GUIDE AND ALL DETAILS IN TELEGRAM')}</span>
+                  <span>{t('ГАЙД В TELEGRAM · ДОБАВИЛИ ВЫБОР ТЕМЫ', 'GUIDE IN TELEGRAM · THEME CHOOSER ADDED')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('MapKluss Companion уже доступен. Перед первым Two-layer сайт покажет ссылку на гайд в Telegram.',
-              'MapKluss Companion is available. Before the first Two-layer build, the site links to the Telegram guide.')}
+            {t('MapKluss Companion уже доступен, гайд находится в Telegram. В редакторе также появился выбор темы интерфейса.',
+              'MapKluss Companion is available with a guide in Telegram. The editor now also includes an interface theme chooser.')}
           </span>
           <a
             className="update-banner-link"
@@ -3866,7 +3868,7 @@ export default function App() {
         <span className="status-spacer" />
         <span className="status-credit">Made by SmetankaKluss</span>
         <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noopener noreferrer">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="#57FF6E" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-1.97 9.269c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 14.173l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.496.413z"/>
           </svg>
           @SmetankaKluss

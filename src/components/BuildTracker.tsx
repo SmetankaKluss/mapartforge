@@ -355,7 +355,7 @@ export function BuildTracker({ sessionId }: { sessionId: string }) {
     drawSnakeReveal(canvasRef.current, colorRef.current, mode === 'building' ? pctDone : 100);
   }
 
-  const accent = mode === 'gathering' ? '#57FF6E' : '#FFD700';
+  const accent = mode === 'gathering' ? 'var(--color-accent)' : 'var(--color-warning)';
   const info   = s.info ?? {};
 
   return (
