@@ -2,12 +2,46 @@
 
 export type MinecraftVersion =
   | '1.12.2' | '1.13.2' | '1.14.4' | '1.15.2'
-  | '1.16.5' | '1.17.1' | '1.18.2' | '1.19' | '1.20' | '1.21.4';
+  | '1.16.5' | '1.17.1' | '1.18.2' | '1.19' | '1.20'
+  | '1.21.4' | '1.21.8' | '1.21.11';
 
 const VERSION_ORDER: MinecraftVersion[] = [
   '1.12.2', '1.13.2', '1.14.4', '1.15.2',
   '1.16.5', '1.17.1', '1.18.2', '1.19', '1.20', '1.21.4',
+  '1.21.8', '1.21.11',
 ];
+
+const DATA_VERSIONS: Record<MinecraftVersion, number> = {
+  '1.12.2': 1343,
+  '1.13.2': 1631,
+  '1.14.4': 1976,
+  '1.15.2': 2230,
+  '1.16.5': 2586,
+  '1.17.1': 2730,
+  '1.18.2': 2975,
+  '1.19': 3105,
+  '1.20': 3463,
+  '1.21.4': 4189,
+  '1.21.8': 4440,
+  '1.21.11': 4671,
+};
+
+export function minecraftDataVersion(version: MinecraftVersion | undefined): number {
+  return DATA_VERSIONS[version ?? '1.21.4'];
+}
+
+export function usesMapIdComponent(version: MinecraftVersion | undefined): boolean {
+  if (version === undefined) return false;
+  const resolved = version;
+  return VERSION_ORDER.indexOf(resolved) >= VERSION_ORDER.indexOf('1.21.4');
+}
+
+export function minecraftDataPackFormat(version: MinecraftVersion | undefined): number {
+  if (version === '1.21.11') return 94;
+  if (version === '1.21.8') return 81;
+  if (version === '1.21.4') return 61;
+  return 15;
+}
 
 // Minimum version required to use a block in map art (by nbt name).
 // Blocks not listed here are available since 1.12.2.
@@ -192,6 +226,8 @@ export function getVersionLabel(version: MinecraftVersion): string {
     '1.19':   'Java 1.19',
     '1.20':   'Java 1.20',
     '1.21.4': 'Java 1.21.4',
+    '1.21.8': 'Java 1.21.8',
+    '1.21.11': 'Java 1.21.11',
   };
   return labels[version] ?? version;
 }

@@ -11,6 +11,9 @@ const KIND_EXTENSIONS: Record<CompanionArtifactKind, string> = {
   mapdat_zip: 'zip',
   frame_commands: 'mcfunction',
   frame_datapack: 'zip',
+  suppression_litematic: 'litematic',
+  suppression_plan: 'json',
+  suppression_bundle: 'zip',
 };
 
 const KIND_SUFFIXES: Partial<Record<CompanionArtifactKind, string>> = {
@@ -20,6 +23,9 @@ const KIND_SUFFIXES: Partial<Record<CompanionArtifactKind, string>> = {
   mapdat_zip: 'mapdat',
   frame_commands: 'frames',
   frame_datapack: 'frames_datapack',
+  suppression_litematic: 'suppression',
+  suppression_plan: 'suppression_plan',
+  suppression_bundle: 'two_layer',
 };
 
 export function companionSlug(input: string): string {

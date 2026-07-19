@@ -10,6 +10,14 @@ import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
 import type { MinecraftVersion } from './versionPresets';
 import type { PlatformMode } from './platformMode';
+import { coerceBuildTechniqueForPlatform, type BuildTechnique } from './buildTechnique';
+import {
+  buildSuppressionArtifacts,
+  buildSuppressionMultiMapZipFromInput,
+  SUPPRESSION_BUNDLE_MIME,
+  SUPPRESSION_PLAN_MIME,
+} from './suppressionExport';
+import type { SuppressionTargetVersion } from './suppressionPlan';
 import type {
   CompanionArtifactKind,
   CompanionArtifactManifestEntry,
@@ -30,7 +38,7 @@ import type {
 } from './companionTypes';
 import { normalizeEditableArtPrivacy } from './companionTypes';
 
-const COMPANION_BUCKET = 'mapartforge';
+const COMPANION_BUCKET = 'mapkluss-companion-private';
 export const MAX_COMPANION_ARTS = 100;
 export const MAX_COMPANION_STORAGE_BYTES = 250 * 1024 * 1024;
 export const TELEGRAM_LOGIN_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME?.trim() ?? '';
@@ -61,6 +69,7 @@ export interface SaveCompanionArtInput {
   bnScale?: number;
   klussParams?: KlussParams;
   platformMode?: PlatformMode;
+  buildTechnique?: BuildTechnique;
 }
 
 interface ArtifactPayload {
@@ -70,16 +79,10 @@ interface ArtifactPayload {
   contentType: string;
 }
 
-interface ExistingArtSnapshot {
-  id: string;
-  title: string;
-  privacy: ArtPrivacy;
-  map_grid: MapGrid;
-  map_mode: '2d' | '3d';
-  minecraft_version: string | null;
-  preview_path: string | null;
-  current_version_id: string | null;
-  updated_at: string;
+interface PreparedArtifact {
+  manifest: CompanionArtifactManifestEntry;
+  bucketId: string;
+  blob: Blob;
 }
 
 function requireUuid(): string {
@@ -116,57 +119,43 @@ function bodyToBlob(body: Blob | Uint8Array | string, contentType: string): Blob
   return new Blob([new Uint8Array(body).buffer], { type: contentType });
 }
 
-async function uploadArtifact(
+async function prepareArtifact(
   ownerId: string,
   artId: string,
   versionId: string,
   payload: ArtifactPayload,
-): Promise<CompanionArtifactManifestEntry> {
-  const supabase = getSupabaseClient();
+): Promise<PreparedArtifact> {
   const sizeBytes = bodySize(payload.body);
   const sha256 = await sha256Hex(payload.body);
   const storagePath = `companion/${ownerId}/${artId}/${versionId}/${payload.filename}`;
   const blob = bodyToBlob(payload.body, payload.contentType);
-  const { error: uploadError } = await supabase.storage
-    .from(COMPANION_BUCKET)
-    .upload(storagePath, blob, { contentType: payload.contentType, upsert: true });
-  if (uploadError) throw uploadError;
-
   const artifactId = requireUuid();
   const now = new Date().toISOString();
-  const { error: dbError } = await supabase.from('art_artifacts').insert({
-    id: artifactId,
-    art_id: artId,
-    version_id: versionId,
-    owner_id: ownerId,
-    kind: payload.kind,
-    filename: payload.filename,
-    storage_path: storagePath,
-    content_type: payload.contentType,
-    size_bytes: sizeBytes,
-    sha256,
-    updated_at: now,
-  });
-  if (dbError) {
-    try {
-      await removeStorageObjects([storagePath]);
-    } catch (cleanupError) {
-      const detail = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-      throw new Error(`${dbError.message} (artifact cleanup failed: ${detail})`);
-    }
-    throw dbError;
-  }
-
   return {
-    id: artifactId,
-    kind: payload.kind,
-    filename: payload.filename,
-    storagePath,
-    contentType: payload.contentType,
-    sizeBytes,
-    sha256,
-    updatedAt: now,
+    bucketId: COMPANION_BUCKET,
+    blob,
+    manifest: {
+      id: artifactId,
+      kind: payload.kind,
+      filename: payload.filename,
+      storagePath,
+      contentType: payload.contentType,
+      sizeBytes,
+      sha256,
+      updatedAt: now,
+    },
   };
+}
+
+async function uploadPreparedArtifact(artifact: PreparedArtifact): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.storage
+    .from(artifact.bucketId)
+    .upload(artifact.manifest.storagePath, artifact.blob, {
+      contentType: artifact.manifest.contentType,
+      upsert: false,
+    });
+  if (error) throw error;
 }
 
 async function removeStorageObjects(paths: string[]): Promise<void> {
@@ -178,56 +167,6 @@ async function removeStorageObjects(paths: string[]): Promise<void> {
     const { error } = await supabase.storage.from(COMPANION_BUCKET).remove(chunk);
     if (error) throw error;
   }
-}
-
-async function rollbackCompanionSave(params: {
-  artId: string;
-  ownerId: string;
-  createdNewArt: boolean;
-  versionId: string | null;
-  uploadedStoragePaths: string[];
-  previousArt: ExistingArtSnapshot | null;
-}): Promise<void> {
-  const { artId, ownerId, createdNewArt, versionId, uploadedStoragePaths, previousArt } = params;
-  const supabase = getSupabaseClient();
-
-  await removeStorageObjects(uploadedStoragePaths);
-
-  if (versionId) {
-    const { error: versionDeleteError } = await supabase
-      .from('art_versions')
-      .delete()
-      .eq('id', versionId)
-      .eq('owner_id', ownerId);
-    if (versionDeleteError) throw versionDeleteError;
-  }
-
-  if (createdNewArt) {
-    const { error: artDeleteError } = await supabase
-      .from('arts')
-      .delete()
-      .eq('id', artId)
-      .eq('owner_id', ownerId);
-    if (artDeleteError) throw artDeleteError;
-    return;
-  }
-
-  if (!previousArt) return;
-  const { error: restoreError } = await supabase
-    .from('arts')
-    .update({
-      title: previousArt.title,
-      privacy: previousArt.privacy,
-      map_grid: previousArt.map_grid,
-      map_mode: previousArt.map_mode,
-      minecraft_version: previousArt.minecraft_version,
-      preview_path: previousArt.preview_path,
-      current_version_id: previousArt.current_version_id,
-      updated_at: previousArt.updated_at,
-    })
-    .eq('id', artId)
-    .eq('owner_id', ownerId);
-  if (restoreError) throw restoreError;
 }
 
 export async function getCurrentCompanionUserId(): Promise<string | null> {
@@ -345,6 +284,24 @@ async function readCompanionFunctionError(error: unknown): Promise<string> {
     if (typeof maybeError.message === 'string' && maybeError.message.trim()) return maybeError.message.trim();
   }
   return String(error);
+}
+
+async function finalizePreparedCompanionSave(versionId: string): Promise<{ updatedAt?: string }> {
+  const supabase = getSupabaseClient();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase.functions.invoke('companion-api', {
+      body: { action: 'art_save_finalize', version_id: versionId },
+    });
+    if (!error) return (data ?? {}) as { updatedAt?: string };
+
+    const message = await readCompanionFunctionError(error);
+    if (message.includes('save_verification_in_progress') && attempt < 2) {
+      await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+      continue;
+    }
+    throw new Error(message);
+  }
+  throw new Error('save_verification_unavailable');
 }
 
 function normalizeTelegramLoginMessage(message: string): string {
@@ -535,10 +492,10 @@ export async function setCompanionCollectionItem(collectionId: string, artId: st
   return Boolean((data as { selected?: boolean }).selected);
 }
 
-export async function getCompanionArtManifest(artId: string): Promise<CompanionArtManifest> {
+export async function getCompanionArtManifest(artId: string, versionId?: string): Promise<CompanionArtManifest> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.functions.invoke('companion-api', {
-    body: { action: 'manifest', art_id: artId },
+    body: { action: 'manifest', art_id: artId, ...(versionId ? { version_id: versionId } : {}) },
   });
   if (error) throw error;
   return data as CompanionArtManifest;
@@ -717,6 +674,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
   const versionId = requireUuid();
   const privacy = normalizeEditableArtPrivacy(input.privacy);
   const previewData = input.previewImageData ?? input.imageData;
+  const buildTechnique = coerceBuildTechniqueForPlatform(input.buildTechnique, input.platformMode ?? 'java');
 
   const projectBlob = new Blob([input.projectJson], { type: 'application/json;charset=utf-8' });
   const previewBlob = await blobFromImageData(previewData);
@@ -730,6 +688,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     structure === 'staircase' ? input.supportBlock : 'air',
     input.staircaseMode,
     input.supportMode,
+    input.minecraftVersion,
   );
   const litematicTilesZip = await buildLitematicTilesZipBlob(
     input.imageData,
@@ -760,104 +719,94 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     { kind: 'frame_commands', filename: companionArtifactFilename(input.title, input.grid, 'frame_commands'), body: frameCommands, contentType: 'text/plain;charset=utf-8' },
     { kind: 'frame_datapack', filename: companionArtifactFilename(input.title, input.grid, 'frame_datapack'), body: frameDatapack, contentType: 'text/plain;charset=utf-8' },
   ];
+  if (buildTechnique === 'suppression_two_layer') {
+    const suppressionInput = {
+      imageData: input.imageData,
+      palette: input.palette,
+      blockSelection: input.blockSelection,
+      grid: input.grid,
+      mapMode: input.mode,
+      platformMode: input.platformMode ?? 'java',
+      minecraftVersion: input.minecraftVersion as SuppressionTargetVersion,
+      fillerBlockNbt: input.supportBlock,
+    };
+    if (input.grid.wide === 1 && input.grid.tall === 1) {
+      const suppression = await buildSuppressionArtifacts(input.title, suppressionInput);
+      artifacts.push(
+        {
+          kind: 'suppression_litematic',
+          filename: suppression.litematicFilename,
+          body: suppression.litematicBlob,
+          contentType: 'application/octet-stream',
+        },
+        {
+          kind: 'suppression_plan',
+          filename: suppression.planFilename,
+          body: suppression.planBlob,
+          contentType: SUPPRESSION_PLAN_MIME,
+        },
+      );
+    } else {
+      const bundle = await buildSuppressionMultiMapZipFromInput(input.title, suppressionInput);
+      artifacts.push({
+        kind: 'suppression_bundle',
+        filename: companionArtifactFilename(input.title, input.grid, 'suppression_bundle'),
+        body: bundle,
+        contentType: SUPPRESSION_BUNDLE_MIME,
+      });
+    }
+  }
 
-  const totalUploadBytes = artifacts.reduce((sum, artifact) => sum + bodySize(artifact.body), 0);
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('art_count,storage_used_bytes')
-    .eq('id', ownerId)
-    .single();
-  const artCount = (profile?.art_count as number | undefined) ?? 0;
-  const storageUsed = (profile?.storage_used_bytes as number | undefined) ?? 0;
-
-  const { data: previousArtRow, error: previousArtError } = await supabase
-    .from('arts')
-    .select('id,title,privacy,map_grid,map_mode,minecraft_version,preview_path,current_version_id,updated_at')
-    .eq('id', artId)
-    .eq('owner_id', ownerId)
-    .maybeSingle();
-  if (previousArtError) throw previousArtError;
-  const createdNewArt = !previousArtRow;
-  if (createdNewArt && artCount >= MAX_COMPANION_ARTS) throw new Error(`Достигнут лимит артов в аккаунте (${MAX_COMPANION_ARTS}).`);
-  if (storageUsed + totalUploadBytes > MAX_COMPANION_STORAGE_BYTES) throw new Error('Достигнут лимит облачного хранилища (250 МБ).');
-
-  await supabase.from('profiles').upsert({ id: ownerId });
-  const now = new Date().toISOString();
-  const previewPath = `companion/${ownerId}/${artId}/${versionId}/${companionArtifactFilename(input.title, input.grid, 'preview_png')}`;
-  const projectPath = `companion/${ownerId}/${artId}/${versionId}/${companionArtifactFilename(input.title, input.grid, 'project')}`;
+  const preparedArtifacts = await Promise.all(
+    artifacts.map(artifact => prepareArtifact(ownerId, artId, versionId, artifact)),
+  );
+  const settings = {
+    grid: input.grid,
+    mode: input.mode,
+    staircaseMode: input.staircaseMode,
+    supportBlock: input.supportBlock,
+    supportMode: input.supportMode,
+    minecraftVersion: input.minecraftVersion,
+    dithering: input.dithering,
+    intensity: input.intensity,
+    bnScale: input.bnScale,
+    klussParams: input.klussParams,
+    platformMode: input.platformMode,
+    buildTechnique,
+  };
+  const reservationArtifacts = preparedArtifacts.map(artifact => ({
+    artifactId: artifact.manifest.id,
+    kind: artifact.manifest.kind,
+    filename: artifact.manifest.filename,
+    bucketId: artifact.bucketId,
+    storagePath: artifact.manifest.storagePath,
+    contentType: artifact.manifest.contentType,
+    sizeBytes: artifact.manifest.sizeBytes,
+    sha256: artifact.manifest.sha256,
+  }));
   const uploadedStoragePaths: string[] = [];
-  let versionInserted = false;
 
   try {
-    const { error: artError } = await supabase.from('arts').upsert({
-      id: artId,
-      owner_id: ownerId,
-      title: input.title,
-      privacy,
-      map_grid: input.grid,
-      map_mode: input.mode,
-      minecraft_version: input.minecraftVersion,
-      preview_path: previewPath,
-      updated_at: now,
+    const { error: prepareError } = await supabase.rpc('prepare_companion_art_save', {
+      requested_art_id: artId,
+      requested_version_id: versionId,
+      requested_title: input.title,
+      requested_privacy: privacy,
+      requested_map_grid: input.grid,
+      requested_map_mode: input.mode,
+      requested_minecraft_version: input.minecraftVersion,
+      requested_settings: settings,
+      requested_artifacts: reservationArtifacts,
     });
-    if (artError) throw artError;
+    if (prepareError) throw prepareError;
 
-    const { data: existingVersions, error: versionCountError } = await supabase
-      .from('art_versions')
-      .select('version_number')
-      .eq('art_id', artId)
-      .order('version_number', { ascending: false })
-      .limit(1);
-    if (versionCountError) throw versionCountError;
-    const versionNumber = ((existingVersions?.[0]?.version_number as number | undefined) ?? 0) + 1;
-
-    const { error: versionError } = await supabase.from('art_versions').insert({
-      id: versionId,
-      art_id: artId,
-      owner_id: ownerId,
-      version_number: versionNumber,
-      settings: {
-        grid: input.grid,
-        mode: input.mode,
-        staircaseMode: input.staircaseMode,
-        supportBlock: input.supportBlock,
-        supportMode: input.supportMode,
-        minecraftVersion: input.minecraftVersion,
-        dithering: input.dithering,
-        intensity: input.intensity,
-        bnScale: input.bnScale,
-        klussParams: input.klussParams,
-        platformMode: input.platformMode,
-      },
-      project_path: projectPath,
-      preview_path: previewPath,
-    });
-    if (versionError) throw versionError;
-    versionInserted = true;
-
-    const uploadedArtifacts = [];
-    for (const artifact of artifacts) {
-      const uploaded = await uploadArtifact(ownerId, artId, versionId, artifact);
-      uploadedArtifacts.push(uploaded);
-      uploadedStoragePaths.push(uploaded.storagePath);
+    for (const artifact of preparedArtifacts) {
+      await uploadPreparedArtifact(artifact);
+      uploadedStoragePaths.push(artifact.manifest.storagePath);
     }
 
-    const { error: updateError } = await supabase
-      .from('arts')
-      .update({ current_version_id: versionId, preview_path: previewPath, updated_at: now })
-      .eq('id', artId)
-      .eq('owner_id', ownerId);
-    if (updateError) throw updateError;
-
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update({
-        art_count: createdNewArt ? artCount + 1 : artCount,
-        storage_used_bytes: storageUsed + totalUploadBytes,
-        updated_at: now,
-      })
-      .eq('id', ownerId);
-    if (profileUpdateError) throw profileUpdateError;
+    const finalResult = await finalizePreparedCompanionSave(versionId);
+    const updatedAt = finalResult?.updatedAt ?? new Date().toISOString();
 
     return {
       artId,
@@ -869,24 +818,50 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
       mode: input.mode,
       dithering: input.dithering,
       minecraftVersion: input.minecraftVersion,
-      previewUrl: previewPath,
-      artifacts: uploadedArtifacts,
-      updatedAt: now,
+      buildTechnique,
+      previewUrl: null,
+      artifacts: preparedArtifacts.map(artifact => artifact.manifest),
+      updatedAt,
     };
   } catch (error) {
-    try {
-      await rollbackCompanionSave({
-        artId,
-        ownerId,
-        createdNewArt,
-        versionId: versionInserted ? versionId : null,
-        uploadedStoragePaths,
-        previousArt: previousArtRow as ExistingArtSnapshot | null,
-      });
-    } catch (rollbackError) {
-      const detail = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+    if (uploadedStoragePaths.length === preparedArtifacts.length) {
+      try {
+        const retriedResult = await finalizePreparedCompanionSave(versionId);
+        return {
+          artId,
+          versionId,
+          ownerId,
+          title: input.title,
+          privacy,
+          grid: input.grid,
+          mode: input.mode,
+          dithering: input.dithering,
+          minecraftVersion: input.minecraftVersion,
+          buildTechnique,
+          previewUrl: null,
+          artifacts: preparedArtifacts.map(artifact => artifact.manifest),
+          updatedAt: retriedResult.updatedAt ?? new Date().toISOString(),
+        };
+      } catch {
+        // Fall through to cancellation and cleanup.
+      }
+    }
+    const cleanupErrors: string[] = [];
+    const { error: cancelError } = await supabase.rpc('cancel_companion_art_save', {
+      requested_version_id: versionId,
+    });
+    if (cancelError) {
+      cleanupErrors.push(cancelError.message);
+    } else {
+      try {
+        await removeStorageObjects(uploadedStoragePaths);
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
+      }
+    }
+    if (cleanupErrors.length > 0) {
       const original = error instanceof Error ? error.message : String(error);
-      throw new Error(`${original} (rollback failed: ${detail})`);
+      throw new Error(`${original} (cleanup failed: ${cleanupErrors.join('; ')})`);
     }
     throw error;
   }

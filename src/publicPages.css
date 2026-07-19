@@ -72,8 +72,8 @@ body {
 }
 
 .public-site-brand img {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
 }
 
@@ -1651,7 +1651,7 @@ body {
   .public-site-header__inner { padding: 0 8px; gap: 5px; }
   .public-site-brand { gap: 5px; }
   .public-site-brand { min-width: var(--public-touch-h); min-height: var(--public-touch-h); justify-content: center; }
-  .public-site-brand img { width: 30px; height: 30px; }
+  .public-site-brand img { width: 32px; height: 32px; }
   .public-site-brand__copy { display: none; }
   .public-site-nav { flex: 1; justify-content: flex-end; gap: 4px; }
   .public-site-nav__link,

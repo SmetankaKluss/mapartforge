@@ -2,6 +2,15 @@ import {
   createClient,
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2.99.3";
+import {
+  drainCompanionStorageDeleteOutbox,
+  type CompanionStorageCleanupClient,
+} from "../_shared/companionStorageCleanup.ts";
+import {
+  classifyCompanionArtifactBackfillState,
+  copyVerifiedCompanionArtifactToPrivate,
+  type LegacyCompanionArtifact,
+} from "../_shared/companionArtifactBackfill.ts";
 
 const API_VERSION = 1;
 const BUCKET = "mapkluss-lens";
@@ -258,6 +267,15 @@ type Database = {
           p_device_token_hash: string;
         };
         Returns: LensSessionRow[];
+      };
+      expire_companion_storage_reservations: {
+        Args: { requested_limit?: number };
+        Returns: {
+          expiredArt: number;
+          expiredImport: number;
+          purgedArt: number;
+          purgedImport: number;
+        };
       };
     };
     Enums: Record<string, never>;
@@ -2030,12 +2048,228 @@ async function sweepOrphanedLensPrefixes(
   return removed;
 }
 
+async function migrateLegacyCompanionImports(
+  admin: CompanionStorageCleanupClient,
+  limit = 5,
+): Promise<{ migrated: number; failed: number; remaining: number }> {
+  const safeLimit = Math.max(1, Math.min(10, Math.trunc(limit)));
+  const { data: rows, error } = await admin
+    .from("companion_imports")
+    .select("id,owner_id,bucket_id,image_path,size_bytes,sha256")
+    .eq("bucket_id", "mapartforge")
+    .order("created_at", { ascending: true })
+    .limit(safeLimit);
+  if (error) throw error;
+
+  let migrated = 0;
+  let failed = 0;
+  for (const row of rows ?? []) {
+    const path = String(row.image_path ?? "");
+    const expectedSize = Number(row.size_bytes ?? 0);
+    const expectedSha = String(row.sha256 ?? "");
+    const { data: source, error: sourceError } = await admin.storage
+      .from("mapartforge")
+      .download(path);
+    if (sourceError || !source) {
+      failed += 1;
+      continue;
+    }
+    const bytes = new Uint8Array(await source.arrayBuffer());
+    const isPng = bytes.length >= 8 &&
+      [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value);
+    if (
+      !isPng || bytes.byteLength !== expectedSize ||
+      await sha256Hex(bytes) !== expectedSha
+    ) {
+      failed += 1;
+      continue;
+    }
+
+    const { error: uploadError } = await admin.storage
+      .from("mapkluss-companion-private")
+      .upload(path, new Blob([bytes], { type: "image/png" }), {
+        contentType: "image/png",
+        upsert: false,
+      });
+    if (uploadError) {
+      const { data: existing, error: existingError } = await admin.storage
+        .from("mapkluss-companion-private")
+        .download(path);
+      if (existingError || !existing) {
+        failed += 1;
+        continue;
+      }
+      const existingBytes = new Uint8Array(await existing.arrayBuffer());
+      if (
+        existingBytes.byteLength !== expectedSize ||
+        await sha256Hex(existingBytes) !== expectedSha
+      ) {
+        failed += 1;
+        continue;
+      }
+    }
+
+    const { error: promoteError } = await admin.rpc(
+      "promote_companion_import_to_private",
+      {
+        requested_import_id: String(row.id),
+        requested_owner_id: String(row.owner_id),
+        requested_image_path: path,
+        requested_size_bytes: expectedSize,
+        requested_sha256: expectedSha,
+      },
+    );
+    if (promoteError) {
+      failed += 1;
+      continue;
+    }
+    migrated += 1;
+  }
+
+  const { count, error: countError } = await admin
+    .from("companion_imports")
+    .select("id", { count: "exact", head: true })
+    .eq("bucket_id", "mapartforge");
+  if (countError) throw countError;
+  return { migrated, failed, remaining: count ?? 0 };
+}
+
+async function legacyCompanionImportCount(
+  admin: CompanionStorageCleanupClient,
+): Promise<number> {
+  const { count, error } = await admin
+    .from("companion_imports")
+    .select("id", { count: "exact", head: true })
+    .eq("bucket_id", "mapartforge");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function migrateLegacyCompanionArtifacts(
+  admin: CompanionStorageCleanupClient,
+  supabaseUrl: string,
+  serviceKey: string,
+  limit = 2,
+): Promise<{ migrated: number; failed: number; remaining: number }> {
+  const safeLimit = Math.max(1, Math.min(4, Math.trunc(limit)));
+  const { data: rows, error } = await admin
+    .from("art_artifacts")
+    .select("id,owner_id,kind,filename,bucket_id,storage_path,content_type,size_bytes,sha256,created_at")
+    .eq("bucket_id", "mapartforge")
+    .order("created_at", { ascending: true })
+    .limit(safeLimit);
+  if (error) throw error;
+
+  let migrated = 0;
+  let failed = 0;
+  for (const row of rows ?? []) {
+    const artifact: LegacyCompanionArtifact = {
+      artifactId: String(row.id ?? ""),
+      kind: String(row.kind ?? ""),
+      filename: String(row.filename ?? ""),
+      storagePath: String(row.storage_path ?? ""),
+      contentType: String(row.content_type ?? ""),
+      sizeBytes: Number(row.size_bytes ?? 0),
+      sha256: String(row.sha256 ?? ""),
+    };
+    try {
+      await copyVerifiedCompanionArtifactToPrivate(
+        artifact,
+        supabaseUrl,
+        serviceKey,
+      );
+      const { error: promoteError } = await admin.rpc(
+        "promote_companion_artifact_to_private",
+        {
+          requested_artifact_id: artifact.artifactId,
+          requested_owner_id: String(row.owner_id),
+          requested_storage_path: artifact.storagePath,
+          requested_content_type: artifact.contentType,
+          requested_size_bytes: artifact.sizeBytes,
+          requested_sha256: artifact.sha256,
+        },
+      );
+      if (promoteError) throw promoteError;
+      migrated += 1;
+    } catch (error) {
+      console.warn("Legacy Companion artifact backfill failed", artifact.artifactId, String(error));
+      const { data: current, error: reconcileError } = await admin
+        .from("art_artifacts")
+        .select("id,owner_id,bucket_id,storage_path,content_type,size_bytes,sha256")
+        .eq("id", artifact.artifactId)
+        .eq("owner_id", String(row.owner_id))
+        .maybeSingle();
+      if (!reconcileError
+        && classifyCompanionArtifactBackfillState(current, artifact, String(row.owner_id)) === "promoted") {
+        migrated += 1;
+        continue;
+      }
+      // Never delete an ambiguous private copy here. Another maintenance run
+      // may have committed the promotion already. A later retry safely upserts
+      // only hash-verified source bytes and verifies the private copy again.
+      if (reconcileError) {
+        console.warn("Legacy Companion artifact reconciliation failed", artifact.artifactId, reconcileError.message);
+      }
+      failed += 1;
+    }
+  }
+
+  const { count, error: countError } = await admin
+    .from("art_artifacts")
+    .select("id", { count: "exact", head: true })
+    .eq("bucket_id", "mapartforge");
+  if (countError) throw countError;
+  return { migrated, failed, remaining: count ?? 0 };
+}
+
+async function legacyCompanionArtifactCount(
+  admin: CompanionStorageCleanupClient,
+): Promise<number> {
+  const { count, error } = await admin
+    .from("art_artifacts")
+    .select("id", { count: "exact", head: true })
+    .eq("bucket_id", "mapartforge");
+  if (error) throw error;
+  return count ?? 0;
+}
+
 async function handleMaintenanceCleanup(
   admin: AdminClient,
   principal: Principal,
+  supabaseUrl: string,
+  serviceKey: string,
 ) {
   requireKind(principal, "server", "unauthorized");
   await consumeRateLimit(admin, principal, "maintenance_cleanup", 6, 60);
+  const { data: reservationCleanup, error: reservationCleanupError } =
+    await admin.rpc("expire_companion_storage_reservations", {
+      requested_limit: 100,
+    });
+  if (reservationCleanupError) throw reservationCleanupError;
+  const cleanupAdmin = admin as unknown as CompanionStorageCleanupClient;
+  const legacyImportBackfillEnabled =
+    Deno.env.get("COMPANION_IMPORT_PRIVATE_BACKFILL_ENABLED") === "true";
+  const legacyImportBackfill = legacyImportBackfillEnabled
+    ? await migrateLegacyCompanionImports(cleanupAdmin)
+    : {
+      migrated: 0,
+      failed: 0,
+      remaining: await legacyCompanionImportCount(cleanupAdmin),
+    };
+  const legacyArtifactBackfillEnabled =
+    Deno.env.get("COMPANION_ARTIFACT_PRIVATE_BACKFILL_ENABLED") === "true";
+  const legacyArtifactBackfill = legacyArtifactBackfillEnabled
+    ? await migrateLegacyCompanionArtifacts(cleanupAdmin, supabaseUrl, serviceKey)
+    : {
+      migrated: 0,
+      failed: 0,
+      remaining: await legacyCompanionArtifactCount(cleanupAdmin),
+    };
+  const companionStorageCleanup = await drainCompanionStorageDeleteOutbox(
+    cleanupAdmin,
+    undefined,
+    100,
+  );
   const { data: sessions, error } = await admin
     .from("companion_lens_sessions")
     .select("*")
@@ -2095,6 +2329,16 @@ async function handleMaintenanceCleanup(
     removedObjects,
     trimmedObjects,
     orphanedObjects,
+    reservationCleanup,
+    companionStorageCleanup,
+    legacyImportBackfill: {
+      enabled: legacyImportBackfillEnabled,
+      ...legacyImportBackfill,
+    },
+    legacyArtifactBackfill: {
+      enabled: legacyArtifactBackfillEnabled,
+      ...legacyArtifactBackfill,
+    },
   });
 }
 
@@ -2121,7 +2365,7 @@ Deno.serve(async (req) => {
       return json({ ...capabilities(), principalKind: principal.kind });
     }
     if (action === "maintenance_cleanup") {
-      return await handleMaintenanceCleanup(admin, principal);
+      return await handleMaintenanceCleanup(admin, principal, supabaseUrl, serviceKey);
     }
     if (Deno.env.get("LENS_ENABLED") !== "true") fail("lens_disabled", 503);
 

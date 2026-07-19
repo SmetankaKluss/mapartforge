@@ -33,6 +33,12 @@ function artifactLabel(kind: CompanionArtifactManifestEntry['kind'], t: (ru: str
       return t('Превью PNG', 'PNG preview');
     case 'litematic':
       return 'Litematic';
+    case 'litematic_tiles_zip':
+      return t('Litematic по картам ZIP', 'Tiled Litematic ZIP');
+    case 'suppression_litematic':
+      return 'Two-layer Litematic';
+    case 'suppression_plan':
+      return t('План Two-layer', 'Two-layer plan');
     case 'materials_txt':
       return t('Материалы TXT', 'Materials TXT');
     case 'materials_csv':

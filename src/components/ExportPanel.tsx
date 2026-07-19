@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ComputedPalette } from '../lib/dithering';
 import type { DitheringMode } from '../lib/dithering';
 import type { MapGrid } from '../lib/types';
@@ -6,6 +6,18 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ImageAdjustments } from '../lib/adjustments';
 import type { PlatformMode } from '../lib/platformMode';
 import type { MinecraftVersion } from '../lib/versionPresets';
+import type { BuildTechnique } from '../lib/buildTechnique';
+import {
+  evaluateSuppressionEligibility,
+  type SuppressionEligibilityReason,
+} from '../lib/suppressionPlan';
+import { coerceSuppressionTargetVersion } from '../lib/buildTechnique';
+import {
+  buildSuppressionArtifacts,
+  buildSuppressionMultiMapZipFromInput,
+  buildSuppressionZipBlob,
+  downloadSuppressionZip,
+} from '../lib/suppressionExport';
 import { downloadPng } from '../lib/exportPng';
 import { exportMapDat } from '../lib/exportMapDat';
 import { exportLitematic, exportLitematicZip, exportLitematicHybrid } from '../lib/exportLitematic';
@@ -63,6 +75,7 @@ interface Props {
   bnScale:     number;
   platformMode: PlatformMode;
   minecraftVersion: MinecraftVersion;
+  buildTechnique: BuildTechnique;
   // Tracker
   onCreateTracker?: () => void;
   // GIF Project
@@ -95,6 +108,7 @@ export function ExportPanel({
   sourceImage, intensity, adjustments, bnScale,
   platformMode,
   minecraftVersion,
+  buildTechnique,
   onCreateTracker, onExportGifPack,
 }: Props) {
   const { t } = useLocale();
@@ -109,6 +123,8 @@ export function ExportPanel({
   const [busySchematic, setBusySchematic] = useState(false);
   const [busyNbt,       setBusyNbt]       = useState(false);
   const [busyMcStruct,  setBusyMcStruct]  = useState(false);
+  const [busySuppression, setBusySuppression] = useState(false);
+  const [suppressionError, setSuppressionError] = useState<string | null>(null);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
 
@@ -121,6 +137,33 @@ export function ExportPanel({
     : t('Сначала обработай изображение.', 'Process an image first.');
 
   const previewData = compareMode ? null : (previewImageData ?? imageData);
+  const suppressionEligibility = useMemo(() => {
+    if (!imageData) return null;
+    return evaluateSuppressionEligibility({
+      imageData,
+      palette: activePalette,
+      blockSelection,
+      grid: mapGrid,
+      mapMode,
+      platformMode,
+      minecraftVersion,
+      fillerBlockNbt: supportBlock,
+    });
+  }, [activePalette, blockSelection, imageData, mapGrid, mapMode, minecraftVersion, platformMode, supportBlock]);
+
+  function suppressionReason(reason: SuppressionEligibilityReason): string {
+    switch (reason.code) {
+      case 'wrong_grid': return t('поддерживаются сетки до 10×10 карт', 'map grids up to 10×10 are supported');
+      case 'wrong_size': return t('размер изображения не совпадает с сеткой карт', 'the image size does not match the map grid');
+      case 'wrong_platform': return t('только Java Edition', 'Java Edition only');
+      case 'unsupported_version': return t('только Minecraft 1.21.8 или 1.21.11', 'Minecraft 1.21.8 or 1.21.11 only');
+      case 'requires_three_shades': return t('нужен режим 3D с тремя оттенками', 'requires 3D mode with three shades');
+      case 'transparent_pixel': return t('прозрачные пиксели пока не поддерживаются', 'transparent pixels are not supported yet');
+      case 'unknown_palette_colour': return t('есть цвет вне текущей палитры', 'a color is outside the current palette');
+      case 'unsupported_shade': return t('найден неподдерживаемый оттенок', 'an unsupported shade was found');
+      case 'unsupported_block': return t(`нестабильный блок: ${reason.detail ?? ''}`, `unstable block: ${reason.detail ?? ''}`);
+    }
+  }
 
   function captureDiagnostics(action: string, preview: ImageData | null) {
     if (!preview) return;
@@ -212,6 +255,33 @@ export function ExportPanel({
       });
     } finally {
       setBusyMapdat(false);
+    }
+  }
+
+  async function handleSuppressionZip() {
+    if (!imageData || !suppressionEligibility?.eligible || compareMode) return;
+    setBusySuppression(true);
+    setSuppressionError(null);
+    try {
+      const input = {
+        imageData,
+        palette: activePalette,
+        blockSelection,
+        grid: mapGrid,
+        mapMode,
+        platformMode,
+        minecraftVersion: coerceSuppressionTargetVersion(minecraftVersion),
+        fillerBlockNbt: supportBlock,
+      };
+      const zip = mapCount === 1
+        ? await buildSuppressionZipBlob(await buildSuppressionArtifacts('MapKluss', input))
+        : await buildSuppressionMultiMapZipFromInput('MapKluss', input);
+      downloadSuppressionZip(zip, 'MapKluss', mapGrid);
+      trackExport('suppression_two_layer_zip');
+    } catch (error) {
+      setSuppressionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusySuppression(false);
     }
   }
 
@@ -433,6 +503,7 @@ export function ExportPanel({
       if (!imgToShare) return;
       const url = await uploadPermalink(imgToShare, preview, {
         dithering, intensity, mapGrid, blockSelection, adjustments, mapMode, staircaseMode, bnScale,
+        minecraftVersion, platformMode, buildTechnique, supportBlock, supportMode,
       });
       setLinkUrl(url);
       setLinkState('idle');
@@ -457,6 +528,13 @@ export function ExportPanel({
         <p className="export-empty">{t('Загрузи изображение — экспорт появится здесь.', 'Upload an image to enable export.')}</p>
       )}
       {!collapsed && hasContent && (
+        <>
+        {!isBedrock && buildTechnique === 'suppression_two_layer' && suppressionEligibility && !suppressionEligibility.eligible && (
+          <p className="build-technique-warning" role="status">
+            {t('Two-layer недоступен: ', 'Two-layer unavailable: ')}
+            {suppressionEligibility.reasons.map(suppressionReason).join('; ')}.
+          </p>
+        )}
         <div className="export-buttons">
           <button
             className="export-btn"
@@ -479,6 +557,19 @@ export function ExportPanel({
 
           {/* Java-only exports — hidden in Bedrock mode */}
           {!isBedrock && (<>
+            {buildTechnique === 'suppression_two_layer' && (
+              <button
+                className="export-btn export-btn-suppression"
+                onClick={() => void handleSuppressionZip()}
+                disabled={base || busySuppression || compareMode || !suppressionEligibility?.eligible}
+                title={t(
+                  `Скачать схемы, планы и SHA-256 для ${mapCount} карт`,
+                  `Download schematics, plans, and SHA-256 checks for ${mapCount} maps`,
+                )}
+              >
+                <IconGlyph icon={mkIcons.archive} /> {busySuppression ? t('Сборка…', 'Building…') : `TWO-LAYER ZIP${mapCount > 1 ? ` (${mapCount})` : ''}`}
+              </button>
+            )}
             <button
               className="export-btn export-btn-mapdat"
               onClick={handleMapDat}
@@ -559,6 +650,8 @@ export function ExportPanel({
           )}
 
         </div>
+        {suppressionError && <p className="export-error-note" role="alert">{suppressionError}</p>}
+        </>
       )}
       {!collapsed && hasContent && isBedrock && (
         <p className="export-note">{t('Bedrock 1.20.80+ — загрузи .mcstructure через структурный блок.', 'Bedrock 1.20.80+ — import .mcstructure via structure block.')}</p>

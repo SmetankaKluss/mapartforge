@@ -11,6 +11,29 @@ export interface PaletteBlock {
   supportBlockMandatory: boolean; // requires a support block (stairs, slabs, etc.)
 }
 
+export interface PreferredBlockState {
+  nbtName: string;
+  properties?: Record<string, string>;
+}
+
+// These entries historically defaulted to a horizontal axis in MapKluss.
+// Some palette rows reuse the same block ID for the vertical end-grain colour,
+// so the display-name qualifier must override that default per selected row.
+const HORIZONTAL_AXIS_DEFAULTS = new Set([
+  'oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log',
+  'dark_oak_log', 'mangrove_log', 'cherry_log', 'cherry_wood',
+  'stripped_cherry_log', 'stripped_cherry_wood', 'crimson_stem',
+  'warped_stem', 'stripped_crimson_stem', 'stripped_warped_stem',
+  'bamboo_block',
+]);
+
+function blockStateProperties(block: PaletteBlock): Record<string, string> | undefined {
+  if (block.displayName.includes('(vertical)')) return { axis: 'y' };
+  if (block.displayName.includes('(horizontal)')) return { axis: 'x' };
+  if (HORIZONTAL_AXIS_DEFAULTS.has(block.nbtName)) return { axis: 'x' };
+  return undefined;
+}
+
 export interface ColourRow {
   csId: number;          // colour set ID (0-60), sprite Y index
   baseId: number;        // Minecraft map colour ID (1-61)
@@ -2882,11 +2905,24 @@ export function buildPaletteFromSelection(
  * baseId, using the first active block from the user's selection.
  */
 export function getPreferredBlockNbt(baseId: number, sel: BlockSelection): string {
+  return getPreferredBlockState(baseId, sel).nbtName;
+}
+
+/**
+ * Return the preferred block together with state properties that affect its
+ * map colour. In particular, vertical and horizontal logs may share one NBT
+ * name while producing different vanilla map base colours.
+ */
+export function getPreferredBlockState(baseId: number, sel: BlockSelection): PreferredBlockState {
   const row = COLOUR_ROWS.find(r => r.baseId === baseId);
-  if (!row) return 'stone';
+  if (!row) return { nbtName: 'stone' };
   const activeIds = sel[row.csId] ?? [];
   const block = row.blocks.find(b => activeIds.includes(b.blockId));
-  return block?.nbtName ?? 'stone';
+  if (!block) return { nbtName: 'stone' };
+  return {
+    nbtName: block.nbtName,
+    properties: blockStateProperties(block),
+  };
 }
 
 /** Returns true if the selected block for this baseId requires a support block underneath. */
@@ -2918,9 +2954,78 @@ function dyeOnly(filterFn: (b: PaletteBlock) => boolean): BlockSelection {
   );
 }
 
+/**
+ * Blocks that break in one mining tick with the correct netherite tool,
+ * Efficiency V and Haste II. Vanilla mining speed is 49 in that setup, so a
+ * correctly tagged block must have hardness <= 49 / 30 (about 1.6333).
+ *
+ * The list is deliberately narrower than the mechanical maximum: every entry
+ * is a stable, full block that is suitable for Two-layer and normally returns
+ * itself. Ordinary logs and planks are not included because hardness 2 is over
+ * the one-tick threshold. The selected axe block is mangrove roots (0.7); all
+ * other entries use a pickaxe.
+ */
+export const INSTANT_MINING_BLOCKS: Readonly<Record<number, number>> = {
+  1: 1,   // sandstone (0.8, pickaxe)
+  8: 7,   // granite (1.5, pickaxe)
+  9: 9,   // andesite (1.5, pickaxe; self-dropping without Silk Touch)
+  12: 3,  // quartz block (0.8, pickaxe)
+  13: 5,  // glazed terracotta (1.4, pickaxe)
+  14: 5,
+  15: 5,
+  16: 5,
+  17: 5,
+  18: 5,
+  19: 5,
+  20: 5,
+  21: 5,
+  22: 5,
+  23: 5,
+  24: 5,
+  25: 5,
+  26: 5,
+  27: 5,
+  28: 5,
+  33: 8,  // mangrove roots (0.7, axe)
+  34: 0,  // netherrack (0.4, pickaxe)
+  35: 0,  // dyed terracotta (1.25, pickaxe)
+  36: 0,
+  37: 0,
+  38: 0,
+  39: 0,
+  40: 0,
+  41: 0,
+  42: 0,
+  43: 0,
+  44: 0,
+  45: 0,
+  46: 0,
+  47: 0,
+  48: 0,
+  49: 0,
+  50: 0,
+};
+
+const INSTANT_MINING: BlockSelection = Object.fromEntries(
+  COLOUR_ROWS.map(row => {
+    const blockId = INSTANT_MINING_BLOCKS[row.csId];
+    return [row.csId, blockId === undefined ? [] : [blockId]];
+  }),
+);
+
+export const BUILTIN_PRESET_LABELS: Readonly<Record<string, Readonly<{ ru: string; en: string }>>> = {
+  'All Blocks': { ru: 'Все блоки', en: 'All blocks' },
+  'Carpet Only': { ru: 'Только ковры', en: 'Carpet only' },
+  'Instant Mining': {
+    ru: 'Мгновенно: Эфф. V + Спешка II',
+    en: 'Instant: Eff. V + Haste II',
+  },
+};
+
 export const BUILTIN_PRESETS: Readonly<Record<string, BlockSelection>> = {
   'All Blocks':  ALL,
   'Carpet Only': dyeOnly(b => b.nbtName.endsWith('_carpet')),
+  'Instant Mining': INSTANT_MINING,
 };
 
 export const DEFAULT_SELECTION: BlockSelection = ALL;

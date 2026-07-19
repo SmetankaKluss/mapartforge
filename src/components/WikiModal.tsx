@@ -226,6 +226,7 @@ export function WikiModal({ onClose }: { onClose: () => void }) {
           <ul>
             <li><b>All blocks:</b> Every available color (default, best quality)</li>
             <li><b>Carpet Only:</b> Only dyed carpet colors (easy to farm, limited palette)</li>
+            <li><b>Instant mining:</b> Stable full blocks that break in one tick with the correct netherite tool, Efficiency V and Haste II</li>
             <li>Custom: Save your own preset for reuse</li>
           </ul>
 

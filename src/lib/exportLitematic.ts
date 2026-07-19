@@ -4,6 +4,7 @@ import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
 import { getPreferredBlockNbt, isMandatorySupport } from './paletteBlocks';
 import type { MapGrid } from './types';
+import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
 
 /**
  * Blocks that require specific block-state Properties in the palette entry
@@ -249,7 +250,10 @@ export function triggerDownload(bytes: Uint8Array, filename: string) {
 /** Extract a 128×128 tile from a full ImageData (col/row in tile units). */
 export function extractTile(src: ImageData, col: number, row: number): ImageData {
   const tw = 128, th = 128;
-  const out = new ImageData(tw, th);
+  const tileData = new Uint8ClampedArray(tw * th * 4);
+  const out = (typeof ImageData === 'undefined'
+    ? { data: tileData, width: tw, height: th }
+    : new ImageData(tileData, tw, th)) as ImageData;
   const ox = col * tw, oy = row * th;
   for (let y = 0; y < th; y++) {
     for (let x = 0; x < tw; x++) {
@@ -274,6 +278,18 @@ export interface BlockVolume {
   indices: Uint32Array;
   /** Block palette; index 0 is always 'minecraft:air'. */
   palette: string[];
+  /**
+   * Optional properties aligned with `palette`. When present, these entries
+   * are authoritative, including an undefined entry meaning no properties.
+   */
+  paletteProperties?: Array<Record<string, string> | undefined>;
+  /** Local minimum coordinate of the packed region. Defaults to 0,0,0. */
+  origin?: { x: number; y: number; z: number };
+}
+
+export interface LitematicWriteOptions {
+  minecraftVersion?: MinecraftVersion;
+  timestampMs?: number;
 }
 
 /** Resolve block-state Properties for a palette entry (axis / attach faces). */
@@ -505,16 +521,21 @@ export function buildBlockVolume(
 }
 
 /** Write a Litematica .litematic (gzipped) from a block volume. */
-export async function writeLitematicNbt(vol: BlockVolume, name: string): Promise<Uint8Array> {
+export async function writeLitematicNbt(
+  vol: BlockVolume,
+  name: string,
+  options: LitematicWriteOptions = {},
+): Promise<Uint8Array> {
   const { sizeX, sizeY, sizeZ: exportSizeZ, indices, palette: blockPalette } = vol;
+  const origin = vol.origin ?? { x: 0, y: 0, z: 0 };
 
   const packedStates = packBlockStates(indices, blockPalette.length);
 
-  const now = BigInt(Date.now());
+  const now = BigInt(options.timestampMs ?? Date.now());
   const w   = new NbtWriter();
 
   w.tagCompoundStart('');
-    w.tagInt('MinecraftDataVersion', 3953);
+    w.tagInt('MinecraftDataVersion', minecraftDataVersion(options.minecraftVersion));
     w.tagInt('Version', 6);
 
     w.tagCompoundStart('Metadata');
@@ -536,9 +557,9 @@ export async function writeLitematicNbt(vol: BlockVolume, name: string): Promise
       w.tagCompoundStart(name);
 
         w.tagCompoundStart('Position');
-          w.tagInt('x', 0);
-          w.tagInt('y', 0);
-          w.tagInt('z', 0);
+          w.tagInt('x', origin.x);
+          w.tagInt('y', origin.y);
+          w.tagInt('z', origin.z);
         w.tagCompoundEnd();
 
         w.tagCompoundStart('Size');
@@ -546,9 +567,12 @@ export async function writeLitematicNbt(vol: BlockVolume, name: string): Promise
         w.tagCompoundEnd();
 
         w.tagListStart('BlockStatePalette', 10, blockPalette.length);
-        for (const id of blockPalette) {
+        for (let paletteIndex = 0; paletteIndex < blockPalette.length; paletteIndex++) {
+          const id = blockPalette[paletteIndex];
           w.tagString('Name', id);
-          const props = blockStateProperties(id);
+          const props = vol.paletteProperties
+            ? vol.paletteProperties[paletteIndex]
+            : blockStateProperties(id);
           if (props) {
             w.tagCompoundStart('Properties');
             for (const [k, v] of Object.entries(props)) w.tagString(k, v);
@@ -582,9 +606,10 @@ export async function buildLitematicBytes(
   supportBlockNbt?: string,
   staircaseMode:    'classic' | 'optimized' = 'classic',
   supportMode:      SupportMode = 1,
+  minecraftVersion?: MinecraftVersion,
 ): Promise<Uint8Array> {
   const vol = buildBlockVolume(imageData, cp, groups, structure, supportBlockNbt, staircaseMode, supportMode);
-  return writeLitematicNbt(vol, name);
+  return writeLitematicNbt(vol, name, { minecraftVersion });
 }
 
 // ── Hybrid multi-layer export ────────────────────────────────────────────────

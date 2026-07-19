@@ -25,6 +25,21 @@ import type { MinecraftVersion } from './lib/versionPresets';
 import { getVersionLabel } from './lib/versionPresets';
 import { sanitizeSelectionForPlatform } from './lib/platformMode';
 import type { PlatformMode } from './lib/platformMode';
+import {
+  SUPPRESSION_TARGET_VERSIONS,
+  coerceBuildTechniqueForPlatform,
+  editorBuildMode,
+  isPlatformLockedForBuildTechnique,
+  normalizeRestoredBuildState,
+  resolveEditorBuildMode,
+  type BuildTechnique,
+  type EditorBuildMode,
+} from './lib/buildTechnique';
+import {
+  isSuppressionSafeBlockName,
+  sanitizeSelectionForSuppression,
+  sanitizeSuppressionSupportBlock,
+} from './lib/suppressionPalette';
 import { DEFAULT_ADJUSTMENTS, normalizeAdjustments } from './lib/adjustments';
 import type { ImageAdjustments } from './lib/adjustments';
 import { DEFAULT_COLOR_MATCH, coerceColorMatchMode } from './lib/colorMatch';
@@ -46,7 +61,7 @@ import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
 import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
-import { serializeProject, deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
+import { deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
 import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
 import { estimateAutosaveSnapshotBytes, useEditorAutosave } from './lib/editorAutosave';
@@ -93,7 +108,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.16.2-2026-07-16',
+  id: 'mapkluss-v1.21.0-companion-2026-07-19',
   url: 'https://t.me/mapkluss',
 };
 
@@ -122,17 +137,17 @@ function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
 
 // Support blocks for 3D staircase (nbt name → sprite coords + label)
 const SUPPORT_BLOCKS_PALETTE = [
-  { nbt: 'stone',        csId: 9,  blockId: 4,  label: 'Stone' },
-  { nbt: 'cobblestone',  csId: 9,  blockId: 0,  label: 'Cobble' },
-  { nbt: 'deepslate',    csId: 58, blockId: 0,  label: 'Deepslate' },
-  { nbt: 'smooth_stone', csId: 9,  blockId: 18, label: 'Smooth' },
-  { nbt: 'granite',      csId: 8,  blockId: 7,  label: 'Granite' },
-  { nbt: 'diorite',      csId: 12, blockId: 1,  label: 'Diorite' },
-  { nbt: 'andesite',     csId: 9,  blockId: 9,  label: 'Andesite' },
-  { nbt: 'dirt',         csId: 8,  blockId: 3,  label: 'Dirt' },
-  { nbt: 'oak_planks',   csId: 11, blockId: 1,  label: 'Oak' },
-  { nbt: 'netherrack',   csId: 34, blockId: 0,  label: 'Nether' },
-  { nbt: 'blackstone',   csId: 28, blockId: 9,  label: 'Blackstone' },
+  { nbt: 'stone',        csId: 9,  blockId: 4,  ru: 'Камень',       en: 'Stone' },
+  { nbt: 'cobblestone',  csId: 9,  blockId: 0,  ru: 'Булыжник',    en: 'Cobble' },
+  { nbt: 'deepslate',    csId: 58, blockId: 0,  ru: 'Глубинный',   en: 'Deepslate' },
+  { nbt: 'smooth_stone', csId: 9,  blockId: 18, ru: 'Гладкий',     en: 'Smooth' },
+  { nbt: 'granite',      csId: 8,  blockId: 7,  ru: 'Гранит',      en: 'Granite' },
+  { nbt: 'diorite',      csId: 12, blockId: 1,  ru: 'Диорит',      en: 'Diorite' },
+  { nbt: 'andesite',     csId: 9,  blockId: 9,  ru: 'Андезит',     en: 'Andesite' },
+  { nbt: 'dirt',         csId: 8,  blockId: 3,  ru: 'Земля',       en: 'Dirt' },
+  { nbt: 'oak_planks',   csId: 11, blockId: 1,  ru: 'Дуб',         en: 'Oak' },
+  { nbt: 'netherrack',   csId: 34, blockId: 0,  ru: 'Незерак',     en: 'Netherrack' },
+  { nbt: 'blackstone',   csId: 28, blockId: 9,  ru: 'Чернит',      en: 'Blackstone' },
 ] as const;
 
 const getSupportModeTitles = (t: (ru: string, en: string) => string): Record<1 | 2 | 3, string> => ({
@@ -293,6 +308,13 @@ export default function App() {
 
   // ── Restore persisted settings — lazy init runs exactly once on mount ─
   const [saved] = useState<Partial<SavedSettings>>(() => loadSettings());
+  const restoredSavedBuild = useMemo(() => normalizeRestoredBuildState({
+    mapMode: saved.mapMode ?? '2d',
+    buildTechnique: saved.buildTechnique,
+    minecraftVersion: (saved.minecraftVersion as MinecraftVersion | undefined) ?? '1.21.4',
+    platformMode: saved.platformMode ?? 'java',
+    blockSelection: saved.blockSelection ?? DEFAULT_SELECTION,
+  }), [saved]);
 
   const [sourceImage, setSourceImage]   = useState<HTMLImageElement | null>(null);
   const [originalData, setOriginalData] = useState<ImageData | null>(null);
@@ -339,16 +361,25 @@ export default function App() {
   const [showSplitLine, setShowSplitLine] = useState(true);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
-  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20','1.21.4'];
+  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20','1.21.4','1.21.8','1.21.11'];
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
-    VALID_VERSIONS.includes(saved.minecraftVersion as MinecraftVersion) ? saved.minecraftVersion as MinecraftVersion : '1.21.4'
+    VALID_VERSIONS.includes(restoredSavedBuild.minecraftVersion) ? restoredSavedBuild.minecraftVersion : '1.21.4'
   );
-  const [platformMode, setPlatformMode] = useState<PlatformMode>(saved.platformMode ?? 'java');
+  const [platformMode, setPlatformMode] = useState<PlatformMode>(restoredSavedBuild.platformMode);
   const [compareMode, setCompareMode]   = useState(false);
   const [compareLeft,  setCompareLeft]  = useState<DitheringMode>('floyd-steinberg');
   const [compareRight, setCompareRight] = useState<DitheringMode>('yliluoma2');
   const [compareData, setCompareData]   = useState<{ left: ImageData; right: ImageData } | null>(null);
-  const [mapMode, setMapMode]           = useState<'2d' | '3d'>(saved.mapMode ?? '2d');
+  const [mapMode, setMapMode]           = useState<'2d' | '3d'>(restoredSavedBuild.mapMode);
+  const [buildTechnique, setBuildTechnique] = useState<BuildTechnique>(
+    restoredSavedBuild.buildTechnique,
+  );
+  const standardBuildSnapshotRef = useRef<{
+    minecraftVersion: MinecraftVersion;
+    platformMode: PlatformMode;
+    blockSelection: BlockSelection;
+    supportBlock: string;
+  } | null>(null);
   const [staircaseMode, setStaircaseMode] = useState<'classic' | 'optimized'>(saved.staircaseMode ?? 'optimized');
   const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
   const [dithering, setDithering]       = useState<DitheringMode>(coerceDitheringMode(saved.dithering));
@@ -359,7 +390,7 @@ export default function App() {
   const [processing, setProcessing]     = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [showShadeWarnings, setShowShadeWarnings] = useState(false);
-  const [blockSelection, setBlockSelection] = useState<BlockSelection>(saved.blockSelection ?? DEFAULT_SELECTION);
+  const [blockSelection, setBlockSelection] = useState<BlockSelection>(restoredSavedBuild.blockSelection);
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(normalizeAdjustments(saved.adjustments));
   const [colorMatch, setColorMatch]     = useState<ColorMatchMode>(coerceColorMatchMode(saved.colorMatch ?? DEFAULT_COLOR_MATCH));
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -614,6 +645,8 @@ export default function App() {
     mapMode: '2d' | '3d';
     staircaseMode: 'classic' | 'optimized';
     platformMode: PlatformMode;
+    minecraftVersion: MinecraftVersion;
+    buildTechnique: BuildTechnique;
   }>({
     imageData: null,
     blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode),
@@ -622,8 +655,34 @@ export default function App() {
     mapMode,
     staircaseMode,
     platformMode,
+    minecraftVersion,
+    buildTechnique,
   });
-  latestRef.current = { imageData, blockSelection, layers, activeLayerId: layerState.activeLayerId, mapMode, staircaseMode, platformMode };
+  latestRef.current = {
+    imageData,
+    blockSelection,
+    layers,
+    activeLayerId: layerState.activeLayerId,
+    mapMode,
+    staircaseMode,
+    platformMode,
+    minecraftVersion,
+    buildTechnique,
+  };
+
+  const normalizeIncomingBuildState = useCallback((
+    selection: BlockSelection,
+    requestedMapMode: '2d' | '3d',
+  ) => {
+    const current = latestRef.current;
+    return normalizeRestoredBuildState({
+      mapMode: requestedMapMode,
+      buildTechnique: current.buildTechnique,
+      minecraftVersion: current.minecraftVersion,
+      platformMode: current.platformMode,
+      blockSelection: selection,
+    });
+  }, []);
 
   // Ref to active layer — used in callbacks to check if layer has real content
   const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
@@ -646,8 +705,10 @@ export default function App() {
   useEffect(() => { saveSettings({ klussParams }); }, [klussParams]);
   useEffect(() => { saveSettings({ minecraftVersion }); }, [minecraftVersion]);
   useEffect(() => { saveSettings({ platformMode }); }, [platformMode]);
+  useEffect(() => { saveSettings({ buildTechnique }); }, [buildTechnique]);
   useEffect(() => {
     setBlockSelection(prev => sanitizeSelectionForPlatform(prev, platformMode));
+    setBuildTechnique(previous => coerceBuildTechniqueForPlatform(previous, platformMode));
   }, [platformMode]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
 
@@ -657,14 +718,14 @@ export default function App() {
   useEffect(() => {
     const layer = layersRef.current.find(l => l.id === activeLayerId);
     if (!layer) return;
-    setMapMode(layer.mapMode ?? '2d');
+    setMapMode(buildTechnique === 'suppression_two_layer' ? '3d' : (layer.mapMode ?? '2d'));
     setStaircaseMode(layer.staircaseMode ?? 'optimized');
     if (layer.dithering !== undefined) setDithering(coerceDitheringMode(layer.dithering));
     setSelectionMask(null);
     if (layer.sourceImage !== undefined) setSourceImage(layer.sourceImage);
     if ('sourceFile' in layer) uploadedFileRef.current = layer.sourceFile ?? null;
     if ('sourceUploadedImage' in layer) uploadedImageRef.current = layer.sourceUploadedImage ?? null;
-  }, [activeLayerId]);
+  }, [activeLayerId, buildTechnique]);
 
   // Push current state onto undo stack before a tracked action
   const pushToHistory = useCallback(() => {
@@ -687,11 +748,14 @@ export default function App() {
       setRedoStack(r => [...r, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }]);
       // Target the correct layer, not necessarily the active one
       processTargetLayerIdRef.current = entry.layerId;
+      const restored = normalizeIncomingBuildState(entry.blockSelection, cur.mapMode);
       setImageData(entry.imageData);
-      setBlockSelection(entry.blockSelection);
+      setMapMode(restored.mapMode);
+      setMinecraftVersion(restored.minecraftVersion);
+      setBlockSelection(restored.blockSelection);
       return prev.slice(0, -1);
     });
-  }, []);
+  }, [normalizeIncomingBuildState]);
 
   const handleRedo = useCallback(() => {
     setRedoStack(prev => {
@@ -704,11 +768,14 @@ export default function App() {
         return next.length > MAX_HISTORY ? next.slice(1) : next;
       });
       processTargetLayerIdRef.current = entry.layerId;
+      const restored = normalizeIncomingBuildState(entry.blockSelection, cur.mapMode);
       setImageData(entry.imageData);
-      setBlockSelection(entry.blockSelection);
+      setMapMode(restored.mapMode);
+      setMinecraftVersion(restored.minecraftVersion);
+      setBlockSelection(restored.blockSelection);
       return prev.slice(0, -1);
     });
-  }, []);
+  }, [normalizeIncomingBuildState]);
 
   // Keyboard shortcuts for undo/redo + export — effect registered below,
   // after handleExportPng/handleExportLitematic are declared.
@@ -979,14 +1046,16 @@ export default function App() {
 
     // Load new frame's config
     const newConfig = updatedConfigs[index];
+    const normalizedBuild = normalizeIncomingBuildState(newConfig.blockSelection, newConfig.mapMode);
     setDithering(coerceDitheringMode(newConfig.dithering));
     setIntensity(newConfig.intensity);
-    setMapMode(newConfig.mapMode);
+    setMapMode(normalizedBuild.mapMode);
+    setMinecraftVersion(normalizedBuild.minecraftVersion);
     setStaircaseMode(newConfig.staircaseMode);
     setAdjustments(newConfig.adjustments);
     setBnScale(newConfig.bnScale);
     setKlussParams(newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
-    setBlockSelection(newConfig.blockSelection);
+    setBlockSelection(normalizedBuild.blockSelection);
 
     // Load new frame into editor
     const img = await imageDataToHtmlImage(gifProject.frames[index]);
@@ -999,10 +1068,15 @@ export default function App() {
     }));
     setUndoStack([]);
     setRedoStack([]);
-    const cfgShades = newConfig.mapMode === '2d' ? [1] : [0, 1, 2];
-    const pal = buildComputedPalette(buildPaletteFromSelection(newConfig.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
+    const cfgShades = normalizedBuild.mapMode === '2d' ? [1] : [0, 1, 2];
+    const pal = buildComputedPalette(buildPaletteFromSelection(
+      normalizedBuild.blockSelection,
+      cfgShades,
+      normalizedBuild.minecraftVersion,
+      normalizedBuild.platformMode,
+    ), colorMatch);
     runProcess(img, coerceDitheringMode(newConfig.dithering), mapGrid, newConfig.intensity, compareMode, compareLeft, compareRight, pal, newConfig.adjustments, newConfig.bnScale, newConfig.klussParams ?? DEFAULT_KLUSS_PARAMS);
-  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, minecraftVersion, platformMode, colorMatch, mapGrid, compareMode, compareLeft, compareRight, runProcess]);
+  }, [gifProject, dithering, intensity, mapMode, staircaseMode, adjustments, bnScale, klussParams, blockSelection, colorMatch, mapGrid, compareMode, compareLeft, compareRight, normalizeIncomingBuildState, runProcess]);
 
   const handleGifProjectConfigChange = useCallback((index: number, partial: Partial<GifFrameConfig>) => {
     setGifProject(prev => {
@@ -1195,25 +1269,48 @@ export default function App() {
   }, [sourceImage, dithering, mapGrid, intensity, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
 
   const handleSelectionChange = useCallback((sel: BlockSelection) => {
+    const safeSelection = buildTechnique === 'suppression_two_layer'
+      ? sanitizeSelectionForSuppression(sel, minecraftVersion, platformMode)
+      : sel;
     pushToHistory();
-    setBlockSelection(sel);
+    setBlockSelection(safeSelection);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(sel, shades, minecraftVersion, platformMode), colorMatch);
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(safeSelection, shades, minecraftVersion, platformMode), colorMatch);
     if (sourceImage) {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, mapMode, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, buildTechnique, pushToHistory, runProcess]);
 
-  const handleMapModeChange = useCallback((mode: '2d' | '3d') => {
+  const handleBuildModeChange = useCallback((mode: EditorBuildMode) => {
+    const enteringSuppression = mode === 'suppression_two_layer' && buildTechnique !== 'suppression_two_layer';
+    const leavingSuppression = mode !== 'suppression_two_layer' && buildTechnique === 'suppression_two_layer';
+    if (enteringSuppression) {
+      standardBuildSnapshotRef.current = { minecraftVersion, platformMode, blockSelection, supportBlock };
+    }
+    const resolved = resolveEditorBuildMode(mode, minecraftVersion);
+    const restored = leavingSuppression ? standardBuildSnapshotRef.current : null;
+    const nextVersion = restored?.minecraftVersion ?? resolved.minecraftVersion;
+    const nextPlatform = mode === 'suppression_two_layer' ? 'java' : (restored?.platformMode ?? platformMode);
+    const nextSelection = mode === 'suppression_two_layer'
+      ? sanitizeSelectionForSuppression(blockSelection, nextVersion, nextPlatform)
+      : (restored?.blockSelection ?? blockSelection);
+
     trackEvent('map_mode_applied', { map_mode: mode });
-    setMapMode(mode);
+    setMapMode(resolved.mapMode);
+    setBuildTechnique(resolved.buildTechnique);
+    setMinecraftVersion(nextVersion);
+    setPlatformMode(nextPlatform);
+    setBlockSelection(nextSelection);
+    if (enteringSuppression) setSupportBlock(sanitizeSuppressionSupportBlock(supportBlock));
+    if (leavingSuppression && restored) setSupportBlock(restored.supportBlock);
+    if (leavingSuppression) standardBuildSnapshotRef.current = null;
     setLayerState(prev => ({
       ...prev,
-      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: mode } : l),
+      layers: prev.layers.map(l => l.id === prev.activeLayerId ? { ...l, mapMode: resolved.mapMode } : l),
     }));
-    const shades = mode === '2d' ? [1] : [0, 1, 2];
-    const newPalette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
+    const shades = resolved.mapMode === '2d' ? [1] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(nextSelection, shades, nextVersion, nextPlatform), colorMatch);
     if (sourceImage && activeLayerHasContent(activeLayerRef)) {
       if (activeLayerRef.current?.isDirty) {
         const img = activeLayerRef.current.imageData;
@@ -1226,7 +1323,19 @@ export default function App() {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, runProcess]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, buildTechnique, supportBlock, runProcess]);
+
+  const handlePlatformModeChange = useCallback((next: PlatformMode) => {
+    if (isPlatformLockedForBuildTechnique(buildTechnique)) return;
+    setPlatformMode(next);
+  }, [buildTechnique]);
+
+  const handleMinecraftVersionChange = useCallback((version: MinecraftVersion) => {
+    setMinecraftVersion(version);
+    setBlockSelection(previous => buildTechnique === 'suppression_two_layer'
+      ? sanitizeSelectionForSuppression(previous, version, platformMode)
+      : sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode));
+  }, [buildTechnique, platformMode]);
 
   const handleStaircaseModeChange = useCallback((mode: 'classic' | 'optimized') => {
     trackEvent('staircase_mode_applied', { staircase_mode: mode });
@@ -1532,11 +1641,30 @@ export default function App() {
 
   // ── Project save / load ──────────────────────────────────────────────────────
 
+  const applyProjectJsonRef = useRef<(json: string, successMessage?: string) => Promise<boolean>>(async () => false);
+
   const handleSaveProject = useCallback(() => {
-    const json = serializeProject(layers, activeLayerId, mapGrid);
+    const settings: FullProjectSettings = {
+      dithering,
+      intensity,
+      blockSelection: blockSelection as Record<string, number[]>,
+      adjustments,
+      colorMatch,
+      mapMode,
+      staircaseMode,
+      bnScale,
+      klussParams,
+      originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
+      minecraftVersion,
+      platformMode,
+      buildTechnique,
+      supportBlock,
+      supportMode,
+    };
+    const json = serializeFullProject(layers, activeLayerId, mapGrid, settings, layerGroups);
     const name = `MapKluss_${mapGrid.wide}x${mapGrid.tall}_${new Date().toISOString().slice(0,10)}.mapkluss`;
     downloadProject(json, name);
-  }, [layers, activeLayerId, mapGrid]);
+  }, [activeLayerId, adjustments, blockSelection, bnScale, buildTechnique, colorMatch, dithering, intensity, klussParams, layerGroups, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode, supportBlock, supportMode]);
 
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
   const handleLoadProject = useCallback(() => {
@@ -1548,19 +1676,11 @@ export default function App() {
       input.onchange = () => {
         const file = input.files?.[0];
         if (!file) return;
-        file.text().then(json => {
-          const result = deserializeProject(json);
-          if (!result) {
+        file.text().then(async json => {
+          const loaded = await applyProjectJsonRef.current(json, t('Проект загружен.', 'Project loaded.'));
+          if (!loaded) {
             showAppNotice(t('Не удалось загрузить проект: файл повреждён или несовместим.', 'Could not load project: file is damaged or incompatible.'), 'error');
-            return;
           }
-          setMapGrid(result.grid);
-          setLayerState({ layers: result.layers, activeLayerId: result.activeLayerId, groups: [] });
-          setSourceImage(null);
-          setOriginalData(null);
-          setCompareData(null);
-          setUndoStack([]);
-          setRedoStack([]);
         });
       };
       projectFileInputRef.current = input;
@@ -1618,19 +1738,30 @@ export default function App() {
   // ── Reset all settings to defaults ───────────────────────────────────────
   const handleResetDefaults = useCallback(() => {
     clearSettings();
+    const normalizedBuild = normalizeIncomingBuildState(
+      sanitizeSelectionForPlatform(DEFAULT_SELECTION, latestRef.current.platformMode),
+      '2d',
+    );
     setDithering('floyd-steinberg');
     setIntensity(100);
     setBnScale(2);
     setMapGrid({ wide: 1, tall: 1 });
-    setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode));
+    setBlockSelection(normalizedBuild.blockSelection);
     setAdjustments(DEFAULT_ADJUSTMENTS);
     setColorMatch(DEFAULT_COLOR_MATCH);
-    setMapMode('2d');
+    setMapMode(normalizedBuild.mapMode);
+    setMinecraftVersion(normalizedBuild.minecraftVersion);
     if (sourceImage) {
-      const palette = buildComputedPalette(buildPaletteFromSelection(DEFAULT_SELECTION, [1], minecraftVersion, platformMode), DEFAULT_COLOR_MATCH);
+      const shades = normalizedBuild.mapMode === '2d' ? [1] : [0, 1, 2];
+      const palette = buildComputedPalette(buildPaletteFromSelection(
+        normalizedBuild.blockSelection,
+        shades,
+        normalizedBuild.minecraftVersion,
+        normalizedBuild.platformMode,
+      ), DEFAULT_COLOR_MATCH);
       runProcess(sourceImage, 'floyd-steinberg', { wide: 1, tall: 1 }, 100, compareMode, compareLeft, compareRight, palette, DEFAULT_ADJUSTMENTS, 2, DEFAULT_KLUSS_PARAMS);
     }
-  }, [sourceImage, compareMode, compareLeft, compareRight, minecraftVersion, platformMode, runProcess]);
+  }, [sourceImage, compareMode, compareLeft, compareRight, normalizeIncomingBuildState, runProcess]);
 
   // ── Load from ?palette= URL param (runs once on mount) ───────────────────
   // ?share= and ?example= take priority because they restore their own settings.
@@ -1642,9 +1773,9 @@ export default function App() {
     if (shareId || exampleId || params.get('companionImport') || params.get('artVersion') || params.get('art') || !paletteQ) return;
     const sel = decodePalette(paletteQ);
     if (!sel) return;
-    setBlockSelection(sel);
+    setBlockSelection(normalizeIncomingBuildState(sel, latestRef.current.mapMode).blockSelection);
     setPaletteBanner(true);
-  }, []);
+  }, [normalizeIncomingBuildState]);
 
   // ── Load from ?share= URL param (runs once on mount) ──────────────────────
   // Using a ref to prevent double-execution in React StrictMode
@@ -1664,10 +1795,28 @@ export default function App() {
       if (s.intensity != null)  setIntensity(s.intensity);
       if (s.bnScale != null)    setBnScale(s.bnScale);
       if (s.mapGrid)         setMapGrid(s.mapGrid);
-      if (s.blockSelection)  setBlockSelection(s.blockSelection);
+      const normalizedBuild = normalizeRestoredBuildState({
+        mapMode: s.mapMode ?? '2d',
+        buildTechnique: s.buildTechnique,
+        minecraftVersion: s.minecraftVersion ?? '1.21.4',
+        platformMode: s.platformMode ?? 'java',
+        blockSelection: s.blockSelection ?? DEFAULT_SELECTION,
+      });
+      setBlockSelection(normalizedBuild.blockSelection);
       if (s.adjustments)     setAdjustments(normalizeAdjustments(s.adjustments));
       if (s.colorMatch)      setColorMatch(coerceColorMatchMode(s.colorMatch));
-      if (s.mapMode)         setMapMode(s.mapMode);
+      setMapMode(normalizedBuild.mapMode);
+      setMinecraftVersion(normalizedBuild.minecraftVersion);
+      setPlatformMode(normalizedBuild.platformMode);
+      setBuildTechnique(normalizedBuild.buildTechnique);
+      setSupportBlock(normalizedBuild.buildTechnique === 'suppression_two_layer'
+        ? sanitizeSuppressionSupportBlock(s.supportBlock ?? 'stone')
+        : (s.supportBlock ?? 'stone'));
+      if (s.supportMode === 1 || s.supportMode === 2 || s.supportMode === 3) {
+        setSupportMode(s.supportMode);
+      }
+      if (s.staircaseMode) setStaircaseMode(s.staircaseMode);
+      standardBuildSnapshotRef.current = null;
 
       // Load source image from storage
       const img = new Image();
@@ -1677,9 +1826,14 @@ export default function App() {
         setViewBanner(true);
         setUndoStack([]);
         setRedoStack([]);
-        const shades = (s.mapMode ?? '2d') === '2d' ? [1] : [0, 1, 2];
+        const shades = normalizedBuild.mapMode === '2d' ? [1] : [0, 1, 2];
         const palette = buildComputedPalette(
-          buildPaletteFromSelection(s.blockSelection ?? DEFAULT_SELECTION, shades, minecraftVersion, platformMode),
+          buildPaletteFromSelection(
+            normalizedBuild.blockSelection,
+            shades,
+            normalizedBuild.minecraftVersion,
+            normalizedBuild.platformMode,
+          ),
           coerceColorMatchMode(s.colorMatch),
         );
         runProcess(
@@ -1716,6 +1870,14 @@ export default function App() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      const current = latestRef.current;
+      const normalizedBuild = normalizeRestoredBuildState({
+        mapMode: trySettings.mapMode,
+        buildTechnique: 'standard',
+        minecraftVersion: current.minecraftVersion,
+        platformMode: current.platformMode,
+        blockSelection: current.blockSelection,
+      });
       uploadedFileRef.current = null;
       uploadedImageRef.current = img;
       setSourceImage(img);
@@ -1724,7 +1886,12 @@ export default function App() {
       setDithering(trySettings.dithering);
       setIntensity(trySettings.intensity);
       setMapGrid(trySettings.mapGrid);
-      setMapMode(trySettings.mapMode);
+      setMapMode(normalizedBuild.mapMode);
+      setMinecraftVersion(normalizedBuild.minecraftVersion);
+      setPlatformMode(normalizedBuild.platformMode);
+      setBuildTechnique(normalizedBuild.buildTechnique);
+      setBlockSelection(normalizedBuild.blockSelection);
+      standardBuildSnapshotRef.current = null;
       setStaircaseMode(trySettings.staircaseMode);
       setBnScale(trySettings.bnScale);
       setViewBanner(true);
@@ -1738,13 +1905,18 @@ export default function App() {
           sourceFile: null,
           sourceUploadedImage: img,
           dithering: trySettings.dithering,
-          mapMode: trySettings.mapMode,
+          mapMode: normalizedBuild.mapMode,
           staircaseMode: trySettings.staircaseMode,
           isDirty: false,
         } : l),
       }));
-      const shades = trySettings.mapMode === '2d' ? [1] : [0, 1, 2];
-      const palette = buildComputedPalette(buildPaletteFromSelection(blockSelection, shades, minecraftVersion, platformMode), colorMatch);
+      const shades = normalizedBuild.mapMode === '2d' ? [1] : [0, 1, 2];
+      const palette = buildComputedPalette(buildPaletteFromSelection(
+        normalizedBuild.blockSelection,
+        shades,
+        normalizedBuild.minecraftVersion,
+        normalizedBuild.platformMode,
+      ), colorMatch);
       runProcess(
         img,
         trySettings.dithering,
@@ -2044,9 +2216,12 @@ export default function App() {
       originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
       minecraftVersion,
       platformMode,
+      buildTechnique,
+      supportBlock,
+      supportMode,
     };
     return serializeFullProject(layers, activeLayerId, mapGrid, settings, layerGroups);
-  }, [activeLayerId, adjustments, blockSelection, bnScale, colorMatch, dithering, intensity, klussParams, layerGroups, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode]);
+  }, [activeLayerId, adjustments, blockSelection, bnScale, buildTechnique, colorMatch, dithering, intensity, klussParams, layerGroups, layers, mapGrid, mapMode, minecraftVersion, platformMode, staircaseMode, supportBlock, supportMode]);
 
   const handleCloudSignInFromEditor = useCallback(async () => {
     setShowCloudArtsPanel(true);
@@ -2095,7 +2270,10 @@ export default function App() {
         title,
         privacy,
         projectJson: buildCurrentCloudProjectJson(),
-        imageData: outputImage,
+        // Keep Cloud construction artifacts byte-for-byte aligned with the
+        // same composite buffer used by local exports. The preview may use a
+        // display-specific buffer, but must not change Two-layer tile hashes.
+        imageData: compositeImageData ?? outputImage,
         previewImageData: outputImage,
         grid: mapGrid,
         mode: mapMode,
@@ -2110,6 +2288,7 @@ export default function App() {
         bnScale,
         klussParams,
         platformMode,
+        buildTechnique,
       });
 
       await setCompanionFavorite(manifest.artId, true);
@@ -2137,7 +2316,7 @@ export default function App() {
     } finally {
       setCloudSaving(false);
     }
-  }, [activePalette, blockSelection, bnScale, buildCurrentCloudProjectJson, cloudSaving, compositeImageData, currentCloudArtId, currentCloudImportId, dithering, intensity, klussParams, mapGrid, mapMode, minecraftVersion, platformMode, previewImageData, showAppNotice, staircaseMode, supportBlock, supportMode, t]);
+  }, [activePalette, blockSelection, bnScale, buildCurrentCloudProjectJson, buildTechnique, cloudSaving, compositeImageData, currentCloudArtId, currentCloudImportId, dithering, intensity, klussParams, mapGrid, mapMode, minecraftVersion, platformMode, previewImageData, showAppNotice, staircaseMode, supportBlock, supportMode, t]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -2206,6 +2385,9 @@ export default function App() {
         originalDataB64: originalDataRef.current ? imageDataToBase64(originalDataRef.current) : undefined,
         minecraftVersion,
         platformMode,
+        buildTechnique,
+        supportBlock,
+        supportMode,
       };
       const data = serializeFullProject(layers, activeLayerId, mapGrid, settings, layerGroups);
       const id = Date.now().toString();
@@ -2215,7 +2397,7 @@ export default function App() {
       console.error('Failed to save project to history', err);
       showAppNotice(t('Не удалось сохранить проект в историю.', 'Could not save project to history.'), 'error');
     }
-  }, [layers, activeLayerId, layerGroups, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, saveThumbnail, showAppNotice, t]);
+  }, [layers, activeLayerId, layerGroups, mapGrid, dithering, intensity, blockSelection, adjustments, colorMatch, mapMode, staircaseMode, bnScale, klussParams, minecraftVersion, platformMode, buildTechnique, supportBlock, supportMode, saveThumbnail, showAppNotice, t]);
 
   const handleLoadProjectFromHistory = useCallback(async (id: string) => {
     try {
@@ -2223,6 +2405,13 @@ export default function App() {
       if (!stored) { console.error('Project not found:', id); return; }
       const result = deserializeFullProject(stored.data);
       if (!result) { console.error('Failed to deserialize project', id); return; }
+      const restoredBuild = normalizeRestoredBuildState({
+        mapMode: result.settings.mapMode,
+        buildTechnique: result.settings.buildTechnique,
+        minecraftVersion: result.settings.minecraftVersion ?? '1.21.4',
+        platformMode: result.settings.platformMode ?? 'java',
+        blockSelection: result.settings.blockSelection as BlockSelection,
+      });
       setMapGrid(result.grid);
       // Mark all layers dirty so runProcess never overwrites restored content.
       // Also stamp per-layer mapMode/staircaseMode/dithering so the useEffect([activeLayerId])
@@ -2233,26 +2422,27 @@ export default function App() {
       const restoredLayers = result.layers.map(l => ({
         ...l,
         isDirty: l.isDirty ?? !canReprocess,
-        mapMode: l.mapMode ?? result.settings.mapMode,
+        mapMode: restoredBuild.buildTechnique === 'suppression_two_layer' ? '3d' : (l.mapMode ?? restoredBuild.mapMode),
         staircaseMode: l.staircaseMode ?? result.settings.staircaseMode,
         dithering: coerceDitheringMode(l.dithering ?? result.settings.dithering),
       }));
       setLayerState({ layers: restoredLayers, activeLayerId: result.activeLayerId, groups: result.groups });
       setDithering(coerceDitheringMode(result.settings.dithering));
       setIntensity(result.settings.intensity);
-      setBlockSelection(result.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
+      setBlockSelection(restoredBuild.blockSelection);
       setAdjustments(normalizeAdjustments(result.settings.adjustments));
       setColorMatch(coerceColorMatchMode(result.settings.colorMatch));
-      setMapMode(result.settings.mapMode);
+      setMapMode(restoredBuild.mapMode);
       setStaircaseMode(result.settings.staircaseMode);
       setBnScale(result.settings.bnScale);
       setKlussParams(result.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
-      if (result.settings.minecraftVersion) {
-        setMinecraftVersion(result.settings.minecraftVersion);
-      }
-      if (result.settings.platformMode) {
-        setPlatformMode(result.settings.platformMode);
-      }
+      setMinecraftVersion(restoredBuild.minecraftVersion);
+      setPlatformMode(restoredBuild.platformMode);
+      setBuildTechnique(restoredBuild.buildTechnique);
+      setSupportBlock(restoredBuild.buildTechnique === 'suppression_two_layer'
+        ? sanitizeSuppressionSupportBlock(result.settings.supportBlock ?? 'stone')
+        : (result.settings.supportBlock ?? 'stone'));
+      setSupportMode(result.settings.supportMode ?? 2);
 
       // Restore originalData (pre-dithering image) if it was saved, and create virtual sourceImage for reprocessing
       if (result.settings.originalDataB64) {
@@ -2282,27 +2472,39 @@ export default function App() {
   const applyProjectJsonToEditor = useCallback(async (json: string, successMessage?: string) => {
     const full = deserializeFullProject(json);
     if (full) {
+      const restoredBuild = normalizeRestoredBuildState({
+        mapMode: full.settings.mapMode,
+        buildTechnique: full.settings.buildTechnique,
+        minecraftVersion: full.settings.minecraftVersion ?? '1.21.4',
+        platformMode: full.settings.platformMode ?? 'java',
+        blockSelection: full.settings.blockSelection as BlockSelection,
+      });
       setMapGrid(full.grid);
       const canReprocess = !!full.settings.originalDataB64;
       const restoredLayers = full.layers.map(layer => ({
         ...layer,
         isDirty: layer.isDirty ?? !canReprocess,
-        mapMode: layer.mapMode ?? full.settings.mapMode,
+        mapMode: restoredBuild.buildTechnique === 'suppression_two_layer' ? '3d' : (layer.mapMode ?? restoredBuild.mapMode),
         staircaseMode: layer.staircaseMode ?? full.settings.staircaseMode,
         dithering: coerceDitheringMode(layer.dithering ?? full.settings.dithering),
       }));
       setLayerState({ layers: restoredLayers, activeLayerId: full.activeLayerId, groups: full.groups });
       setDithering(coerceDitheringMode(full.settings.dithering));
       setIntensity(full.settings.intensity);
-      setBlockSelection(full.settings.blockSelection as import('./lib/paletteBlocks').BlockSelection);
+      setBlockSelection(restoredBuild.blockSelection);
       setAdjustments(normalizeAdjustments(full.settings.adjustments));
       setColorMatch(coerceColorMatchMode(full.settings.colorMatch));
-      setMapMode(full.settings.mapMode);
+      setMapMode(restoredBuild.mapMode);
       setStaircaseMode(full.settings.staircaseMode);
       setBnScale(full.settings.bnScale);
       setKlussParams(full.settings.klussParams ?? DEFAULT_KLUSS_PARAMS);
-      if (full.settings.minecraftVersion) setMinecraftVersion(full.settings.minecraftVersion);
-      if (full.settings.platformMode) setPlatformMode(full.settings.platformMode);
+      setMinecraftVersion(restoredBuild.minecraftVersion);
+      setPlatformMode(restoredBuild.platformMode);
+      setBuildTechnique(restoredBuild.buildTechnique);
+      setSupportBlock(restoredBuild.buildTechnique === 'suppression_two_layer'
+        ? sanitizeSuppressionSupportBlock(full.settings.supportBlock ?? 'stone')
+        : (full.settings.supportBlock ?? 'stone'));
+      setSupportMode(full.settings.supportMode ?? 2);
 
       if (full.settings.originalDataB64) {
         const width = full.grid.wide * 128;
@@ -2342,6 +2544,7 @@ export default function App() {
     if (successMessage) showAppNotice(successMessage);
     return true;
   }, [showAppNotice]);
+  applyProjectJsonRef.current = applyProjectJsonToEditor;
 
   const estimateCurrentAutosaveBytes = useCallback(
     () => estimateAutosaveSnapshotBytes(layers, originalDataRef.current),
@@ -2581,14 +2784,32 @@ export default function App() {
       </header>
 
       {showAnnouncement && (
-        <div className="update-banner">
-          <div className="update-banner-main">
-            <span className="update-banner-badge">{t('ОБНОВЛЕНИЕ', 'UPDATE')}</span>
-            <span className="update-banner-text">
-              {t('Lens стал стабильнее, а у MapKluss появился новый логотип.',
-                'Lens is more stable, and MapKluss has a new logo.')}
-            </span>
+        <div
+          className="update-banner update-banner--companion"
+          role="region"
+          aria-label={t('Новость MapKluss Companion', 'MapKluss Companion announcement')}
+        >
+          <div className="update-banner-badge" aria-hidden="true">
+            <IconGlyph icon={mkIcons.hammer} size={15} />
+            <span>COMPANION</span>
+            <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
+          <div className="update-banner-ticker" aria-hidden="true">
+            <div className="update-banner-track">
+              {[0, 1].map(copy => (
+                <span className="update-banner-segment" key={copy}>
+                  <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
+                  <i />
+                  <span>{t('ГАЙД И ВСЕ ПОДРОБНОСТИ В TELEGRAM', 'GUIDE AND ALL DETAILS IN TELEGRAM')}</span>
+                  <IconGlyph icon={mkIcons.arrowRight} size={14} />
+                </span>
+              ))}
+            </div>
+          </div>
+          <span className="update-banner-sr">
+            {t('Появился полезный мод MapKluss Companion. Гайд и вся информация — в Telegram.',
+              'MapKluss Companion is now available. The guide and all details are on Telegram.')}
+          </span>
           <a
             className="update-banner-link"
             href={ANNOUNCEMENT.url}
@@ -2599,7 +2820,8 @@ export default function App() {
               setShowAnnouncement(false);
             }}
           >
-            {t('Читать в TG', 'Read on TG')}
+            <span>{t('В TELEGRAM', 'TELEGRAM')}</span>
+            <IconGlyph icon={mkIcons.arrowRight} size={13} />
           </a>
           <button
             className="update-banner-close"
@@ -2724,7 +2946,8 @@ export default function App() {
               mapGrid={mapGrid}
               onMapGridChange={handleMapGridChange}
               mapMode={mapMode}
-              onMapModeChange={handleMapModeChange}
+              buildTechnique={buildTechnique}
+              onBuildModeChange={handleBuildModeChange}
               staircaseMode={staircaseMode}
               onStaircaseModeChange={handleStaircaseModeChange}
               processing={processing}
@@ -3447,23 +3670,31 @@ export default function App() {
                 <select
                   className="version-selector-select"
                   value={minecraftVersion}
-                  onChange={e => { setMinecraftVersion(e.target.value as MinecraftVersion); setBlockSelection(sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode)); }}
+                  onChange={e => handleMinecraftVersionChange(e.target.value as MinecraftVersion)}
                 >
-                  {VALID_VERSIONS.map(v => (
+                  {(buildTechnique === 'suppression_two_layer' ? SUPPRESSION_TARGET_VERSIONS : VALID_VERSIONS).map(v => (
                     <option key={v} value={v}>{getVersionLabel(v)}</option>
                   ))}
                 </select>
               </div>
               <div className="version-selector-row">
                 <span className="version-selector-label">{t('Платформа', 'Platform')}</span>
-                <select
-                  className="version-selector-select"
-                  value={platformMode}
-                  onChange={e => setPlatformMode(e.target.value as PlatformMode)}
-                >
-                  <option value="java">Java</option>
-                  <option value="bedrock">Bedrock</option>
-                </select>
+                {isPlatformLockedForBuildTechnique(buildTechnique) ? (
+                  <div
+                    className="version-selector-lock"
+                    title={t('Two-layer работает только в Java Edition', 'Two-layer is Java Edition only')}
+                    aria-label={t('Платформа Java закреплена для Two-layer', 'Java platform is locked for Two-layer')}
+                  >Java</div>
+                ) : (
+                  <select
+                    className="version-selector-select"
+                    value={platformMode}
+                    onChange={e => handlePlatformModeChange(e.target.value as PlatformMode)}
+                  >
+                    <option value="java">Java</option>
+                    <option value="bedrock">Bedrock</option>
+                  </select>
+                )}
               </div>
               <PaletteEditor
                 blockSelection={blockSelection}
@@ -3472,18 +3703,33 @@ export default function App() {
                 disabled={processing}
                 minecraftVersion={minecraftVersion}
                 platformMode={platformMode}
+                suppressionMode={buildTechnique === 'suppression_two_layer'}
               />
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
-                <div className="support-block-section">
-                  <div className="support-block-section-title">{t('Опорный блок (3D)', 'Support block (3D)')}</div>
+                <div className={`support-block-section${buildTechnique === 'suppression_two_layer' ? ' support-block-section--suppression' : ''}`}>
+                  <div className="support-block-section-title">
+                    {buildTechnique === 'suppression_two_layer'
+                      ? t('Блок перепада высоты', 'Height-step block')
+                      : t('Опорный блок (3D)', 'Support block (3D)')}
+                  </div>
+                  {buildTechnique === 'suppression_two_layer' && (
+                    <div className="suppression-filler-help">
+                      {t(
+                        'Это часть двухслойного арта для нужного оттенка, а не основание или разметка.',
+                        'This is part of the two-layer art for the required shade, not a base or marker.',
+                      )}
+                    </div>
+                  )}
                   <div className="support-block-grid">
-                    {SUPPORT_BLOCKS_PALETTE.map(b => (
+                    {SUPPORT_BLOCKS_PALETTE
+                      .filter(b => buildTechnique !== 'suppression_two_layer' || isSuppressionSafeBlockName(b.nbt))
+                      .map(b => (
                       <button
                         key={b.nbt}
                         className={`support-block-item${supportBlock === b.nbt ? ' active' : ''}`}
                         onClick={() => setSupportBlock(b.nbt)}
-                        title={b.label}
+                        title={t(b.ru, b.en)}
                       >
                         <span
                           className="support-block-sprite"
@@ -3492,11 +3738,11 @@ export default function App() {
                             backgroundPosition: `-${b.blockId * 32}px -${b.csId * 32}px`,
                           }}
                         />
-                        <span className="support-block-item-label">{b.label}</span>
+                        <span className="support-block-item-label">{t(b.ru, b.en)}</span>
                       </button>
-                    ))}
-                    {/* None + Depth — spans 4 cells together */}
-                    <div className="support-none-depth">
+                      ))}
+                    {buildTechnique !== 'suppression_two_layer' && (
+                      <div className="support-none-depth">
                       <button
                         className={`support-block-item support-none-btn${supportBlock === 'air' ? ' active' : ''}`}
                         onClick={() => setSupportBlock('air')}
@@ -3517,22 +3763,32 @@ export default function App() {
                           >{SUPPORT_MODE_LABELS[m]}</button>
                         ))}
                       </div>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
             <div className="mobile-export-content">
-              <MaterialsList
-                imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
-                cp={activePalette}
-                blockSelection={blockSelection}
-                mapGrid={mapGrid}
-                mapMode={mapMode}
-                staircaseMode={staircaseMode}
-                supportBlock={supportBlock}
-                supportMode={supportMode}
-              />
+              {buildTechnique === 'suppression_two_layer' ? (
+                <div className="suppression-materials-note">
+                  {t(
+                    'Точные материалы и количество возвращаемых блоков будут в Two-layer ZIP.',
+                    'Exact materials and recoverable block counts are included in the Two-layer ZIP.',
+                  )}
+                </div>
+              ) : (
+                <MaterialsList
+                  imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
+                  cp={activePalette}
+                  blockSelection={blockSelection}
+                  mapGrid={mapGrid}
+                  mapMode={mapMode}
+                  staircaseMode={staircaseMode}
+                  supportBlock={supportBlock}
+                  supportMode={supportMode}
+                />
+              )}
             </div>
           </div>
           <div className="panel-footer mobile-export-content">
@@ -3569,6 +3825,7 @@ export default function App() {
               bnScale={bnScale}
               platformMode={platformMode}
               minecraftVersion={minecraftVersion}
+              buildTechnique={buildTechnique}
               onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
               onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
             />
@@ -3597,7 +3854,7 @@ export default function App() {
         <span><i className="status-dot" aria-hidden="true" /> {DITHERING_LABELS[dithering].toUpperCase()}</span>
         <span><i className="status-dot" aria-hidden="true" /> {mapGrid.wide}×{mapGrid.tall} MAPS</span>
         <span><i className="status-dot" aria-hidden="true" /> {activePalette.colors.length} COLORS</span>
-        <span><i className="status-dot" aria-hidden="true" /> {mapMode.toUpperCase()}</span>
+        <span><i className="status-dot" aria-hidden="true" /> {editorBuildMode(mapMode, buildTechnique).replace('suppression_two_layer', 'TWO-LAYER').toUpperCase()}</span>
         <span><i className="status-dot" aria-hidden="true" /> {zoom}%</span>
         {hasContent && <span><i className="status-dot" aria-hidden="true" /> {pw}×{ph}px</span>}
         {autosaveLabel && (

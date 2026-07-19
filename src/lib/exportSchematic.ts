@@ -22,23 +22,9 @@ import type { BlockVolume, SupportMode } from './exportLitematic';
 import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
-import type { MinecraftVersion } from './versionPresets';
+import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
 import { NbtWriter, gzipBytes, encodeVarint } from './nbt';
 import { getLegacyBlockId } from './legacyBlockIds';
-
-// ── Data-version numbers used in Sponge Schematic DataVersion field ──────────
-const MC_DATA_VERSIONS: Record<MinecraftVersion, number> = {
-  '1.12.2': 1343,
-  '1.13.2': 1631,
-  '1.14.4': 1976,
-  '1.15.2': 2230,
-  '1.16.5': 2730,
-  '1.17.1': 2730,
-  '1.18.2': 2860,
-  '1.19':   3105,
-  '1.20':   3463,
-  '1.21.4': 4082,
-};
 
 /** True when version → MCEdit legacy format; false → Sponge v2. */
 function isLegacyVersion(ver: MinecraftVersion): boolean {
@@ -111,7 +97,7 @@ function writeSpongeSchematic(vol: BlockVolume, _name: string, mcVersion: Minecr
   }
   const blockData = new Uint8Array(variantBytes);
 
-  const dataVersion = MC_DATA_VERSIONS[mcVersion] ?? 3953;
+  const dataVersion = minecraftDataVersion(mcVersion);
 
   const w = new NbtWriter();
   w.tagCompoundStart('Schematic');

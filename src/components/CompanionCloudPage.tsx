@@ -86,22 +86,22 @@ function usageRatio(used: number, limit: number): number {
 type ImportFilter = 'all' | 'needs_save' | 'saved' | 'missing_maps';
 type LibraryTab = 'arts' | 'favorites' | 'recent';
 
-const COMPANION_MOD_DOWNLOAD_REV = '20260710-lens-placement-recovery';
+const COMPANION_MOD_DOWNLOAD_REV = '20260719-large-two-layer';
 
 const COMPANION_MOD_VERSION_OPTIONS = [
   {
     minecraftVersion: '1.21.8',
     label: 'Minecraft 1.21.8',
     badge: 'рекомендуемая',
-    href: `/downloads/mod/mapkluss-companion-1.21.8-0.1.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.8-0.1.0.jar',
+    href: `/downloads/mod/mapkluss-companion-1.21.8-0.7.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.8-0.7.0.jar',
   },
   {
     minecraftVersion: '1.21.11',
     label: 'Minecraft 1.21.11',
     badge: 'новая',
-    href: `/downloads/mod/mapkluss-companion-1.21.11-0.1.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.11-0.1.0.jar',
+    href: `/downloads/mod/mapkluss-companion-1.21.11-0.7.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.11-0.7.0.jar',
   },
 ] as const;
 

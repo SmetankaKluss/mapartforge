@@ -80,7 +80,8 @@ const routeLoadError = (
 root.render(routeBootstrap);
 
 async function initializeBackend() {
-  await import('./lib/supabase.ts');
+  const { initializeSupabase } = await import('./lib/supabase.ts');
+  await initializeSupabase();
 }
 
 async function renderApplication() {

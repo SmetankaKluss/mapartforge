@@ -1,6 +1,7 @@
 import type { MapGrid } from './types';
 import type { DitheringMode } from './dithering';
 import type { MinecraftVersion } from './versionPresets';
+import type { BuildTechnique } from './buildTechnique';
 
 export type ArtPrivacy = 'private' | 'unlisted' | 'public';
 export type EditableArtPrivacy = 'private' | 'unlisted';
@@ -18,7 +19,10 @@ export type CompanionArtifactKind =
   | 'materials_csv'
   | 'mapdat_zip'
   | 'frame_commands'
-  | 'frame_datapack';
+  | 'frame_datapack'
+  | 'suppression_litematic'
+  | 'suppression_plan'
+  | 'suppression_bundle';
 
 export interface CompanionArtifactManifestEntry {
   id: string;
@@ -42,6 +46,7 @@ export interface CompanionArtManifest {
   mode: '2d' | '3d';
   dithering?: DitheringMode;
   minecraftVersion?: MinecraftVersion;
+  buildTechnique?: BuildTechnique;
   previewUrl: string | null;
   isFavorite?: boolean;
   collectionIds?: string[];

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
+import { BUILTIN_PRESET_LABELS, COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
 import { buildPaletteUrl } from '../lib/paletteShare';
@@ -12,6 +12,7 @@ import type { PlatformMode } from '../lib/platformMode';
 import { trackEvent } from '../lib/analytics';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { isSuppressionPaletteBlockAvailable } from '../lib/suppressionPalette';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
@@ -27,9 +28,10 @@ interface Props {
   disabled: boolean;
   minecraftVersion?: MinecraftVersion;
   platformMode?: PlatformMode;
+  suppressionMode?: boolean;
 }
 
-export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion, platformMode = 'java' }: Props) {
+export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion, platformMode = 'java', suppressionMode = false }: Props) {
   const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
   const [selectedPreset,  setSelectedPreset]  = useState('');
@@ -147,11 +149,11 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   }
 
   function toggleRow(csId: number) {
-    const row = COLOUR_ROWS[csId];
+    const row = versionRows.find(candidate => candidate.csId === csId);
     const cur = blockSelection[csId] ?? [];
     const hasSelection = cur.length > 0;
     // Toggle: if any block selected, deselect all; otherwise select first block
-    const next = hasSelection ? [] : [row.blocks[0]?.blockId ?? 0];
+    const next = hasSelection || !row?.blocks[0] ? [] : [row.blocks[0].blockId];
     trackEvent('palette_row_changed', { color_group: csId, selected: !hasSelection });
     onSelectionChange({ ...blockSelection, [csId]: next });
   }
@@ -164,11 +166,12 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         ...row,
         blocks: row.blocks.filter(b =>
           (!minecraftVersion || isBlockAvailable(b.nbtName, minecraftVersion))
-          && isBlockAvailableOnPlatform(b.nbtName, platformMode),
+          && isBlockAvailableOnPlatform(b.nbtName, platformMode)
+          && (!suppressionMode || !minecraftVersion || isSuppressionPaletteBlockAvailable(b, minecraftVersion, platformMode)),
         ),
       }))
       .filter(row => row.blocks.length > 0);
-  }, [minecraftVersion, platformMode]);
+  }, [minecraftVersion, platformMode, suppressionMode]);
 
   // ── Search filtering ─────────────────────────────────────────────────────
 
@@ -210,7 +213,9 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           <option value="">{t('— выбрать пресет —', '— select preset —')}</option>
           <optgroup label={t('Встроенные', 'Built-in')}>
             {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
-              <option key={name} value={name}>{name}</option>
+              <option key={name} value={name}>
+                {t(BUILTIN_PRESET_LABELS[name]?.ru ?? name, BUILTIN_PRESET_LABELS[name]?.en ?? name)}
+              </option>
             ))}
           </optgroup>
           {customNames.length > 0 && (

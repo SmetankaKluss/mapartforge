@@ -5,6 +5,7 @@ import type { BlockSelection } from './paletteBlocks';
 import type { ImageAdjustments } from './adjustments';
 import type { ColorMatchMode } from './colorMatch';
 import type { PlatformMode } from './platformMode';
+import type { BuildTechnique } from './buildTechnique';
 
 export interface SavedSettings {
   dithering: DitheringMode;
@@ -19,6 +20,9 @@ export interface SavedSettings {
   klussParams?: KlussParams;
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
   platformMode?: PlatformMode;
+  buildTechnique?: BuildTechnique;
+  supportBlock?: string;
+  supportMode?: 1 | 2 | 3;
 }
 
 const STORAGE_KEY = 'mapartforge-v4';

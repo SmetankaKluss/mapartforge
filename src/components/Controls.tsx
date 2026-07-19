@@ -9,6 +9,7 @@ import type { MapGrid } from '../lib/types';
 import { trackEvent } from '../lib/analytics';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import type { BuildTechnique, EditorBuildMode } from '../lib/buildTechnique';
 
 interface Props {
   dithering: DitheringMode;
@@ -25,7 +26,8 @@ interface Props {
   mapGrid: MapGrid;
   onMapGridChange: (g: MapGrid) => void;
   mapMode: '2d' | '3d';
-  onMapModeChange: (mode: '2d' | '3d') => void;
+  buildTechnique: BuildTechnique;
+  onBuildModeChange: (mode: EditorBuildMode) => void;
   staircaseMode: 'classic' | 'optimized';
   onStaircaseModeChange: (mode: 'classic' | 'optimized') => void;
   processing: boolean;
@@ -240,7 +242,7 @@ export function Controls({
   bnScale, onBnScaleChange,
   klussParams, onKlussParamsChange,
   mapGrid, onMapGridChange,
-  mapMode, onMapModeChange,
+  mapMode, buildTechnique, onBuildModeChange,
   staircaseMode, onStaircaseModeChange,
   processing,
   isBlankCanvas,
@@ -470,34 +472,40 @@ export function Controls({
           {t('Режим', 'Mode')}
         </h2>
         <div className={`control-group-content${collapsedSections['map-mode'] ? ' collapsed' : ''}`}>
-          <div className="mode-toggle">
+          <div className="mode-toggle mode-toggle-three">
             <button
-              className={`mode-btn${mapMode === '2d' ? ' active' : ''}`}
-              onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); onMapModeChange('2d'); }}
+              className={`mode-btn${buildTechnique === 'standard' && mapMode === '2d' ? ' active' : ''}`}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); onBuildModeChange('2d'); }}
               disabled={processing}
-              title="2D flat — one shade per color, ~61 colors"
-            >2D Flat</button>
+              title={t('2D — плоский арт, один оттенок каждого цвета', '2D — flat art with one shade per colour')}
+            >2D</button>
             <button
-              className={`mode-btn${mapMode === '3d' ? ' active' : ''}`}
-              onClick={() => { trackEvent('map_mode_changed', { map_mode: '3d' }); onMapModeChange('3d'); }}
+              className={`mode-btn${buildTechnique === 'standard' && mapMode === '3d' ? ' active' : ''}`}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '3d' }); onBuildModeChange('3d'); }}
               disabled={processing}
-              title="3D staircase — 3 shades per color, ~183 colors"
-            >3D Stair</button>
+              title={t('3D — обычные лесенки, три оттенка каждого цвета', '3D — ordinary staircases with three shades per colour')}
+            >3D</button>
+            <button
+              className={`mode-btn${buildTechnique === 'suppression_two_layer' ? ' active' : ''}`}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: 'two_layer' }); onBuildModeChange('suppression_two_layer'); }}
+              disabled={processing}
+              title={t('Two-layer — полное качество 3D без постоянных лесенок', 'Two-layer — full 3D quality without permanent staircases')}
+            >Two-layer</button>
           </div>
-          {mapMode === '3d' && (
+          {mapMode === '3d' && buildTechnique === 'standard' && (
             <div className="mode-toggle" style={{ marginTop: '6px' }}>
               <button
                 className={`mode-btn${staircaseMode === 'classic' ? ' active' : ''}`}
                 onClick={() => { trackEvent('staircase_mode_changed', { staircase_mode: 'classic' }); onStaircaseModeChange('classic'); }}
                 disabled={processing}
-                title="Classic: each shade at its own height"
+                title={t('Классический: каждый оттенок на своей высоте', 'Classic: each shade at its own height')}
                 style={{ fontSize: '10px' }}
               >Classic</button>
               <button
                 className={`mode-btn${staircaseMode === 'optimized' ? ' active' : ''}`}
                 onClick={() => { trackEvent('staircase_mode_changed', { staircase_mode: 'optimized' }); onStaircaseModeChange('optimized'); }}
                 disabled={processing}
-                title="Optimized: all shades at height 0, texture only"
+                title={t('Оптимизированный: все оттенки на одной высоте, меняется только текстура', 'Optimized: all shades at one height, texture only')}
                 style={{ fontSize: '10px' }}
               >Optimized</button>
             </div>

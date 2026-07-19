@@ -1,5 +1,5 @@
 import type { MapGrid } from './types';
-import type { MinecraftVersion } from './versionPresets';
+import { minecraftDataPackFormat, usesMapIdComponent, type MinecraftVersion } from './versionPresets';
 
 export interface FrameCommandOptions {
   mapGrid: MapGrid;
@@ -25,7 +25,7 @@ const PLAYER_FACING_RULES = [
 ] as const;
 
 function usesLegacyMapItemNbt(version: MinecraftVersion | undefined): boolean {
-  return version !== '1.21.4';
+  return !usesMapIdComponent(version);
 }
 
 function mapItemNbt(mapId: number, version: MinecraftVersion | undefined): string {
@@ -36,8 +36,7 @@ function mapItemNbt(mapId: number, version: MinecraftVersion | undefined): strin
 }
 
 function packFormatForVersion(version: MinecraftVersion | undefined): number {
-  if (version === '1.21.4') return 48;
-  return 15;
+  return minecraftDataPackFormat(version);
 }
 
 function clampStartMapId(value: number): number {
@@ -65,7 +64,7 @@ export function buildFrameFillCommands({
   const lastId = firstId + mapGrid.wide * mapGrid.tall - 1;
   const lines: string[] = [
     '# MapKluss item frame fill commands',
-    `# Minecraft ${minecraftVersion === '1.21.4' ? 'Java 1.21.4+' : 'Java 1.20.1 compatible'}`,
+    `# Minecraft Java ${minecraftVersion ?? '1.21.4'}`,
     `# Maps: map_${firstId}.dat ... map_${lastId}.dat`,
     `# Grid: ${mapGrid.wide}x${mapGrid.tall}`,
     '#',

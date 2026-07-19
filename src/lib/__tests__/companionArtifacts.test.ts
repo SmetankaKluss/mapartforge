@@ -9,6 +9,12 @@ describe('companion artifact naming', () => {
       .toBe('castle_01_2x3_mapdat.zip');
     expect(companionArtifactFilename('Castle 01', { wide: 2, tall: 3 }, 'frame_commands'))
       .toBe('castle_01_2x3_frames.mcfunction');
+    expect(companionArtifactFilename('Castle 01', { wide: 1, tall: 1 }, 'suppression_litematic'))
+      .toBe('castle_01_1x1_suppression.litematic');
+    expect(companionArtifactFilename('Castle 01', { wide: 1, tall: 1 }, 'suppression_plan'))
+      .toBe('castle_01_1x1_suppression_plan.json');
+    expect(companionArtifactFilename('Castle 01', { wide: 3, tall: 2 }, 'suppression_bundle'))
+      .toBe('castle_01_3x2_two_layer.zip');
   });
 
   it('keeps cyrillic names readable and falls back for empty names', () => {

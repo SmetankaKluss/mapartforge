@@ -2,6 +2,7 @@ import type { Layer, LayerBuildMode, LayerGroup } from './layers';
 import type { MapGrid } from './types';
 import { base64ToBytes, bytesToBase64 } from './base64';
 import type { TextLayerMeta } from '../components/previewCanvasShared';
+import { coerceBuildTechnique, type BuildTechnique } from './buildTechnique';
 
 interface SerializedLayer {
   id: string;
@@ -137,6 +138,9 @@ export interface FullProjectSettings {
   originalDataB64?: string; // base64-encoded pre-dithering image data for reprocessing
   minecraftVersion?: import('./versionPresets').MinecraftVersion;
   platformMode?: import('./platformMode').PlatformMode;
+  buildTechnique?: BuildTechnique;
+  supportBlock?: string;
+  supportMode?: 1 | 2 | 3;
 }
 
 interface FullProjectDataV2 {
@@ -152,7 +156,14 @@ interface FullProjectDataV3 {
   settings: FullProjectSettings;
 }
 
-type FullProjectData = FullProjectDataV2 | FullProjectDataV3;
+interface FullProjectDataV4 {
+  version: 4;
+  project: ProjectFile;
+  groups: LayerGroup[];
+  settings: FullProjectSettings;
+}
+
+type FullProjectData = FullProjectDataV2 | FullProjectDataV3 | FullProjectDataV4;
 
 export function serializeFullProject(
   layers: Layer[],
@@ -170,7 +181,12 @@ export function serializeFullProject(
     layers: serialized,
   };
 
-  const full: FullProjectDataV3 = { version: 3, project, groups, settings };
+  const full: FullProjectDataV4 = {
+    version: 4,
+    project,
+    groups,
+    settings: { ...settings, buildTechnique: coerceBuildTechnique(settings.buildTechnique) },
+  };
   return JSON.stringify(full);
 }
 
@@ -183,7 +199,7 @@ export function deserializeFullProject(json: string): {
 } | null {
   try {
     const full = JSON.parse(json) as FullProjectData;
-    if (full.version !== 2 && full.version !== 3) return null;
+    if (full.version !== 2 && full.version !== 3 && full.version !== 4) return null;
     const { project, settings } = full;
     const layers = project.layers.map(deserializeLayer);
 
@@ -191,7 +207,7 @@ export function deserializeFullProject(json: string): {
       layers,
       activeLayerId: project.activeLayerId,
       grid: project.grid,
-      groups: full.version === 3 ? full.groups : [],
+      groups: full.version === 2 ? [] : full.groups,
       settings: {
         ...settings,
         adjustments: {
@@ -200,6 +216,7 @@ export function deserializeFullProject(json: string): {
           green: settings.adjustments.green ?? 0,
           blue: settings.adjustments.blue ?? 0,
         },
+        buildTechnique: coerceBuildTechnique(settings.buildTechnique),
       },
     };
   } catch {

@@ -1,4 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.99.3';
+import {
+  CompanionArtifactVerificationError,
+  companionStorageObjectUrl,
+  parseReservedCompanionArtifacts,
+  verifyCompanionArtifactResponse,
+  type VerifiedCompanionArtifact,
+} from '../_shared/companionSaveVerification.ts';
+import {
+  drainCompanionStorageDeleteOutbox,
+  queueCompanionStorageDelete,
+} from '../_shared/companionStorageCleanup.ts';
+import {
+  CompanionScanUploadError,
+  processCompanionScanUpload,
+} from '../_shared/companionScanUpload.ts';
+
+// Generated database types are not available in this standalone Edge bundle.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminClient = ReturnType<typeof createClient<any>>;
 
 type Action =
   | 'device_start'
@@ -33,7 +52,8 @@ type Action =
   | 'telegram_unlink'
   | 'cloud_overview'
   | 'art_overview'
-  | 'collection_overview';
+  | 'collection_overview'
+  | 'art_save_finalize';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,7 +93,10 @@ type ArtifactKind =
   | 'materials_csv'
   | 'mapdat_zip'
   | 'frame_commands'
-  | 'frame_datapack';
+  | 'frame_datapack'
+  | 'suppression_litematic'
+  | 'suppression_plan'
+  | 'suppression_bundle';
 
 const artifactExtensions: Record<ArtifactKind, string> = {
   project: 'mapkluss',
@@ -85,6 +108,9 @@ const artifactExtensions: Record<ArtifactKind, string> = {
   mapdat_zip: 'zip',
   frame_commands: 'mcfunction',
   frame_datapack: 'zip',
+  suppression_litematic: 'litematic',
+  suppression_plan: 'json',
+  suppression_bundle: 'zip',
 };
 
 const artifactSuffixes: Partial<Record<ArtifactKind, string>> = {
@@ -94,6 +120,9 @@ const artifactSuffixes: Partial<Record<ArtifactKind, string>> = {
   mapdat_zip: 'mapdat',
   frame_commands: 'frames',
   frame_datapack: 'frames_datapack',
+  suppression_litematic: 'suppression',
+  suppression_plan: 'suppression_plan',
+  suppression_bundle: 'two_layer',
 };
 
 function companionSlug(input: string): string {
@@ -126,7 +155,7 @@ function normalizeEditablePrivacy(value: string): 'private' | 'unlisted' | null 
 }
 
 async function renameCurrentVersionArtifacts(
-  admin: ReturnType<typeof createClient>,
+  admin: AdminClient,
   params: {
     ownerId: string;
     versionId: string;
@@ -138,7 +167,7 @@ async function renameCurrentVersionArtifacts(
   const { ownerId, versionId, title, grid, now } = params;
   const { data: artifacts, error: artifactError } = await admin
     .from('art_artifacts')
-    .select('id,kind,filename,storage_path')
+    .select('*')
     .eq('version_id', versionId)
     .eq('owner_id', ownerId);
   if (artifactError) throw artifactError;
@@ -149,13 +178,18 @@ async function renameCurrentVersionArtifacts(
   for (const artifact of artifacts ?? []) {
     const kind = artifact.kind as ArtifactKind;
     if (!(kind in artifactExtensions)) continue;
+    // These two files are a cryptographically pinned pair. Renaming the
+    // Litematic without rewriting and re-hashing the plan would invalidate it.
+    if (kind === 'suppression_litematic' || kind === 'suppression_plan' || kind === 'suppression_bundle') continue;
 
     const nextFilename = companionArtifactFilename(title, grid, kind);
     const currentPath = String(artifact.storage_path ?? '');
     const nextPath = currentPath ? storagePathWithFilename(currentPath, nextFilename) : currentPath;
 
     if (currentPath && nextPath && currentPath !== nextPath) {
-      const { error: moveError } = await admin.storage.from('mapartforge').move(currentPath, nextPath);
+      const { error: moveError } = await admin.storage
+        .from(String(artifact.bucket_id ?? 'mapartforge'))
+        .move(currentPath, nextPath);
       if (moveError) throw moveError;
     }
 
@@ -191,16 +225,32 @@ async function renameCurrentVersionArtifacts(
   return { previewPath, projectPath };
 }
 
-async function createPreviewSignedUrl(admin: ReturnType<typeof createClient>, previewPath: string | null) {
+async function createPreviewSignedUrl(
+  admin: AdminClient,
+  artId: string,
+  versionId: string | null,
+  previewPath: string | null,
+) {
   if (!previewPath) return null;
-  if (/^(https?:|data:|blob:)/i.test(previewPath)) return previewPath;
+  if (/^(https?:|data:|blob:)/i.test(previewPath)) return null;
+  if (!versionId) return null;
+  const { data: artifact, error: artifactError } = await admin
+    .from('art_artifacts')
+    .select('*')
+    .eq('art_id', artId)
+    .eq('version_id', versionId)
+    .eq('kind', 'preview_png')
+    .eq('storage_path', previewPath)
+    .maybeSingle();
+  if (artifactError) throw artifactError;
+  if (!artifact) return null;
   const { data } = await admin.storage
-    .from('mapartforge')
-    .createSignedUrl(previewPath, 60 * 30);
+    .from(String(artifact.bucket_id ?? 'mapartforge'))
+    .createSignedUrl(artifact.storage_path, 60 * 30);
   return data?.signedUrl ?? null;
 }
 
-async function mapLibraryRow(admin: ReturnType<typeof createClient>, row: LibraryRow, isFavorite = false) {
+async function mapLibraryRow(admin: AdminClient, row: LibraryRow, isFavorite = false) {
   return {
     artId: row.id,
     currentVersionId: row.current_version_id,
@@ -208,7 +258,7 @@ async function mapLibraryRow(admin: ReturnType<typeof createClient>, row: Librar
     privacy: row.privacy,
     grid: row.map_grid,
     mode: row.map_mode,
-    previewUrl: await createPreviewSignedUrl(admin, row.preview_path),
+    previewUrl: await createPreviewSignedUrl(admin, row.id, row.current_version_id, row.preview_path),
     updatedAt: row.updated_at,
     isFavorite,
   };
@@ -256,22 +306,7 @@ function randomUserCode(): string {
   return Array.from(data, b => alphabet[b % alphabet.length]).join('');
 }
 
-function decodeBase64DataUrl(value: string): { bytes: Uint8Array; contentType: string } {
-  const match = value.match(/^data:([^;,]+);base64,(.+)$/);
-  const contentType = match?.[1] ?? 'image/png';
-  const base64 = match?.[2] ?? value;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return { bytes, contentType };
-}
-
-async function sha256Bytes(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function hmacSha256Hex(key: Uint8Array, value: string): Promise<string> {
+async function hmacSha256Hex(key: Uint8Array<ArrayBuffer>, value: string): Promise<string> {
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
     key,
@@ -283,7 +318,7 @@ async function hmacSha256Hex(key: Uint8Array, value: string): Promise<string> {
   return hex(new Uint8Array(signature));
 }
 
-async function getBearerUserId(admin: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
+async function getBearerUserId(admin: AdminClient, req: Request): Promise<string | null> {
   const authHeader = req.headers.get('Authorization') ?? '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
   if (!token) return null;
@@ -301,37 +336,134 @@ async function getBearerUserId(admin: ReturnType<typeof createClient>, req: Requ
   return deviceToken.user_id as string;
 }
 
+async function getWebsiteBearerUserId(admin: AdminClient, req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  const { data, error } = await admin.auth.getUser(token);
+  return !error && data.user ? data.user.id : null;
+}
+
+type CompanionSaveVerificationClaim = {
+  state?: 'claimed' | 'busy' | 'published';
+  artifacts?: unknown;
+  totalSizeBytes?: unknown;
+  result?: unknown;
+};
+
+async function handleCompanionSaveFinalize(
+  admin: AdminClient,
+  req: Request,
+  payload: Record<string, unknown>,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<Response> {
+  const userId = await getWebsiteBearerUserId(admin, req);
+  if (!userId) return json({ error: 'unauthorized' }, 401);
+
+  const versionId = String(payload.version_id ?? '');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(versionId)) {
+    return json({ error: 'bad_version_id' }, 400);
+  }
+
+  const verificationToken = crypto.randomUUID();
+  let claimed = false;
+  try {
+    const { data: claimData, error: claimError } = await admin.rpc('begin_companion_art_save_verification', {
+      requested_owner_id: userId,
+      requested_version_id: versionId,
+      requested_verification_token: verificationToken,
+    });
+    if (claimError) throw claimError;
+    const claim = (claimData ?? {}) as CompanionSaveVerificationClaim;
+    if (claim.state === 'published') return json(claim.result ?? { versionId });
+    if (claim.state === 'busy') return json({ error: 'save_verification_in_progress' }, 409);
+    if (claim.state !== 'claimed') {
+      throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
+    }
+    claimed = true;
+
+    const artifacts = parseReservedCompanionArtifacts(claim.artifacts);
+    const totalSizeBytes = artifacts.reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
+    if (!Number.isSafeInteger(Number(claim.totalSizeBytes)) || Number(claim.totalSizeBytes) !== totalSizeBytes) {
+      throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
+    }
+
+    const verifiedArtifacts: VerifiedCompanionArtifact[] = [];
+    for (const artifact of artifacts) {
+      let response: Response;
+      try {
+        response = await fetch(companionStorageObjectUrl(supabaseUrl, artifact), {
+          method: 'GET',
+          redirect: 'error',
+          cache: 'no-store',
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+            'Accept-Encoding': 'identity',
+          },
+        });
+      } catch {
+        throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
+      }
+      verifiedArtifacts.push(await verifyCompanionArtifactResponse(artifact, response));
+    }
+
+    const { data: finalized, error: finalizeError } = await admin.rpc('publish_verified_companion_art_save', {
+      requested_owner_id: userId,
+      requested_version_id: versionId,
+      requested_verification_token: verificationToken,
+      verified_artifacts: verifiedArtifacts,
+    });
+    if (finalizeError) throw finalizeError;
+    claimed = false;
+    return json(finalized ?? { versionId });
+  } catch (error) {
+    const verificationError = error instanceof CompanionArtifactVerificationError ? error : null;
+    if (claimed) {
+      const { error: releaseError } = await admin.rpc('release_companion_art_save_verification', {
+        requested_owner_id: userId,
+        requested_version_id: versionId,
+        requested_verification_token: verificationToken,
+        requested_cancel: verificationError ? !verificationError.retryable : false,
+      });
+      if (releaseError) console.warn('Companion save verification lease release failed');
+    }
+    if (verificationError) {
+      return json({ error: verificationError.code }, verificationError.responseStatus);
+    }
+    console.error('Companion save verification failed');
+    return json({ error: 'save_verification_unavailable' }, 503);
+  }
+}
+
 async function listStorageObjectPaths(
-  admin: ReturnType<typeof createClient>,
+  admin: AdminClient,
   bucket: string,
   prefix: string,
 ): Promise<string[]> {
   const paths: string[] = [];
-  const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: 1000 });
-  if (error) throw error;
-  for (const item of data ?? []) {
-    const path = `${prefix}/${item.name}`;
-    if (item.metadata) {
-      paths.push(path);
-    } else {
-      paths.push(...await listStorageObjectPaths(admin, bucket, path));
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await admin.storage.from(bucket).list(prefix, {
+      limit: 1000,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error) throw error;
+    for (const item of data ?? []) {
+      const path = `${prefix}/${item.name}`;
+      if (item.metadata) {
+        paths.push(path);
+      } else {
+        paths.push(...await listStorageObjectPaths(admin, bucket, path));
+      }
     }
+    if ((data ?? []).length < 1000) break;
   }
   return paths;
 }
 
-async function removeStoragePrefix(admin: ReturnType<typeof createClient>, bucket: string, prefix: string): Promise<number> {
-  const paths = await listStorageObjectPaths(admin, bucket, prefix.replace(/\/+$/, ''));
-  for (let i = 0; i < paths.length; i += 100) {
-    const chunk = paths.slice(i, i + 100);
-    if (chunk.length === 0) continue;
-    const { error } = await admin.storage.from(bucket).remove(chunk);
-    if (error) throw error;
-  }
-  return paths.length;
-}
-
-async function refreshProfileUsage(admin: ReturnType<typeof createClient>, userId: string): Promise<void> {
+async function refreshProfileUsage(admin: AdminClient, userId: string): Promise<void> {
   const { count, error: countError } = await admin
     .from('arts')
     .select('id', { count: 'exact', head: true })
@@ -344,8 +476,14 @@ async function refreshProfileUsage(admin: ReturnType<typeof createClient>, userI
     .eq('owner_id', userId);
   if (artifactsError) throw artifactsError;
 
-  const storageUsedBytes = (artifacts ?? []).reduce((sum, artifact) => {
-    const size = Number(artifact.size_bytes ?? 0);
+  const { data: imports, error: importsError } = await admin
+    .from('companion_imports')
+    .select('size_bytes')
+    .eq('owner_id', userId);
+  if (importsError) throw importsError;
+
+  const storageUsedBytes = [...(artifacts ?? []), ...(imports ?? [])].reduce((sum, item) => {
+    const size = Number(item.size_bytes ?? 0);
     return Number.isFinite(size) && size > 0 ? sum + size : sum;
   }, 0);
 
@@ -360,7 +498,7 @@ async function refreshProfileUsage(admin: ReturnType<typeof createClient>, userI
   if (updateError) throw updateError;
 }
 
-async function getProfileSummary(admin: ReturnType<typeof createClient>, userId: string) {
+async function getProfileSummary(admin: AdminClient, userId: string) {
   await admin.from('profiles').upsert({ id: userId });
   const { data, error } = await admin
     .from('profiles')
@@ -385,7 +523,7 @@ async function getProfileSummary(admin: ReturnType<typeof createClient>, userId:
   };
 }
 
-async function getPublicProfileSummary(admin: ReturnType<typeof createClient>, userId: string) {
+async function getPublicProfileSummary(admin: AdminClient, userId: string) {
   const { data, error } = await admin
     .from('profiles')
     .select('id,display_name,avatar_url,telegram_id,telegram_username')
@@ -409,7 +547,7 @@ async function getPublicProfileSummary(admin: ReturnType<typeof createClient>, u
   };
 }
 
-async function listOwnedArts(admin: ReturnType<typeof createClient>, userId: string) {
+async function listOwnedArts(admin: AdminClient, userId: string) {
   const { data, error } = await admin
     .from('arts')
     .select('id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at')
@@ -419,7 +557,7 @@ async function listOwnedArts(admin: ReturnType<typeof createClient>, userId: str
   return Promise.all((data ?? []).map(row => mapLibraryRow(admin, row as LibraryRow)));
 }
 
-async function listFavoriteArts(admin: ReturnType<typeof createClient>, userId: string) {
+async function listFavoriteArts(admin: AdminClient, userId: string) {
   const { data, error } = await admin
     .from('favorites')
     .select('art_id,created_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
@@ -431,7 +569,7 @@ async function listFavoriteArts(admin: ReturnType<typeof createClient>, userId: 
   return rows.filter(Boolean);
 }
 
-async function listRecentArts(admin: ReturnType<typeof createClient>, userId: string) {
+async function listRecentArts(admin: AdminClient, userId: string) {
   const { data: ownedArts, error: ownedError } = await admin
     .from('arts')
     .select('id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at')
@@ -465,7 +603,7 @@ async function listRecentArts(admin: ReturnType<typeof createClient>, userId: st
     .slice(0, 30);
 }
 
-async function listCollections(admin: ReturnType<typeof createClient>, userId: string) {
+async function listCollections(admin: AdminClient, userId: string) {
   const { data, error } = await admin
     .from('collections')
     .select('id,name,created_at,updated_at')
@@ -489,10 +627,10 @@ async function listCollections(admin: ReturnType<typeof createClient>, userId: s
   return rows.map(row => mapCollectionRow(row, itemCounts.get(String(row.id)) ?? 0));
 }
 
-async function listRecentImports(admin: ReturnType<typeof createClient>, userId: string) {
+async function listRecentImports(admin: AdminClient, userId: string) {
   const { data, error } = await admin
     .from('companion_imports')
-    .select('id,source,title,map_grid,image_path,size_bytes,sha256,created_art_id,metadata,created_at')
+    .select('id,source,title,map_grid,bucket_id,image_path,size_bytes,sha256,created_art_id,metadata,created_at')
     .eq('owner_id', userId)
     .order('created_at', { ascending: false })
     .limit(12);
@@ -501,7 +639,7 @@ async function listRecentImports(admin: ReturnType<typeof createClient>, userId:
   const items = [];
   for (const row of data ?? []) {
     const { data: signed } = await admin.storage
-      .from('mapartforge')
+      .from(String(row.bucket_id ?? 'mapartforge'))
       .createSignedUrl(String(row.image_path), 60 * 30);
     items.push({
       importId: row.id,
@@ -520,7 +658,7 @@ async function listRecentImports(admin: ReturnType<typeof createClient>, userId:
   return items;
 }
 
-async function getCollectionOverview(admin: ReturnType<typeof createClient>, userId: string, collectionId: string) {
+async function getCollectionOverview(admin: AdminClient, userId: string, collectionId: string) {
   const { data: collection, error: collectionError } = await admin
     .from('collections')
     .select('id,name,created_at,updated_at')
@@ -544,7 +682,7 @@ async function getCollectionOverview(admin: ReturnType<typeof createClient>, use
   };
 }
 
-async function getArtManifest(admin: ReturnType<typeof createClient>, userId: string | null, artId: string) {
+async function getArtManifest(admin: AdminClient, userId: string | null, artId: string, requestedVersionId?: string) {
   const { data: art, error: artError } = await admin
     .from('arts')
     .select('id,owner_id,current_version_id,title,privacy,map_grid,map_mode,minecraft_version,preview_path,updated_at')
@@ -554,26 +692,114 @@ async function getArtManifest(admin: ReturnType<typeof createClient>, userId: st
   if (art.privacy === 'private' && art.owner_id !== userId) {
     return null;
   }
+  const versionId = requestedVersionId || art.current_version_id;
+  if (!versionId) return null;
+
+  const { data: version, error: versionError } = await admin
+    .from('art_versions')
+    .select('id,settings')
+    .eq('id', versionId)
+    .eq('art_id', art.id)
+    .eq('owner_id', art.owner_id)
+    .maybeSingle();
+  if (versionError) throw versionError;
+  if (!version) return null;
+  const versionSettings = version.settings && typeof version.settings === 'object'
+    ? version.settings as Record<string, unknown>
+    : {};
 
   const { data: artifacts, error: artifactError } = await admin
     .from('art_artifacts')
-    .select('id,kind,filename,storage_path,content_type,size_bytes,sha256,updated_at')
-    .eq('version_id', art.current_version_id);
+    .select('*')
+    .eq('version_id', versionId)
+    .eq('art_id', art.id)
+    .eq('owner_id', art.owner_id);
   if (artifactError) throw artifactError;
+
+  let manifestArtifacts = artifacts ?? [];
+  const suppressionGrid = versionSettings.grid && typeof versionSettings.grid === 'object'
+    ? versionSettings.grid as { wide?: unknown; tall?: unknown }
+    : null;
+  const suppressionWide = Math.floor(Number(suppressionGrid?.wide ?? 1));
+  const suppressionTall = Math.floor(Number(suppressionGrid?.tall ?? 1));
+  const isMultiMapSuppression = versionSettings.buildTechnique === 'suppression_two_layer'
+    && suppressionWide * suppressionTall > 1;
+  if (isMultiMapSuppression) {
+    const { data: bundlePin, error: bundlePinError } = await admin
+      .from('art_version_suppression_bundle_pins')
+      .select('*')
+      .eq('art_id', art.id)
+      .eq('version_id', versionId)
+      .eq('owner_id', art.owner_id)
+      .maybeSingle();
+    if (bundlePinError) throw bundlePinError;
+    if (!bundlePin) return null;
+    manifestArtifacts = manifestArtifacts
+      .filter(row => row.kind !== 'suppression_bundle'
+        && row.kind !== 'suppression_plan' && row.kind !== 'suppression_litematic')
+      .concat([{
+        id: bundlePin.artifact_id,
+        kind: 'suppression_bundle',
+        filename: bundlePin.filename,
+        bucket_id: bundlePin.bucket_id,
+        storage_path: bundlePin.storage_path,
+        content_type: bundlePin.content_type,
+        size_bytes: bundlePin.size_bytes,
+        sha256: bundlePin.sha256,
+        updated_at: bundlePin.updated_at,
+      }]);
+  } else if (versionSettings.buildTechnique === 'suppression_two_layer' && versionId === art.current_version_id) {
+    const { data: pin, error: pinError } = await admin
+      .from('art_current_suppression_pins')
+      .select('*')
+      .eq('art_id', art.id)
+      .eq('version_id', versionId)
+      .eq('owner_id', art.owner_id)
+      .maybeSingle();
+    if (pinError) throw pinError;
+    if (!pin) return null;
+    manifestArtifacts = manifestArtifacts
+      .filter(row => row.kind !== 'suppression_plan' && row.kind !== 'suppression_litematic')
+      .concat([
+        {
+          id: pin.plan_artifact_id,
+          kind: 'suppression_plan',
+          filename: pin.plan_filename,
+          bucket_id: pin.plan_bucket_id ?? 'mapartforge',
+          storage_path: pin.plan_storage_path,
+          content_type: pin.plan_content_type,
+          size_bytes: pin.plan_size_bytes,
+          sha256: pin.plan_sha256,
+          updated_at: pin.updated_at,
+        },
+        {
+          id: pin.litematic_artifact_id,
+          kind: 'suppression_litematic',
+          filename: pin.litematic_filename,
+          bucket_id: pin.litematic_bucket_id ?? 'mapartforge',
+          storage_path: pin.litematic_storage_path,
+          content_type: pin.litematic_content_type,
+          size_bytes: pin.litematic_size_bytes,
+          sha256: pin.litematic_sha256,
+          updated_at: pin.updated_at,
+        },
+      ]);
+  }
 
   const artifactRows = [];
   let signedPreviewUrl: string | null = null;
-  for (const row of artifacts ?? []) {
-    const { data: signed } = await admin.storage
-      .from('mapartforge')
+  for (const row of manifestArtifacts) {
+    const { data: signed, error: signedError } = await admin.storage
+      .from(String(row.bucket_id ?? 'mapartforge'))
       .createSignedUrl(row.storage_path, 60 * 10);
+    if (signedError || !signed?.signedUrl) throw signedError ?? new Error('artifact signing failed');
     if (row.kind === 'preview_png') signedPreviewUrl = signed?.signedUrl ?? null;
     artifactRows.push({
       id: row.id,
       kind: row.kind,
       filename: row.filename,
       storagePath: row.storage_path,
-      signedUrl: signed?.signedUrl,
+      signedUrl: signed.signedUrl,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
       sha256: row.sha256,
@@ -602,13 +828,15 @@ async function getArtManifest(admin: ReturnType<typeof createClient>, userId: st
 
   return {
     artId: art.id,
-    versionId: art.current_version_id,
+    versionId,
     ownerId: art.owner_id,
     title: art.title,
     privacy: art.privacy,
-    grid: art.map_grid,
-    mode: art.map_mode,
-    minecraftVersion: art.minecraft_version,
+    grid: versionSettings.grid ?? art.map_grid,
+    mode: versionSettings.mode === '2d' || versionSettings.mode === '3d' ? versionSettings.mode : art.map_mode,
+    dithering: typeof versionSettings.dithering === 'string' ? versionSettings.dithering : undefined,
+    minecraftVersion: typeof versionSettings.minecraftVersion === 'string' ? versionSettings.minecraftVersion : art.minecraft_version,
+    buildTechnique: versionSettings.buildTechnique === 'suppression_two_layer' ? 'suppression_two_layer' : 'standard',
     previewUrl: signedPreviewUrl,
     isFavorite,
     collectionIds,
@@ -617,7 +845,7 @@ async function getArtManifest(admin: ReturnType<typeof createClient>, userId: st
   };
 }
 
-async function listArtVersions(admin: ReturnType<typeof createClient>, artId: string, currentVersionId: string | null) {
+async function listArtVersions(admin: AdminClient, artId: string, currentVersionId: string | null) {
   const { data: versions, error: versionsError } = await admin
     .from('art_versions')
     .select('id,version_number,settings,preview_path,created_at')
@@ -627,18 +855,22 @@ async function listArtVersions(admin: ReturnType<typeof createClient>, artId: st
 
   const versionIds = (versions ?? []).map(version => String(version.id));
   const artifactCounts = new Map<string, number>();
-  const projectPaths = new Map<string, string>();
+  const projectArtifacts = new Map<string, Record<string, unknown>>();
+  const previewArtifacts = new Map<string, Record<string, unknown>>();
   if (versionIds.length > 0) {
     const { data: artifacts, error: artifactsError } = await admin
       .from('art_artifacts')
-      .select('version_id,kind,storage_path')
+      .select('*')
       .in('version_id', versionIds);
     if (artifactsError) throw artifactsError;
     for (const artifact of artifacts ?? []) {
       const versionId = String(artifact.version_id);
       artifactCounts.set(versionId, (artifactCounts.get(versionId) ?? 0) + 1);
       if (artifact.kind === 'project' && artifact.storage_path) {
-        projectPaths.set(versionId, String(artifact.storage_path));
+        projectArtifacts.set(versionId, artifact as Record<string, unknown>);
+      }
+      if (artifact.kind === 'preview_png' && artifact.storage_path) {
+        previewArtifacts.set(versionId, artifact as Record<string, unknown>);
       }
     }
   }
@@ -647,13 +879,15 @@ async function listArtVersions(admin: ReturnType<typeof createClient>, artId: st
   for (const version of versions ?? []) {
     const versionId = String(version.id);
     const settings = (version.settings ?? {}) as Record<string, unknown>;
-    const previewPath = typeof version.preview_path === 'string' ? version.preview_path : '';
-    const projectPath = projectPaths.get(versionId) ?? '';
-    const previewSigned = previewPath
-      ? await admin.storage.from('mapartforge').createSignedUrl(previewPath, 60 * 10)
+    const previewArtifact = previewArtifacts.get(versionId);
+    const projectArtifact = projectArtifacts.get(versionId);
+    const previewSigned = previewArtifact
+      ? await admin.storage.from(String(previewArtifact.bucket_id ?? 'mapartforge'))
+          .createSignedUrl(String(previewArtifact.storage_path), 60 * 10)
       : { data: null };
-    const projectSigned = projectPath
-      ? await admin.storage.from('mapartforge').createSignedUrl(projectPath, 60 * 10)
+    const projectSigned = projectArtifact
+      ? await admin.storage.from(String(projectArtifact.bucket_id ?? 'mapartforge'))
+          .createSignedUrl(String(projectArtifact.storage_path), 60 * 10)
       : { data: null };
     items.push({
       id: versionId,
@@ -671,10 +905,10 @@ async function listArtVersions(admin: ReturnType<typeof createClient>, artId: st
   return items;
 }
 
-async function getArtVersionProject(admin: ReturnType<typeof createClient>, userId: string | null, versionId: string) {
+async function getArtVersionProject(admin: AdminClient, userId: string | null, versionId: string) {
   const { data: version, error: versionError } = await admin
     .from('art_versions')
-    .select('id,art_id,version_number,project_path,created_at')
+    .select('id,art_id,owner_id,version_number,created_at')
     .eq('id', versionId)
     .single();
   if (versionError || !version) return null;
@@ -685,13 +919,24 @@ async function getArtVersionProject(admin: ReturnType<typeof createClient>, user
     .eq('id', version.art_id)
     .single();
   if (artError || !art) return null;
+  if (version.owner_id !== art.owner_id) return null;
   if (art.privacy === 'private' && art.owner_id !== userId) return null;
-  if (!version.project_path) return null;
 
-  const { data: signed } = await admin.storage
-    .from('mapartforge')
-    .createSignedUrl(String(version.project_path), 60 * 10);
-  if (!signed?.signedUrl) return null;
+  const { data: project, error: projectError } = await admin
+    .from('art_artifacts')
+    .select('*')
+    .eq('version_id', version.id)
+    .eq('art_id', art.id)
+    .eq('owner_id', art.owner_id)
+    .eq('kind', 'project')
+    .maybeSingle();
+  if (projectError) throw projectError;
+  if (!project) return null;
+
+  const { data: signed, error: signedError } = await admin.storage
+    .from(String(project.bucket_id ?? 'mapartforge'))
+    .createSignedUrl(String(project.storage_path), 60 * 10);
+  if (signedError || !signed?.signedUrl) throw signedError ?? new Error('project signing failed');
 
   return {
     artId: String(art.id),
@@ -703,7 +948,7 @@ async function getArtVersionProject(admin: ReturnType<typeof createClient>, user
   };
 }
 
-async function getBuildSessionForAccess(admin: ReturnType<typeof createClient>, req: Request, sessionId: string) {
+async function getBuildSessionForAccess(admin: AdminClient, req: Request, sessionId: string) {
   const { data: session, error } = await admin
     .from('build_sessions')
     .select('*')
@@ -923,6 +1168,10 @@ Deno.serve(async req => {
       return json({ status: 'approved', userId: claimed[0].user_id, accessToken });
     }
 
+    if (action === 'art_save_finalize') {
+      return await handleCompanionSaveFinalize(admin, req, payload, supabaseUrl, serviceKey);
+    }
+
     if (action === 'device_approve') {
       const userId = await getBearerUserId(admin, req);
       if (!userId) return json({ error: 'unauthorized' }, 401);
@@ -973,10 +1222,19 @@ Deno.serve(async req => {
       if (!userId) return json({ error: 'unauthorized' }, 401);
       if (payload.confirm !== 'DELETE') return json({ error: 'confirmation_required' }, 400);
 
-      const removedObjects = await removeStoragePrefix(admin, 'mapartforge', `companion/${userId}`);
+      const pendingPaths = new Map<string, string[]>();
+      for (const bucketId of ['mapartforge', 'mapkluss-companion-private']) {
+        pendingPaths.set(bucketId, await listStorageObjectPaths(admin, bucketId, `companion/${userId}`));
+      }
       const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) throw error;
-      return json({ ok: true, removedObjects });
+      for (const [bucketId, paths] of pendingPaths) {
+        for (const path of paths) {
+          await queueCompanionStorageDelete(admin, userId, bucketId, path, 'account_deleted');
+        }
+      }
+      const cleanup = await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => ({ removed: 0, deferred: 1 }));
+      return json({ ok: true, removedObjects: cleanup.removed, cleanupDeferred: cleanup.deferred > 0 });
     }
 
     if (action === 'telegram_link') {
@@ -1055,6 +1313,7 @@ Deno.serve(async req => {
     if (action === 'cloud_overview') {
       const userId = await getBearerUserId(admin, req);
       if (!userId) return json({ error: 'unauthorized' }, 401);
+      await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => undefined);
       const [{ profile, usage }, arts, favorites, recent, collections, imports] = await Promise.all([
         getProfileSummary(admin, userId),
         listOwnedArts(admin, userId),
@@ -1264,76 +1523,19 @@ Deno.serve(async req => {
     if (action === 'scan_upload') {
       const userId = await getBearerUserId(admin, req);
       if (!userId) return json({ error: 'unauthorized' }, 401);
-      const source = String(payload.source ?? 'wall');
-      const title = String(payload.title ?? 'Imported map art').slice(0, 120);
-      const mapGrid = payload.map_grid ?? { wide: 1, tall: 1 };
-      const imageBase64 = String(payload.image_base64 ?? '');
-      const missingMaps = Math.max(0, Number(payload.missing_maps ?? 0) || 0);
-      if (!imageBase64) return json({ error: 'missing_image' }, 400);
-      const { bytes, contentType } = decodeBase64DataUrl(imageBase64);
-      const sha256 = await sha256Bytes(bytes);
-      const metadata = { ...((payload.metadata ?? {}) as Record<string, unknown>), missing_maps: missingMaps };
-      const { data: existingImports, error: existingImportsError } = await admin
-        .from('companion_imports')
-        .select('id,title,map_grid,image_path,size_bytes,sha256,metadata,created_at')
-        .eq('owner_id', userId)
-        .eq('source', source)
-        .eq('sha256', sha256)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (existingImportsError) throw existingImportsError;
-
-      const existingImport = (existingImports ?? []).find(row =>
-        JSON.stringify(row.map_grid ?? null) === JSON.stringify(mapGrid ?? null),
-      );
-      if (existingImport) {
-        const { error: refreshError } = await admin
-          .from('companion_imports')
-          .update({
-            title,
-            metadata,
-            size_bytes: bytes.byteLength,
-          })
-          .eq('id', existingImport.id)
-          .eq('owner_id', userId);
-        if (refreshError) throw refreshError;
-        const { data: signed } = await admin.storage.from('mapartforge').createSignedUrl(existingImport.image_path, 60 * 30);
-        return json({
-          importId: existingImport.id,
-          imagePath: existingImport.image_path,
-          signedUrl: signed?.signedUrl,
-          sha256,
-          createdAt: existingImport.created_at,
-          reused: true,
-        });
+      try {
+        return json(await processCompanionScanUpload(admin, userId, payload));
+      } catch (error) {
+        if (error instanceof CompanionScanUploadError) {
+          const headers = error.retryAfterMs
+            ? { 'Retry-After': String(Math.max(1, Math.ceil(error.retryAfterMs / 1000))) }
+            : undefined;
+          const response = json({ error: error.code, retryAfterMs: error.retryAfterMs }, error.responseStatus);
+          if (headers) response.headers.set('Retry-After', headers['Retry-After']);
+          return response;
+        }
+        throw error;
       }
-
-      const importId = randomToken(12);
-      const storagePath = `companion/${userId}/imports/${importId}.png`;
-      const { error: uploadError } = await admin.storage
-        .from('mapartforge')
-        .upload(storagePath, new Blob([bytes], { type: contentType }), { contentType, upsert: true });
-      if (uploadError) throw uploadError;
-      const { data, error } = await admin.from('companion_imports').insert({
-        owner_id: userId,
-        source,
-        title,
-        map_grid: mapGrid,
-        image_path: storagePath,
-        size_bytes: bytes.byteLength,
-        sha256,
-        metadata,
-      }).select('id,created_at').single();
-      if (error) throw error;
-      const { data: signed } = await admin.storage.from('mapartforge').createSignedUrl(storagePath, 60 * 30);
-      return json({
-        importId: data.id,
-        imagePath: storagePath,
-        signedUrl: signed?.signedUrl,
-        sha256,
-        createdAt: data.created_at,
-        reused: false,
-      });
     }
 
     if (action === 'scan_get') {
@@ -1342,13 +1544,13 @@ Deno.serve(async req => {
       const importId = String(payload.import_id ?? '');
       const { data, error } = await admin
         .from('companion_imports')
-        .select('id,source,title,map_grid,image_path,size_bytes,sha256,created_art_id,metadata,created_at')
+        .select('id,source,title,map_grid,bucket_id,image_path,size_bytes,sha256,created_art_id,metadata,created_at')
         .eq('id', importId)
         .eq('owner_id', userId)
         .single();
       if (error || !data) return json({ error: 'not_found' }, 404);
       const { data: signed } = await admin.storage
-        .from('mapartforge')
+        .from(String(data.bucket_id ?? 'mapartforge'))
         .createSignedUrl(data.image_path, 60 * 30);
         return json({
           importId: data.id,
@@ -1404,20 +1606,11 @@ Deno.serve(async req => {
 
         const { data: scanImport, error: importError } = await admin
           .from('companion_imports')
-          .select('id,image_path')
+          .select('id,bucket_id,image_path')
           .eq('id', importId)
           .eq('owner_id', userId)
           .single();
         if (importError || !scanImport) return json({ error: 'not_found' }, 404);
-
-        let removedObjects = 0;
-        if (scanImport.image_path) {
-          const { data: removed, error: removeError } = await admin.storage
-            .from('mapartforge')
-            .remove([scanImport.image_path]);
-          if (removeError) throw removeError;
-          removedObjects = removed?.length ?? 0;
-        }
 
         const { error: deleteError } = await admin
           .from('companion_imports')
@@ -1425,8 +1618,9 @@ Deno.serve(async req => {
           .eq('id', importId)
           .eq('owner_id', userId);
         if (deleteError) throw deleteError;
-
-        return json({ ok: true, removedObjects });
+        await refreshProfileUsage(admin, userId);
+        const cleanup = await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => ({ removed: 0, deferred: 1 }));
+        return json({ ok: true, removedObjects: cleanup.removed, cleanupDeferred: cleanup.deferred > 0 });
       }
 
     if (action === 'tracker_create') {
@@ -1488,22 +1682,22 @@ Deno.serve(async req => {
       let materials: Array<{ nbtName: string; displayName: string; count: number }> = [];
       const { data: csvArtifact } = await admin
         .from('art_artifacts')
-        .select('storage_path')
+        .select('*')
         .eq('art_id', art.id)
         .eq('version_id', art.current_version_id)
         .eq('kind', 'materials_csv')
         .maybeSingle();
       if (csvArtifact?.storage_path) {
-        const { data: csvBlob, error: csvError } = await admin.storage.from('mapartforge').download(csvArtifact.storage_path);
+        const { data: csvBlob, error: csvError } = await admin.storage
+          .from(String(csvArtifact.bucket_id ?? 'mapartforge'))
+          .download(csvArtifact.storage_path);
         if (csvError) throw csvError;
         materials = parseMaterialsCsv(await csvBlob.text());
       }
 
-      let imagePreview = art.preview_path ?? '';
-      if (art.preview_path) {
-        const { data: signed } = await admin.storage.from('mapartforge').createSignedUrl(art.preview_path, 60 * 60);
-        imagePreview = signed?.signedUrl ?? art.preview_path;
-      }
+      const imagePreview = await createPreviewSignedUrl(
+        admin, String(art.id), String(art.current_version_id), art.preview_path,
+      ) ?? '';
 
       const { data: session, error } = await admin
         .from('build_sessions')
@@ -1615,36 +1809,6 @@ Deno.serve(async req => {
         .single();
       if (artError || !art || art.owner_id !== userId) return json({ error: 'not_found' }, 404);
 
-      const storagePaths = new Set<string>();
-      if (art.preview_path) storagePaths.add(String(art.preview_path));
-      const { data: artifacts, error: artifactsError } = await admin
-        .from('art_artifacts')
-        .select('storage_path')
-        .eq('art_id', artId)
-        .eq('owner_id', userId);
-      if (artifactsError) throw artifactsError;
-      for (const artifact of artifacts ?? []) {
-        if (artifact.storage_path) storagePaths.add(String(artifact.storage_path));
-      }
-      const { data: versions, error: versionsError } = await admin
-        .from('art_versions')
-        .select('project_path,preview_path')
-        .eq('art_id', artId)
-        .eq('owner_id', userId);
-      if (versionsError) throw versionsError;
-      for (const version of versions ?? []) {
-        if (version.project_path) storagePaths.add(String(version.project_path));
-        if (version.preview_path) storagePaths.add(String(version.preview_path));
-      }
-      const paths = Array.from(storagePaths);
-      for (let i = 0; i < paths.length; i += 100) {
-        const chunk = paths.slice(i, i + 100);
-        if (chunk.length > 0) {
-          const { error } = await admin.storage.from('mapartforge').remove(chunk);
-          if (error) throw error;
-        }
-      }
-
       const { error: deleteError } = await admin
         .from('arts')
         .delete()
@@ -1652,13 +1816,15 @@ Deno.serve(async req => {
         .eq('owner_id', userId);
       if (deleteError) throw deleteError;
       await refreshProfileUsage(admin, userId);
-      return json({ ok: true, removedObjects: paths.length });
+      const cleanup = await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => ({ removed: 0, deferred: 1 }));
+      return json({ ok: true, removedObjects: cleanup.removed, cleanupDeferred: cleanup.deferred > 0 });
     }
 
     if (action === 'manifest') {
       const userId = await getBearerUserId(admin, req);
       const artId = String(payload.art_id ?? '');
-      const manifest = await getArtManifest(admin, userId, artId);
+      const versionId = payload.version_id ? String(payload.version_id) : undefined;
+      const manifest = await getArtManifest(admin, userId, artId, versionId);
       if (!manifest) return json({ error: 'not_found' }, 404);
       return json(manifest);
     }
@@ -1686,6 +1852,11 @@ Deno.serve(async req => {
 
     return json({ error: 'unknown_action' }, 400);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    const code = error instanceof Error ? error.message : '';
+    if (/^telegram_(not_configured|bad_payload|auth_expired|bad_hash)$/.test(code)) {
+      return json({ error: code }, code === 'telegram_not_configured' ? 503 : 400);
+    }
+    console.error(`Companion API action failed: ${action ?? 'missing'}`);
+    return json({ error: 'request_failed' }, 500);
   }
 });
