@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Layer } from './layers';
-import { deleteAutosave, loadAutosave, saveAutosave } from './projectStorage';
+import { deleteAutosave, saveAutosave } from './projectStorage';
 import { useLocale } from './useLocale';
 import { VERSION } from '../version';
 
@@ -17,7 +17,7 @@ const EXPLICIT_EDITOR_PARAMS = [
   'example',
 ] as const;
 
-export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'restored' | 'too-large' | 'error';
+export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'too-large' | 'error';
 
 export interface EditorAutosaveState {
   status: AutosaveStatus;
@@ -30,11 +30,10 @@ interface UseEditorAutosaveOptions {
   processing: boolean;
   serializeProject: () => string;
   estimateBytes: () => number;
-  restoreProject: (data: string, successMessage?: string) => Promise<boolean>;
   notify: (message: string, kind?: 'info' | 'error') => void;
 }
 
-export function shouldRestoreEditorAutosave(pathname: string, search: string): boolean {
+export function shouldClearEditorAutosaveOnLoad(pathname: string, search: string): boolean {
   if (pathname !== '/' && pathname !== '/index.html') return false;
   const params = new URLSearchParams(search);
   return !EXPLICIT_EDITOR_PARAMS.some(key => params.has(key));
@@ -67,12 +66,10 @@ export function autosaveFitsBudget(
 export function useEditorAutosave(options: UseEditorAutosaveOptions): EditorAutosaveState {
   const { t } = useLocale();
   const latestRef = useRef(options);
-  latestRef.current = options;
-  const restoreAllowedRef = useRef<boolean | null>(null);
-  if (restoreAllowedRef.current === null) {
-    restoreAllowedRef.current = shouldRestoreEditorAutosave(window.location.pathname, window.location.search);
-  }
-  const restoreStartedRef = useRef(false);
+  const [clearOnOpen] = useState(
+    () => shouldClearEditorAutosaveOnLoad(window.location.pathname, window.location.search),
+  );
+  const initializationStartedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const generationRef = useRef(0);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -81,8 +78,12 @@ export function useEditorAutosave(options: UseEditorAutosaveOptions): EditorAuto
   const [state, setState] = useState<EditorAutosaveState>({
     status: 'idle',
     savedAt: null,
-    ready: false,
+    ready: !clearOnOpen,
   });
+
+  useEffect(() => {
+    latestRef.current = options;
+  }, [options]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -153,45 +154,23 @@ export function useEditorAutosave(options: UseEditorAutosaveOptions): EditorAuto
   }, [clearTimer, t]);
 
   useEffect(() => {
-    if (restoreStartedRef.current) return;
-    restoreStartedRef.current = true;
+    if (initializationStartedRef.current) return;
+    initializationStartedRef.current = true;
 
-    if (!restoreAllowedRef.current) {
-      setState(previous => ({ ...previous, ready: true }));
-      return;
-    }
+    if (!clearOnOpen) return;
 
-    void (async () => {
-      try {
-        const record = await loadAutosave();
-        if (!record) return;
-        const restored = await latestRef.current.restoreProject(
-          record.data,
-          t('Автосохранённая работа восстановлена.', 'Autosaved work restored.'),
-        );
-        if (!restored) {
-          await deleteAutosave();
-          setState({ status: 'error', savedAt: null, ready: true });
-          latestRef.current.notify(t(
-            'Повреждённое автосохранение удалено. Именованные проекты не затронуты.',
-            'The corrupted autosave was removed. Named projects were not affected.',
-          ), 'error');
-          return;
-        }
-        hadContentRef.current = true;
-        setState({ status: 'restored', savedAt: record.savedAt, ready: true });
-      } catch (error) {
-        console.error('Editor autosave restore failed', error);
-        setState({ status: 'error', savedAt: null, ready: true });
+    void deleteAutosave()
+      .catch(error => {
+        console.error('Could not clear editor autosave on load', error);
         latestRef.current.notify(t(
-          'Не удалось прочитать автосохранение. Именованные проекты не затронуты.',
-          'Could not read the autosave. Named projects were not affected.',
+          'Не удалось очистить автосохранение редактора. Именованные проекты не затронуты.',
+          'Could not clear the editor autosave. Named projects were not affected.',
         ), 'error');
-      } finally {
-        setState(previous => previous.ready ? previous : { ...previous, ready: true });
-      }
-    })();
-  }, [t]);
+      })
+      .finally(() => {
+        setState(previous => ({ ...previous, ready: true }));
+      });
+  }, [clearOnOpen, t]);
 
   useEffect(() => {
     if (!state.ready) return;
@@ -201,15 +180,16 @@ export function useEditorAutosave(options: UseEditorAutosaveOptions): EditorAuto
       if (hadContentRef.current) {
         hadContentRef.current = false;
         generationRef.current += 1;
-        void deleteAutosave().catch(error => console.error('Could not clear editor autosave', error));
-        setState({ status: 'idle', savedAt: null, ready: true });
+        void deleteAutosave()
+          .catch(error => console.error('Could not clear editor autosave', error))
+          .finally(() => setState({ status: 'idle', savedAt: null, ready: true }));
       }
       return;
     }
 
     hadContentRef.current = true;
     if (options.processing) return;
-    setState(previous => ({ ...previous, status: 'pending' }));
+    queueMicrotask(() => setState(previous => ({ ...previous, status: 'pending' })));
     timerRef.current = window.setTimeout(() => { void flush(); }, AUTOSAVE_DELAY_MS);
     return clearTimer;
   }, [clearTimer, flush, options.hasContent, options.processing, options.serializeProject, options.estimateBytes, state.ready]);

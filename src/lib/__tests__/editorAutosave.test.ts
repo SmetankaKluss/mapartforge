@@ -3,16 +3,16 @@ import type { Layer } from '../layers';
 import {
   autosaveFitsBudget,
   estimateAutosaveSnapshotBytes,
-  shouldRestoreEditorAutosave,
+  shouldClearEditorAutosaveOnLoad,
 } from '../editorAutosave';
 
 describe('editor autosave policy', () => {
-  it('restores only the ordinary root editor', () => {
-    expect(shouldRestoreEditorAutosave('/', '')).toBe(true);
-    expect(shouldRestoreEditorAutosave('/', '?announcement=1')).toBe(true);
-    expect(shouldRestoreEditorAutosave('/', '?art=art-id')).toBe(false);
-    expect(shouldRestoreEditorAutosave('/', '?cloudFolder=1&cloudFolderMock=1')).toBe(false);
-    expect(shouldRestoreEditorAutosave('/cloud', '')).toBe(false);
+  it('clears the previous session only for an ordinary root editor load', () => {
+    expect(shouldClearEditorAutosaveOnLoad('/', '')).toBe(true);
+    expect(shouldClearEditorAutosaveOnLoad('/', '?announcement=1')).toBe(true);
+    expect(shouldClearEditorAutosaveOnLoad('/', '?art=art-id')).toBe(false);
+    expect(shouldClearEditorAutosaveOnLoad('/', '?cloudFolder=1&cloudFolderMock=1')).toBe(false);
+    expect(shouldClearEditorAutosaveOnLoad('/cloud', '')).toBe(false);
   });
 
   it('estimates encoded layer and original-image storage before serialization', () => {

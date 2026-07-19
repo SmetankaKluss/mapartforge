@@ -108,7 +108,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.21.0-companion-2026-07-19',
+  id: 'mapkluss-v1.21.1-companion-2026-07-19',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2555,7 +2555,6 @@ export default function App() {
     processing,
     serializeProject: buildCurrentCloudProjectJson,
     estimateBytes: estimateCurrentAutosaveBytes,
-    restoreProject: applyProjectJsonToEditor,
     notify: showAppNotice,
   });
   const autosaveLabel = useMemo(() => {
@@ -2569,7 +2568,6 @@ export default function App() {
       case 'pending': return t('АВТОСОХРАНЕНИЕ ОЖИДАЕТ', 'AUTOSAVE PENDING');
       case 'saving': return t('СОХРАНЕНИЕ…', 'SAVING…');
       case 'saved': return t(`СОХРАНЕНО ${time}`, `SAVED ${time}`);
-      case 'restored': return t(`ВОССТАНОВЛЕНО ${time}`, `RESTORED ${time}`);
       case 'too-large': return t('АВТОСОХРАНЕНИЕ НЕДОСТУПНО', 'AUTOSAVE UNAVAILABLE');
       case 'error': return t('ОШИБКА АВТОСОХРАНЕНИЯ', 'AUTOSAVE ERROR');
       default: return '';
