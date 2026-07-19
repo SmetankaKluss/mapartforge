@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { BUILTIN_PRESET_LABELS, COLOUR_ROWS, BUILTIN_PRESETS } from '../lib/paletteBlocks';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { BlockIcon } from './BlockIcon';
@@ -12,13 +12,24 @@ import type { PlatformMode } from '../lib/platformMode';
 import { trackEvent } from '../lib/analytics';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
-import { isSuppressionPaletteBlockAvailable } from '../lib/suppressionPalette';
+import {
+  isSuppressionPaletteBlockAvailable,
+  sanitizeSelectionForSuppression,
+} from '../lib/suppressionPalette';
 
 const STORAGE_KEY = 'mapart_custom_presets';
 
 function loadStoredPresets(): Record<string, BlockSelection> {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); }
   catch { return {}; }
+}
+
+function selectionKey(selection: BlockSelection): string {
+  return JSON.stringify(
+    Object.keys(selection)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(key => [key, [...(selection[Number(key)] ?? [])].sort((a, b) => a - b)]),
+  );
 }
 
 interface Props {
@@ -34,7 +45,6 @@ interface Props {
 export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion, platformMode = 'java', suppressionMode = false }: Props) {
   const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
-  const [selectedPreset,  setSelectedPreset]  = useState('');
   const [searchQuery,     setSearchQuery]     = useState('');
   const [showSaveModal,   setShowSaveModal]   = useState(false);
   const [modalName,       setModalName]       = useState('');
@@ -43,24 +53,29 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modalInputRef = useRef<HTMLInputElement>(null);
 
+  const builtInPresetNames = Object.keys(BUILTIN_PRESETS)
+    .filter(name => !suppressionMode || name !== 'Carpet Only');
+  const contextualPresets = (() => {
+    const builtIns = Object.fromEntries(
+      builtInPresetNames.map(name => [name, BUILTIN_PRESETS[name]]),
+    );
+    const presets = { ...builtIns, ...customPresets };
+    if (!suppressionMode || !minecraftVersion) return presets;
+    return Object.fromEntries(
+      Object.entries(presets).map(([name, selection]) => [
+        name,
+        sanitizeSelectionForSuppression(selection, minecraftVersion, platformMode),
+      ]),
+    );
+  })();
+  const currentSelectionKey = selectionKey(blockSelection);
+  const selectedPreset = Object.entries(contextualPresets)
+    .find(([, selection]) => selectionKey(selection) === currentSelectionKey)?.[0] ?? '';
+
   // Focus the modal input whenever it opens
   useEffect(() => {
     if (showSaveModal) modalInputRef.current?.focus();
   }, [showSaveModal]);
-
-  // Auto-detect matching preset when blockSelection changes externally
-  useEffect(() => {
-    const allPresets = { ...BUILTIN_PRESETS, ...customPresets };
-    for (const [name, sel] of Object.entries(allPresets)) {
-      const norm = (o: BlockSelection) => JSON.stringify(Object.keys(o).sort().map(k => [k, [...(o[+k] ?? [])].sort()]));
-      if (norm(blockSelection) === norm(sel)) {
-        setSelectedPreset(name);
-        return;
-      }
-    }
-    setSelectedPreset('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockSelection]);
 
   const persistPresets = useCallback((p: Record<string, BlockSelection>) => {
     setCustomPresets(p);
@@ -72,7 +87,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   function handlePresetSelect(name: string) {
     trackEvent('palette_preset_selected', { preset: name || 'none', custom: Boolean(name && !(name in BUILTIN_PRESETS)) });
     trackEvent('preset_changed', { preset_type: 'palette', preset: name || 'none', custom: Boolean(name && !(name in BUILTIN_PRESETS)) });
-    setSelectedPreset(name);
     if (!name) {
       // Reset to empty selection when "select preset" is chosen
       const emptySelection = Object.fromEntries(
@@ -81,10 +95,8 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
       onSelectionChange(emptySelection);
       return;
     }
-    if (name in BUILTIN_PRESETS) {
-      onSelectionChange(BUILTIN_PRESETS[name]);
-    } else if (name in customPresets) {
-      onSelectionChange(customPresets[name]);
+    if (name in contextualPresets) {
+      onSelectionChange(contextualPresets[name]);
     }
   }
 
@@ -94,7 +106,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     delete next[selectedPreset];
     trackEvent('palette_preset_deleted', { preset: selectedPreset });
     persistPresets(next);
-    setSelectedPreset('');
   }
 
   // ── Clear all ────────────────────────────────────────────────────────────
@@ -127,7 +138,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     if (!name || name in BUILTIN_PRESETS) return;
     trackEvent('palette_preset_saved', { preset: name });
     persistPresets({ ...customPresets, [name]: blockSelection });
-    setSelectedPreset(name);
     setModalName('');
     setShowSaveModal(false);
   }
@@ -160,18 +170,16 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
 
   // ── Version filtering ────────────────────────────────────────────────────
 
-  const versionRows = useMemo(() => {
-    return COLOUR_ROWS
-      .map(row => ({
-        ...row,
-        blocks: row.blocks.filter(b =>
-          (!minecraftVersion || isBlockAvailable(b.nbtName, minecraftVersion))
-          && isBlockAvailableOnPlatform(b.nbtName, platformMode)
-          && (!suppressionMode || !minecraftVersion || isSuppressionPaletteBlockAvailable(b, minecraftVersion, platformMode)),
-        ),
-      }))
-      .filter(row => row.blocks.length > 0);
-  }, [minecraftVersion, platformMode, suppressionMode]);
+  const versionRows = COLOUR_ROWS
+    .map(row => ({
+      ...row,
+      blocks: row.blocks.filter(b =>
+        (!minecraftVersion || isBlockAvailable(b.nbtName, minecraftVersion))
+        && isBlockAvailableOnPlatform(b.nbtName, platformMode)
+        && (!suppressionMode || !minecraftVersion || isSuppressionPaletteBlockAvailable(b, minecraftVersion, platformMode)),
+      ),
+    }))
+    .filter(row => row.blocks.length > 0);
 
   // ── Search filtering ─────────────────────────────────────────────────────
 
@@ -212,7 +220,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         >
           <option value="">{t('— выбрать пресет —', '— select preset —')}</option>
           <optgroup label={t('Встроенные', 'Built-in')}>
-            {(Object.keys(BUILTIN_PRESETS) as string[]).map(name => (
+            {builtInPresetNames.map(name => (
               <option key={name} value={name}>
                 {t(BUILTIN_PRESET_LABELS[name]?.ru ?? name, BUILTIN_PRESET_LABELS[name]?.en ?? name)}
               </option>

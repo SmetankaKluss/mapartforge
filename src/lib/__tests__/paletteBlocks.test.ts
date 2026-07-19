@@ -9,11 +9,12 @@ import {
 
 const EXPECTED_INSTANT_MINING: Record<number, number> = {
   1: 1,
+  3: 0,
   8: 7,
   9: 9,
   12: 3,
   13: 5,
-  14: 5,
+  14: 14,
   15: 5,
   16: 5,
   17: 5,
@@ -89,5 +90,16 @@ describe('built-in palette presets', () => {
       )].sort((a, b) => a - b);
       expect(baseIds).toEqual(expectedBaseIds);
     }
+  });
+
+  it('includes the zero-hardness hand-break options', () => {
+    const selection = BUILTIN_PRESETS['Instant Mining'];
+    const selectedNames = COLOUR_ROWS.flatMap(row =>
+      row.blocks
+        .filter(block => (selection[row.csId] ?? []).includes(block.blockId))
+        .map(block => block.nbtName),
+    );
+    expect(selectedNames).toContain('tnt');
+    expect(selectedNames).toContain('honey_block');
   });
 });

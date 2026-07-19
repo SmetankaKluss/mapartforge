@@ -108,7 +108,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.21.1-companion-2026-07-19',
+  id: 'mapkluss-v1.21.2-companion-guide-2026-07-19',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2805,8 +2805,8 @@ export default function App() {
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('Появился полезный мод MapKluss Companion. Гайд и вся информация — в Telegram.',
-              'MapKluss Companion is now available. The guide and all details are on Telegram.')}
+            {t('MapKluss Companion уже доступен. Перед первым Two-layer сайт покажет ссылку на гайд в Telegram.',
+              'MapKluss Companion is available. Before the first Two-layer build, the site links to the Telegram guide.')}
           </span>
           <a
             className="update-banner-link"

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { NumInput } from './NumInput';
 import type { DitheringMode, KlussParams } from '../lib/dithering';
 import { DEFAULT_KLUSS_PARAMS } from '../lib/dithering';
@@ -10,6 +10,11 @@ import { trackEvent } from '../lib/analytics';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import type { BuildTechnique, EditorBuildMode } from '../lib/buildTechnique';
+import {
+  acknowledgeTwoLayerGuide,
+  hasAcknowledgedTwoLayerGuide,
+} from '../lib/twoLayerGuide';
+import { TwoLayerGuideModal } from './TwoLayerGuideModal';
 
 interface Props {
   dithering: DitheringMode;
@@ -255,10 +260,28 @@ export function Controls({
   const ditherGuide = getDitheringGuide(dithering, t);
   const blockW = mapGrid.wide * MAP_BLOCK_SIZE;
   const blockH = mapGrid.tall * MAP_BLOCK_SIZE;
+  const [showTwoLayerGuide, setShowTwoLayerGuide] = useState(false);
 
   // Dithering tooltip state
   const [tooltipInfo, setTooltipInfo] = useState<{ mode: DitheringMode; top: number; left: number } | null>(null);
   const tooltipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const closeTwoLayerGuide = useCallback(() => setShowTwoLayerGuide(false), []);
+
+  function requestBuildMode(mode: EditorBuildMode) {
+    if (mode !== 'suppression_two_layer' || buildTechnique === 'suppression_two_layer' || hasAcknowledgedTwoLayerGuide()) {
+      onBuildModeChange(mode);
+      return;
+    }
+    trackEvent('two_layer_guide_warning_shown');
+    setShowTwoLayerGuide(true);
+  }
+
+  function confirmTwoLayerGuide() {
+    acknowledgeTwoLayerGuide();
+    trackEvent('two_layer_guide_acknowledged');
+    setShowTwoLayerGuide(false);
+    onBuildModeChange('suppression_two_layer');
+  }
 
   function handleOptionMouseEnter(e: React.MouseEvent<HTMLLabelElement>, value: DitheringMode) {
     clearTimeout(tooltipTimer.current);
@@ -475,19 +498,19 @@ export function Controls({
           <div className="mode-toggle mode-toggle-three">
             <button
               className={`mode-btn${buildTechnique === 'standard' && mapMode === '2d' ? ' active' : ''}`}
-              onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); onBuildModeChange('2d'); }}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); requestBuildMode('2d'); }}
               disabled={processing}
               title={t('2D — плоский арт, один оттенок каждого цвета', '2D — flat art with one shade per colour')}
             >2D</button>
             <button
               className={`mode-btn${buildTechnique === 'standard' && mapMode === '3d' ? ' active' : ''}`}
-              onClick={() => { trackEvent('map_mode_changed', { map_mode: '3d' }); onBuildModeChange('3d'); }}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: '3d' }); requestBuildMode('3d'); }}
               disabled={processing}
               title={t('3D — обычные лесенки, три оттенка каждого цвета', '3D — ordinary staircases with three shades per colour')}
             >3D</button>
             <button
               className={`mode-btn${buildTechnique === 'suppression_two_layer' ? ' active' : ''}`}
-              onClick={() => { trackEvent('map_mode_changed', { map_mode: 'two_layer' }); onBuildModeChange('suppression_two_layer'); }}
+              onClick={() => { trackEvent('map_mode_changed', { map_mode: 'two_layer' }); requestBuildMode('suppression_two_layer'); }}
               disabled={processing}
               title={t('Two-layer — полное качество 3D без постоянных лесенок', 'Two-layer — full 3D quality without permanent staircases')}
             >Two-layer</button>
@@ -777,6 +800,14 @@ export function Controls({
 
       {processing && (
         <div className="processing-badge">{t('Обработка…', 'Processing…')}</div>
+      )}
+
+      {showTwoLayerGuide && (
+        <TwoLayerGuideModal
+          t={t}
+          onCancel={closeTwoLayerGuide}
+          onConfirm={confirmTwoLayerGuide}
+        />
       )}
 
       </div>{/* end ctrl-block: Processing */}

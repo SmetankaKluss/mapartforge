@@ -2959,19 +2959,20 @@ function dyeOnly(filterFn: (b: PaletteBlock) => boolean): BlockSelection {
  * Efficiency V and Haste II. Vanilla mining speed is 49 in that setup, so a
  * correctly tagged block must have hardness <= 49 / 30 (about 1.6333).
  *
- * The list is deliberately narrower than the mechanical maximum: every entry
- * is a stable, full block that is suitable for Two-layer and normally returns
- * itself. Ordinary logs and planks are not included because hardness 2 is over
- * the one-tick threshold. The selected axe block is mangrove roots (0.7); all
- * other entries use a pickaxe.
+ * The list is deliberately narrower than the mechanical maximum. Tool-mined
+ * entries are stable full blocks suitable for Two-layer and normally return
+ * themselves. Ordinary logs and planks are not included because hardness 2 is
+ * over the one-tick threshold. TNT and honey blocks are the explicit hand-break
+ * additions: both have zero hardness and return themselves without a tool.
  */
 export const INSTANT_MINING_BLOCKS: Readonly<Record<number, number>> = {
   1: 1,   // sandstone (0.8, pickaxe)
+  3: 0,   // TNT (0, hand; keep away from ignition and redstone)
   8: 7,   // granite (1.5, pickaxe)
   9: 9,   // andesite (1.5, pickaxe; self-dropping without Silk Touch)
   12: 3,  // quartz block (0.8, pickaxe)
   13: 5,  // glazed terracotta (1.4, pickaxe)
-  14: 5,
+  14: 14, // honey block (0, hand)
   15: 5,
   16: 5,
   17: 5,
@@ -3017,8 +3018,8 @@ export const BUILTIN_PRESET_LABELS: Readonly<Record<string, Readonly<{ ru: strin
   'All Blocks': { ru: 'Все блоки', en: 'All blocks' },
   'Carpet Only': { ru: 'Только ковры', en: 'Carpet only' },
   'Instant Mining': {
-    ru: 'Мгновенно: Эфф. V + Спешка II',
-    en: 'Instant: Eff. V + Haste II',
+    ru: 'Быстро: инструменты + рукой',
+    en: 'Fast: tools + by hand',
   },
 };
 

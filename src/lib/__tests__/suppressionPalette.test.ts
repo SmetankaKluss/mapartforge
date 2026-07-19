@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLOUR_ROWS, DEFAULT_SELECTION } from '../paletteBlocks';
+import { BUILTIN_PRESETS, COLOUR_ROWS, DEFAULT_SELECTION } from '../paletteBlocks';
 import {
   isSuppressionSafeBlockName,
   sanitizeSuppressionSupportBlock,
@@ -9,6 +9,7 @@ import {
 describe('Two-layer palette safety', () => {
   it('keeps ordinary stone available', () => {
     expect(isSuppressionSafeBlockName('minecraft:stone')).toBe(true);
+    expect(isSuppressionSafeBlockName('minecraft:tnt')).toBe(true);
   });
 
   it('rejects spreading dirt and replaces an unsafe height-step block only in Two-layer', () => {
@@ -36,5 +37,10 @@ describe('Two-layer palette safety', () => {
     );
     expect(changedRows.length).toBeGreaterThan(0);
     expect(changedRows.length).toBeLessThan(COLOUR_ROWS.length / 2);
+  });
+
+  it('preserves deliberately empty preset rows in Two-layer', () => {
+    const sanitized = sanitizeSelectionForSuppression(BUILTIN_PRESETS['Instant Mining'], '1.21.11');
+    expect(sanitized).toEqual(BUILTIN_PRESETS['Instant Mining']);
   });
 });

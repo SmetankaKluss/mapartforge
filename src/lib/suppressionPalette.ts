@@ -17,7 +17,7 @@ const UNSAFE_BLOCK_NAMES = new Set([
   'pink_concrete_powder', 'gray_concrete_powder', 'light_gray_concrete_powder',
   'cyan_concrete_powder', 'purple_concrete_powder', 'blue_concrete_powder',
   'brown_concrete_powder', 'green_concrete_powder', 'red_concrete_powder',
-  'black_concrete_powder', 'ice', 'frosted_ice', 'tnt', 'unknown',
+  'black_concrete_powder', 'ice', 'frosted_ice', 'unknown',
 ]);
 
 const UNSAFE_BLOCK_TOKENS = [
@@ -62,7 +62,12 @@ export function sanitizeSelectionForSuppression(
 ): BlockSelection {
   const next: BlockSelection = {};
   for (const row of COLOUR_ROWS) {
-    const selectedId = selection[row.csId]?.[0];
+    const selectedIds = selection[row.csId] ?? [];
+    if (selectedIds.length === 0) {
+      next[row.csId] = [];
+      continue;
+    }
+    const selectedId = selectedIds[0];
     const selected = row.blocks.find(block => block.blockId === selectedId);
     if (selected && isSuppressionPaletteBlockAvailable(selected, minecraftVersion, platformMode)) {
       next[row.csId] = [selected.blockId];
