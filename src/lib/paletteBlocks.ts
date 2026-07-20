@@ -1126,6 +1126,48 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Bamboo Pressure Plate",
         "nbtName": "bamboo_pressure_plate",
         "supportBlockMandatory": true
+      },
+      {
+        "blockId": 14,
+        "displayName": "Sulfur",
+        "nbtName": "sulfur",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 15,
+        "displayName": "Sulfur Slab",
+        "nbtName": "sulfur_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 16,
+        "displayName": "Polished Sulfur",
+        "nbtName": "polished_sulfur",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 17,
+        "displayName": "Polished Sulfur Slab",
+        "nbtName": "polished_sulfur_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 18,
+        "displayName": "Sulfur Bricks",
+        "nbtName": "sulfur_bricks",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 19,
+        "displayName": "Sulfur Brick Slab",
+        "nbtName": "sulfur_brick_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 20,
+        "displayName": "Chiseled Sulfur",
+        "nbtName": "chiseled_sulfur",
+        "supportBlockMandatory": false
       }
     ]
   },
@@ -1766,6 +1808,48 @@ export const COLOUR_ROWS: ColourRow[] = [
         "displayName": "Mangrove Pressure Plate",
         "nbtName": "mangrove_pressure_plate",
         "supportBlockMandatory": true
+      },
+      {
+        "blockId": 14,
+        "displayName": "Cinnabar",
+        "nbtName": "cinnabar",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 15,
+        "displayName": "Cinnabar Slab",
+        "nbtName": "cinnabar_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 16,
+        "displayName": "Polished Cinnabar",
+        "nbtName": "polished_cinnabar",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 17,
+        "displayName": "Polished Cinnabar Slab",
+        "nbtName": "polished_cinnabar_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 18,
+        "displayName": "Cinnabar Bricks",
+        "nbtName": "cinnabar_bricks",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 19,
+        "displayName": "Cinnabar Brick Slab",
+        "nbtName": "cinnabar_brick_slab",
+        "supportBlockMandatory": true
+      },
+      {
+        "blockId": 20,
+        "displayName": "Chiseled Cinnabar",
+        "nbtName": "chiseled_cinnabar",
+        "supportBlockMandatory": false
       }
     ]
   },
@@ -1905,6 +1989,12 @@ export const COLOUR_ROWS: ColourRow[] = [
         "blockId": 2,
         "displayName": "Block Of Raw Gold",
         "nbtName": "raw_gold_block",
+        "supportBlockMandatory": false
+      },
+      {
+        "blockId": 3,
+        "displayName": "Potent Sulfur",
+        "nbtName": "potent_sulfur",
         "supportBlockMandatory": false
       }
     ]

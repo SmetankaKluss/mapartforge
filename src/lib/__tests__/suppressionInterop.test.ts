@@ -48,7 +48,7 @@ describe('Two-layer site-to-Companion interoperability fixture', () => {
     const outputDir = process.env.MAPKLUSS_SUPPRESSION_INTEROP_DIR;
     if (outputDir) mkdirSync(outputDir, { recursive: true });
 
-    for (const minecraftVersion of ['1.21.11', '1.21.8'] as const) {
+    for (const minecraftVersion of ['26.2', '1.21.11', '1.21.8', '1.21.4'] as const) {
       const artifacts = await buildSuppressionArtifacts(`Interop ${minecraftVersion}`, input(minecraftVersion));
       const zipBlob = await buildSuppressionZipBlob(artifacts);
       const zipBytes = new Uint8Array(await zipBlob.arrayBuffer());

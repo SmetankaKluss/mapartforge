@@ -22,9 +22,7 @@ import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
 import { NbtWriter, gzipBytes } from './nbt';
-
-// Current Java Edition data version (1.21.4)
-const DATA_VERSION = 4082;
+import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
 
 function writeStructureNbt(
   sizeX: number,
@@ -32,6 +30,7 @@ function writeStructureNbt(
   sizeZ: number,
   indices: Uint32Array,
   palette: string[],
+  dataVersion: number,
 ): Uint8Array {
   // Collect non-air block placements up-front so we know the count.
   const blockEntries: { state: number; x: number; y: number; z: number }[] = [];
@@ -48,7 +47,7 @@ function writeStructureNbt(
 
   const w = new NbtWriter();
   w.tagCompoundStart('');
-    w.tagInt('DataVersion', DATA_VERSION);
+    w.tagInt('DataVersion', dataVersion);
     w.tagIntList('size', [sizeX, sizeY, sizeZ]);
 
     // palette — TAG_List of TAG_Compound
@@ -92,9 +91,10 @@ export async function exportStructureNbt(
   supportBlockNbt?: string,
   supportMode:      SupportMode = 1,
   staircaseMode:    'classic' | 'optimized' = 'classic',
+  minecraftVersion: MinecraftVersion = '1.21.4',
 ): Promise<void> {
   const vol    = buildBlockVolume(imageData, cp, groups, structure, supportBlockNbt, staircaseMode, supportMode);
-  const raw    = writeStructureNbt(vol.sizeX, vol.sizeY, vol.sizeZ, vol.indices, vol.palette);
+  const raw    = writeStructureNbt(vol.sizeX, vol.sizeY, vol.sizeZ, vol.indices, vol.palette, minecraftDataVersion(minecraftVersion));
   const bytes  = await gzipBytes(raw);
   const suffix = structure === 'staircase' ? '_3d' : '_2d';
   triggerDownload(bytes, `${name}${suffix}.nbt`);
@@ -111,6 +111,7 @@ export async function exportStructureNbtZip(
   supportBlockNbt?: string,
   supportMode:      SupportMode = 1,
   staircaseMode:    'classic' | 'optimized' = 'classic',
+  minecraftVersion: MinecraftVersion = '1.21.4',
 ): Promise<void> {
   const zip = new JSZip();
   let idx = 1;
@@ -119,7 +120,7 @@ export async function exportStructureNbtZip(
       const tile     = extractTile(imageData, col, row);
       const tileName = `mapart_${idx}`;
       const vol      = buildBlockVolume(tile, cp, groups, structure, supportBlockNbt, staircaseMode, supportMode);
-      const raw      = writeStructureNbt(vol.sizeX, vol.sizeY, vol.sizeZ, vol.indices, vol.palette);
+      const raw      = writeStructureNbt(vol.sizeX, vol.sizeY, vol.sizeZ, vol.indices, vol.palette, minecraftDataVersion(minecraftVersion));
       const bytes    = await gzipBytes(raw);
       zip.file(`${tileName}.nbt`, bytes);
       idx++;

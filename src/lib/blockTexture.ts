@@ -16,7 +16,35 @@ const SPRITESHEET_ROW_MAX: Partial<Record<number, number>> = {
   54:  2,   // Warped Nylium — new blocks start at 3
   55:  6,   // Warped Stem — new blocks start at 7
   58:  2,   // Deepslate — new blocks start at 3
+  17: 13,   // Yellow — 26.2 sulfur family starts at 14
+  27: 13,   // Red — 26.2 cinnabar family starts at 14
+  29:  2,   // Gold — 26.2 potent sulfur starts at 3
 };
+
+const LOCAL_TEXTURE_ROOT = '/textures/minecraft/26.2';
+
+const LOCAL_TEXTURE_NAMES: Record<string, string> = {
+  sulfur: 'sulfur',
+  sulfur_slab: 'sulfur',
+  polished_sulfur: 'polished_sulfur',
+  polished_sulfur_slab: 'polished_sulfur',
+  sulfur_bricks: 'sulfur_bricks',
+  sulfur_brick_slab: 'sulfur_bricks',
+  chiseled_sulfur: 'chiseled_sulfur',
+  potent_sulfur: 'potent_sulfur',
+  cinnabar: 'cinnabar',
+  cinnabar_slab: 'cinnabar',
+  polished_cinnabar: 'polished_cinnabar',
+  polished_cinnabar_slab: 'polished_cinnabar',
+  cinnabar_bricks: 'cinnabar_bricks',
+  cinnabar_brick_slab: 'cinnabar_bricks',
+  chiseled_cinnabar: 'chiseled_cinnabar',
+};
+
+export function localBlockTextureUrl(nbtName: string): string | null {
+  const filename = LOCAL_TEXTURE_NAMES[nbtName];
+  return filename ? `${LOCAL_TEXTURE_ROOT}/${filename}.png` : null;
+}
 
 // Overrides for blocks where simple Title_Case doesn't match the wiki file name.
 // Slabs share texture files with their parent blocks; logs use the top-face texture.
@@ -49,6 +77,11 @@ export function wikiTextureUrl(nbtName: string): string {
   return `https://minecraft.wiki/w/Special:FilePath/${filename}.png`;
 }
 
+/** Prefer bundled Mojang textures for new blocks; fall back to the wiki for older additions. */
+export function blockTextureUrl(nbtName: string): string {
+  return localBlockTextureUrl(nbtName) ?? wikiTextureUrl(nbtName);
+}
+
 // Module-level cache: nbtName → resolved URL string (success) | null (error) | undefined (not fetched)
 const cache = new Map<string, string | null>();
 
@@ -74,7 +107,7 @@ export function fetchWikiTexture(nbtName: string): Promise<string> {
     if (!pending.has(nbtName)) {
       pending.set(nbtName, []);
 
-      const url = wikiTextureUrl(nbtName);
+      const url = blockTextureUrl(nbtName);
       const img = new Image();
       // No crossOrigin — we only use the URL for CSS background-image (no canvas access needed)
       img.onload = () => {

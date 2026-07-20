@@ -12,6 +12,21 @@ const BEDROCK_UNSAFE_BLOCKS = new Set([
   'light_weighted_pressure_plate',
   'resin_clump',
   'resin_block', // Java 1.21.4 Pale Garden — not yet in Bedrock
+  'sulfur',
+  'sulfur_slab',
+  'polished_sulfur',
+  'polished_sulfur_slab',
+  'sulfur_bricks',
+  'sulfur_brick_slab',
+  'chiseled_sulfur',
+  'potent_sulfur',
+  'cinnabar',
+  'cinnabar_slab',
+  'polished_cinnabar',
+  'polished_cinnabar_slab',
+  'cinnabar_bricks',
+  'cinnabar_brick_slab',
+  'chiseled_cinnabar',
 ]);
 
 export function isBlockAvailableOnPlatform(nbtName: string, platformMode: PlatformMode): boolean {

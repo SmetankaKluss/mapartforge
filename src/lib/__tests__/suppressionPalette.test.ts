@@ -12,6 +12,12 @@ describe('Two-layer palette safety', () => {
     expect(isSuppressionSafeBlockName('minecraft:tnt')).toBe(true);
   });
 
+  it('allows stable 26.2 stones but excludes active potent sulfur', () => {
+    expect(isSuppressionSafeBlockName('sulfur')).toBe(true);
+    expect(isSuppressionSafeBlockName('cinnabar_bricks')).toBe(true);
+    expect(isSuppressionSafeBlockName('potent_sulfur')).toBe(false);
+  });
+
   it('rejects spreading dirt and replaces an unsafe height-step block only in Two-layer', () => {
     expect(isSuppressionSafeBlockName('minecraft:dirt')).toBe(false);
     expect(sanitizeSuppressionSupportBlock('dirt')).toBe('stone');

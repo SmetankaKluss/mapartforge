@@ -3,6 +3,7 @@ import { useLocale } from '../lib/useLocale';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+import { isInSpritesheet, localBlockTextureUrl } from '../lib/blockTexture';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 
@@ -27,6 +28,12 @@ interface Props {
 // full block area rather than rendering as a narrow horizontal strip.
 
 interface CellBounds { y: number; h: number }
+interface TexturePixels { data: Uint8ClampedArray; width: number; height: number }
+
+const LOCAL_TEXTURE_BLOCKS = Array.from(new Set(
+  COLOUR_ROWS.flatMap(row => row.blocks.map(block => block.nbtName))
+    .filter(nbtName => localBlockTextureUrl(nbtName) !== null),
+));
 
 function analyzeSpriteCells(sprite: HTMLImageElement): Map<string, CellBounds> {
   const CELL = 32;
@@ -63,8 +70,8 @@ function analyzeSpriteCells(sprite: HTMLImageElement): Map<string, CellBounds> {
 
 // ── Colour → palette entry lookup ─────────────────────────────────────────
 
-function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { csId: number; blockId: number }> {
-  const map = new Map<number, { csId: number; blockId: number }>();
+function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { csId: number; blockId: number; nbtName: string }> {
+  const map = new Map<number, { csId: number; blockId: number; nbtName: string }>();
   for (const c of cp.colors) {
     const key = (c.r << 16) | (c.g << 8) | c.b;
     if (map.has(key)) continue;
@@ -72,7 +79,9 @@ function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { cs
     if (!row) continue;
     const activeIds = sel[row.csId] ?? [];
     const blockId = activeIds[0] ?? (row.blocks[0]?.blockId ?? 0);
-    map.set(key, { csId: row.csId, blockId });
+    const block = row.blocks.find(candidate => candidate.blockId === blockId) ?? row.blocks[0];
+    if (!block) continue;
+    map.set(key, { csId: row.csId, blockId, nbtName: block.nbtName });
   }
   return map;
 }
@@ -83,6 +92,8 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
   const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
   // Sprite pixel data stored as typed array — avoids per-pixel ctx.drawImage calls
   const [spritePixels, setSpritePixels] = useState<{ data: Uint8ClampedArray; width: number } | null>(null);
+  const [localTexturePixels, setLocalTexturePixels] = useState<Map<string, TexturePixels>>(new Map());
+  const [localTexturesReady, setLocalTexturesReady] = useState(false);
   const [spriteReady, setSpriteReady] = useState(false);
   const [rendering,   setRendering]   = useState(false);
 
@@ -109,8 +120,40 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
   }, [onSpriteLoad]);
 
   useEffect(() => {
+    let cancelled = false;
+    Promise.all(LOCAL_TEXTURE_BLOCKS.map(nbtName => new Promise<[string, TexturePixels] | null>(resolve => {
+      const src = localBlockTextureUrl(nbtName);
+      if (!src) {
+        resolve(null);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = img.naturalWidth;
+        offscreen.height = img.naturalHeight;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const pixels = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
+        resolve([nbtName, { data: pixels.data, width: pixels.width, height: pixels.height }]);
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    }))).then(results => {
+      if (cancelled) return;
+      setLocalTexturePixels(new Map(results.filter((entry): entry is [string, TexturePixels] => entry !== null)));
+      setLocalTexturesReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !imageData || !spritePixels || !spriteReady) return;
+    if (!canvas || !imageData || !spritePixels || !spriteReady || !localTexturesReady) return;
 
     let renderRafId = 0;
     let cancelled = false;
@@ -146,7 +189,16 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
             for (let sy = 0; sy < rasterScale; sy++) {
               for (let sx = 0; sx < rasterScale; sx++) {
                 const di = ((y * rasterScale + sy) * cw + (x * rasterScale + sx)) * 4;
-                if (entry) {
+                const localTexture = entry ? localTexturePixels.get(entry.nbtName) : undefined;
+                if (entry && localTexture) {
+                  const ssx = Math.floor(sx * localTexture.width / rasterScale);
+                  const ssy = Math.floor(sy * localTexture.height / rasterScale);
+                  const si = (ssy * localTexture.width + ssx) * 4;
+                  dst[di] = localTexture.data[si];
+                  dst[di + 1] = localTexture.data[si + 1];
+                  dst[di + 2] = localTexture.data[si + 2];
+                  dst[di + 3] = 255;
+                } else if (entry && isInSpritesheet(entry.csId, entry.blockId)) {
                   const bounds   = spriteBounds?.get(`${entry.blockId}_${entry.csId}`);
                   const spriteY0 = bounds ? bounds.y : entry.csId * CELL;
                   const spriteH  = bounds ? bounds.h : CELL;
@@ -191,7 +243,7 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
       cancelAnimationFrame(overlayRafId);
       cancelAnimationFrame(renderRafId);
     };
-  }, [imageData, spritePixels, spriteBounds, spriteReady, cp, blockSelection, width, height, showGrid, scale]);
+  }, [imageData, spritePixels, spriteBounds, spriteReady, localTexturePixels, localTexturesReady, cp, blockSelection, width, height, showGrid, scale]);
 
   if (!imageData) {
     return (
@@ -257,12 +309,12 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
 
   return (
     <div className="canvas-wrapper" style={{ position: 'relative' }}>
-      {(!spriteReady || rendering) && (
+      {(!spriteReady || !localTexturesReady || rendering) && (
         <div className="block-mode-overlay">
-          {!spriteReady ? t('Загрузка текстур блоков…', 'Loading block textures…') : t('Рендеринг текстур…', 'Rendering textures…')}
+          {!spriteReady || !localTexturesReady ? t('Загрузка текстур блоков…', 'Loading block textures…') : t('Рендеринг текстур…', 'Rendering textures…')}
         </div>
       )}
-      {isLarge && spriteReady && !rendering && (
+      {isLarge && spriteReady && localTexturesReady && !rendering && (
         <div className="block-mode-warning">
           <IconGlyph icon={mkIcons.alert} /> {t(`Режим текстур блоков отображает ${width.toLocaleString()}×${height.toLocaleString()} спрайтов — большие сетки могут быть медленными.`, `Block texture mode renders ${width.toLocaleString()}×${height.toLocaleString()} sprites — large grids may be slow.`)}
         </div>

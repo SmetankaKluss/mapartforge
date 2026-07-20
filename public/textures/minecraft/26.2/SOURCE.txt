@@ -1,0 +1,7 @@
+Minecraft Java Edition 26.2 block textures
+
+Source: official Mojang 26.2 client JAR
+Client SHA-1: 2dc72797acbc1b63fc16a11c4ac393605f453754
+Metadata: https://piston-meta.mojang.com/v1/packages/9e272020887b72a23b1a525c5d8e74d2d7aa8222/26.2.json
+
+Only the nine 16x16 block textures needed by the MapKluss 26.2 palette are included.

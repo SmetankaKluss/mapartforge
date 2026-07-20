@@ -35,10 +35,6 @@ function mapItemNbt(mapId: number, version: MinecraftVersion | undefined): strin
   return `{id:"minecraft:filled_map",count:1,components:{"minecraft:map_id":${mapId}}}`;
 }
 
-function packFormatForVersion(version: MinecraftVersion | undefined): number {
-  return minecraftDataPackFormat(version);
-}
-
 function clampStartMapId(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.floor(value));
@@ -107,11 +103,12 @@ export function buildFrameFillCommands({
 
 export function buildFrameFillDatapackFiles(options: FrameCommandOptions): DatapackFile[] {
   const fillFunction = buildFrameFillCommands(options);
+  const format = minecraftDataPackFormat(options.minecraftVersion);
+  const pack = typeof format === 'number'
+    ? { pack_format: format, description: 'MapKluss map art item-frame filler' }
+    : { min_format: format, max_format: format, description: 'MapKluss map art item-frame filler' };
   const packMeta = JSON.stringify({
-    pack: {
-      pack_format: packFormatForVersion(options.minecraftVersion),
-      description: 'MapKluss map art item-frame filler',
-    },
+    pack,
   }, null, 2);
 
   return [

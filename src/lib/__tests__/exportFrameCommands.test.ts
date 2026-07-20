@@ -56,4 +56,15 @@ describe('frame fill command export', () => {
     expect(files[1].content).toContain('/function mapkluss:fill_frames');
     expect(files[1].content).toContain('tag:{map:42}');
   });
+
+  it('uses the minor-aware pack metadata required by Minecraft 26.2', () => {
+    const files = buildFrameFillDatapackFiles({
+      mapGrid: { wide: 1, tall: 1 },
+      startMapId: 0,
+      minecraftVersion: '26.2',
+    });
+    const meta = JSON.parse(files[0].content) as { pack: Record<string, unknown> };
+    expect(meta.pack).toMatchObject({ min_format: [107, 1], max_format: [107, 1] });
+    expect(meta.pack).not.toHaveProperty('pack_format');
+  });
 });

@@ -84,12 +84,32 @@ describe('built-in palette presets', () => {
       .map(row => row.baseId)
       .sort((a, b) => a - b);
 
-    for (const version of ['1.21.8', '1.21.11'] as const) {
+    for (const version of ['1.21.4', '1.21.8', '1.21.11', '26.2'] as const) {
       const baseIds = [...new Set(
         buildPaletteFromSelection(selection, [2], version, 'java').map(color => color.baseId),
       )].sort((a, b) => a - b);
       expect(baseIds).toEqual(expectedBaseIds);
     }
+  });
+
+  it('exposes the new 26.2 sulfur and cinnabar families only in 26.2', () => {
+    const sulfurRow = COLOUR_ROWS.find(row => row.baseId === 18)!;
+    const cinnabarRow = COLOUR_ROWS.find(row => row.baseId === 28)!;
+    const goldRow = COLOUR_ROWS.find(row => row.baseId === 30)!;
+    const selection = {
+      [sulfurRow.csId]: sulfurRow.blocks.filter(block => block.nbtName.includes('sulfur')).map(block => block.blockId),
+      [cinnabarRow.csId]: cinnabarRow.blocks.filter(block => block.nbtName.includes('cinnabar')).map(block => block.blockId),
+      [goldRow.csId]: goldRow.blocks.filter(block => block.nbtName === 'potent_sulfur').map(block => block.blockId),
+    };
+
+    expect(buildPaletteFromSelection(selection, [2], '1.21.11', 'java')).toHaveLength(0);
+    expect([
+      ...sulfurRow.blocks.filter(block => block.nbtName.includes('sulfur')),
+      ...cinnabarRow.blocks.filter(block => block.nbtName.includes('cinnabar')),
+      ...goldRow.blocks.filter(block => block.nbtName === 'potent_sulfur'),
+    ]).toHaveLength(15);
+    expect(buildPaletteFromSelection(selection, [2], '26.2', 'java')).toHaveLength(3);
+    expect(buildPaletteFromSelection(selection, [2], '26.2', 'bedrock')).toHaveLength(0);
   });
 
   it('includes the zero-hardness hand-break options', () => {

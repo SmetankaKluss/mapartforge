@@ -21,8 +21,7 @@ import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
 import type { MapGrid } from './lib/types';
 import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
 import type { BlockSelection } from './lib/paletteBlocks';
-import type { MinecraftVersion } from './lib/versionPresets';
-import { getVersionLabel } from './lib/versionPresets';
+import { MINECRAFT_VERSIONS, getVersionLabel, type MinecraftVersion } from './lib/versionPresets';
 import { sanitizeSelectionForPlatform } from './lib/platformMode';
 import type { PlatformMode } from './lib/platformMode';
 import {
@@ -109,7 +108,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.23.2-companion-themes-tools-2026-07-20',
+  id: 'mapkluss-v1.24.0-minecraft-26-2-2026-07-21',
   url: 'https://t.me/mapkluss',
 };
 
@@ -321,7 +320,7 @@ export default function App() {
   const restoredSavedBuild = useMemo(() => normalizeRestoredBuildState({
     mapMode: saved.mapMode ?? '2d',
     buildTechnique: saved.buildTechnique,
-    minecraftVersion: (saved.minecraftVersion as MinecraftVersion | undefined) ?? '1.21.4',
+    minecraftVersion: (saved.minecraftVersion as MinecraftVersion | undefined) ?? '26.2',
     platformMode: saved.platformMode ?? 'java',
     blockSelection: saved.blockSelection ?? DEFAULT_SELECTION,
   }), [saved]);
@@ -372,9 +371,9 @@ export default function App() {
   const [showSplitLine, setShowSplitLine] = useState(true);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
-  const VALID_VERSIONS: MinecraftVersion[] = ['1.12.2','1.13.2','1.14.4','1.15.2','1.16.5','1.17.1','1.18.2','1.19','1.20','1.21.4','1.21.8','1.21.11'];
+  const VALID_VERSIONS = MINECRAFT_VERSIONS;
   const [minecraftVersion, setMinecraftVersion] = useState<MinecraftVersion>(
-    VALID_VERSIONS.includes(restoredSavedBuild.minecraftVersion) ? restoredSavedBuild.minecraftVersion : '1.21.4'
+    VALID_VERSIONS.includes(restoredSavedBuild.minecraftVersion) ? restoredSavedBuild.minecraftVersion : '26.2'
   );
   const [platformMode, setPlatformMode] = useState<PlatformMode>(restoredSavedBuild.platformMode);
   const [compareMode, setCompareMode]   = useState(false);
@@ -2893,7 +2892,7 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новости MapKluss Companion, темы и инструменты редактора', 'MapKluss Companion, themes, and editor tools announcement')}
+          aria-label={t('Новые версии Minecraft в MapKluss', 'New Minecraft versions in MapKluss')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
@@ -2904,17 +2903,17 @@ export default function App() {
             <div className="update-banner-track">
               {[0, 1].map(copy => (
                 <span className="update-banner-segment" key={copy}>
-                  <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
+                  <strong>{t('MAPKLUSS COMPANION ТЕПЕРЬ НА MINECRAFT 26.2', 'MAPKLUSS COMPANION NOW SUPPORTS MINECRAFT 26.2')}</strong>
                   <i />
-                  <span>{t('ГАЙД В TELEGRAM · ТЕМЫ · УЛУЧШИЛИ ИНСТРУМЕНТЫ', 'GUIDE IN TELEGRAM · THEMES · EDITOR TOOLS IMPROVED')}</span>
+                  <span>{t('26.2 · 1.21.11 · 1.21.8 · 1.21.4 · НОВЫЕ БЛОКИ В РЕДАКТОРЕ', '26.2 · 1.21.11 · 1.21.8 · 1.21.4 · NEW EDITOR BLOCKS')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('MapKluss Companion уже доступен, гайд находится в Telegram. В редакторе появились темы и улучшенная панель инструментов.',
-              'MapKluss Companion is available with a guide in Telegram. The editor now includes themes and an improved tool panel.')}
+            {t('MapKluss Companion теперь поддерживает Minecraft 26.2, 1.21.11, 1.21.8 и 1.21.4. В палитру редактора добавлены блоки 26.2; гайд по моду — в Telegram.',
+              'MapKluss Companion now supports Minecraft 26.2, 1.21.11, 1.21.8, and 1.21.4. The editor palette includes the 26.2 blocks; the mod guide is in Telegram.')}
           </span>
           <a
             className="update-banner-link"

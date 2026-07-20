@@ -86,22 +86,36 @@ function usageRatio(used: number, limit: number): number {
 type ImportFilter = 'all' | 'needs_save' | 'saved' | 'missing_maps';
 type LibraryTab = 'arts' | 'favorites' | 'recent';
 
-const COMPANION_MOD_DOWNLOAD_REV = '20260719-large-two-layer';
+const COMPANION_MOD_DOWNLOAD_REV = '20260721-minecraft-matrix';
 
 const COMPANION_MOD_VERSION_OPTIONS = [
   {
-    minecraftVersion: '1.21.8',
-    label: 'Minecraft 1.21.8',
-    badge: 'рекомендуемая',
-    href: `/downloads/mod/mapkluss-companion-1.21.8-0.7.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.8-0.7.0.jar',
+    minecraftVersion: '26.2',
+    label: 'Minecraft 26.2',
+    badge: 'Java 25',
+    href: `/downloads/mod/mapkluss-companion-26.2-0.8.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-26.2-0.8.0.jar',
   },
   {
     minecraftVersion: '1.21.11',
     label: 'Minecraft 1.21.11',
-    badge: 'новая',
-    href: `/downloads/mod/mapkluss-companion-1.21.11-0.7.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.11-0.7.0.jar',
+    badge: 'Java 21',
+    href: `/downloads/mod/mapkluss-companion-1.21.11-0.8.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.11-0.8.0.jar',
+  },
+  {
+    minecraftVersion: '1.21.8',
+    label: 'Minecraft 1.21.8',
+    badge: 'Java 21',
+    href: `/downloads/mod/mapkluss-companion-1.21.8-0.8.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.8-0.8.0.jar',
+  },
+  {
+    minecraftVersion: '1.21.4',
+    label: 'Minecraft 1.21.4',
+    badge: 'Java 21',
+    href: `/downloads/mod/mapkluss-companion-1.21.4-0.8.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.4-0.8.0.jar',
   },
 ] as const;
 
@@ -346,7 +360,7 @@ function CompanionModDownloadPanel({
     <section className="companion-panel companion-mod-download-panel">
       <div className="companion-mod-download-copy">
         <strong>{t('Скачать мод', 'Download mod')}</strong>
-        <small>Fabric / Java 21</small>
+        <small>Fabric / {selected.badge}</small>
       </div>
       <label className="companion-mod-version-field">
         <span>{t('Версия', 'Version')}</span>
@@ -415,7 +429,7 @@ export function CompanionCloudPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [emailCooldownUntil, setEmailCooldownUntil] = useState(0);
   const [emailCooldownNow, setEmailCooldownNow] = useState(Date.now());
-  const [selectedModVersion, setSelectedModVersion] = useState<CompanionModVersion>('1.21.8');
+  const [selectedModVersion, setSelectedModVersion] = useState<CompanionModVersion>('26.2');
   const [libraryQuery, setLibraryQuery] = useState('');
   const [libraryTab, setLibraryTab] = useState<LibraryTab>('arts');
   const [trackerArtId, setTrackerArtId] = useState<string | null>(null);

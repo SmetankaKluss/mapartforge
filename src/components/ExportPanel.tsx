@@ -156,7 +156,7 @@ export function ExportPanel({
       case 'wrong_grid': return t('поддерживаются сетки до 10×10 карт', 'map grids up to 10×10 are supported');
       case 'wrong_size': return t('размер изображения не совпадает с сеткой карт', 'the image size does not match the map grid');
       case 'wrong_platform': return t('только Java Edition', 'Java Edition only');
-      case 'unsupported_version': return t('только Minecraft 1.21.8 или 1.21.11', 'Minecraft 1.21.8 or 1.21.11 only');
+      case 'unsupported_version': return t('только Minecraft 1.21.4, 1.21.8, 1.21.11 или 26.2', 'Minecraft 1.21.4, 1.21.8, 1.21.11, or 26.2 only');
       case 'requires_three_shades': return t('нужен режим 3D с тремя оттенками', 'requires 3D mode with three shades');
       case 'transparent_pixel': return t('прозрачные пиксели пока не поддерживаются', 'transparent pixels are not supported yet');
       case 'unknown_palette_colour': return t('есть цвет вне текущей палитры', 'a color is outside the current palette');
@@ -437,10 +437,10 @@ export function ExportPanel({
         const ditheringSlug = DITHERING_LABELS[compareMode ? compareLeft : dithering];
         await exportStructureNbtZip(src, activePalette, blockSelection, mapGrid, structure,
           `MapartForge_${mapGrid.wide}x${mapGrid.tall}_${ditheringSlug}_nbt.zip`,
-          supportForExport, supportMode, staircaseMode);
+          supportForExport, supportMode, staircaseMode, minecraftVersion);
       } else {
         await exportStructureNbt(src, activePalette, blockSelection, 'MapartForge', structure,
-          supportForExport, supportMode, staircaseMode);
+          supportForExport, supportMode, staircaseMode, minecraftVersion);
       }
       trackEvent('nbt_exported', {
         map_mode: mapMode,

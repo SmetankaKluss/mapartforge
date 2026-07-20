@@ -156,7 +156,7 @@ describe('Two-layer suppression planner', () => {
     const input = makeInput();
     input.grid = { wide: 2, tall: 1 };
     input.platformMode = 'bedrock';
-    input.minecraftVersion = '1.21.4';
+    input.minecraftVersion = '1.20';
     input.mapMode = '2d';
     input.imageData.data[3] = 0;
 

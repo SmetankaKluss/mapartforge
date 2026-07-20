@@ -18,6 +18,7 @@ const UNSAFE_BLOCK_NAMES = new Set([
   'cyan_concrete_powder', 'purple_concrete_powder', 'blue_concrete_powder',
   'brown_concrete_powder', 'green_concrete_powder', 'red_concrete_powder',
   'black_concrete_powder', 'ice', 'frosted_ice', 'unknown',
+  'potent_sulfur', // can become an active geyser in its water/magma arrangement
 ]);
 
 const UNSAFE_BLOCK_TOKENS = [

@@ -3,13 +3,15 @@
 export type MinecraftVersion =
   | '1.12.2' | '1.13.2' | '1.14.4' | '1.15.2'
   | '1.16.5' | '1.17.1' | '1.18.2' | '1.19' | '1.20'
-  | '1.21.4' | '1.21.8' | '1.21.11';
+  | '1.21.4' | '1.21.8' | '1.21.11' | '26.2';
 
-const VERSION_ORDER: MinecraftVersion[] = [
+export const MINECRAFT_VERSIONS: readonly MinecraftVersion[] = [
   '1.12.2', '1.13.2', '1.14.4', '1.15.2',
   '1.16.5', '1.17.1', '1.18.2', '1.19', '1.20', '1.21.4',
-  '1.21.8', '1.21.11',
+  '1.21.8', '1.21.11', '26.2',
 ];
+
+const VERSION_ORDER = MINECRAFT_VERSIONS;
 
 const DATA_VERSIONS: Record<MinecraftVersion, number> = {
   '1.12.2': 1343,
@@ -24,6 +26,7 @@ const DATA_VERSIONS: Record<MinecraftVersion, number> = {
   '1.21.4': 4189,
   '1.21.8': 4440,
   '1.21.11': 4671,
+  '26.2': 4903,
 };
 
 export function minecraftDataVersion(version: MinecraftVersion | undefined): number {
@@ -36,7 +39,10 @@ export function usesMapIdComponent(version: MinecraftVersion | undefined): boole
   return VERSION_ORDER.indexOf(resolved) >= VERSION_ORDER.indexOf('1.21.4');
 }
 
-export function minecraftDataPackFormat(version: MinecraftVersion | undefined): number {
+export type MinecraftPackFormat = number | readonly [major: number, minor: number];
+
+export function minecraftDataPackFormat(version: MinecraftVersion | undefined): MinecraftPackFormat {
+  if (version === '26.2') return [107, 1];
   if (version === '1.21.11') return 94;
   if (version === '1.21.8') return 81;
   if (version === '1.21.4') return 61;
@@ -195,6 +201,23 @@ const BLOCK_MIN_VERSION: Record<string, MinecraftVersion | 'future'> = {
   'polished_tuff':                    '1.21.4',
   'polished_tuff_slab':               '1.21.4',
   'chiseled_tuff':                    '1.21.4',
+
+  // ── 26.2 — Chaos Cubed ───────────────────────────────────────────
+  'sulfur':                            '26.2',
+  'sulfur_slab':                       '26.2',
+  'polished_sulfur':                   '26.2',
+  'polished_sulfur_slab':              '26.2',
+  'sulfur_bricks':                     '26.2',
+  'sulfur_brick_slab':                 '26.2',
+  'chiseled_sulfur':                   '26.2',
+  'potent_sulfur':                     '26.2',
+  'cinnabar':                          '26.2',
+  'cinnabar_slab':                     '26.2',
+  'polished_cinnabar':                 '26.2',
+  'polished_cinnabar_slab':            '26.2',
+  'cinnabar_bricks':                   '26.2',
+  'cinnabar_brick_slab':               '26.2',
+  'chiseled_cinnabar':                 '26.2',
 };
 
 /** True if the block is available in the given MC version. */
@@ -228,6 +251,7 @@ export function getVersionLabel(version: MinecraftVersion): string {
     '1.21.4': 'Java 1.21.4',
     '1.21.8': 'Java 1.21.8',
     '1.21.11': 'Java 1.21.11',
+    '26.2': 'Java 26.2',
   };
   return labels[version] ?? version;
 }

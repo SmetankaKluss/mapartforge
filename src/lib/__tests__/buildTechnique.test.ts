@@ -20,11 +20,11 @@ describe('build technique platform guard', () => {
     expect(isPlatformLockedForBuildTechnique('standard')).toBe(false);
   });
 
-  it('enters Two-layer as 3D and defaults unsupported versions to 1.21.11', () => {
-    expect(resolveEditorBuildMode('suppression_two_layer', '1.21.4')).toEqual({
+  it('enters Two-layer as 3D and defaults unsupported versions to 26.2', () => {
+    expect(resolveEditorBuildMode('suppression_two_layer', '1.20')).toEqual({
       mapMode: '3d',
       buildTechnique: 'suppression_two_layer',
-      minecraftVersion: '1.21.11',
+      minecraftVersion: '26.2',
     });
   });
 
@@ -38,11 +38,11 @@ describe('build technique platform guard', () => {
   });
 
   it('lets the editor enter Two-layer even from a restored Bedrock state', () => {
-    const resolved = resolveEditorBuildMode('suppression_two_layer', '1.21.4');
+    const resolved = resolveEditorBuildMode('suppression_two_layer', '1.20');
     expect(resolved).toMatchObject({
       mapMode: '3d',
       buildTechnique: 'suppression_two_layer',
-      minecraftVersion: '1.21.11',
+      minecraftVersion: '26.2',
     });
   });
 
@@ -50,12 +50,12 @@ describe('build technique platform guard', () => {
     const restored = normalizeRestoredBuildState({
       mapMode: '2d',
       buildTechnique: 'suppression_two_layer',
-      minecraftVersion: '1.21.4',
+      minecraftVersion: '1.20',
       platformMode: 'java',
       blockSelection: { 0: [0] },
     });
     expect(restored.mapMode).toBe('3d');
-    expect(restored.minecraftVersion).toBe('1.21.11');
+    expect(restored.minecraftVersion).toBe('26.2');
     expect(restored.buildTechnique).toBe('suppression_two_layer');
     expect(restored.blockSelection[0]).not.toEqual([0]);
   });

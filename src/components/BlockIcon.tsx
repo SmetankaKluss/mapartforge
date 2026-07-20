@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { isInSpritesheet, getCachedWikiTexture, fetchWikiTexture, wikiTextureUrl } from '../lib/blockTexture';
+import { blockTextureUrl, isInSpritesheet, getCachedWikiTexture, fetchWikiTexture } from '../lib/blockTexture';
 import { SPRITE_URL } from './BlockCanvas';
 
 interface Props {
@@ -86,7 +86,7 @@ export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: P
     <span
       className={`${className} block-icon-wiki`}
       style={{
-        backgroundImage: `url(${wikiTextureUrl(nbtName)})`,
+        backgroundImage: `url(${blockTextureUrl(nbtName)})`,
         backgroundSize: 'cover',
         imageRendering: 'pixelated',
       }}

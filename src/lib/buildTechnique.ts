@@ -6,7 +6,7 @@ import { sanitizeSelectionForSuppression } from './suppressionPalette';
 export type BuildTechnique = 'standard' | 'suppression_two_layer';
 
 export const DEFAULT_BUILD_TECHNIQUE: BuildTechnique = 'standard';
-export const SUPPRESSION_TARGET_VERSIONS = ['1.21.11', '1.21.8'] as const;
+export const SUPPRESSION_TARGET_VERSIONS = ['26.2', '1.21.11', '1.21.8', '1.21.4'] as const;
 export type SuppressionTargetVersion = typeof SUPPRESSION_TARGET_VERSIONS[number];
 
 export type EditorBuildMode = '2d' | '3d' | 'suppression_two_layer';
@@ -16,7 +16,7 @@ export function isSuppressionTargetVersion(value: unknown): value is Suppression
 }
 
 export function coerceSuppressionTargetVersion(value: unknown): SuppressionTargetVersion {
-  return isSuppressionTargetVersion(value) ? value : '1.21.11';
+  return isSuppressionTargetVersion(value) ? value : '26.2';
 }
 
 export function editorBuildMode(
