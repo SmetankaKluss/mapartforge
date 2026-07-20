@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { useLocale } from '../lib/useLocale';
 import type { BlockSelection } from '../lib/paletteBlocks';
@@ -21,6 +22,14 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   const [search, setSearch] = useState('');
   void mapMode; // reserved for future use
   const ref = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (openerRef.current?.isConnected) openerRef.current.focus();
+    };
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -40,6 +49,8 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   }, [onClose]);
 
   const q = search.toLowerCase().trim();
+  const showsTransparent = !q || 'transparent'.includes(q) || 'air'.includes(q)
+    || 'прозрачный'.includes(q) || 'воздух'.includes(q);
 
   const items = COLOUR_ROWS.flatMap(row => {
     const ids = blockSelection[row.csId];
@@ -60,8 +71,10 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
     } satisfies PaintBlock];
   });
 
-  return (
-    <div className="block-picker-popup" ref={ref}>
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="block-picker-popup" ref={ref} role="dialog" aria-modal="false" aria-label={t('Выбор блока', 'Block picker')}>
       <div className="block-picker-header">
         <span className="block-picker-title">{t('Выбери блок', 'Choose block')}</span>
         <button className="block-picker-close" onClick={onClose} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
@@ -70,17 +83,20 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
         <input
           className="block-picker-search"
           placeholder={t('Поиск блоков…', 'Search blocks…')}
+          aria-label={t('Поиск блоков', 'Search blocks')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           autoFocus
         />
       </div>
-      <div className="block-picker-list">
-        {(!q || 'transparent'.includes(q) || 'air'.includes(q)) && (
+      <div className="block-picker-list" role="listbox" aria-label={t('Доступные блоки', 'Available blocks')}>
+        {showsTransparent && (
           <button
             className={`block-picker-item${current?.baseId === -1 ? ' selected' : ''}`}
             onClick={() => onSelect(TRANSPARENT_PAINT_BLOCK)}
             title={t('Прозрачный (Воздух)', 'Transparent (Air)')}
+            role="option"
+            aria-selected={current?.baseId === -1}
           >
             <div className="block-picker-icon-wrap">
               <span className="block-picker-icon block-picker-icon-transparent" />
@@ -95,6 +111,8 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
             className={`block-picker-item${current?.csId === item.csId ? ' selected' : ''}`}
             onClick={() => onSelect(item)}
             title={`${item.displayName} (${item.colourName})`}
+            role="option"
+            aria-selected={current?.csId === item.csId}
           >
             <div className="block-picker-icon-wrap">
               <span
@@ -109,10 +127,11 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
             <span className="block-picker-group">{item.colourName}</span>
           </button>
         ))}
-        {items.length === 0 && (
+        {items.length === 0 && !showsTransparent && (
           <div className="block-picker-empty">{t(`Блоков не найдено «${search}»`, `No blocks match "${search}"`)}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

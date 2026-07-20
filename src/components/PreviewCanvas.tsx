@@ -8,7 +8,7 @@ import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
 import { BlockPickerPopup } from './BlockPickerPopup';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
-import { paintWithPatternTile, paintWithPatternStamp } from '../lib/patternTool';
+import { forEachLinePoint, paintWithPatternTile, paintWithPatternStamp } from '../lib/patternTool';
 import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
@@ -21,6 +21,7 @@ import type { ComputedPalette } from '../lib/dithering';
 import { rgbToOklab, oklabDistance } from '../lib/oklab';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { useLocale } from '../lib/useLocale';
 
 // ── Internal types ────────────────────────────────────────────────────────────
 
@@ -53,6 +54,14 @@ type CanvasDrag = {
   startScaleX: number; startScaleY: number;
   startMouseX: number; startMouseY: number;  // viewport clientX/Y
   baseW: number; baseH: number;
+};
+
+type CanvasPointEvent = { clientX: number; clientY: number };
+type CanvasDownEvent = CanvasPointEvent & {
+  button: number;
+  shiftKey: boolean;
+  altKey: boolean;
+  preventDefault: () => void;
 };
 
 type TextState = TextLayerMeta | null;
@@ -102,6 +111,7 @@ interface Props {
   warningMask?: Uint8Array | null;
   showWarningMask?: boolean;
   viewportPanning?: boolean;
+  editingDisabled?: boolean;
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -475,8 +485,9 @@ export function PreviewCanvas({
   magicWandContiguous = true,
   magicWandMode = 'similar',
   activePattern, patternAnchorMode, gradientStops, gradientDithering,
-  warningMask, showWarningMask, viewportPanning = false,
+  warningMask, showWarningMask, viewportPanning = false, editingDisabled = false,
 }: Props) {
+  const { t } = useLocale();
   // Tooltip state
   const [hoverInfo, setHoverInfo]     = useState<HoverInfo | null>(null);
   // Single source of truth for tooltip position. Updated on every mousemove (not
@@ -612,6 +623,8 @@ export function PreviewCanvas({
   const canvasZoneRef = useRef<HTMLDivElement>(null);
   const imageDataRef  = useRef<ImageData | null>(null);
   imageDataRef.current = imageData;
+  const paintDataRef = useRef<ImageData | null>(null);
+  paintDataRef.current = paintData;
   const propsRef = useRef<{
     activeTool: PaintTool | null; paintBlock: PaintBlock | null;
     patternBlocks: PaintBlock[];
@@ -737,6 +750,7 @@ export function PreviewCanvas({
     let lastTime = 0;
     function frame(time: number) {
       antsRafRef.current = requestAnimationFrame(frame);
+      if (lastTime && time - lastTime < 34) return;
       const overlay = overlayCanvasRef.current;
       if (!overlay) return;
       const mask = selectionMaskRef.current;
@@ -747,7 +761,8 @@ export function PreviewCanvas({
       if (overlay.height !== ch) overlay.height = ch;
       const ctx = overlay.getContext('2d');
       if (!ctx) return;
-      // Advance phase ~8px/s
+      // Advance phase ~8px/s. The overlay is capped near 30 FPS so large
+      // selection masks do not monopolize the main thread.
       const dt = Math.min(time - lastTime, 100);
       lastTime = time;
       antsPhaseRef.current = (antsPhaseRef.current + dt * 0.008) % 8;
@@ -831,7 +846,7 @@ export function PreviewCanvas({
         ctx.restore();
         // Draw shifted marching ants border
         const shifted = shiftMask(floatSel.mask, floatSel.dx, floatSel.dy, w, h);
-        drawMarchingAnts(ctx, shifted, w, h, s, antsPhaseRef.current);
+        drawMarchingAnts(ctx, shifted, w, h, s, antsPhaseRef.current, false);
         return;
       }
 
@@ -860,7 +875,7 @@ export function PreviewCanvas({
         }
         ctx.restore();
       }
-      if (mask) drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current);
+      if (mask) drawMarchingAnts(ctx, mask, w, h, s, antsPhaseRef.current, false);
     }
     antsRafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(antsRafRef.current);
@@ -930,7 +945,7 @@ export function PreviewCanvas({
   // ── Global mousemove + mouseup ──────────────────────────────────────────────
 
   useEffect(() => {
-    function onGlobalMouseMove(e: MouseEvent) {
+    function onGlobalMouseMove(e: CanvasPointEvent) {
       if (isViewportPanActive()) {
         dismissHoverForViewportPan();
         return;
@@ -1152,19 +1167,24 @@ export function PreviewCanvas({
         }
         lastDragPixelRef.current = { px: cx, py: cy };
       } else {
-        // Pattern tools: paint only new center positions (no line interpolation)
-        const centerKey = cy * width + cx;
-        if (paintedSetRef.current.has(centerKey)) return;
-        paintedSetRef.current.add(centerKey);
-        if (activeTool === 'pattern-tile' && aPattern) {
-          if (pam === 'brush') {
-            paintWithPatternStamp(paintBufferRef.current!, cx, cy, aPattern, cp, sMask ?? undefined);
-          } else {
-            paintWithPatternTile(paintBufferRef.current!, cx, cy, brushSize, aPattern, cp, sMask ?? undefined);
+        // Pointer events can skip many canvas pixels during a fast drag. Visit
+        // every integer point between samples so pattern strokes stay continuous.
+        const last = lastDragPixelRef.current ?? { px: cx, py: cy };
+        forEachLinePoint(last.px, last.py, cx, cy, (px, py) => {
+          const centerKey = py * width + px;
+          if (paintedSetRef.current.has(centerKey)) return;
+          paintedSetRef.current.add(centerKey);
+          if (activeTool === 'pattern-tile' && aPattern) {
+            if (pam === 'brush') {
+              paintWithPatternStamp(paintBufferRef.current!, px, py, aPattern, cp, sMask ?? undefined);
+            } else {
+              paintWithPatternTile(paintBufferRef.current!, px, py, brushSize, aPattern, cp, sMask ?? undefined);
+            }
+          } else if (activeTool === 'pattern') {
+            paintPatternBrush(paintBufferRef.current!, px, py, brushSize, patternBlocks, cp, sMask ?? undefined);
           }
-        } else if (activeTool === 'pattern') {
-          paintPatternBrush(paintBufferRef.current!, cx, cy, brushSize, patternBlocks, cp, sMask ?? undefined);
-        }
+        });
+        lastDragPixelRef.current = { px: cx, py: cy };
       }
       {
         const { otherLayersData: oLD } = propsRef.current;
@@ -1173,7 +1193,7 @@ export function PreviewCanvas({
       }
     }
 
-    function onGlobalMouseUp(e: MouseEvent) {
+    function onGlobalMouseUp(e: CanvasPointEvent) {
       if (canvasDragRef.current) { canvasDragRef.current = null; return; }
 
       // Commit floating selection
@@ -1181,7 +1201,12 @@ export function PreviewCanvas({
         const fs = floatingSelRef.current;
         const { width: w, height: h } = propsRef.current;
         // Cut from source, paste at destination
-        const orig = imageDataRef.current!;
+        const orig = paintDataRef.current;
+        if (!orig) {
+          paintBufferRef.current = null;
+          floatingSelRef.current = null;
+          return;
+        }
         const erased = new ImageData(new Uint8ClampedArray(orig.data), orig.width, orig.height);
         for (let i = 0; i < fs.mask.length; i++) { if (fs.mask[i]) erased.data[i * 4 + 3] = 0; }
         const stamped = stampFloating(erased, fs.pixels, fs.mask, fs.dx, fs.dy);
@@ -1207,7 +1232,7 @@ export function PreviewCanvas({
         const gd = gradientDragRef.current;
         gradientDragRef.current = null;
         const { gradientStops: gStops, gradientDithering: gDither, selectionMask: sMask, cp: gcp } = propsRef.current;
-        const paintBuf = paintBufferRef.current ?? imageDataRef.current;
+        const paintBuf = paintBufferRef.current ?? paintDataRef.current;
         if (paintBuf && gStops && gStops.length >= 1) {
           const buf = new ImageData(new Uint8ClampedArray(paintBuf.data), paintBuf.width, paintBuf.height);
           applyGradient(buf, gd.startPx, gd.curPx, gStops, gcp, gDither ?? 'ordered', sMask ?? undefined);
@@ -1273,12 +1298,31 @@ export function PreviewCanvas({
       }
     }
 
+    function onGlobalTouchMove(e: TouchEvent) {
+      if (!propsRef.current.activeTool || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      onGlobalMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+    }
+
+    function onGlobalTouchEnd(e: TouchEvent) {
+      if (!propsRef.current.activeTool || e.changedTouches.length === 0) return;
+      const touch = e.changedTouches[0];
+      onGlobalMouseUp({ clientX: touch.clientX, clientY: touch.clientY });
+    }
+
     window.addEventListener('mousemove', onGlobalMouseMove);
     window.addEventListener('mouseup',   onGlobalMouseUp);
+    window.addEventListener('touchmove', onGlobalTouchMove, { passive: false });
+    window.addEventListener('touchend', onGlobalTouchEnd);
+    window.addEventListener('touchcancel', onGlobalTouchEnd);
     document.addEventListener('mouseleave', onDocMouseLeave);
     return () => {
       window.removeEventListener('mousemove', onGlobalMouseMove);
       window.removeEventListener('mouseup',   onGlobalMouseUp);
+      window.removeEventListener('touchmove', onGlobalTouchMove);
+      window.removeEventListener('touchend', onGlobalTouchEnd);
+      window.removeEventListener('touchcancel', onGlobalTouchEnd);
       document.removeEventListener('mouseleave', onDocMouseLeave);
       if (hoverRafRef.current != null) cancelAnimationFrame(hoverRafRef.current);
     };
@@ -1405,11 +1449,11 @@ export function PreviewCanvas({
     return { px, py };
   }
 
-  function getPixelCoords(e: React.MouseEvent<HTMLDivElement>): { px: number; py: number } | null {
+  function getPixelCoords(e: CanvasPointEvent): { px: number; py: number } | null {
     return getPixelCoordsAt(e.clientX, e.clientY);
   }
 
-  function lookupAtEvent(e: React.MouseEvent<HTMLDivElement>): HoverInfo | null {
+  function lookupAtEvent(e: CanvasPointEvent): HoverInfo | null {
     return lookupAtClient(e.clientX, e.clientY);
   }
 
@@ -1523,14 +1567,14 @@ export function PreviewCanvas({
 
   // ── Paint tool handler ──────────────────────────────────────────────────────
 
-  function handleZoneMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+  function handleZoneMouseDown(e: CanvasDownEvent) {
     if (isDraggingSplitRef.current) return;
-    if (e.altKey && splitPos != null && splitContainerRef.current) {
+
+    const mutatingTool = activeTool === 'move' || activeTool === 'brush' || activeTool === 'fill'
+      || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile'
+      || activeTool === 'gradient' || activeTool === 'text';
+    if (editingDisabled && mutatingTool) {
       e.preventDefault();
-      isDraggingSplitRef.current = true;
-      const rect = splitContainerRef.current.getBoundingClientRect();
-      onSplitPosChangeRef.current?.(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
-      showSplitLabels();
       return;
     }
 
@@ -1556,7 +1600,7 @@ export function PreviewCanvas({
       const addMode: 'replace' | 'add' | 'sub' = e.shiftKey ? 'add' : e.altKey ? 'sub' : 'replace';
 
       // Click inside selection (no modifier) → start floating selection drag
-      if (selectionMask && addMode === 'replace' && selectionMask[py * width + px] && paintData) {
+      if (!editingDisabled && selectionMask && addMode === 'replace' && selectionMask[py * width + px] && paintData) {
         e.preventDefault();
         // Copy selected pixels for drag preview — actual cut happens on mouseup
         const floatPixels = new ImageData(width, height);
@@ -1721,6 +1765,7 @@ export function PreviewCanvas({
       if (!activePattern) return;
       isDraggingRef.current = true;
       paintedSetRef.current = new Set();
+      lastDragPixelRef.current = { px: pos.px, py: pos.py };
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       paintedSetRef.current.add(pos.py * width + pos.px);
       if (patternAnchorMode === 'brush') {
@@ -1786,6 +1831,7 @@ export function PreviewCanvas({
       paintedSetRef.current = new Set();
       paintBufferRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
       const { px: cx, py: cy } = pos;
+      lastDragPixelRef.current = { px: cx, py: cy };
       paintedSetRef.current.add(cy * width + cx);
       paintPatternBrush(paintBufferRef.current, cx, cy, brushSize, patternBlocks, cp, selectionMask ?? undefined);
       const canvas = canvasZoneRef.current?.querySelector('canvas');
@@ -1794,6 +1840,19 @@ export function PreviewCanvas({
         drawImageData(canvas, bufToDraw, width, height, scale, showGrid);
       }
     }
+  }
+
+  function handleZoneTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (!activeTool || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    handleZoneMouseDown({
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      button: 0,
+      shiftKey: false,
+      altKey: false,
+      preventDefault: () => {},
+    });
   }
 
   // ── Tooltip handlers ────────────────────────────────────────────────────────
@@ -2029,6 +2088,7 @@ export function PreviewCanvas({
     <BlockCanvas
       imageData={displayImageData} cp={cp} blockSelection={blockSelection}
       width={width} height={height} showGrid={showGrid} scale={scale} viewScale={viewScale}
+      overlayRef={overlayCanvasRef}
     />
   ) : (
     <MapCanvas
@@ -2077,19 +2137,20 @@ export function PreviewCanvas({
           onClick={e => e.stopPropagation()}
         ><IconGlyph icon={mkIcons.compare} /></div>
       </div>
-      <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>ORIGINAL</span>
-      <span className={`split-label split-label-right${labelsVisible ? ' visible' : ''}`}>PROCESSED</span>
+      <span className={`split-label split-label-left${labelsVisible ? ' visible' : ''}`}>{t('ОРИГИНАЛ', 'ORIGINAL')}</span>
+      <span className={`split-label split-label-right${labelsVisible ? ' visible' : ''}`}>{t('ОБРАБОТКА', 'PROCESSED')}</span>
     </div>
   ) : processedLayer;
 
   return (
     <div
       ref={canvasZoneRef}
-      className="preview-hover-zone"
+      className={`preview-hover-zone${activeTool ? ' preview-tool-active' : ''}`}
       style={zoneCursor ? { cursor: zoneCursor } : undefined}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleZoneLeave}
       onMouseDown={handleZoneMouseDown}
+      onTouchStart={handleZoneTouchStart}
       onClick={handleZoneClick}
     >
       {inner}
@@ -2247,7 +2308,7 @@ export function PreviewCanvas({
           onClick={e => e.stopPropagation()}
         >
           {isPinned && (
-            <button className="hover-tooltip-close" onClick={closeTooltip} title="Close" aria-label="Close"><IconGlyph icon={mkIcons.close} /></button>
+            <button className="hover-tooltip-close" onClick={closeTooltip} title={t('Закрыть', 'Close')} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
           )}
           <div className="hover-tooltip-block">
             <div className="hover-tooltip-icon-wrap">
@@ -2272,16 +2333,16 @@ export function PreviewCanvas({
 
           {!showRepaint && (
             <div className="hover-tooltip-actions">
-              <button className="hover-btn hover-btn-remove" onClick={handleRemove}>Remove</button>
-              <button className="hover-btn hover-btn-repaint" onClick={() => setShowRepaint(true)}>Repaint ▸</button>
+              <button className="hover-btn hover-btn-remove" onClick={handleRemove}>{t('Убрать цвет', 'Remove')}</button>
+              <button className="hover-btn hover-btn-repaint" onClick={() => setShowRepaint(true)}>{t('Заменить', 'Repaint')} ▸</button>
             </div>
           )}
 
           {showRepaint && !repaintTarget && (
             <div className="repaint-picker">
               <div className="repaint-picker-header">
-                <span>Pick replacement</span>
-                <button className="repaint-back-btn" onClick={() => { setShowRepaint(false); setRepaintTarget(null); }} aria-label="Закрыть"><IconGlyph icon={mkIcons.close} /></button>
+                <span>{t('Выбери замену', 'Pick replacement')}</span>
+                <button className="repaint-back-btn" onClick={() => { setShowRepaint(false); setRepaintTarget(null); }} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
               </div>
               <div className="repaint-picker-list">
                 {repaintEntries.map(e => (
@@ -2316,11 +2377,11 @@ export function PreviewCanvas({
             <div className="repaint-picker">
               <div className="repaint-picker-header">
                 <span>{repaintTarget.displayName}</span>
-                <button className="repaint-back-btn" onClick={() => setRepaintTarget(null)} aria-label="Назад"><IconGlyph icon={mkIcons.chevronLeft} /></button>
+                <button className="repaint-back-btn" onClick={() => setRepaintTarget(null)} aria-label={t('Назад', 'Back')}><IconGlyph icon={mkIcons.chevronLeft} /></button>
               </div>
               <div className="repaint-shade-row">
                 {([0, 1, 2] as const).map(sh => {
-                  const shLabel = ['Dark', 'Mid', 'Bright'] as const;
+                  const shLabel = [t('Тёмный', 'Dark'), t('Средний', 'Mid'), t('Светлый', 'Bright')] as const;
                   const shIcon = [mkIcons.arrowDown, mkIcons.circle, mkIcons.arrowUp] as const;
                   const sc = cp.colors.find(c => c.baseId === repaintTarget.baseId && c.shade === sh);
                   const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';

@@ -73,7 +73,7 @@ import { createTour, shouldAutoStart, markTourDone } from './lib/tour';
 import type { TourType } from './lib/tour';
 import { useLocale } from './lib/useLocale';
 import type { PatternDefinition } from './lib/patternTool';
-import { createDefaultPattern } from './lib/patternTool';
+import { createDefaultPattern, parsePatternDefinition } from './lib/patternTool';
 import type { GradientStop } from './lib/gradientTool';
 import { PatternEditorPopup } from './components/PatternEditorPopup';
 import { importMapDat, MapDatImportError } from './lib/importMapDat';
@@ -109,7 +109,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.22.0-companion-themes-2026-07-20',
+  id: 'mapkluss-v1.23.2-companion-themes-tools-2026-07-20',
   url: 'https://t.me/mapkluss',
 };
 
@@ -165,15 +165,24 @@ const SUPPORT_MODE_LABELS: Record<1 | 2, string> = {
 const MAX_HISTORY = 20;
 
 interface HistoryEntry {
-  layerId: string;          // which layer this entry belongs to
-  imageData: ImageData | null;
+  layerState: LayerState;
   blockSelection: BlockSelection;
+  mapMode: '2d' | '3d';
+  minecraftVersion: MinecraftVersion;
 }
 
 interface LayerState {
   layers: Layer[];
   activeLayerId: string;
   groups: LayerGroup[];
+}
+
+function snapshotLayerState(state: LayerState): LayerState {
+  return {
+    layers: state.layers.map(layer => ({ ...layer })),
+    activeLayerId: state.activeLayerId,
+    groups: state.groups.map(group => ({ ...group })),
+  };
 }
 
 interface AppNotice {
@@ -344,6 +353,7 @@ export default function App() {
       const targetLayer = prev.layers.find(l => l.id === targetId);
       // Never overwrite a manually-edited layer with a fresh auto-process result
       // (dirty=true path = dithering-change with alpha mask preservation — still allowed)
+      if (targetLayer?.locked && (dirty || fromProcess)) return prev;
       if (fromProcess && !dirty && targetLayer?.isDirty) return prev;
       return {
         ...prev,
@@ -447,12 +457,15 @@ export default function App() {
   function importPattern(file: File) {
     file.text().then(text => {
       try {
-        const p = JSON.parse(text) as PatternDefinition;
-        if (!p.width || !p.height || !Array.isArray(p.pixels)) return;
+        const p = parsePatternDefinition(JSON.parse(text));
+        if (!p) throw new Error('invalid pattern');
         const imported = { ...p, id: crypto.randomUUID() };
         setSavedPatterns(prev => [...prev, imported]);
         setActivePatternId(imported.id);
-      } catch { /* ignore invalid */ }
+        showAppNotice(t('Паттерн импортирован.', 'Pattern imported.'));
+      } catch {
+        showAppNotice(t('Не удалось импортировать паттерн: проверь JSON и размер до 16×16.', 'Could not import pattern: check the JSON and the 16×16 size limit.'), 'error');
+      }
     });
   }
 
@@ -479,6 +492,21 @@ export default function App() {
   const [sourceHasAlpha, setSourceHasAlpha] = useState(false);
   const [bgMode, setBgMode] = useState<'color' | 'transparent'>('color');
   const [bgColor, setBgColor] = useState('#ffffff');
+
+  const moveGradientStop = useCallback((originalIndex: number, direction: -1 | 1) => {
+    setGradientStops(previous => {
+      const order = previous.map((stop, index) => ({ stop, index })).sort((a, b) => a.stop.t - b.stop.t);
+      const position = order.findIndex(item => item.index === originalIndex);
+      const targetPosition = position + direction;
+      if (position < 0 || targetPosition < 0 || targetPosition >= order.length) return previous;
+      const targetIndex = order[targetPosition].index;
+      const next = previous.map(stop => ({ ...stop }));
+      const currentT = next[originalIndex].t;
+      next[originalIndex].t = next[targetIndex].t;
+      next[targetIndex].t = currentT;
+      return next;
+    });
+  }, []);
   const bgModeRef  = useRef<'color' | 'transparent'>('color');
   const bgColorRef = useRef('#ffffff');
   bgModeRef.current  = bgMode;
@@ -643,6 +671,7 @@ export default function App() {
     blockSelection: BlockSelection;
     layers: Layer[];
     activeLayerId: string;
+    groups: LayerGroup[];
     mapMode: '2d' | '3d';
     staircaseMode: 'classic' | 'optimized';
     platformMode: PlatformMode;
@@ -653,6 +682,7 @@ export default function App() {
     blockSelection: sanitizeSelectionForPlatform(DEFAULT_SELECTION, platformMode),
     layers: layerState.layers,
     activeLayerId: layerState.activeLayerId,
+    groups: layerState.groups,
     mapMode,
     staircaseMode,
     platformMode,
@@ -664,6 +694,7 @@ export default function App() {
     blockSelection,
     layers,
     activeLayerId: layerState.activeLayerId,
+    groups: layerState.groups,
     mapMode,
     staircaseMode,
     platformMode,
@@ -689,6 +720,14 @@ export default function App() {
   const activeLayerRef = useRef<typeof activeLayer>(activeLayer);
   activeLayerRef.current = activeLayer;
 
+  const ensureActiveLayerEditable = useCallback(() => {
+    const current = latestRef.current;
+    const layer = current.layers.find(item => item.id === current.activeLayerId);
+    if (!layer?.locked) return true;
+    showAppNotice(t('Слой заблокирован. Сними блокировку, чтобы редактировать его.', 'This layer is locked. Unlock it to edit.'), 'info');
+    return false;
+  }, [showAppNotice, t]);
+
   // Ref with all current state needed for export shortcuts (avoids stale closures)
   const exportRef = useRef({ imageData, dithering, mapGrid, activePalette: null as unknown as ReturnType<typeof buildComputedPalette>, blockSelection, mapMode, staircaseMode, layers: layerState.layers });
 
@@ -712,6 +751,15 @@ export default function App() {
     setBuildTechnique(previous => coerceBuildTechniqueForPlatform(previous, platformMode));
   }, [platformMode]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
+  useEffect(() => {
+    if (editorMode === 'artist') return;
+    if (activeTool === 'move' || activeTool === 'select-rect' || activeTool === 'select-lasso'
+      || activeTool === 'select-magic' || activeTool === 'select-pixel'
+      || activeTool === 'pattern' || activeTool === 'pattern-tile' || activeTool === 'gradient') {
+      setActiveTool(null);
+      setSelectionMask(null);
+    }
+  }, [activeTool, editorMode]);
 
   // Per-layer settings: restore mapMode/staircaseMode/dithering when active layer changes
   const layersRef = useRef(layers);
@@ -730,9 +778,18 @@ export default function App() {
 
   // Push current state onto undo stack before a tracked action
   const pushToHistory = useCallback(() => {
-    const { imageData: img, blockSelection: sel, activeLayerId: lid } = latestRef.current;
+    const current = latestRef.current;
     setUndoStack(prev => {
-      const next = [...prev, { layerId: lid, imageData: img, blockSelection: sel }];
+      const next = [...prev, {
+        layerState: snapshotLayerState({
+          layers: current.layers,
+          activeLayerId: current.activeLayerId,
+          groups: current.groups,
+        }),
+        blockSelection: current.blockSelection,
+        mapMode: current.mapMode,
+        minecraftVersion: current.minecraftVersion,
+      }];
       return next.length > MAX_HISTORY ? next.slice(1) : next;
     });
     setRedoStack([]);
@@ -744,15 +801,17 @@ export default function App() {
       if (prev.length === 0) return prev;
       const entry = prev[prev.length - 1];
       const cur = latestRef.current;
-      // Save current state of the specific layer being undone (for redo)
-      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
-      setRedoStack(r => [...r, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }]);
-      // Target the correct layer, not necessarily the active one
-      processTargetLayerIdRef.current = entry.layerId;
-      const restored = normalizeIncomingBuildState(entry.blockSelection, cur.mapMode);
-      setImageData(entry.imageData);
+      setRedoStack(r => [...r, {
+        layerState: snapshotLayerState({ layers: cur.layers, activeLayerId: cur.activeLayerId, groups: cur.groups }),
+        blockSelection: cur.blockSelection,
+        mapMode: cur.mapMode,
+        minecraftVersion: cur.minecraftVersion,
+      }]);
+      const restored = normalizeIncomingBuildState(entry.blockSelection, entry.mapMode);
+      setLayerState(snapshotLayerState(entry.layerState));
+      setSelectionMask(null);
       setMapMode(restored.mapMode);
-      setMinecraftVersion(restored.minecraftVersion);
+      setMinecraftVersion(entry.minecraftVersion);
       setBlockSelection(restored.blockSelection);
       return prev.slice(0, -1);
     });
@@ -763,16 +822,20 @@ export default function App() {
       if (prev.length === 0) return prev;
       const entry = prev[prev.length - 1];
       const cur = latestRef.current;
-      const layerNow = cur.layers.find(l => l.id === entry.layerId)?.imageData ?? null;
       setUndoStack(u => {
-        const next = [...u, { layerId: entry.layerId, imageData: layerNow, blockSelection: cur.blockSelection }];
+        const next = [...u, {
+          layerState: snapshotLayerState({ layers: cur.layers, activeLayerId: cur.activeLayerId, groups: cur.groups }),
+          blockSelection: cur.blockSelection,
+          mapMode: cur.mapMode,
+          minecraftVersion: cur.minecraftVersion,
+        }];
         return next.length > MAX_HISTORY ? next.slice(1) : next;
       });
-      processTargetLayerIdRef.current = entry.layerId;
-      const restored = normalizeIncomingBuildState(entry.blockSelection, cur.mapMode);
-      setImageData(entry.imageData);
+      const restored = normalizeIncomingBuildState(entry.blockSelection, entry.mapMode);
+      setLayerState(snapshotLayerState(entry.layerState));
+      setSelectionMask(null);
       setMapMode(restored.mapMode);
-      setMinecraftVersion(restored.minecraftVersion);
+      setMinecraftVersion(entry.minecraftVersion);
       setBlockSelection(restored.blockSelection);
       return prev.slice(0, -1);
     });
@@ -788,20 +851,20 @@ export default function App() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (isInteractiveKeyboardTarget(e.target)) return;
       if (!imageData) return;
       switch (e.code) {
         case 'KeyE': setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper'); break;
-        case 'KeyB': setActiveTool(t => t === 'brush' ? null : 'brush'); break;
-        case 'KeyF': setActiveTool(t => t === 'fill' ? null : 'fill'); break;
-        case 'KeyX': setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
+        case 'KeyB': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'brush' ? null : 'brush'); break;
+        case 'KeyF': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'fill' ? null : 'fill'); break;
+        case 'KeyX': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
         case 'KeyT': /* text tool hidden — to be reworked */ break;
         case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
         case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
         case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
-        case 'KeyP': if (editorMode === 'artist') setActiveTool(t => t === 'pattern-tile' ? null : 'pattern-tile'); break;
-        case 'KeyG': if (editorMode === 'artist') setActiveTool(t => t === 'gradient' ? null : 'gradient'); break;
-        case 'KeyV': if (editorMode === 'artist') setActiveTool(t => t === 'move' ? null : 'move'); break;
+        case 'KeyP': if (editorMode === 'artist' && ensureActiveLayerEditable()) setActiveTool(t => t === 'pattern-tile' ? null : 'pattern-tile'); break;
+        case 'KeyG': if (editorMode === 'artist' && ensureActiveLayerEditable()) setActiveTool(t => t === 'gradient' ? null : 'gradient'); break;
+        case 'KeyV': if (editorMode === 'artist' && ensureActiveLayerEditable()) setActiveTool(t => t === 'move' ? null : 'move'); break;
         case 'Delete':
         case 'Backspace': if (editorMode === 'artist' && selectionMask) { handleDeleteSelectionRef.current?.(); } break;
         case 'Escape':
@@ -814,7 +877,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [imageData, compareMode, editorMode, selectionMask]);
+  }, [imageData, compareMode, editorMode, selectionMask, ensureActiveLayerEditable]);
 
 
   const modeShades = (mapMode === '2d') ? [1] : [0, 1, 2];
@@ -830,6 +893,22 @@ export default function App() {
 
 
   const selectedPixelCount = useMemo(() => selectionMask ? countSelected(selectionMask) : 0, [selectionMask]);
+  const activeLayerLocked = Boolean(activeLayer?.locked);
+  const activeToolUi = (() => {
+    switch (activeTool) {
+      case 'eyedropper': return { icon: mkIcons.eyedropper, name: t('Пипетка', 'Eyedropper'), key: 'E', hint: t('Выбери цвет прямо с арта.', 'Pick a color directly from the art.') };
+      case 'brush': return { icon: mkIcons.brush, name: t('Кисть', 'Brush'), key: 'B', hint: t('Рисуй выбранным блоком. Shift + клик — прямая линия.', 'Paint with the selected block. Shift + click draws a straight line.') };
+      case 'fill': return { icon: mkIcons.fill, name: t('Заливка', 'Fill'), key: 'F', hint: t('Заполни связанную область выбранным блоком.', 'Fill a connected area with the selected block.') };
+      case 'eraser': return { icon: mkIcons.eraser, name: t('Ластик', 'Eraser'), key: 'X', hint: t('Удали пиксели активного слоя.', 'Erase pixels from the active layer.') };
+      case 'move': return { icon: mkIcons.move, name: t('Перемещение слоя', 'Move layer'), key: 'V', hint: t('Сдвинь активный слой. Space + ЛКМ двигает только холст.', 'Move the active layer. Space + LMB pans only the canvas.') };
+      case 'select-rect': return { icon: mkIcons.selectRect, name: t('Прямоугольное выделение', 'Rectangular selection'), key: 'R', hint: t('Shift добавляет область, Alt вычитает.', 'Shift adds to the selection, Alt subtracts.') };
+      case 'select-lasso': return { icon: mkIcons.lasso, name: t('Лассо', 'Lasso'), key: 'L', hint: t('Обведи область вручную. Shift добавляет, Alt вычитает.', 'Draw a freeform selection. Shift adds, Alt subtracts.') };
+      case 'select-magic': return { icon: mkIcons.wand, name: t('Волшебная палочка', 'Magic wand'), key: 'W', hint: t('Выдели похожие цвета или прозрачность.', 'Select similar colors or transparency.') };
+      case 'pattern-tile': return { icon: mkIcons.pattern, name: t('Паттерн-кисть', 'Pattern brush'), key: 'P', hint: t('Выбери блок, настрой сетку и рисуй повторяющимся паттерном.', 'Choose a block, edit the grid, then paint a repeating pattern.') };
+      case 'gradient': return { icon: mkIcons.gradient, name: t('Градиент', 'Gradient'), key: 'G', hint: t('Протяни линию от первого цвета к последнему.', 'Drag a line from the first color to the last.') };
+      default: return { icon: mkIcons.select, name: t('Курсор', 'Cursor'), key: 'Esc', hint: t('Клик — действия с блоком, перетаскивание — навигация по арту.', 'Click for block actions, drag to navigate the art.') };
+    }
+  })();
 
   // exportRef is updated below, after compositeImageData is computed
 
@@ -1204,6 +1283,7 @@ export default function App() {
     // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
     setUndoStack([]);
     setRedoStack([]);
+    setSelectionMask(null);
     // Scale originalData (compare preview) to new dimensions
     if (originalDataRef.current) {
       setOriginalData(scaleImageData(originalDataRef.current, newW, newH));
@@ -1408,15 +1488,16 @@ export default function App() {
   }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
+    if (!ensureActiveLayerEditable()) return;
     pushToHistory();
     setImageData(data, true);  // manual paint → mark dirty
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ensureActiveLayerEditable, pushToHistory]);
 
   // ── Selection operations ─────────────────────────────────────────────────────
 
   const handleDeleteSelection = useCallback(() => {
     if (!imageData || !selectionMask) return;
+    if (!ensureActiveLayerEditable()) return;
     pushToHistory();
     const buf = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
     for (let i = 0; i < selectionMask.length; i++) {
@@ -1424,11 +1505,12 @@ export default function App() {
       buf.data[i * 4] = 0; buf.data[i * 4 + 1] = 0; buf.data[i * 4 + 2] = 0; buf.data[i * 4 + 3] = 0;
     }
     setImageData(buf, true);  // manual edit → dirty
-  }, [imageData, selectionMask, pushToHistory]);
+  }, [imageData, selectionMask, ensureActiveLayerEditable, pushToHistory]);
   handleDeleteSelectionRef.current = handleDeleteSelection;
 
   const handleFillSelection = useCallback(() => {
     if (!imageData || !selectionMask || !paintBlock || paintBlock.baseId === -1) return;
+    if (!ensureActiveLayerEditable()) return;
     const color = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === paintBlock.shade)
       ?? activePalette.colors.find(c => c.baseId === paintBlock.baseId);
     if (!color) return;
@@ -1439,7 +1521,7 @@ export default function App() {
       buf.data[i * 4] = color.r; buf.data[i * 4 + 1] = color.g; buf.data[i * 4 + 2] = color.b; buf.data[i * 4 + 3] = 255;
     }
     setImageData(buf, true);  // manual edit → dirty
-  }, [imageData, selectionMask, paintBlock, activePalette, pushToHistory]);
+  }, [imageData, selectionMask, paintBlock, activePalette, ensureActiveLayerEditable, pushToHistory]);
 
   const handleInvertSelection = useCallback(() => {
     if (!imageData) return;
@@ -1448,6 +1530,7 @@ export default function App() {
 
   const handleMoveSelectionToLayer = useCallback(() => {
     if (!imageData || !selectionMask) return;
+    if (!ensureActiveLayerEditable()) return;
     pushToHistory();
     const w = imageData.width, h = imageData.height;
     const newLayerData = new ImageData(w, h);
@@ -1473,21 +1556,23 @@ export default function App() {
       return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
     });
     setSelectionMask(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageData, selectionMask]);
+  }, [imageData, selectionMask, ensureActiveLayerEditable, pushToHistory]);
 
   // ── Layer management ─────────────────────────────────────────────────────────
 
   const handleAddLayer = useCallback(() => {
+    pushToHistory();
     setLayerState(prev => {
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
       const l = createLayer(`Слой ${prev.layers.length + 1}`, new ImageData(w, h));
       return { ...prev, layers: [...prev.layers, l], activeLayerId: l.id };
     });
-  }, [mapGrid]);
+  }, [mapGrid, pushToHistory]);
 
   const handleDeleteLayer = useCallback((id: string) => {
+    if (latestRef.current.layers.length <= 1) return;
+    pushToHistory();
     setLayerState(prev => {
       if (prev.layers.length <= 1) return prev; // always keep at least 1
       const newLayers = prev.layers.filter(l => l.id !== id);
@@ -1496,7 +1581,7 @@ export default function App() {
         : prev.activeLayerId;
       return { ...prev, layers: newLayers, activeLayerId: newActive };
     });
-  }, []);
+  }, [pushToHistory]);
 
   const handleRenameLayer = useCallback((id: string, name: string) => {
     setLayerState(prev => ({
@@ -1506,13 +1591,17 @@ export default function App() {
   }, []);
 
   const handleToggleLayerVisible = useCallback((id: string) => {
+    pushToHistory();
     setLayerState(prev => ({
       ...prev,
       layers: prev.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l),
     }));
-  }, []);
+  }, [pushToHistory]);
 
   const handleMoveLayerUp = useCallback((id: string) => {
+    const index = latestRef.current.layers.findIndex(layer => layer.id === id);
+    if (index < 0 || index >= latestRef.current.layers.length - 1) return;
+    pushToHistory();
     setLayerState(prev => {
       const idx = prev.layers.findIndex(l => l.id === id);
       if (idx >= prev.layers.length - 1) return prev;
@@ -1520,9 +1609,12 @@ export default function App() {
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       return { ...prev, layers: next };
     });
-  }, []);
+  }, [pushToHistory]);
 
   const handleMoveLayerDown = useCallback((id: string) => {
+    const index = latestRef.current.layers.findIndex(layer => layer.id === id);
+    if (index <= 0) return;
+    pushToHistory();
     setLayerState(prev => {
       const idx = prev.layers.findIndex(l => l.id === id);
       if (idx <= 0) return prev;
@@ -1530,7 +1622,7 @@ export default function App() {
       [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
       return { ...prev, layers: next };
     });
-  }, []);
+  }, [pushToHistory]);
 
   const handleOpacityChange = useCallback((id: string, opacity: number) => {
     setLayerState(prev => ({
@@ -1540,13 +1632,16 @@ export default function App() {
   }, []);
 
   const handleToggleLock = useCallback((id: string) => {
+    pushToHistory();
     setLayerState(prev => ({
       ...prev,
       layers: prev.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l),
     }));
-  }, []);
+  }, [pushToHistory]);
 
   const handleMoveLayer = useCallback((fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    pushToHistory();
     setLayerState(prev => {
       const display = [...prev.layers].reverse();
       if (fromIdx < 0 || fromIdx >= display.length || toIdx < 0 || toIdx >= display.length) return prev;
@@ -1554,9 +1649,12 @@ export default function App() {
       display.splice(toIdx, 0, moved);
       return { ...prev, layers: display.reverse() };
     });
-  }, []);
+  }, [pushToHistory]);
 
   const handleMergeDown = useCallback(() => {
+    const activeIndex = latestRef.current.layers.findIndex(layer => layer.id === latestRef.current.activeLayerId);
+    if (activeIndex <= 0) return;
+    pushToHistory();
     setLayerState(prev => {
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
@@ -1565,9 +1663,11 @@ export default function App() {
       const newActive = newLayers[Math.max(0, mergedIdx - 1)]?.id ?? newLayers[0]?.id ?? prev.activeLayerId;
       return { ...prev, layers: newLayers, activeLayerId: newActive };
     });
-  }, [mapGrid]);
+  }, [mapGrid, pushToHistory]);
 
   const handleMergeVisible = useCallback(() => {
+    if (latestRef.current.layers.filter(layer => layer.visible && layer.imageData).length <= 1) return;
+    pushToHistory();
     setLayerState(prev => {
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
@@ -1575,9 +1675,11 @@ export default function App() {
       const firstVisible = newLayers.find(l => l.visible && l.imageData);
       return { ...prev, layers: newLayers, activeLayerId: firstVisible?.id ?? prev.activeLayerId };
     });
-  }, [mapGrid]);
+  }, [mapGrid, pushToHistory]);
 
   const handleCreateGroup = useCallback((layerIds: string[]) => {
+    if (layerIds.length === 0) return;
+    pushToHistory();
     const groupId = `group-${Date.now()}`;
     const newGroup: LayerGroup = { id: groupId, name: 'Группа', visible: true, collapsed: false };
     setLayerState(prev => ({
@@ -1585,7 +1687,7 @@ export default function App() {
       groups: [...prev.groups, newGroup],
       layers: prev.layers.map(l => layerIds.includes(l.id) ? { ...l, groupId } : l),
     }));
-  }, []);
+  }, [pushToHistory]);
 
   const handleToggleGroupCollapse = useCallback((groupId: string) => {
     setLayerState(prev => ({
@@ -1595,14 +1697,17 @@ export default function App() {
   }, []);
 
   const handleDeleteGroup = useCallback((groupId: string) => {
+    pushToHistory();
     setLayerState(prev => ({
       ...prev,
       groups: prev.groups.filter(g => g.id !== groupId),
       layers: prev.layers.map(l => l.groupId === groupId ? { ...l, groupId: null } : l),
     }));
-  }, []);
+  }, [pushToHistory]);
 
   const handleTextCommit = useCallback((textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => {
+    if (replaceActive && !ensureActiveLayerEditable()) return;
+    pushToHistory();
     setLayerState(prev => {
       if (replaceActive) {
         // Re-editing an existing text layer: replace its pixels + metadata in place.
@@ -1618,7 +1723,7 @@ export default function App() {
       const newLayers = [...prev.layers.slice(0, insertAt), newLayer, ...prev.layers.slice(insertAt)];
       return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
     });
-  }, []);
+  }, [ensureActiveLayerEditable, pushToHistory]);
 
   // ── Export shortcuts (stable — uses exportRef for fresh state) ───────────
   const handleExportPng = useCallback(() => {
@@ -1712,6 +1817,7 @@ export default function App() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!e.ctrlKey && !e.metaKey) return;
+      if (isInteractiveKeyboardTarget(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA' && editorMode === 'artist' && imageData) {
         e.preventDefault();
         setSelectionMask(selectAllMask(imageData.width, imageData.height));
@@ -2787,7 +2893,7 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новости MapKluss Companion и темы интерфейса', 'MapKluss Companion and interface themes announcement')}
+          aria-label={t('Новости MapKluss Companion, темы и инструменты редактора', 'MapKluss Companion, themes, and editor tools announcement')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
@@ -2800,15 +2906,15 @@ export default function App() {
                 <span className="update-banner-segment" key={copy}>
                   <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
                   <i />
-                  <span>{t('ГАЙД В TELEGRAM · ДОБАВИЛИ ВЫБОР ТЕМЫ', 'GUIDE IN TELEGRAM · THEME CHOOSER ADDED')}</span>
+                  <span>{t('ГАЙД В TELEGRAM · ТЕМЫ · УЛУЧШИЛИ ИНСТРУМЕНТЫ', 'GUIDE IN TELEGRAM · THEMES · EDITOR TOOLS IMPROVED')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('MapKluss Companion уже доступен, гайд находится в Telegram. В редакторе также появился выбор темы интерфейса.',
-              'MapKluss Companion is available with a guide in Telegram. The editor now also includes an interface theme chooser.')}
+            {t('MapKluss Companion уже доступен, гайд находится в Telegram. В редакторе появились темы и улучшенная панель инструментов.',
+              'MapKluss Companion is available with a guide in Telegram. The editor now includes themes and an improved tool panel.')}
           </span>
           <a
             className="update-banner-link"
@@ -3035,36 +3141,24 @@ export default function App() {
               <div className="toolbar-paint-tools">
                 {/* Tool buttons */}
                 <div className="toolbar-group">
-                  <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Курсор / перемещение холста (Esc)', 'Cursor / pan canvas (Esc)')}>
+                  <button className={`tool-btn${activeTool === null ? ' active' : ''}`} onClick={() => setActiveTool(null)} title={t('Курсор / перемещение холста (Esc)', 'Cursor / pan canvas (Esc)')} aria-label={t('Курсор', 'Cursor')} aria-pressed={activeTool === null} aria-keyshortcuts="Escape">
                     <IconGlyph icon={mkIcons.select} />
                   </button>
-                  <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')}>
+                  <button className={`tool-btn${activeTool === 'eyedropper' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eyedropper' ? null : 'eyedropper')} title={t('Пипетка (E)', 'Eyedropper (E)')} aria-label={t('Пипетка', 'Eyedropper')} aria-pressed={activeTool === 'eyedropper'} aria-keyshortcuts="E">
                     <IconGlyph icon={mkIcons.eyedropper} />
                   </button>
-                  <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')}>
+                  <button className={`tool-btn${activeTool === 'brush' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'brush' ? null : 'brush')} title={t('Кисть (B)', 'Brush (B)')} aria-label={t('Кисть', 'Brush')} aria-pressed={activeTool === 'brush'} aria-keyshortcuts="B" disabled={activeLayerLocked}>
                     <IconGlyph icon={mkIcons.brush} />
                   </button>
-                  <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')}>
+                  <button className={`tool-btn${activeTool === 'fill' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'fill' ? null : 'fill')} title={t('Заливка (F). Без блока — прозрачный', 'Fill (F). No block = transparent')} aria-label={t('Заливка', 'Fill')} aria-pressed={activeTool === 'fill'} aria-keyshortcuts="F" disabled={activeLayerLocked}>
                     <IconGlyph icon={mkIcons.fill} />
                   </button>
-                  <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')}>
+                  <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')} aria-label={t('Ластик', 'Eraser')} aria-pressed={activeTool === 'eraser'} aria-keyshortcuts="X" disabled={activeLayerLocked}>
                     <IconGlyph icon={mkIcons.eraser} />
                   </button>
                   {/* text tool hidden — to be reworked */}
                   {/* pattern tool hidden — work in progress */}
                 </div>
-
-                {/* Brush size — hidden in pattern stamp mode (size = pattern dimensions) */}
-                {(activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'pattern' || (activeTool === 'pattern-tile' && patternAnchorMode !== 'brush')) && (
-                  <div className="toolbar-group brush-size-group">
-                    <input type="range" min={0} max={BRUSH_SIZES.length - 1} step={1}
-                      value={Math.max(0, BRUSH_SIZES.indexOf(brushSize))}
-                      className="brush-size-slider"
-                      onChange={e => setBrushSize(BRUSH_SIZES[Number(e.target.value)])}
-                      title={t(`Размер: ${brushSize}px`, `Size: ${brushSize}px`)} />
-                    <span className="brush-size-label">{brushSize}px</span>
-                  </div>
-                )}
 
                 {/* Pattern blocks — hidden while text/pattern tools are WIP */}
                 {SHOW_PATTERN_BLOCKS && editorMode === 'artist' && activeTool === 'pattern' && (
@@ -3103,42 +3197,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Shade selector (3D mode, brush/fill) */}
-                {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
-                  <div className="toolbar-group shade-selector">
-                    {([0, 1, 2] as const).map(sh => {
-                      const shadeLabel = [t('Тёмный', 'Dark'), t('Средний', 'Mid'), t('Светлый', 'Bright')];
-                      const sc = activePalette.colors.find(c => c.baseId === paintBlock.baseId && c.shade === sh);
-                      const bg = sc ? `rgb(${sc.r},${sc.g},${sc.b})` : '#888';
-                      return (
-                        <button key={sh} className={`shade-btn${paintBlock.shade === sh ? ' active' : ''}`} style={{ '--shade-color': bg } as React.CSSProperties} title={shadeLabel[sh]} onClick={() => setPaintBlock(pb => pb ? { ...pb, shade: sh } : pb)} />
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Main paint block picker */}
-                <div className="toolbar-group paint-swatch-wrapper">
-                  <div className="paint-active-swatch">
-                    {paintBlock && paintBlock.baseId === -1 ? (
-                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span><span className="paint-swatch-name">{t('Прозрачный', 'Transparent')}</span></>
-                    ) : paintBlock ? (
-                      <><span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span><span className="paint-swatch-name">{paintBlock.displayName}</span></>
-                    ) : (
-                      <span className="paint-no-block">{t('нет блока', 'no block')}</span>
-                    )}
-                  </div>
-                  <button className="tool-btn block-picker-arrow" onClick={() => setShowBlockPicker(p => !p)} title={t('Выбрать блок', 'Choose block')}><IconGlyph icon={mkIcons.chevronDown} /></button>
-                  {showBlockPicker && (
-                    <BlockPickerPopup
-                      blockSelection={blockSelection}
-                      current={paintBlock}
-                      onSelect={b => { setPaintBlock(b); setShowBlockPicker(false); }}
-                      onClose={() => setShowBlockPicker(false)}
-                      mapMode={mapMode}
-                    />
-                  )}
-                </div>
                 {editorMode === 'artist' && (
                   <>
                     <div className="toolbar-sep" />
@@ -3147,86 +3205,27 @@ export default function App() {
                         className={`tool-btn${activeTool === 'move' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'move' ? null : 'move')}
                         title={t('Переместить слой (V)', 'Move layer (V)')}
+                        aria-label={t('Переместить слой', 'Move layer')} aria-pressed={activeTool === 'move'} aria-keyshortcuts="V" disabled={activeLayerLocked}
                       ><IconGlyph icon={mkIcons.move} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-rect' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-rect' ? null : 'select-rect')}
                         title={t('Прямоугольное выделение (R)', 'Rect select (R)')}
+                        aria-label={t('Прямоугольное выделение', 'Rectangular selection')} aria-pressed={activeTool === 'select-rect'} aria-keyshortcuts="R"
                       ><IconGlyph icon={mkIcons.selectRect} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-lasso' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso')}
                         title={t('Лассо (L)', 'Lasso (L)')}
+                        aria-label={t('Лассо', 'Lasso')} aria-pressed={activeTool === 'select-lasso'} aria-keyshortcuts="L"
                       ><IconGlyph icon={mkIcons.lasso} /></button>
                       <button
                         className={`tool-btn${activeTool === 'select-magic' ? ' active' : ''}`}
                         onClick={() => setActiveTool(t => t === 'select-magic' ? null : 'select-magic')}
                         title={t('Волшебная палочка (W)', 'Magic wand (W)')}
+                        aria-label={t('Волшебная палочка', 'Magic wand')} aria-pressed={activeTool === 'select-magic'} aria-keyshortcuts="W"
                       ><IconGlyph icon={mkIcons.wand} /></button>
                     </div>
-                    {activeTool === 'select-magic' && (
-                      <div className="toolbar-group wand-controls">
-                        <button
-                          className={`wand-mode-btn${magicWandMode === 'similar' ? ' active' : ''}`}
-                          onClick={() => setMagicWandMode('similar')}
-                          title={t('Сравнивать по близости цвета', 'Match by color similarity')}
-                        >
-                          {t('Похоже', 'Similar')}
-                        </button>
-                        <button
-                          className={`wand-mode-btn${magicWandMode === 'exact' ? ' active' : ''}`}
-                          onClick={() => setMagicWandMode('exact')}
-                          title={t('Искать только точное совпадение цвета', 'Match only exact color')}
-                        >
-                          {t('Точно', 'Exact')}
-                        </button>
-                        <button
-                          className={`wand-mode-btn${magicWandMode === 'alpha' ? ' active' : ''}`}
-                          onClick={() => setMagicWandMode('alpha')}
-                          title={t('Сравнивать только прозрачность и пустые области', 'Match transparency only')}
-                        >
-                          {t('Прозр.', 'Alpha')}
-                        </button>
-                        <button
-                          className={`wand-mode-btn${magicWandContiguous ? ' active' : ''}`}
-                          onClick={() => setMagicWandContiguous(true)}
-                          title={t('Выделять только связанную область', 'Select only the connected area')}
-                        >
-                          {t('Смежные', 'Contiguous')}
-                        </button>
-                        <button
-                          className={`wand-mode-btn${!magicWandContiguous ? ' active' : ''}`}
-                          onClick={() => setMagicWandContiguous(false)}
-                          title={t('Искать похожие пиксели по всему слою', 'Find similar pixels across the whole layer')}
-                        >
-                          {t('Везде', 'Global')}
-                        </button>
-                        {magicWandMode === 'similar' && (
-                          <label className="wand-tolerance">
-                            <span>{t('Чувств.', 'Tol.')}</span>
-                            <input
-                              type="range"
-                              min={0.005}
-                              max={0.12}
-                              step={0.005}
-                              value={magicWandTolerance}
-                              onChange={(e) => setMagicWandTolerance(Number(e.target.value))}
-                            />
-                            <span className="wand-tolerance-value">{magicWandTolerance.toFixed(3)}</span>
-                          </label>
-                        )}
-                      </div>
-                    )}
-                    {selectionMask && (
-                      <div className="toolbar-group selection-ops">
-                        <button className="tool-btn sel-op-btn" onClick={handleDeleteSelection} title={t('Удалить выделенное (Del)', 'Delete selected (Del)')}><IconGlyph icon={mkIcons.trash} /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleFillSelection} disabled={!paintBlock || paintBlock.baseId === -1} title={t('Залить выделенное', 'Fill selected')}><IconGlyph icon={mkIcons.fill} /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleInvertSelection} title={t('Инвертировать (Ctrl+I)', 'Invert (Ctrl+I)')}><IconGlyph icon={mkIcons.invert} /></button>
-                        <button className="tool-btn sel-op-btn" onClick={handleMoveSelectionToLayer} title={t('Перенести на новый слой', 'Move to new layer')}><IconGlyph icon={mkIcons.layer} /></button>
-                        <button className="tool-btn sel-op-btn" onClick={() => setSelectionMask(null)} title={t('Снять выделение (Ctrl+D)', 'Deselect (Ctrl+D)')}><IconGlyph icon={mkIcons.deselect} /></button>
-                        <span className="selection-count">{selectedPixelCount}px</span>
-                      </div>
-                    )}
                     {/* Pattern-tile tool */}
                     <div className="toolbar-sep" />
                     <div className="toolbar-group">
@@ -3234,32 +3233,8 @@ export default function App() {
                         className={`tool-btn${activeTool === 'pattern-tile' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'pattern-tile' ? null : 'pattern-tile')}
                         title={t('Паттерн-кисть (P)', 'Pattern brush (P)')}
+                        aria-label={t('Паттерн-кисть', 'Pattern brush')} aria-pressed={activeTool === 'pattern-tile'} aria-keyshortcuts="P" disabled={activeLayerLocked}
                       ><IconGlyph icon={mkIcons.pattern} /></button>
-                      {activeTool === 'pattern-tile' && (<>
-                        <button
-                          className="tool-btn"
-                          onClick={() => setShowPatternEditor(true)}
-                          title={t('Редактировать паттерн', 'Edit pattern')}
-                        ><IconGlyph icon={mkIcons.settings} /></button>
-                        <button
-                          className={`tool-btn${patternAnchorMode === 'brush' ? ' active' : ''}`}
-                          onClick={() => setPatternAnchorMode(m => m === 'brush' ? 'canvas' : 'brush')}
-                          title={patternAnchorMode === 'brush'
-                            ? t('Якорь: от кисти (кликни для холста)', 'Anchor: brush start (click for canvas)')
-                            : t('Якорь: холст (кликни для кисти)', 'Anchor: canvas (click for brush)')}
-                        ><IconGlyph icon={mkIcons.anchor} /></button>
-                        <button
-                          className="tool-btn"
-                          onClick={() => activePattern && exportPattern(activePattern)}
-                          title={t('Экспорт паттерна в JSON', 'Export pattern as JSON')}
-                        ><IconGlyph icon={mkIcons.export} /></button>
-                        <label className="tool-btn" title={t('Импорт паттерна из JSON', 'Import pattern from JSON')} style={{ cursor: 'pointer' }}>
-                          <IconGlyph icon={mkIcons.import} />
-                          <input type="file" accept=".json" style={{ display: 'none' }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) importPattern(f); e.target.value = ''; }}
-                          />
-                        </label>
-                      </>)}
                     </div>
 
                     {/* Gradient tool */}
@@ -3268,108 +3243,9 @@ export default function App() {
                         className={`tool-btn${activeTool === 'gradient' ? ' active' : ''}`}
                         onClick={() => setActiveTool(prev => prev === 'gradient' ? null : 'gradient')}
                         title={t('Градиент (G)', 'Gradient (G)')}
+                        aria-label={t('Градиент', 'Gradient')} aria-pressed={activeTool === 'gradient'} aria-keyshortcuts="G" disabled={activeLayerLocked}
                       ><IconGlyph icon={mkIcons.gradient} /></button>
                     </div>
-                    {activeTool === 'gradient' && (
-                      <div className="toolbar-group gradient-stops-bar">
-                        {(() => {
-                          const sorted = [...gradientStops.map((stop, origIdx) => ({ stop, origIdx }))].sort((a, b) => a.stop.t - b.stop.t);
-                          return sorted.map(({ stop, origIdx }, sortedPos) => {
-                          const c = activePalette.colors.find(col => col.baseId === stop.block.baseId && col.shade === stop.block.shade)
-                            ?? activePalette.colors.find(col => col.baseId === stop.block.baseId);
-                          const bg = c ? `rgb(${c.r},${c.g},${c.b})` : '#888';
-                          const isFirst = sortedPos === 0;
-                          const isLast = sortedPos === gradientStops.length - 1;
-                          const swapBlocks = (posA: number, posB: number) => {
-                            const idxA = sorted[posA].origIdx;
-                            const idxB = sorted[posB].origIdx;
-                            setGradientStops(prev => {
-                              const next = [...prev];
-                              const tmp = next[idxA].block;
-                              next[idxA] = { ...next[idxA], block: next[idxB].block };
-                              next[idxB] = { ...next[idxB], block: tmp };
-                              return next;
-                            });
-                          };
-                          return (
-                            <div key={origIdx} className="gradient-stop-chip" style={{ position: 'relative' }}>
-                              {!isFirst && (
-                                <button className="gradient-stop-move" title="Переместить влево" aria-label="Переместить влево" onClick={() => swapBlocks(sortedPos, sortedPos - 1)}><IconGlyph icon={mkIcons.chevronLeft} /></button>
-                              )}
-                              <button
-                                className={`gradient-stop-swatch${showGradientStopPicker === origIdx ? ' active' : ''}`}
-                                style={{ background: bg }}
-                                title={`${stop.block.displayName} (${Math.round(stop.t * 100)}%)`}
-                                onClick={() => setShowGradientStopPicker(prev => prev === origIdx ? null : origIdx)}
-                              />
-                              {!isLast && (
-                                <button className="gradient-stop-move" title="Переместить вправо" aria-label="Переместить вправо" onClick={() => swapBlocks(sortedPos, sortedPos + 1)}><IconGlyph icon={mkIcons.chevronRight} /></button>
-                              )}
-                              {!isFirst && !isLast && (
-                                <button className="gradient-stop-remove" onClick={() => setGradientStops(prev => prev.filter((_, j) => j !== origIdx))} aria-label={t('Удалить цвет', 'Remove color')}><IconGlyph icon={mkIcons.close} /></button>
-                              )}
-                              {showGradientStopPicker === origIdx && (
-                                <BlockPickerPopup
-                                  blockSelection={blockSelection}
-                                  current={stop.block}
-                                  onSelect={b => {
-                                    setGradientStops(prev => prev.map((s, j) => j === origIdx ? { ...s, block: b } : s));
-                                    setShowGradientStopPicker(null);
-                                  }}
-                                  onClose={() => setShowGradientStopPicker(null)}
-                                  mapMode={mapMode}
-                                />
-                              )}
-                            </div>
-                          );
-                        });
-                        })()}
-                        {gradientStops.length < 6 && (
-                          <div style={{ position: 'relative' }}>
-                            <button
-                              className="tool-btn gradient-add-stop"
-                              title={t('Добавить цвет', 'Add color')}
-                              onClick={() => setShowGradientAddPicker(v => !v)}
-                            ><IconGlyph icon={mkIcons.plus} /></button>
-                            {showGradientAddPicker && (
-                              <BlockPickerPopup
-                                blockSelection={blockSelection}
-                                current={null}
-                                onSelect={b => {
-                                  setGradientStops(prev => {
-                                    // Place first stop at 0, second at 1, subsequent ones bisect the widest gap
-                                    let newT: number;
-                                    if (prev.length === 0) {
-                                      newT = 0;
-                                    } else if (prev.length === 1) {
-                                      newT = 1;
-                                    } else {
-                                      // Find the widest gap between consecutive stops
-                                      const sorted = [...prev].sort((a, b) => a.t - b.t);
-                                      let maxGap = 0, gapStart = 0;
-                                      for (let i = 0; i < sorted.length - 1; i++) {
-                                        const gap = sorted[i + 1].t - sorted[i].t;
-                                        if (gap > maxGap) { maxGap = gap; gapStart = sorted[i].t; }
-                                      }
-                                      newT = gapStart + maxGap / 2;
-                                    }
-                                    return [...prev, { t: newT, block: b }];
-                                  });
-                                  setShowGradientAddPicker(false);
-                                }}
-                                onClose={() => setShowGradientAddPicker(false)}
-                                mapMode={mapMode}
-                              />
-                            )}
-                          </div>
-                        )}
-                        <button
-                          className={`tool-btn${gradientDithering === 'ordered' ? ' active' : ''}`}
-                          title={t('Дизеринг (упорядоченный Байер)', 'Ordered dithering (Bayer)')}
-                          onClick={() => setGradientDithering(d => d === 'ordered' ? 'none' : 'ordered')}
-                        ><IconGlyph icon={mkIcons.grid} /></button>
-                      </div>
-                    )}
                   </>
                 )}
                 <div className="toolbar-sep" />
@@ -3420,6 +3296,7 @@ export default function App() {
                     className={`tool-btn${showSplitLine ? ' active' : ''}`}
                     title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
                     onClick={() => setShowSplitLine(v => !v)}
+                    aria-label={t('Полоса сравнения', 'Comparison split')} aria-pressed={showSplitLine}
                   ><IconGlyph icon={mkIcons.compare} /></button>
                   <button
                     className="tool-btn"
@@ -3427,10 +3304,10 @@ export default function App() {
                     onClick={() => setSplitPos(50)}
                   ><IconGlyph icon={mkIcons.layoutCenter} /></button>
                   {!compareMode && (
-                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')}><IconGlyph icon={mkIcons.blockTextures} />{t('Блоки', 'Blocks')}</button>
+                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')} aria-label={t('Текстуры блоков', 'Block textures')} aria-pressed={textureMode === 'block'}><IconGlyph icon={mkIcons.blockTextures} /></button>
                   )}
-                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')}>{t('Сравнить', 'Compare')}</button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')}><IconGlyph icon={mkIcons.grid} />{t('Сетка', 'Grid')}</button>
+                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')} aria-label={t('Сравнение', 'Comparison')} aria-pressed={compareMode}><IconGlyph icon={mkIcons.compare} /></button>
+                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')} aria-label={t('Сетка', 'Grid')} aria-pressed={showGrid}><IconGlyph icon={mkIcons.grid} /></button>
                   <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}><IconGlyph icon={mkIcons.view} /></button>
                 </div>
               </>
@@ -3450,7 +3327,7 @@ export default function App() {
             {/* SHORTCUTS */}
             <div className="toolbar-sep" />
             <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}><IconGlyph icon={mkIcons.keyboard} /></button>
+              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')} aria-label={t('Клавиатурные сочетания', 'Keyboard shortcuts')} aria-expanded={showShortcuts}><IconGlyph icon={mkIcons.keyboard} /></button>
               {showShortcuts && (
                 <div className="shortcuts-panel">
                   <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
@@ -3468,9 +3345,16 @@ export default function App() {
                   <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
                   <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
                   <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
-                  <div className="shortcut-row"><kbd>L</kbd><span>{t('Линия', 'Line')}</span></div>
+                  <div className="shortcut-row"><kbd>V</kbd><span>{t('Перемещение слоя', 'Move layer')}</span></div>
+                  <div className="shortcut-row"><kbd>R</kbd><span>{t('Прямоугольное выделение', 'Rectangular selection')}</span></div>
+                  <div className="shortcut-row"><kbd>L</kbd><span>{t('Лассо', 'Lasso')}</span></div>
+                  <div className="shortcut-row"><kbd>W</kbd><span>{t('Волшебная палочка', 'Magic wand')}</span></div>
                   <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
                   <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
+                  <div className="shortcut-row"><kbd>Shift + клик</kbd><span>{t('Прямая линия кистью', 'Straight brush line')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+A</kbd><span>{t('Выделить всё', 'Select all')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+D</kbd><span>{t('Снять выделение', 'Deselect')}</span></div>
+                  <div className="shortcut-row"><kbd>Ctrl+I</kbd><span>{t('Инвертировать выделение', 'Invert selection')}</span></div>
                   <div className="shortcut-row"><kbd>Space + ЛКМ</kbd><span>{t('Временно перемещать холст', 'Temporarily pan canvas')}</span></div>
                   <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
                 </div>
@@ -3487,11 +3371,206 @@ export default function App() {
                 })}
                 title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
                 aria-label={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника', 'Artist mode')}
+                aria-pressed={editorMode === 'artist'}
               >
                 <IconGlyph icon={mkIcons.artist} />
               </button>
             </div>
           </div>
+
+          {!compareMode && imageData && (
+            <div className="editor-tool-context" role="region" aria-label={t('Настройки активного инструмента', 'Active tool settings')}>
+              <div className="editor-tool-context-summary">
+                <span className="editor-tool-context-icon" aria-hidden="true"><IconGlyph icon={activeToolUi.icon} /></span>
+                <span className="editor-tool-context-copy">
+                  <strong>{activeToolUi.name}</strong>
+                  <span>{activeToolUi.hint}</span>
+                </span>
+                <kbd>{activeToolUi.key}</kbd>
+              </div>
+
+              {activeLayerLocked && (
+                <div className="editor-tool-lock" role="status">
+                  <IconGlyph icon={mkIcons.lock} />
+                  <span>{t('Слой защищён от изменений', 'Layer protected from changes')}</span>
+                  <button type="button" onClick={() => activeLayer && handleToggleLock(activeLayer.id)}>
+                    {t('Разблокировать', 'Unlock')}
+                  </button>
+                </div>
+              )}
+
+              {(activeTool === 'brush' || activeTool === 'eraser' || (activeTool === 'pattern-tile' && patternAnchorMode !== 'brush')) && (
+                <label className="editor-tool-setting editor-tool-brush-size">
+                  <span>{t('Размер', 'Size')}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={BRUSH_SIZES.length - 1}
+                    step={1}
+                    value={Math.max(0, BRUSH_SIZES.indexOf(brushSize))}
+                    onChange={event => setBrushSize(BRUSH_SIZES[Number(event.target.value)])}
+                    disabled={activeLayerLocked}
+                  />
+                  <output>{brushSize}px</output>
+                </label>
+              )}
+
+              {(activeTool === 'brush' || activeTool === 'fill' || activeTool === 'pattern-tile') && (
+                <div className="editor-tool-block-control">
+                  <span className="editor-tool-setting-label">
+                    {activeTool === 'pattern-tile' ? t('Блок паттерна', 'Pattern block') : t('Блок', 'Block')}
+                  </span>
+                  <button
+                    type="button"
+                    className="editor-tool-block-button"
+                    onClick={() => setShowBlockPicker(value => !value)}
+                    aria-expanded={showBlockPicker}
+                    disabled={activeLayerLocked}
+                  >
+                    {paintBlock?.baseId === -1 ? (
+                      <span className="paint-swatch-icon block-picker-icon-transparent" />
+                    ) : paintBlock ? (
+                      <span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} />
+                    ) : null}
+                    <span>{paintBlock?.displayName ?? t('Выбрать блок', 'Choose block')}</span>
+                    <IconGlyph icon={mkIcons.chevronDown} />
+                  </button>
+                  {showBlockPicker && (
+                    <BlockPickerPopup
+                      blockSelection={blockSelection}
+                      current={paintBlock}
+                      onSelect={block => { setPaintBlock(block); setShowBlockPicker(false); }}
+                      onClose={() => setShowBlockPicker(false)}
+                      mapMode={mapMode}
+                    />
+                  )}
+                </div>
+              )}
+
+              {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
+                <div className="editor-tool-setting editor-tool-shades" role="group" aria-label={t('Оттенок карты', 'Map shade')}>
+                  <span>{t('Оттенок', 'Shade')}</span>
+                  {([0, 1, 2] as const).map(shade => {
+                    const shadeNames = [t('Тёмный', 'Dark'), t('Средний', 'Mid'), t('Светлый', 'Bright')];
+                    const color = activePalette.colors.find(item => item.baseId === paintBlock.baseId && item.shade === shade);
+                    return (
+                      <button
+                        key={shade}
+                        type="button"
+                        className={`editor-tool-shade${paintBlock.shade === shade ? ' active' : ''}`}
+                        style={{ '--shade-color': color ? `rgb(${color.r},${color.g},${color.b})` : 'var(--text-muted)' } as React.CSSProperties}
+                        aria-label={shadeNames[shade]}
+                        aria-pressed={paintBlock.shade === shade}
+                        onClick={() => setPaintBlock(block => block ? { ...block, shade } : block)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeTool === 'select-magic' && (
+                <div className="editor-tool-options" role="group" aria-label={t('Настройки волшебной палочки', 'Magic wand settings')}>
+                  {(['similar', 'exact', 'alpha'] as const).map(mode => (
+                    <button key={mode} type="button" className={magicWandMode === mode ? 'active' : ''} aria-pressed={magicWandMode === mode} onClick={() => setMagicWandMode(mode)}>
+                      {mode === 'similar' ? t('Похожие', 'Similar') : mode === 'exact' ? t('Точные', 'Exact') : t('Прозрачные', 'Alpha')}
+                    </button>
+                  ))}
+                  <span className="editor-tool-options-separator" />
+                  <button type="button" className={magicWandContiguous ? 'active' : ''} aria-pressed={magicWandContiguous} onClick={() => setMagicWandContiguous(true)}>{t('Смежные', 'Contiguous')}</button>
+                  <button type="button" className={!magicWandContiguous ? 'active' : ''} aria-pressed={!magicWandContiguous} onClick={() => setMagicWandContiguous(false)}>{t('Весь слой', 'Whole layer')}</button>
+                  {magicWandMode === 'similar' && (
+                    <label className="editor-tool-setting">
+                      <span>{t('Допуск', 'Tolerance')}</span>
+                      <input type="range" min={0.005} max={0.12} step={0.005} value={magicWandTolerance} onChange={event => setMagicWandTolerance(Number(event.target.value))} />
+                      <output>{magicWandTolerance.toFixed(3)}</output>
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {selectionMask && (
+                <div className="editor-selection-actions" role="group" aria-label={t('Действия с выделением', 'Selection actions')}>
+                  <span className="editor-selection-count">{selectedPixelCount.toLocaleString()} {t('пикс.', 'px')}</span>
+                  <button type="button" onClick={handleDeleteSelection} disabled={activeLayerLocked}><IconGlyph icon={mkIcons.trash} />{t('Удалить', 'Delete')}</button>
+                  <button type="button" onClick={handleFillSelection} disabled={activeLayerLocked || !paintBlock || paintBlock.baseId === -1}><IconGlyph icon={mkIcons.fill} />{t('Залить', 'Fill')}</button>
+                  <button type="button" onClick={handleInvertSelection}><IconGlyph icon={mkIcons.invert} />{t('Инвертировать', 'Invert')}</button>
+                  <button type="button" onClick={handleMoveSelectionToLayer} disabled={activeLayerLocked}><IconGlyph icon={mkIcons.layer} />{t('На новый слой', 'To new layer')}</button>
+                  <button type="button" onClick={() => setSelectionMask(null)}><IconGlyph icon={mkIcons.deselect} />{t('Снять', 'Deselect')}</button>
+                </div>
+              )}
+
+              {activeTool === 'pattern-tile' && (
+                <div className="editor-tool-options">
+                  <button type="button" onClick={() => setShowPatternEditor(true)}><IconGlyph icon={mkIcons.settings} />{t('Редактировать паттерн', 'Edit pattern')}</button>
+                  <button type="button" className={patternAnchorMode === 'brush' ? 'active' : ''} aria-pressed={patternAnchorMode === 'brush'} onClick={() => setPatternAnchorMode(mode => mode === 'brush' ? 'canvas' : 'brush')}><IconGlyph icon={mkIcons.anchor} />{patternAnchorMode === 'brush' ? t('Якорь: кисть', 'Anchor: brush') : t('Якорь: холст', 'Anchor: canvas')}</button>
+                  <button type="button" onClick={() => activePattern && exportPattern(activePattern)}><IconGlyph icon={mkIcons.export} />{t('Экспорт', 'Export')}</button>
+                  <label className="editor-tool-file-button"><IconGlyph icon={mkIcons.import} />{t('Импорт', 'Import')}<input type="file" accept=".json" onChange={event => { const file = event.target.files?.[0]; if (file) importPattern(file); event.target.value = ''; }} /></label>
+                </div>
+              )}
+
+              {activeTool === 'gradient' && (
+                <div className="editor-gradient-context">
+                  <span className="editor-tool-setting-label">{t('Цвета', 'Colors')}</span>
+                  {[...gradientStops.map((stop, index) => ({ stop, index }))].sort((a, b) => a.stop.t - b.stop.t).map(({ stop, index }, sortedIndex, sortedStops) => {
+                    const color = activePalette.colors.find(item => item.baseId === stop.block.baseId && item.shade === stop.block.shade)
+                      ?? activePalette.colors.find(item => item.baseId === stop.block.baseId);
+                    return (
+                      <div key={index} className="editor-gradient-stop">
+                        {sortedIndex > 0 && (
+                          <button type="button" className="editor-gradient-move" aria-label={t('Переместить цвет влево', 'Move color left')} onClick={() => moveGradientStop(index, -1)}><IconGlyph icon={mkIcons.chevronLeft} /></button>
+                        )}
+                        <button
+                          type="button"
+                          className={`editor-gradient-swatch${showGradientStopPicker === index ? ' active' : ''}`}
+                          style={{ '--stop-color': color ? `rgb(${color.r},${color.g},${color.b})` : 'var(--text-muted)' } as React.CSSProperties}
+                          aria-label={`${stop.block.displayName}, ${Math.round(stop.t * 100)}%`}
+                          onClick={() => setShowGradientStopPicker(value => value === index ? null : index)}
+                        />
+                        {sortedIndex < sortedStops.length - 1 && (
+                          <button type="button" className="editor-gradient-move" aria-label={t('Переместить цвет вправо', 'Move color right')} onClick={() => moveGradientStop(index, 1)}><IconGlyph icon={mkIcons.chevronRight} /></button>
+                        )}
+                        {gradientStops.length > 2 && sortedIndex > 0 && sortedIndex < sortedStops.length - 1 && (
+                          <button type="button" className="editor-gradient-remove" aria-label={t('Удалить цвет градиента', 'Remove gradient color')} onClick={() => setGradientStops(previous => previous.filter((_, itemIndex) => itemIndex !== index))}><IconGlyph icon={mkIcons.close} /></button>
+                        )}
+                        {showGradientStopPicker === index && (
+                          <BlockPickerPopup blockSelection={blockSelection} current={stop.block} onSelect={block => { setGradientStops(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, block } : item)); setShowGradientStopPicker(null); }} onClose={() => setShowGradientStopPicker(null)} mapMode={mapMode} />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {gradientStops.length < 6 && (
+                    <div className="editor-gradient-stop editor-gradient-add">
+                      <button type="button" className="editor-gradient-add-button" aria-label={t('Добавить цвет градиента', 'Add gradient color')} onClick={() => setShowGradientAddPicker(value => !value)}><IconGlyph icon={mkIcons.plus} /></button>
+                      {showGradientAddPicker && (
+                        <BlockPickerPopup
+                          blockSelection={blockSelection}
+                          current={null}
+                          onSelect={block => {
+                            setGradientStops(previous => {
+                              if (previous.length === 0) return [{ t: 0, block }];
+                              if (previous.length === 1) return [...previous, { t: 1, block }];
+                              const sorted = [...previous].sort((a, b) => a.t - b.t);
+                              let widestGap = 0;
+                              let gapStart = 0;
+                              for (let index = 0; index < sorted.length - 1; index++) {
+                                const gap = sorted[index + 1].t - sorted[index].t;
+                                if (gap > widestGap) { widestGap = gap; gapStart = sorted[index].t; }
+                              }
+                              return [...previous, { t: gapStart + widestGap / 2, block }];
+                            });
+                            setShowGradientAddPicker(false);
+                          }}
+                          onClose={() => setShowGradientAddPicker(false)}
+                          mapMode={mapMode}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <button type="button" className={`editor-gradient-dither${gradientDithering === 'ordered' ? ' active' : ''}`} aria-pressed={gradientDithering === 'ordered'} onClick={() => setGradientDithering(value => value === 'ordered' ? 'none' : 'ordered')}><IconGlyph icon={mkIcons.grid} />{t('Дизеринг', 'Dither')}</button>
+                </div>
+              )}
+            </div>
+          )}
 
           {compareMode && hasContent && (
             <div className="compare-selectors">
@@ -3593,6 +3672,7 @@ export default function App() {
                   warningMask={finalPreview?.shadeWarnings ?? null}
                   showWarningMask={editorMode === 'artist' && showShadeWarnings}
                   viewportPanning={isCanvasPanning}
+                  editingDisabled={Boolean(activeLayer?.locked)}
                 />
               )}
             </div>

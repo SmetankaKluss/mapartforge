@@ -3,10 +3,10 @@ import type { PaintBlock } from './previewCanvasShared';
 import type { ComputedPalette } from '../lib/dithering';
 import type { PatternDefinition } from '../lib/patternTool';
 import { resizePattern } from '../lib/patternTool';
-import { BlockPickerPopup } from './BlockPickerPopup';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { useLocale } from '../lib/useLocale';
 
 interface Props {
   pattern: PatternDefinition;
@@ -25,10 +25,12 @@ function getBlockColor(block: PaintBlock, cp: ComputedPalette): string {
 }
 
 export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, blockSelection, mapMode, onSave, onClose }: Props) {
+  const { t } = useLocale();
+  void blockSelection;
+  void mapMode;
   const [pattern, setPattern] = useState<PatternDefinition>(initialPattern);
   const [widthInput, setWidthInput] = useState(String(initialPattern.width));
   const [heightInput, setHeightInput] = useState(String(initialPattern.height));
-  const [showBlockPicker, setShowBlockPicker] = useState<number | null>(null);
   const [isErasing, setIsErasing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -114,35 +116,42 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
       style={style}
       onMouseUp={handleMouseUp}
       onContextMenu={e => e.preventDefault()}
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="pattern-editor-title"
     >
       <div
         className="pattern-editor-header"
         onMouseDown={onHeaderMouseDown}
         style={{ cursor: 'grab' }}
       >
-        <span className="pattern-editor-title">Редактор паттерна</span>
-        <button className="pattern-editor-close" onClick={onClose} aria-label="Закрыть"><IconGlyph icon={mkIcons.close} /></button>
+        <span className="pattern-editor-title" id="pattern-editor-title">{t('Редактор паттерна', 'Pattern editor')}</span>
+        <button className="pattern-editor-close" onClick={onClose} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
       </div>
 
       {/* Size controls */}
       <div className="pattern-editor-size-row">
-        <label>W</label>
+        <label htmlFor="pattern-width" title={t('Ширина', 'Width')}>{t('Ш', 'W')}</label>
         <input
+          id="pattern-width"
+          aria-label={t('Ширина паттерна', 'Pattern width')}
           type="number" min={1} max={16} value={widthInput}
           onChange={e => setWidthInput(e.target.value)}
           onBlur={applySize}
           onKeyDown={e => e.key === 'Enter' && applySize()}
           className="pattern-editor-size-input"
         />
-        <label>H</label>
+        <label htmlFor="pattern-height" title={t('Высота', 'Height')}>{t('В', 'H')}</label>
         <input
+          id="pattern-height"
+          aria-label={t('Высота паттерна', 'Pattern height')}
           type="number" min={1} max={16} value={heightInput}
           onChange={e => setHeightInput(e.target.value)}
           onBlur={applySize}
           onKeyDown={e => e.key === 'Enter' && applySize()}
           className="pattern-editor-size-input"
         />
-        <button className="pattern-editor-apply-btn" onClick={applySize}>OK</button>
+        <button className="pattern-editor-apply-btn" onClick={applySize}>{t('Применить', 'Apply')}</button>
       </div>
 
       {/* Pixel grid */}
@@ -156,8 +165,9 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
         }}
       >
         {pattern.pixels.map((block, idx) => (
-          <div
+          <button
             key={idx}
+            type="button"
             className="pattern-editor-cell"
             style={{
               width: CELL_SIZE,
@@ -169,38 +179,36 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
             }}
             onMouseDown={e => { if (e.button === 0 || e.button === 2) handleCellMouseDown(idx, e); }}
             onMouseEnter={e => handleCellMouseEnter(idx, e)}
+            onClick={() => paintCell(idx, false)}
+            onKeyDown={e => {
+              if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                paintCell(idx, true);
+              }
+            }}
+            aria-label={t(
+              `Ячейка ${Math.floor(idx / pattern.width) + 1}, ${idx % pattern.width + 1}: ${block?.displayName ?? 'пусто'}`,
+              `Cell ${Math.floor(idx / pattern.width) + 1}, ${idx % pattern.width + 1}: ${block?.displayName ?? 'empty'}`,
+            )}
           />
         ))}
       </div>
 
       {/* Info row */}
       <div className="pattern-editor-info">
-        <span className="pattern-editor-hint">ЛКМ — красить, ПКМ — стереть</span>
+        <span className="pattern-editor-hint">{t('ЛКМ — красить, ПКМ или Delete — стереть', 'LMB paints; RMB or Delete erases')}</span>
         <span className="pattern-editor-dims">{pattern.width}×{pattern.height}</span>
       </div>
 
       {/* Actions */}
       <div className="pattern-editor-actions">
         <button className="pattern-editor-clear-btn" onClick={() => setPattern(p => ({ ...p, pixels: Array(p.width * p.height).fill(null) }))}>
-          Очистить
+          {t('Очистить', 'Clear')}
         </button>
         <button className="pattern-editor-save-btn" onClick={() => { onSave(pattern); onClose(); }}>
-          Сохранить
+          {t('Сохранить паттерн', 'Save pattern')}
         </button>
       </div>
-
-      {showBlockPicker !== null && (
-        <BlockPickerPopup
-          blockSelection={blockSelection}
-          current={pattern.pixels[showBlockPicker]}
-          onSelect={() => {
-            paintCell(showBlockPicker, false);
-            setShowBlockPicker(null);
-          }}
-          onClose={() => setShowBlockPicker(null)}
-          mapMode={mapMode}
-        />
-      )}
     </div>
   );
 }

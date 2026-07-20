@@ -10,6 +10,42 @@ export interface PatternDefinition {
   pixels: (PaintBlock | null)[];
 }
 
+function isPaintBlock(value: unknown): value is PaintBlock {
+  if (!value || typeof value !== 'object') return false;
+  const block = value as Partial<PaintBlock>;
+  return Number.isInteger(block.csId)
+    && Number.isInteger(block.blockId)
+    && Number.isInteger(block.baseId)
+    && Number.isInteger(block.shade)
+    && (block.shade ?? -1) >= 0
+    && (block.shade ?? 4) <= 3
+    && typeof block.displayName === 'string'
+    && block.displayName.length <= 160
+    && typeof block.colourName === 'string'
+    && block.colourName.length <= 160;
+}
+
+/** Strictly validates a user-imported pattern before it reaches editor state. */
+export function parsePatternDefinition(value: unknown): PatternDefinition | null {
+  if (!value || typeof value !== 'object') return null;
+  const pattern = value as Partial<PatternDefinition>;
+  if (!Number.isInteger(pattern.width) || !Number.isInteger(pattern.height)) return null;
+  const width = pattern.width as number;
+  const height = pattern.height as number;
+  if (width < 1 || width > 16 || height < 1 || height > 16) return null;
+  if (!Array.isArray(pattern.pixels) || pattern.pixels.length !== width * height) return null;
+  if (!pattern.pixels.every(pixel => pixel === null || isPaintBlock(pixel))) return null;
+  return {
+    id: typeof pattern.id === 'string' && pattern.id.length <= 160 ? pattern.id : crypto.randomUUID(),
+    name: typeof pattern.name === 'string' && pattern.name.trim() && pattern.name.length <= 160
+      ? pattern.name.trim()
+      : 'Импортированный паттерн',
+    width,
+    height,
+    pixels: pattern.pixels,
+  };
+}
+
 export function createDefaultPattern(name = 'Паттерн 1'): PatternDefinition {
   return {
     id: crypto.randomUUID(),
@@ -29,6 +65,33 @@ export function resizePattern(p: PatternDefinition, newW: number, newH: number):
     }
   }
   return { ...p, width: newW, height: newH, pixels };
+}
+
+/** Visits every integer pixel between two pointer samples using Bresenham interpolation. */
+export function forEachLinePoint(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  visit: (x: number, y: number) => void,
+): void {
+  let x = Math.trunc(x0);
+  let y = Math.trunc(y0);
+  const targetX = Math.trunc(x1);
+  const targetY = Math.trunc(y1);
+  const dx = Math.abs(targetX - x);
+  const sx = x < targetX ? 1 : -1;
+  const dy = -Math.abs(targetY - y);
+  const sy = y < targetY ? 1 : -1;
+  let error = dx + dy;
+
+  while (true) {
+    visit(x, y);
+    if (x === targetX && y === targetY) return;
+    const doubled = error * 2;
+    if (doubled >= dy) { error += dy; x += sx; }
+    if (doubled <= dx) { error += dx; y += sy; }
+  }
 }
 
 function getTargetColor(shade: number, baseId: number, cp: ComputedPalette): { r: number; g: number; b: number } | null {

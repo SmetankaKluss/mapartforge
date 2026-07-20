@@ -210,8 +210,9 @@ export function drawMarchingAnts(
   w: number, h: number,
   scale: number,
   phase: number,
+  clear = true,
 ): void {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  if (clear) ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   const path = new Path2D();
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
@@ -225,6 +226,10 @@ export function drawMarchingAnts(
     }
   }
   ctx.save();
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.72)';
+  ctx.stroke(path);
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
   ctx.strokeStyle = '#fff';

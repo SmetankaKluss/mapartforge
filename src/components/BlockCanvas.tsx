@@ -18,6 +18,7 @@ interface Props {
   showGrid: boolean;
   scale: number;
   viewScale?: number;
+  overlayRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
 // ── Sprite cell bounds analysis ───────────────────────────────────────────
@@ -76,7 +77,7 @@ function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { cs
   return map;
 }
 
-export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale, viewScale = scale }: Props) {
+export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale, viewScale = scale, overlayRef }: Props) {
   const { t } = useLocale();
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
@@ -255,7 +256,7 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
   }
 
   return (
-    <div className="canvas-wrapper">
+    <div className="canvas-wrapper" style={{ position: 'relative' }}>
       {(!spriteReady || rendering) && (
         <div className="block-mode-overlay">
           {!spriteReady ? t('Загрузка текстур блоков…', 'Loading block textures…') : t('Рендеринг текстур…', 'Rendering textures…')}
@@ -271,6 +272,12 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
         className="map-canvas"
         style={{ imageRendering: 'pixelated', width: width * viewScale, height: height * viewScale }}
       />
+      {overlayRef && (
+        <canvas
+          ref={overlayRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        />
+      )}
     </div>
   );
 }
