@@ -151,7 +151,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
 
   return (
     <section className="sidebar-section">
-      <div className="mat-header">
+      <div className="mat-header" data-tour="materials">
         <h2 className="section-title" style={{ margin: 0 }}>{t('Материалы', 'Materials')}</h2>
         <label
           className="mat-mode-toggle"

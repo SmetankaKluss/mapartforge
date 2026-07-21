@@ -1,196 +1,189 @@
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { getEmptyCanvasTimeline } from '../../lib/emptyCanvasMotion';
 
-const FRAME = {
-  x: 506,
-  y: 104,
-  width: 304,
-  height: 244,
-};
+const TILE_SIZE = 128;
+const TILE_LEFT = 256;
+const TILE_TOP = 46;
 
-const GRID = [
-  '....YY......',
-  '...YYYY.....',
-  'CCCCCCCCCCCC',
-  'CCCCCCCGCCCC',
-  'CCCGGGGGGCCC',
-  'CGGGGGGGGGGC',
-  'GGGBBBBBBGGG',
-  'BBBBDDDDBBBB',
-] as const;
+const easeOut = (value: number) => Easing.bezier(0.16, 1, 0.3, 1)(value);
+const easeInOut = (value: number) => Easing.bezier(0.65, 0, 0.35, 1)(value);
 
-const COLORS: Record<string, string> = {
-  Y: '#FFD700',
-  C: '#60c8f0',
-  G: '#57FF6E',
-  B: '#C8622A',
-  D: '#68666b',
-};
+function MapLayer({
+  depth,
+  open,
+  arrival,
+}: {
+  depth: 'back' | 'middle' | 'front';
+  open: number;
+  arrival: number;
+}) {
+  const config = {
+    back: {
+      rotate: [-24, -5],
+      translateX: [-14, 7],
+      translateY: [8, 8],
+      scale: [0.78, 0.96],
+      background: 'var(--canvas-empty-secondary)',
+      opacity: 0.52,
+    },
+    middle: {
+      rotate: [18, 4],
+      translateX: [15, 4],
+      translateY: [4, 4],
+      scale: [0.84, 0.98],
+      background: 'var(--canvas-empty-primary)',
+      opacity: 0.72,
+    },
+    front: {
+      rotate: [-7, 0],
+      translateX: [0, 0],
+      translateY: [0, 0],
+      scale: [0.9, 1],
+      background: 'color-mix(in srgb, var(--canvas-empty-primary) 7%, var(--canvas-workspace-bg))',
+      opacity: 1,
+    },
+  }[depth];
 
-const PIXEL_SIZE = 16;
-const PIXEL_STEP = 19;
-const GRID_X = FRAME.x + 38;
-const GRID_Y = FRAME.y + 37;
-
-const SOURCE_PIXELS = [
-  '#60c8f0', '#60c8f0', '#FFD700', '#FFD700', '#60c8f0',
-  '#60c8f0', '#57FF6E', '#57FF6E', '#57FF6E', '#60c8f0',
-  '#57FF6E', '#57FF6E', '#C8622A', '#57FF6E', '#57FF6E',
-  '#C8622A', '#C8622A', '#68666b', '#C8622A', '#C8622A',
-] as const;
-
-const DELIVERY_COLORS = ['#60c8f0', '#57FF6E', '#FFD700', '#C8622A', '#57FF6E', '#68666b'] as const;
-
-const bracketStyle = (horizontal: boolean): React.CSSProperties => ({
-  position: 'absolute',
-  width: horizontal ? 34 : 2,
-  height: horizontal ? 2 : 34,
-  background: '#57FF6E',
-  opacity: 0.66,
-});
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        boxSizing: 'border-box',
+        background: config.background,
+        border: depth === 'front' ? '3px solid var(--canvas-empty-primary)' : '0',
+        opacity: arrival * config.opacity,
+        rotate: `${interpolate(open, [0, 1], config.rotate)}deg`,
+        translate: `${interpolate(open, [0, 1], config.translateX)}px ${interpolate(open, [0, 1], config.translateY)}px`,
+        scale: interpolate(arrival * open, [0, 1], [config.scale[0], config.scale[1]]),
+        transformOrigin: 'center center',
+      }}
+    />
+  );
+}
 
 export function EmptyCanvasComposition() {
   const frame = useCurrentFrame();
   const timeline = getEmptyCanvasTimeline(frame);
-  const sourceEase = Easing.bezier(0.16, 1, 0.3, 1)(timeline.sourceArrival);
-  const transferEase = Easing.bezier(0.45, 0, 0.55, 1)(timeline.sourceTransfer);
-  const mapEase = Easing.bezier(0.16, 1, 0.3, 1)(timeline.mapArrival);
-  const holdPulse = interpolate(Math.sin(frame / 17), [-1, 1], [0.82, 1]);
-  const sourceX = interpolate(transferEase, [0, 1], [128, 246]);
-  const sourceScale = interpolate(transferEase, [0, 1], [1, 0.76]);
-  const sourceOpacity = interpolate(transferEase, [0, 1], [0.92, 0.26]);
+  const arrival = easeOut(timeline.stackArrival);
+  const open = easeInOut(timeline.mapOpen);
+  const emblem = easeOut(timeline.emblemReveal);
+  const sweep = easeInOut(timeline.lightSweep);
+  const sweepVisibility = Math.sin(Math.PI * sweep) * emblem;
+  const shadowWidth = interpolate(open, [0, 1], [68, 116]);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: 'transparent',
-        color: '#dbd2bc',
-        fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+        background: 'transparent',
         opacity: timeline.cycleOpacity,
         overflow: 'hidden',
       }}
     >
       <div
+        aria-hidden="true"
         style={{
           position: 'absolute',
-          left: sourceX,
-          top: interpolate(sourceEase, [0, 1], [176, 148]),
-          width: 152,
-          height: 116,
-          background: '#17171c',
-          border: '2px solid rgba(219,210,188,0.38)',
-          opacity: sourceOpacity,
-          transform: `scale(${sourceScale})`,
-          transformOrigin: 'center center',
+          left: 320 - shadowWidth / 2,
+          top: TILE_TOP + TILE_SIZE + 14,
+          width: shadowWidth,
+          height: 9,
+          borderRadius: '50%',
+          background: 'rgb(var(--color-shadow-rgb) / 0.5)',
+          filter: 'blur(7px)',
+          opacity: arrival * interpolate(open, [0, 1], [0.28, 0.5]),
         }}
-      >
-        <div style={{ position: 'absolute', inset: 12, background: '#0d0d12', border: '1px solid rgba(96,200,240,0.34)' }}>
-          {SOURCE_PIXELS.map((color, index) => (
-            <div
-              key={`${color}-${index}`}
-              style={{
-                position: 'absolute',
-                left: 8 + (index % 5) * 22,
-                top: 7 + Math.floor(index / 5) * 19,
-                width: 19,
-                height: 16,
-                background: color,
-                opacity: 0.72,
-              }}
-            />
-          ))}
-        </div>
-        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 6, height: 2, background: 'rgba(219,210,188,0.24)' }} />
-      </div>
-
-      {DELIVERY_COLORS.map((color, index) => {
-        const travel = interpolate(frame, [42 + index * 6, 90 + index * 6], [0, 1], {
-          easing: Easing.bezier(0.45, 0, 0.55, 1),
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        });
-        const visibility = Math.sin(Math.PI * travel);
-        return (
-          <div
-            key={`${color}-${index}`}
-            style={{
-              position: 'absolute',
-              left: interpolate(travel, [0, 1], [352, GRID_X + 16 + index * 30]),
-              top: interpolate(travel, [0, 1], [208 + (index % 2) * 18, GRID_Y + 22 + (index % 3) * 36]) - Math.sin(Math.PI * travel) * 38,
-              width: 13,
-              height: 13,
-              background: color,
-              opacity: visibility * 0.9,
-            }}
-          />
-        );
-      })}
+      />
 
       <div
         style={{
           position: 'absolute',
-          left: FRAME.x,
-          top: FRAME.y,
-          width: FRAME.width,
-          height: FRAME.height,
-          background: '#111116',
-          border: '2px solid rgba(219,210,188,0.42)',
-          opacity: interpolate(mapEase, [0, 1], [0.18, 1]),
-          transform: `translateX(${interpolate(mapEase, [0, 1], [28, 0])}px) scale(${interpolate(mapEase, [0, 1], [0.96, 1])})`,
+          left: TILE_LEFT,
+          top: TILE_TOP + interpolate(arrival, [0, 1], [12, 0]),
+          width: TILE_SIZE,
+          height: TILE_SIZE,
+          opacity: arrival,
+          scale: interpolate(arrival, [0, 1], [0.88, 1]),
           transformOrigin: 'center center',
         }}
       >
-        <div style={{ position: 'absolute', left: 12, top: 11, fontSize: 13, letterSpacing: 1.8, color: 'rgba(210,193,162,0.56)' }}>MAP SHEET</div>
-        <div style={{ position: 'absolute', right: 12, top: 11, fontSize: 13, color: 'rgba(87,255,110,0.72)' }}>128 × 128</div>
-
-        {GRID.flatMap((row, rowIndex) => [...row].map((token, columnIndex) => {
-          const pixelIndex = rowIndex * row.length + columnIndex;
-          const revealAt = 47 + rowIndex * 9 + columnIndex * 2;
-          const reveal = interpolate(frame, [revealAt, revealAt + 15], [0, 1], {
-            easing: Easing.bezier(0.16, 1, 0.3, 1),
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          });
-          const color = COLORS[token];
-          return (
-            <div
-              key={`${rowIndex}-${columnIndex}`}
-              style={{
-                position: 'absolute',
-                left: GRID_X - FRAME.x + columnIndex * PIXEL_STEP,
-                top: GRID_Y - FRAME.y + rowIndex * PIXEL_STEP,
-                width: PIXEL_SIZE,
-                height: PIXEL_SIZE,
-                background: color ?? '#1e1e25',
-                opacity: color ? reveal * holdPulse : 0.38,
-                transform: color ? `scale(${interpolate(reveal, [0, 1], [0.72, 1])})` : undefined,
-              }}
-              data-pixel={pixelIndex}
-            />
-          );
-        }))}
+        <MapLayer depth="back" open={open} arrival={arrival} />
+        <MapLayer depth="middle" open={open} arrival={arrival} />
+        <MapLayer depth="front" open={open} arrival={arrival} />
 
         <div
-          data-remotion-scan="true"
           style={{
             position: 'absolute',
-            left: 34,
-            right: 34,
-            top: 35 + timeline.scanProgress * 153,
-            height: 2,
-            background: '#57FF6E',
-            opacity: frame < 52 ? 0 : 0.18 + holdPulse * 0.2,
-            boxShadow: '0 0 7px rgba(87,255,110,0.44)',
+            inset: 11,
+            background: 'var(--canvas-workspace-bg)',
+            opacity: arrival,
+            scale: interpolate(open, [0, 1], [0.86, 1]),
           }}
         />
-        <div style={{ position: 'absolute', left: 34, bottom: 13, width: 132, height: 2, background: 'rgba(219,210,188,0.2)' }} />
-        <div style={{ position: 'absolute', right: 34, bottom: 10, fontSize: 11, color: 'rgba(210,193,162,0.48)' }}>READY FOR ART</div>
-      </div>
 
-      <div style={{ ...bracketStyle(true), left: FRAME.x - 14, top: FRAME.y - 14, transform: `scaleX(${mapEase})`, transformOrigin: 'left' }} />
-      <div style={{ ...bracketStyle(false), left: FRAME.x - 14, top: FRAME.y - 14, transform: `scaleY(${mapEase})`, transformOrigin: 'top' }} />
-      <div style={{ ...bracketStyle(true), left: FRAME.x + FRAME.width - 20, top: FRAME.y + FRAME.height + 12, transform: `scaleX(${mapEase})`, transformOrigin: 'right' }} />
-      <div style={{ ...bracketStyle(false), left: FRAME.x + FRAME.width + 12, top: FRAME.y + FRAME.height - 20, transform: `scaleY(${mapEase})`, transformOrigin: 'bottom' }} />
+        <div
+          style={{
+            position: 'absolute',
+            right: 3,
+            top: 3,
+            width: 30,
+            height: 30,
+            background: 'var(--canvas-empty-secondary)',
+            clipPath: 'polygon(100% 0, 100% 100%, 0 0)',
+            opacity: arrival * interpolate(open, [0, 1], [0.38, 0.92]),
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 16,
+            display: 'grid',
+            placeItems: 'center',
+            overflow: 'hidden',
+            opacity: emblem,
+            scale: interpolate(emblem, [0, 1], [0.82, 1]),
+            translate: `0 ${interpolate(emblem, [0, 1], [7, 0])}px`,
+            clipPath: `inset(${interpolate(emblem, [0, 1], [45, 0])}% 0 ${interpolate(emblem, [0, 1], [45, 0])}% 0)`,
+          }}
+        >
+          <Img
+            src={staticFile('logo-opt.png')}
+            style={{
+              width: 86,
+              height: 86,
+              objectFit: 'contain',
+              imageRendering: 'pixelated',
+              filter: `brightness(${interpolate(sweepVisibility, [0, 1], [1, 1.2])}) saturate(${interpolate(emblem, [0, 1], [0.9, 1.08])})`,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: -8,
+              bottom: -8,
+              left: interpolate(sweep, [0, 1], [-34, 118]),
+              width: 22,
+              background: 'rgb(var(--color-text-primary-rgb) / 0.15)',
+              filter: 'blur(6px)',
+              opacity: sweepVisibility,
+              rotate: '9deg',
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            position: 'absolute',
+            left: 11,
+            bottom: 7,
+            width: interpolate(emblem, [0, 1], [0, 52]),
+            height: 5,
+            background: 'var(--canvas-empty-primary)',
+            opacity: emblem,
+          }}
+        />
+      </div>
     </AbsoluteFill>
   );
 }

@@ -519,7 +519,7 @@ export function ExportPanel({
   const isBedrock = platformMode === 'bedrock';
 
   return (
-    <section className="sidebar-section" id="tour-export">
+    <section className="sidebar-section" id="tour-export" data-tour="export">
       <h2 className="section-title section-title-collapsible" onClick={() => setCollapsed(c => !c)}>
         {t('Экспорт', 'Export')}
         <IconGlyph icon={mkIcons.chevronDown} className={`section-collapse-arrow${collapsed ? ' collapsed' : ''}`} />

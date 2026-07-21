@@ -193,6 +193,7 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
     <>
       <div
         className={`upload-zone ${dragging ? 'drag-over' : ''}`}
+        data-tour="upload"
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}

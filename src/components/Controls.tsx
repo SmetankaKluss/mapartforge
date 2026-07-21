@@ -351,7 +351,7 @@ export function Controls({
           {isBlankCanvas && <span className="section-disabled-hint"> {t('(холст)', '(canvas)')}</span>}
         </h2>
         <div className={`control-group-content${collapsedSections['map-grid'] ? ' collapsed' : ''}`}>
-        <div className="grid-options">
+        <div className="grid-options" data-tour="map-size">
           {MAP_GRID_OPTIONS.map((g) => {
             const active = !customIsActive && g.wide === mapGrid.wide && g.tall === mapGrid.tall;
             return (
@@ -495,7 +495,7 @@ export function Controls({
           {t('Режим', 'Mode')}
         </h2>
         <div className={`control-group-content${collapsedSections['map-mode'] ? ' collapsed' : ''}`}>
-          <div className="mode-toggle mode-toggle-three">
+          <div className="mode-toggle mode-toggle-three" data-tour="build-mode">
             <button
               className={`mode-btn${buildTechnique === 'standard' && mapMode === '2d' ? ' active' : ''}`}
               onClick={() => { trackEvent('map_mode_changed', { map_mode: '2d' }); requestBuildMode('2d'); }}
@@ -562,7 +562,7 @@ export function Controls({
             ))}
           </select>
         </div>
-        <div className="dither-options">
+        <div className="dither-options" data-tour="dithering">
           {DITHERING_OPTIONS.map(({ value, label, desc }) => (
             <label
               key={value}

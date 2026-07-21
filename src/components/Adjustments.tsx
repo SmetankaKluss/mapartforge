@@ -183,7 +183,7 @@ export function Adjustments({ adjustments, sourceImage, onChange, onCommit, disa
       )}
 
       {/* Sliders */}
-      <div className="adj-sliders">
+      <div className="adj-sliders" data-tour="adjustments">
         {SLIDERS.map(({ key, label }) => (
           <div key={key} className="adj-slider-row">
             <div className="adj-slider-header">

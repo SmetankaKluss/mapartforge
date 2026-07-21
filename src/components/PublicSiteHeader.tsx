@@ -4,7 +4,7 @@ import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { ThemeSelector } from './ThemeSelector';
 
-type PublicSection = 'editor' | 'examples' | 'cloud';
+type PublicSection = 'editor' | 'examples' | 'cloud' | 'wiki';
 
 interface PublicSiteHeaderProps {
   active?: PublicSection;
@@ -41,6 +41,13 @@ export function PublicSiteHeader({ active, lang, onToggleLanguage }: PublicSiteH
       label: isRussian ? 'Облако и мод' : 'Cloud & mod',
       shortLabel: isRussian ? 'Облако' : 'Cloud',
       icon: mkIcons.cloud,
+    },
+    {
+      id: 'wiki',
+      href: '/wiki',
+      label: 'Wiki',
+      shortLabel: 'Wiki',
+      icon: mkIcons.wiki,
     },
   ];
 

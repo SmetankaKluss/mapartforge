@@ -9,6 +9,7 @@ import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
 import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
 import { getExampleByPath, isExamplesIndexPath } from './lib/examples.ts'
+import { isWikiPath } from './lib/wiki.ts'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
 const searchParams = new URLSearchParams(window.location.search);
@@ -27,7 +28,8 @@ const companionCollectionMatch = path.match(/^\/collection\/([0-9a-f-]{36})$/i);
 const seoPage = getSeoPageByPath(path);
 const examplePage = getExampleByPath(path);
 const examplesIndex = isExamplesIndexPath(path);
-const pageType = buildMatch ? 'build_tracker' : companionArtMatch ? 'companion_art' : companionCollectionMatch ? 'companion_collection' : examplePage ? 'example_detail' : examplesIndex ? 'examples' : path === '/cloud' ? 'cloud' : path === '/device' ? 'device' : seoPage ? 'seo' : 'editor';
+const wikiPage = isWikiPath(path);
+const pageType = buildMatch ? 'build_tracker' : companionArtMatch ? 'companion_art' : companionCollectionMatch ? 'companion_collection' : examplePage ? 'example_detail' : examplesIndex ? 'examples' : wikiPage ? 'wiki' : path === '/cloud' ? 'cloud' : path === '/device' ? 'device' : seoPage ? 'seo' : 'editor';
 
 initAnalyticsContext();
 initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
@@ -48,6 +50,7 @@ const routeLabels: Record<string, string> = {
   device: 'Готовлю вход мода…',
   examples: 'Открываю примеры…',
   example_detail: 'Открываю пример…',
+  wiki: 'Открываю Wiki MapKluss…',
   seo: 'Открываю руководство…',
   editor: 'Запускаю редактор…',
 };
@@ -111,6 +114,13 @@ async function renderApplication() {
     root.render(
       <LocaleProvider>
         <CompanionCloudPage />
+      </LocaleProvider>,
+    );
+  } else if (wikiPage) {
+    const { WikiPage } = await import('./components/WikiPage.tsx');
+    root.render(
+      <LocaleProvider>
+        <WikiPage />
       </LocaleProvider>,
     );
   } else if (path === '/device') {

@@ -53,7 +53,6 @@ import { exportLitematicHybrid } from './lib/exportLitematic';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
-const WikiModal = lazy(() => import('./components/WikiModal').then(m => ({ default: m.WikiModal })));
 const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
 const GifModal = lazy(() => import('./components/GifModal').then(m => ({ default: m.GifModal })));
 import { NewCanvasModal } from './components/NewCanvasModal';
@@ -68,8 +67,9 @@ import { SaveProjectModal } from './components/SaveProjectModal';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { CloudArtsPanel } from './components/CloudArtsPanel';
 import { CloudSaveModal } from './components/CloudSaveModal';
-import { createTour, shouldAutoStart, markTourDone } from './lib/tour';
+import { createTour, markTourOfferDismissed, shouldAutoStart } from './lib/tour';
 import type { TourType } from './lib/tour';
+import { TourSelector } from './components/TourSelector';
 import { useLocale } from './lib/useLocale';
 import type { PatternDefinition } from './lib/patternTool';
 import { createDefaultPattern, parsePatternDefinition } from './lib/patternTool';
@@ -108,7 +108,7 @@ import {
 } from './lib/canvasViewport';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.24.0-minecraft-26-2-2026-07-21',
+  id: 'mapkluss-v1.25.0-companion-themes-versions-2026-07-21',
   url: 'https://t.me/mapkluss',
 };
 
@@ -404,9 +404,9 @@ export default function App() {
   const [adjustments, setAdjustments]   = useState<ImageAdjustments>(normalizeAdjustments(saved.adjustments));
   const [colorMatch, setColorMatch]     = useState<ColorMatchMode>(coerceColorMatchMode(saved.colorMatch ?? DEFAULT_COLOR_MATCH));
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showWiki, setShowWiki] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTourSelector, setShowTourSelector] = useState(false);
+  const [tourSelectorIsWelcome, setTourSelectorIsWelcome] = useState(false);
   const [suppressAutoTour] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return Boolean(
@@ -2055,17 +2055,38 @@ export default function App() {
 
   // ── Onboarding tour ───────────────────────────────────────────────────────
   const startTour = useCallback((tourType: TourType) => {
-    markTourDone(tourType);
-    trackEvent('tutorial_opened', { tutorial_type: tourType === 'advanced' ? 'tour_advanced' : 'tour_basic', lang });
-    createTour(tourType, switchTourStep, lang).drive();
+    setCollapsedSections(previous => ({
+      ...previous,
+      'map-grid': false,
+      'map-mode': false,
+      dithering: false,
+      adjustments: false,
+    }));
+    const tutorialType = `tour_${tourType.replace('-', '_')}`;
+    trackEvent('tutorial_opened', { tutorial_type: tutorialType, lang });
+    createTour(tourType, {
+      lang,
+      switchTab: switchTourStep,
+      onComplete: completedTour => trackEvent('tutorial_completed', { tutorial_type: `tour_${completedTour.replace('-', '_')}`, lang }),
+      onDismiss: dismissedTour => trackEvent('tutorial_dismissed', { tutorial_type: `tour_${dismissedTour.replace('-', '_')}`, lang }),
+    }).drive();
   }, [lang, switchTourStep]);
   useEffect(() => {
-    if (suppressAutoTour) return;
+    if (suppressAutoTour || showAnnouncement) return;
     if (shouldAutoStart()) {
-      const timer = setTimeout(() => createTour('basic', switchTourStep, lang).drive(), 600);
+      const timer = setTimeout(() => {
+        setTourSelectorIsWelcome(true);
+        setShowTourSelector(true);
+      }, 700);
       return () => clearTimeout(timer);
     }
-  }, [lang, switchTourStep, suppressAutoTour]);
+  }, [showAnnouncement, suppressAutoTour]);
+
+  const closeTourSelector = useCallback(() => {
+    markTourOfferDismissed();
+    setShowTourSelector(false);
+    setTourSelectorIsWelcome(false);
+  }, []);
 
   // ── Import map.dat ────────────────────────────────────────────────────────
   const handleDatFile = useCallback(async (file: File) => {
@@ -2808,7 +2829,7 @@ export default function App() {
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
           </div>
           <div className="header-spacer" />
-          <div className={`header-cloud-actions${cloudMenuOpen ? ' is-open' : ''}`} aria-label="Облако и мод MapKluss">
+          <div className={`header-cloud-actions${cloudMenuOpen ? ' is-open' : ''}`} aria-label="Облако и мод MapKluss" data-tour="cloud">
             <button
               ref={cloudMenuButtonRef}
               className={`cloud-link-btn cloud-account-btn cloud-menu-trigger${cloudUserEmail ? ' is-signed-in' : ''}`}
@@ -2880,8 +2901,8 @@ export default function App() {
               </div>
           </div>
           <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
-          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
-          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang }); setShowWiki(true); }} title={t('Открыть полную документацию', 'Read full documentation')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></button>
+          <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
+          <a className="header-icon-btn" href="/wiki" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <ThemeSelector lang={lang} />
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
@@ -2892,7 +2913,7 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новые версии Minecraft в MapKluss', 'New Minecraft versions in MapKluss')}
+          aria-label={t('Новости MapKluss Companion, новых версий и тем', 'MapKluss Companion, new versions, and themes announcement')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
@@ -2903,17 +2924,17 @@ export default function App() {
             <div className="update-banner-track">
               {[0, 1].map(copy => (
                 <span className="update-banner-segment" key={copy}>
-                  <strong>{t('MAPKLUSS COMPANION ТЕПЕРЬ НА MINECRAFT 26.2', 'MAPKLUSS COMPANION NOW SUPPORTS MINECRAFT 26.2')}</strong>
+                  <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
                   <i />
-                  <span>{t('26.2 · 1.21.11 · 1.21.8 · 1.21.4 · НОВЫЕ БЛОКИ В РЕДАКТОРЕ', '26.2 · 1.21.11 · 1.21.8 · 1.21.4 · NEW EDITOR BLOCKS')}</span>
+                  <span>{t('НОВЫЕ ВЕРСИИ MINECRAFT · 10 ТЕМ РЕДАКТОРА', 'NEW MINECRAFT VERSIONS · 10 EDITOR THEMES')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('MapKluss Companion теперь поддерживает Minecraft 26.2, 1.21.11, 1.21.8 и 1.21.4. В палитру редактора добавлены блоки 26.2; гайд по моду — в Telegram.',
-              'MapKluss Companion now supports Minecraft 26.2, 1.21.11, 1.21.8, and 1.21.4. The editor palette includes the 26.2 blocks; the mod guide is in Telegram.')}
+            {t('MapKluss Companion помогает строить арты быстрее и поддерживает Minecraft 26.2, 1.21.11, 1.21.8 и 1.21.4. В редакторе доступны десять тем.',
+              'MapKluss Companion helps you build map art faster and supports Minecraft 26.2, 1.21.11, 1.21.8, and 1.21.4. The editor includes ten themes.')}
           </span>
           <a
             className="update-banner-link"
@@ -2978,7 +2999,7 @@ export default function App() {
         data-tab={mobileTab}
       >
         {/* ── LEFT PANEL ── */}
-        <aside id="editor-settings-panel" className="panel panel-left">
+        <aside id="editor-settings-panel" className="panel panel-left" data-tour="settings-panel">
           <div className="panel-scroll">
             <ImageUpload ref={imageUploadRef} onImageLoaded={handleImageLoaded} onDatFile={handleDatFile} onGifFile={handleGifFile} />
             <div className="new-canvas-row">
@@ -3126,7 +3147,7 @@ export default function App() {
           >
             <IconGlyph icon={rightPanelCollapsed ? mkIcons.chevronLeft : mkIcons.chevronRight} />
           </button>
-          <div className="toolbar">
+          <div className="toolbar" data-tour="toolbar">
 
             {/* LEFT: undo/redo — always visible */}
             <div className="toolbar-group">
@@ -3378,7 +3399,7 @@ export default function App() {
           </div>
 
           {!compareMode && imageData && (
-            <div className="editor-tool-context" role="region" aria-label={t('Настройки активного инструмента', 'Active tool settings')}>
+            <div className="editor-tool-context" role="region" aria-label={t('Настройки активного инструмента', 'Active tool settings')} data-tour="tool-context">
               <div className="editor-tool-context-summary">
                 <span className="editor-tool-context-icon" aria-hidden="true"><IconGlyph icon={activeToolUi.icon} /></span>
                 <span className="editor-tool-context-copy">
@@ -3602,6 +3623,7 @@ export default function App() {
           <div
             ref={canvasAreaRef}
             className={`canvas-area${!hasContent ? ' canvas-area-clickable' : ''}${hasContent && (compareMode || activeTool === null) ? ' canvas-area-pan-ready' : ''}${hasContent && isSpacePanActive ? ' canvas-area-space-pan-ready' : ''}${isCanvasPanning ? ' canvas-area-panning' : ''}`}
+            data-tour="canvas"
             onClickCapture={handleCanvasClickCapture}
             onPointerDownCapture={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
@@ -3709,7 +3731,7 @@ export default function App() {
 
         {/* ── RIGHT PANEL ── */}
         {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
-        <aside id="editor-palette-panel" className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`}>
+        <aside id="editor-palette-panel" className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`} data-tour="palette-panel">
           <div className="panel-scroll">
             {editorMode === 'artist' && (
               <>
@@ -3744,7 +3766,7 @@ export default function App() {
               </>
             )}
             <div className="mobile-palette-content">
-              <div className="version-selector-row">
+              <div className="version-selector-row" data-tour="minecraft-version">
                 <span className="version-selector-label">{t('Версия', 'Version')}</span>
                 <select
                   className="version-selector-select"
@@ -3975,9 +3997,6 @@ export default function App() {
       />
     )}
 
-    {/* ── Wiki modal ── */}
-    {showWiki && <Suspense fallback={null}><WikiModal onClose={() => setShowWiki(false)} /></Suspense>}
-
     {/* ── Save project modal ── */}
     {showSaveModal && (
       <SaveProjectModal
@@ -4089,44 +4108,17 @@ export default function App() {
 
     {/* ── Tour selector modal ── */}
     {showTourSelector && (
-      <div className="tour-selector-overlay" onClick={() => setShowTourSelector(false)}>
-        <div className="tour-selector-modal" onClick={e => e.stopPropagation()}>
-          <button className="tour-selector-close" onClick={() => setShowTourSelector(false)}><IconGlyph icon={mkIcons.close} size={15} /></button>
-          <div className="tour-selector-title"><IconGlyph icon={mkIcons.guide} /> {t('ВЫБЕРИ ТУР', 'SELECT A TOUR')}</div>
-          <div className="tour-selector-desc">{t(
-            'Выбери уровень — тур покажет только нужные функции.',
-            'Choose a level — the tour shows only relevant features.',
-          )}</div>
-          <div className="tour-selector-btns">
-            <button
-              className="tour-selector-btn tour-selector-btn--basic"
-              onClick={() => { setShowTourSelector(false); startTour('basic'); }}
-            >
-              <IconGlyph icon={mkIcons.play} className="tour-selector-btn-icon" />
-              <span className="tour-selector-btn-body">
-                <span className="tour-selector-btn-title">{t('БАЗОВЫЙ', 'BASIC')}</span>
-                <span className="tour-selector-btn-sub">{t(
-                  'Загрузка, сетка, дизеринг, экспорт',
-                  'Upload, grid, dithering, export',
-                )}</span>
-              </span>
-            </button>
-            <button
-              className="tour-selector-btn tour-selector-btn--advanced"
-              onClick={() => { setShowTourSelector(false); startTour('advanced'); }}
-            >
-              <IconGlyph icon={mkIcons.tourAdvanced} className="tour-selector-btn-icon" />
-              <span className="tour-selector-btn-body">
-                <span className="tour-selector-btn-title">{t('ПРОДВИНУТЫЙ', 'ADVANCED')}</span>
-                <span className="tour-selector-btn-sub">{t(
-                  'Режим художника, слои, выделение, паттерны, градиент',
-                  'Artist mode, layers, selection, patterns, gradient',
-                )}</span>
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <TourSelector
+        lang={lang}
+        hasArtwork={hasContent}
+        isWelcome={tourSelectorIsWelcome}
+        onClose={closeTourSelector}
+        onSelect={tourType => {
+          setShowTourSelector(false);
+          setTourSelectorIsWelcome(false);
+          startTour(tourType);
+        }}
+      />
     )}
     </>
   );
