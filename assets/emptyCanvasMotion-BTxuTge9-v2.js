@@ -1,0 +1,1 @@
+var e=e=>Math.max(0,Math.min(1,e)),t=(t,n,r)=>r<=n?+(t>=r):e((t-n)/(r-n));function n(e){let n=t(e,0,9),r=1-t(e,106,113),i=e<80?t(e,15,44):1-t(e,80,106);return{cycleOpacity:Math.min(n,r),stackArrival:t(e,1,24),mapOpen:i,emblemReveal:Math.min(t(e,34,57),1-t(e,79,99)),lightSweep:t(e,48,77)}}export{n as t};
