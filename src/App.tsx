@@ -106,9 +106,10 @@ import {
   hasCanvasPanStarted,
   sliderToCanvasZoom,
 } from './lib/canvasViewport';
+import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.25.0-companion-themes-versions-2026-07-21',
+  id: 'mapkluss-v1.25.1-companion-themes-versions-2026-07-22',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2431,11 +2432,7 @@ export default function App() {
       setCurrentCloudTitle(manifest.title);
       setCurrentCloudPrivacy(manifest.privacy);
       setShowCloudSaveModal(false);
-      const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.delete('companionImport');
-      nextUrl.searchParams.delete('artVersion');
-      nextUrl.searchParams.set('art', manifest.artId);
-      window.history.replaceState(null, '', nextUrl.toString());
+      window.history.replaceState(null, '', detachEditorUrlFromCloudSource(window.location.href));
       showAppNotice(t('Арт сохранён в облако и добавлен в избранное.', 'Art saved to Cloud and added to favorites.'));
     } catch (err) {
       console.error('Cloud save failed', err);
@@ -2823,7 +2820,15 @@ export default function App() {
     <div className="app">
         <header className={`app-header${cloudMenuOpen ? ' is-cloud-menu-open' : ''}`}>
         <div className="header-inner">
-          <img className="app-logo" src="/logo-opt.png" width="128" height="128" alt="MapKluss" fetchPriority="high" />
+          <a
+            className="app-logo-link"
+            href="/"
+            title={t('Начать новый арт', 'Start a new art')}
+            aria-label={t('Начать новый арт', 'Start a new art')}
+            onClick={() => trackEvent('new_art_logo_clicked')}
+          >
+            <img className="app-logo" src="/logo-opt.png" width="128" height="128" alt="" fetchPriority="high" />
+          </a>
           <div className="header-titles">
             <h1 className="app-title">MAPKLUSS</h1>
             <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>

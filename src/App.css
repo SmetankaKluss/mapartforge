@@ -883,6 +883,25 @@ input, select, textarea { outline: none; }
   z-index: 1;
 }
 
+.app-logo-link {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  outline: 1px solid transparent;
+  outline-offset: 2px;
+}
+
+.app-logo-link:hover .app-logo {
+  filter: drop-shadow(0 0 8px rgb(var(--color-accent-rgb) / 0.42));
+}
+
+.app-logo-link:focus-visible {
+  outline-color: var(--focus);
+}
+
 .app-logo,
 img[src="/logo-opt.png"] {
   object-fit: contain;
