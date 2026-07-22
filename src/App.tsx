@@ -109,7 +109,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.25.1-companion-themes-versions-2026-07-22',
+  id: 'mapkluss-v1.26.0-companion-themes-versions-2026-07-22',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2905,7 +2905,6 @@ export default function App() {
                 />
               </div>
           </div>
-          <a href="https://boosty.to/klussforge" target="_blank" rel="noopener noreferrer" className="support-btn" title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}><IconGlyph icon={mkIcons.support} /> {t('Поддержать', 'Support')}</a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
           <a className="header-icon-btn" href="/wiki" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <ThemeSelector lang={lang} />

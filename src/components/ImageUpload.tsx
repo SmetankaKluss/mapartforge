@@ -44,13 +44,13 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
     }
     // Handle Minecraft map.dat files
     if (file.name.endsWith('.dat') && onDatFile) {
-      trackEvent('mapdat_uploaded', { source, size_mb: Math.round(file.size / 1024 / 1024) });
+      trackEvent('mapdat_uploaded', { input_method: source, size_mb: Math.round(file.size / 1024 / 1024) });
       onDatFile(file);
       return;
     }
     // Handle animated GIF
     if (file.type === 'image/gif' && onGifFile) {
-      trackEvent('gif_uploaded', { source, size_mb: Math.round(file.size / 1024 / 1024) });
+      trackEvent('gif_uploaded', { input_method: source, size_mb: Math.round(file.size / 1024 / 1024) });
       onGifFile(file);
       return;
     }
@@ -63,7 +63,7 @@ export const ImageUpload = forwardRef<ImageUploadHandle, Props>(function ImageUp
     const img = new Image();
     img.onload = () => {
       trackEvent('image_uploaded', {
-        source,
+        input_method: source,
         file_type: file.type || file.name.split('.').pop()?.toLowerCase() || 'unknown',
         size_mb: Math.round(file.size / 1024 / 1024),
         width: img.naturalWidth,

@@ -33,6 +33,11 @@ import { useLocale } from '../lib/useLocale';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { trackEvent } from '../lib/analytics';
+import {
+  deferSupportPrompt,
+  shouldShowSupportPrompt,
+  SUPPORT_URL,
+} from '../lib/supportPrompt';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
 function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
@@ -79,7 +84,7 @@ interface Props {
   // Tracker
   onCreateTracker?: () => void;
   // GIF Project
-  onExportGifPack?: () => void;
+  onExportGifPack?: () => void | Promise<void>;
 }
 
 
@@ -127,6 +132,8 @@ export function ExportPanel({
   const [suppressionError, setSuppressionError] = useState<string | null>(null);
   const [linkState,      setLinkState]      = useState<'idle' | 'uploading' | 'error'>('idle');
   const [linkUrl,        setLinkUrl]        = useState<string | null>(null);
+  const [supportPromptVisible, setSupportPromptVisible] = useState(false);
+  const [supportExportFormat, setSupportExportFormat] = useState<string | null>(null);
 
   const hasPreview = (previewImageData ?? imageData) !== null;
   const hasCmp     = compareData !== null;
@@ -200,16 +207,50 @@ export function ExportPanel({
     });
   }
 
+  function getSupportStorage(): Storage | null {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  function completeExport(format: string) {
+    trackEvent('export_completed', {
+      format,
+      map_mode: mapMode,
+      map_wide: mapGrid.wide,
+      map_tall: mapGrid.tall,
+      platform_mode: platformMode,
+    });
+    if (supportPromptVisible || !shouldShowSupportPrompt(getSupportStorage())) return;
+    setSupportExportFormat(format);
+    setSupportPromptVisible(true);
+    trackEvent('support_prompt_visible', { after_export_format: format });
+  }
+
+  function hideSupportPrompt(reason: 'dismissed' | 'opened') {
+    deferSupportPrompt(getSupportStorage());
+    setSupportPromptVisible(false);
+    trackEvent(reason === 'opened' ? 'support_prompt_clicked' : 'support_prompt_dismissed', {
+      after_export_format: supportExportFormat,
+      destination: reason === 'opened' ? 'boosty' : undefined,
+    });
+  }
+
   function handlePng() {
-    trackExport(compareMode ? 'png_compare' : 'png');
+    const format = compareMode ? 'png_compare' : 'png';
+    trackExport(format);
     if (compareMode && hasCmp) {
       captureDiagnostics('export_png_compare_left', compareData!.left);
       captureDiagnostics('export_png_compare_right', compareData!.right);
       downloadPng(compareData!.left,  makePngFilename(mapGrid, compareLeft)  .replace('.png', '_left.png'));
       downloadPng(compareData!.right, makePngFilename(mapGrid, compareRight) .replace('.png', '_right.png'));
+      completeExport(format);
     } else if (previewData) {
       captureDiagnostics('export_png', previewData);
       downloadPng(previewData, makePngFilename(mapGrid, dithering));
+      completeExport(format);
     }
   }
 
@@ -229,6 +270,7 @@ export function ExportPanel({
         colors: activePalette.colors.length,
       });
       downloadBlob(blob, `mapkluss_showcase_${mapGrid.wide}x${mapGrid.tall}_${mapMode}.png`);
+      completeExport('showcase_png');
     } finally {
       setBusyShowcase(false);
     }
@@ -253,6 +295,7 @@ export function ExportPanel({
         file_count: mapGrid.wide * mapGrid.tall,
         start_map_id: 0,
       });
+      completeExport('map_dat');
     } finally {
       setBusyMapdat(false);
     }
@@ -278,6 +321,7 @@ export function ExportPanel({
         : await buildSuppressionMultiMapZipFromInput('MapKluss', input);
       downloadSuppressionZip(zip, 'MapKluss', mapGrid);
       trackExport('suppression_two_layer_zip');
+      completeExport('suppression_two_layer_zip');
     } catch (error) {
       setSuppressionError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -307,6 +351,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
       });
+      completeExport('litematic');
     } finally {
       setBusyLiteFlat(false);
     }
@@ -335,6 +380,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
       });
+      completeExport('litematic_zip');
     } finally {
       setBusyZip(false);
     }
@@ -360,6 +406,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
       });
+      completeExport('litematic_hybrid');
     } finally {
       setBusyHybrid(false);
     }
@@ -391,6 +438,7 @@ export function ExportPanel({
         artist_mode: Boolean(artistMode),
         platform_mode: platformMode,
       });
+      completeExport('litematic_layer');
     } finally {
       setBusyLayer(false);
     }
@@ -420,6 +468,7 @@ export function ExportPanel({
         mc_version: minecraftVersion,
         platform_mode: platformMode,
       });
+      completeExport('schematic');
     } finally {
       setBusySchematic(false);
     }
@@ -448,6 +497,7 @@ export function ExportPanel({
         map_tall: mapGrid.tall,
         platform_mode: platformMode,
       });
+      completeExport('nbt');
     } finally {
       setBusyNbt(false);
     }
@@ -476,6 +526,7 @@ export function ExportPanel({
         map_tall: mapGrid.tall,
         platform_mode: platformMode,
       });
+      completeExport('mcstructure');
     } finally {
       setBusyMcStruct(false);
     }
@@ -513,6 +564,13 @@ export function ExportPanel({
     }
   }
 
+  async function handleGifPack() {
+    if (!onExportGifPack) return;
+    trackEvent('export_clicked', { format: 'gif_litematic_pack', map_wide: mapGrid.wide, map_tall: mapGrid.tall });
+    await onExportGifPack();
+    completeExport('gif_litematic_pack');
+  }
+
   const base        = disabled || !hasContent;
   const busyAnyLite = busyLiteFlat || busyZip || busyHybrid || busyLayer || busySchematic || busyNbt || busyMcStruct;
   const isMultiMap  = mapGrid.wide * mapGrid.tall > 1;
@@ -529,6 +587,34 @@ export function ExportPanel({
       )}
       {!collapsed && hasContent && (
         <>
+        {supportPromptVisible && (
+          <aside className="export-support-prompt" aria-labelledby="export-support-title">
+            <span className="export-support-icon" aria-hidden="true"><IconGlyph icon={mkIcons.support} /></span>
+            <div className="export-support-copy" role="status" aria-live="polite">
+              <strong id="export-support-title">{t('MapKluss помог?', 'Did MapKluss help?')}</strong>
+              <span>{t('Поддержи развитие проекта и его серверы.', 'Support the project and help cover its servers.')}</span>
+            </div>
+            <button
+              type="button"
+              className="export-support-dismiss"
+              onClick={() => hideSupportPrompt('dismissed')}
+              aria-label={t('Не показывать предложение один день', 'Hide this prompt for one day')}
+              title={t('Скрыть', 'Dismiss')}
+            >
+              <IconGlyph icon={mkIcons.close} />
+            </button>
+            <a
+              className="export-support-action"
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => hideSupportPrompt('opened')}
+            >
+              {t('Поддержать автора', 'Support the author')}
+              <IconGlyph icon={mkIcons.arrowRight} />
+            </a>
+          </aside>
+        )}
         {!isBedrock && buildTechnique === 'suppression_two_layer' && suppressionEligibility && !suppressionEligibility.eligible && (
           <p className="build-technique-warning" role="status">
             {t('Two-layer недоступен: ', 'Two-layer unavailable: ')}
@@ -691,10 +777,7 @@ export function ExportPanel({
           <div className="link-row">
             <button
               className="link-export-btn gif-pack-export-btn"
-              onClick={() => {
-                trackEvent('export_clicked', { format: 'gif_litematic_pack', map_wide: mapGrid.wide, map_tall: mapGrid.tall });
-                onExportGifPack();
-              }}
+              onClick={() => void handleGifPack()}
               aria-label={t('Экспортировать GIF проект как Litematic ZIP', 'Export GIF project as Litematic ZIP')}
               title={t('Экспортировать все кадры GIF как .litematic ZIP', 'Export all GIF frames as .litematic ZIP')}
             >

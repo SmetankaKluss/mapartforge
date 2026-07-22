@@ -14,6 +14,21 @@ type AttributionSnapshot = {
 const ATTRIBUTION_STORAGE_KEY = 'mapkluss_attribution_v1';
 const ATTRIBUTION_QUERY_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'] as const;
 
+export function sanitizeAnalyticsPath(pathAndQuery: string): string {
+  try {
+    const url = new URL(pathAndQuery, 'https://mapkluss.local');
+    const safeParams = new URLSearchParams();
+    for (const key of ATTRIBUTION_QUERY_KEYS) {
+      const value = url.searchParams.get(key);
+      if (value) safeParams.set(key, value);
+    }
+    const search = safeParams.toString();
+    return `${url.pathname}${search ? `?${search}` : ''}`;
+  } catch {
+    return '/';
+  }
+}
+
 function isLocalAnalyticsHost(): boolean {
   if (typeof window === 'undefined') return false;
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -74,7 +89,7 @@ function getCurrentAttributionFromLocation(): AttributionSnapshot {
   const term = params.get('utm_term') ?? undefined;
   const clickId = params.get('gclid') ?? params.get('fbclid') ?? undefined;
   const referrerHost = getReferrerHost();
-  const landingPath = `${window.location.pathname}${window.location.search}`;
+  const landingPath = sanitizeAnalyticsPath(`${window.location.pathname}${window.location.search}`);
 
   let kind: AttributionSnapshot['kind'];
   if (source || medium || campaign || content || term || clickId) kind = 'campaign';
@@ -94,7 +109,7 @@ function getAttributionParams(): AnalyticsParams {
     session_content: attribution.content,
     session_term: attribution.term,
     session_click_id: attribution.clickId,
-    landing_path: attribution.landingPath,
+    landing_path: attribution.landingPath ? sanitizeAnalyticsPath(attribution.landingPath) : undefined,
     landing_referrer_host: attribution.referrerHost,
     acquisition_kind: attribution.kind,
   });
