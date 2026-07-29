@@ -3,21 +3,31 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 async function migration(name: string): Promise<string> {
-  return await Deno.readTextFile(new URL(`../../migrations/${name}`, import.meta.url));
+  return await Deno.readTextFile(
+    new URL(`../../migrations/${name}`, import.meta.url),
+  );
 }
 
 async function releaseGate(name: string): Promise<string> {
-  return await Deno.readTextFile(new URL(`../../release-gates/${name}`, import.meta.url));
+  return await Deno.readTextFile(
+    new URL(`../../release-gates/${name}`, import.meta.url),
+  );
 }
 
 Deno.test("art save quota reserves space held by concurrent imports", async () => {
-  const sql = await migration("20260719090126_atomic_private_companion_saves.sql");
+  const sql = await migration(
+    "20260719090126_atomic_private_companion_saves.sql",
+  );
   const prepare = sql.slice(
     sql.indexOf("create or replace function public.prepare_companion_art_save"),
-    sql.indexOf("create or replace function public.begin_companion_art_save_verification"),
+    sql.indexOf(
+      "create or replace function public.begin_companion_art_save_verification",
+    ),
   );
   const publish = sql.slice(
-    sql.indexOf("create or replace function public.publish_verified_companion_art_save"),
+    sql.indexOf(
+      "create or replace function public.publish_verified_companion_art_save",
+    ),
     sql.indexOf("create or replace function public.cancel_companion_art_save"),
   );
   assert(
@@ -32,30 +42,101 @@ Deno.test("art save quota reserves space held by concurrent imports", async () =
   );
 });
 
+Deno.test("private Companion upload policy handles multipart preflight overhead", async () => {
+  const sql = await migration(
+    "20260719174705_fix_companion_storage_multipart_preflight.sql",
+  );
+  assert(
+    sql.includes("requested_metadata ->> 'contentLength'") &&
+      sql.includes("requested_metadata ->> 'size'") &&
+      sql.includes("multipart_overhead_limit constant bigint := 1048576") &&
+      sql.includes(
+        "declared_size_text is null and completed_size_text is null",
+      ) &&
+      sql.includes("declared_size > expected_size + multipart_overhead_limit"),
+    "reserved uploads must allow only bounded multipart overhead while retaining exact completed sizes",
+  );
+  assert(
+    sql.includes("legacy_published_bytes + expected_size <= 262144000"),
+    "quota accounting must use the server-reserved artifact size instead of HTTP envelope bytes",
+  );
+  assert(
+    sql.includes("reservation.owner_id = current_user_id") &&
+      sql.includes("reservation.status = 'uploading'") &&
+      sql.includes("artifact ->> 'storagePath' = requested_name"),
+    "the metadata compatibility fix must retain owner, active reservation and exact-path checks",
+  );
+});
+
+Deno.test("private Companion upload policy accepts Storage-normalized media types", async () => {
+  const sql = await migration(
+    "20260719175941_normalize_companion_storage_upload_mime.sql",
+  );
+  assert(
+    sql.includes("split_part(requested_metadata ->> 'mimetype', ';', 1)") &&
+      sql.includes("split_part(artifact ->> 'contentType', ';', 1)"),
+    "Storage MIME parameters must be normalized on both sides of the reserved upload comparison",
+  );
+  assert(
+    sql.includes("reservation.owner_id = current_user_id") &&
+      sql.includes("reservation.status = 'uploading'") &&
+      sql.includes("artifact ->> 'storagePath' = requested_name") &&
+      sql.includes("completed_size <> expected_size") &&
+      sql.includes("legacy_published_bytes + expected_size <= 262144000"),
+    "MIME normalization must retain owner, reservation, path, exact completed size and quota checks",
+  );
+});
+
 Deno.test("legacy lockdown requires approval and zero artifact/import bytes", async () => {
   const sql = await releaseGate("legacy_companion_save_lockdown.sql");
-  assert(sql.includes("legacy_companion_save_lockdown"), "lockdown must require the release gate");
-  assert(sql.includes("public.art_artifacts where bucket_id = 'mapartforge'"), "artifact rows must reach zero");
-  assert(sql.includes("public.companion_imports where bucket_id = 'mapartforge'"), "import rows must reach zero");
-  assert(sql.includes("name like 'companion/%'"), "public Companion bytes must reach zero");
+  assert(
+    sql.includes("legacy_companion_save_lockdown"),
+    "lockdown must require the release gate",
+  );
+  assert(
+    sql.includes("public.art_artifacts where bucket_id = 'mapartforge'"),
+    "artifact rows must reach zero",
+  );
+  assert(
+    sql.includes("public.companion_imports where bucket_id = 'mapartforge'"),
+    "import rows must reach zero",
+  );
+  assert(
+    sql.includes("name like 'companion/%'"),
+    "public Companion bytes must reach zero",
+  );
 });
 
 Deno.test("large Two-layer saves require one private hash-pinned bundle", async () => {
-  const atomicSave = await migration("20260719090126_atomic_private_companion_saves.sql");
-  const enumMigration = await migration("20260719090136_add_suppression_bundle_kind.sql");
-  const pinMigration = await migration("20260719090141_pin_suppression_bundles.sql");
+  const atomicSave = await migration(
+    "20260719090126_atomic_private_companion_saves.sql",
+  );
+  const enumMigration = await migration(
+    "20260719090136_add_suppression_bundle_kind.sql",
+  );
+  const pinMigration = await migration(
+    "20260719090141_pin_suppression_bundles.sql",
+  );
   assert(
     enumMigration.includes("add value if not exists 'suppression_bundle'"),
     "the bundle enum value must be committed before dependent DDL",
   );
   assert(
-    atomicSave.includes("a multi-map Two-layer save requires one bundle artifact only") &&
-      atomicSave.includes("application/vnd.mapkluss.suppression-bundle+zip;version=2"),
+    atomicSave.includes(
+      "a multi-map Two-layer save requires one bundle artifact only",
+    ) &&
+      atomicSave.includes(
+        "application/vnd.mapkluss.suppression-bundle+zip;version=2",
+      ),
     "atomic saves must reject incomplete or ambiguous multi-map artifacts",
   );
   assert(
-    pinMigration.includes("create table public.art_version_suppression_bundle_pins") &&
-      pinMigration.includes("foreign key (artifact_id, version_id, art_id, owner_id)") &&
+    pinMigration.includes(
+      "create table public.art_version_suppression_bundle_pins",
+    ) &&
+      pinMigration.includes(
+        "foreign key (artifact_id, version_id, art_id, owner_id)",
+      ) &&
       pinMigration.includes("pinned Two-layer artifacts are immutable"),
     "bundle pins must bind the exact artifact/version/owner tuple and stay immutable",
   );

@@ -11,6 +11,10 @@ import {
   copyVerifiedCompanionArtifactToPrivate,
   type LegacyCompanionArtifact,
 } from "../_shared/companionArtifactBackfill.ts";
+import {
+  type CompanionLensFacing,
+  isCompanionLensFacing,
+} from "../_shared/companionLensFacing.ts";
 
 const API_VERSION = 1;
 const BUCKET = "mapkluss-lens";
@@ -89,7 +93,7 @@ interface LensPlacementRow {
   anchor_x: number;
   anchor_y: number;
   anchor_z: number;
-  facing: "north" | "south" | "east" | "west";
+  facing: CompanionLensFacing;
   last_seen_at: string;
   created_at: string;
   updated_at: string;
@@ -1683,8 +1687,8 @@ async function handlePlacementUpsert(
   const x = integer(anchorPayload, "x", -30000000, 30000000);
   const y = integer(anchorPayload, "y", -2048, 2048);
   const z = integer(anchorPayload, "z", -30000000, 30000000);
-  const facing = String(payload.facing ?? "") as LensPlacementRow["facing"];
-  if (!["north", "south", "east", "west"].includes(facing)) {
+  const facing = String(payload.facing ?? "");
+  if (!isCompanionLensFacing(facing)) {
     fail("invalid_request", 400, "Invalid facing.");
   }
   const requestedId = optionalString(payload, "placementId", 36);

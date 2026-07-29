@@ -109,7 +109,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.26.0-companion-themes-versions-2026-07-22',
+  id: 'mapkluss-v1.26.1-companion-0-11-0-2026-07-30',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2928,17 +2928,17 @@ export default function App() {
             <div className="update-banner-track">
               {[0, 1].map(copy => (
                 <span className="update-banner-segment" key={copy}>
-                  <strong>{t('НОВЫЙ MAPKLUSS COMPANION — СТРОЙ АРТЫ БЫСТРЕЕ', 'NEW MAPKLUSS COMPANION — BUILD MAP ART FASTER')}</strong>
+                  <strong>{t('MAPKLUSS COMPANION 0.11.0 — НОВЫЙ ИНТЕРФЕЙС', 'MAPKLUSS COMPANION 0.11.0 — NEW INTERFACE')}</strong>
                   <i />
-                  <span>{t('НОВЫЕ ВЕРСИИ MINECRAFT · 10 ТЕМ РЕДАКТОРА', 'NEW MINECRAFT VERSIONS · 10 EDITOR THEMES')}</span>
+                  <span>{t('УЛУЧШЕНЫ AUTOFRAME · LENS · TWO-LAYER', 'IMPROVED AUTOFRAME · LENS · TWO-LAYER')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('MapKluss Companion помогает строить арты быстрее и поддерживает Minecraft 26.2, 1.21.11, 1.21.8 и 1.21.4. В редакторе доступны десять тем.',
-              'MapKluss Companion helps you build map art faster and supports Minecraft 26.2, 1.21.11, 1.21.8, and 1.21.4. The editor includes ten themes.')}
+            {t('Вышел MapKluss Companion 0.11.0 с полностью обновлённым интерфейсом и улучшениями AutoFrame, Lens и Two-layer.',
+              'MapKluss Companion 0.11.0 is out with a completely refreshed interface and improvements to AutoFrame, Lens, and Two-layer.')}
           </span>
           <a
             className="update-banner-link"
