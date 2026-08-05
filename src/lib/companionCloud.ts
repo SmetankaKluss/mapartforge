@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase';
+import { mapWithConcurrency } from './boundedConcurrency';
 import { companionArtifactFilename, sha256Hex } from './companionArtifacts';
 import { buildLitematicBytes, buildLitematicTilesZipBlob } from './exportLitematic';
 import type { SupportMode } from './exportLitematic';
@@ -158,6 +159,8 @@ async function uploadPreparedArtifact(artifact: PreparedArtifact): Promise<void>
   if (error) throw error;
 }
 
+const COMPANION_UPLOAD_CONCURRENCY = 3;
+
 async function removeStorageObjects(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   const supabase = getSupabaseClient();
@@ -183,6 +186,16 @@ export async function getCurrentCompanionAuthUser(): Promise<{ userId: string; e
   return {
     userId: data.user.id,
     email: data.user.email ?? null,
+  };
+}
+
+export async function getCurrentCompanionSessionUser(): Promise<{ userId: string; email: string | null } | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session?.user) return null;
+  return {
+    userId: data.session.user.id,
+    email: data.session.user.email ?? null,
   };
 }
 
@@ -700,6 +713,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     structure === 'staircase' ? input.supportBlock : 'air',
     input.supportMode,
     input.staircaseMode,
+    input.grid.wide === 1 && input.grid.tall === 1 ? litematicBytes : undefined,
   );
   const materials = countMaterials(input.imageData, input.palette, input.blockSelection);
   const materialsTxt = formatMaterialsAsText(materials, input.grid);
@@ -800,10 +814,14 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     });
     if (prepareError) throw prepareError;
 
-    for (const artifact of preparedArtifacts) {
-      await uploadPreparedArtifact(artifact);
-      uploadedStoragePaths.push(artifact.manifest.storagePath);
-    }
+    await mapWithConcurrency(
+      preparedArtifacts,
+      COMPANION_UPLOAD_CONCURRENCY,
+      async artifact => {
+        await uploadPreparedArtifact(artifact);
+        uploadedStoragePaths.push(artifact.manifest.storagePath);
+      },
+    );
 
     const finalResult = await finalizePreparedCompanionSave(versionId);
     const updatedAt = finalResult?.updatedAt ?? new Date().toISOString();

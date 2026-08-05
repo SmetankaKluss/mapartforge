@@ -104,7 +104,7 @@ export async function buildMapDatZipBlob(
       const colors  = buildTileColors(imageData, col, row, lookup);
       const nbt     = buildMapNbt(colors, minecraftVersion);
       const gzipped = await gzipBytes(nbt);
-      mapsFolder.file(`map_${startMapId + idx}.dat`, gzipped);
+      mapsFolder.file(`map_${startMapId + idx}.dat`, gzipped, { compression: 'STORE' });
       idx++;
     }
   }

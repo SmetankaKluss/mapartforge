@@ -2,21 +2,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authMocks = vi.hoisted(() => ({
   signInWithOtp: vi.fn(),
+  getSession: vi.fn(),
 }));
 
 vi.mock('../supabase', () => ({
   getSupabaseClient: () => ({
     auth: {
       signInWithOtp: authMocks.signInWithOtp,
+      getSession: authMocks.getSession,
     },
   }),
 }));
 
-import { signInWithCompanionEmail } from '../companionCloud';
+import { getCurrentCompanionSessionUser, signInWithCompanionEmail } from '../companionCloud';
 
 describe('signInWithCompanionEmail', () => {
   beforeEach(() => {
     authMocks.signInWithOtp.mockReset();
+    authMocks.getSession.mockReset();
+  });
+
+  it('checks the local session before opening an authenticated editor action', async () => {
+    authMocks.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'user-1', email: 'builder@example.com' } } },
+      error: null,
+    });
+
+    await expect(getCurrentCompanionSessionUser()).resolves.toEqual({
+      userId: 'user-1',
+      email: 'builder@example.com',
+    });
   });
 
   it('uses the native Supabase OTP flow with the production redirect', async () => {

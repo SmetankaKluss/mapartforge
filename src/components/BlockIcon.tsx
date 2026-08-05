@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { blockTextureUrl, isInSpritesheet, getCachedWikiTexture, fetchWikiTexture } from '../lib/blockTexture';
 import { SPRITE_URL } from './BlockCanvas';
 
@@ -26,6 +26,8 @@ interface WikiResult {
 export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: Props) {
   const inSprite = isInSpritesheet(csId, blockId);
   const cachedTexture = inSprite ? undefined : getCachedWikiTexture(nbtName);
+  const hostRef = useRef<HTMLSpanElement>(null);
+  const [nearViewport, setNearViewport] = useState(() => typeof IntersectionObserver === 'undefined');
 
   const [wikiResult, setWikiResult] = useState<WikiResult>(() => {
     if (cachedTexture === undefined) return { nbtName, state: 'loading' };
@@ -39,8 +41,23 @@ export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: P
       : 'loading';
 
   useEffect(() => {
+    if (inSprite || cachedTexture !== undefined || nearViewport) return;
+    const host = hostRef.current;
+    if (!host || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      setNearViewport(true);
+      observer.disconnect();
+    }, { rootMargin: '240px' });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [cachedTexture, inSprite, nearViewport]);
+
+  useEffect(() => {
     if (inSprite) return;
     if (cachedTexture !== undefined) return;
+    if (!nearViewport) return;
 
     let cancelled = false;
     fetchWikiTexture(nbtName).then(
@@ -48,7 +65,7 @@ export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: P
       () => { if (!cancelled) setWikiResult({ nbtName, state: 'error' }); },
     );
     return () => { cancelled = true; };
-  }, [nbtName, inSprite, cachedTexture]);
+  }, [nbtName, inSprite, cachedTexture, nearViewport]);
 
   if (inSprite) {
     return (
@@ -65,6 +82,7 @@ export function BlockIcon({ nbtName, blockId, csId, r, g, b, className = '' }: P
   if (wikiState === 'loading') {
     return (
       <span
+        ref={hostRef}
         className={`${className} block-icon-loading`}
         style={{ backgroundColor: `rgb(${r},${g},${b})` }}
       />

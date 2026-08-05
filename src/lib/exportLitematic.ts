@@ -1037,6 +1037,7 @@ export async function buildLitematicTilesZipBlob(
   supportBlockNbt?: string,
   supportMode:      SupportMode = 1,
   staircaseMode:    'classic' | 'optimized' = 'classic',
+  prebuiltSingleTile?: Uint8Array,
 ): Promise<Blob> {
   const zip = new JSZip();
   let idx = 1;
@@ -1044,10 +1045,20 @@ export async function buildLitematicTilesZipBlob(
 
   for (let row = 0; row < mapGrid.tall; row++) {
     for (let col = 0; col < mapGrid.wide; col++) {
-      const tile = extractTile(imageData, col, row);
       const name = `${baseName}_${col + 1}x${row + 1}`;
-      const bytes = await buildLitematicBytes(tile, cp, groups, name, structure, supportBlockNbt, staircaseMode, supportMode);
-      zip.file(`mapart_${idx}_${col + 1}x${row + 1}.litematic`, bytes);
+      const bytes = mapGrid.wide === 1 && mapGrid.tall === 1 && prebuiltSingleTile
+        ? prebuiltSingleTile
+        : await buildLitematicBytes(
+          extractTile(imageData, col, row),
+          cp,
+          groups,
+          name,
+          structure,
+          supportBlockNbt,
+          staircaseMode,
+          supportMode,
+        );
+      zip.file(`mapart_${idx}_${col + 1}x${row + 1}.litematic`, bytes, { compression: 'STORE' });
       idx++;
     }
   }

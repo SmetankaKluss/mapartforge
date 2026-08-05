@@ -86,36 +86,36 @@ function usageRatio(used: number, limit: number): number {
 type ImportFilter = 'all' | 'needs_save' | 'saved' | 'missing_maps';
 type LibraryTab = 'arts' | 'favorites' | 'recent';
 
-const COMPANION_MOD_DOWNLOAD_REV = '20260730-companion-0-11-0';
+const COMPANION_MOD_DOWNLOAD_REV = '20260805-companion-0-11-1';
 
 const COMPANION_MOD_VERSION_OPTIONS = [
   {
     minecraftVersion: '26.2',
     label: 'Minecraft 26.2',
     badge: 'Java 25',
-    href: `/downloads/mod/mapkluss-companion-26.2-0.11.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-26.2-0.11.0.jar',
+    href: `/downloads/mod/mapkluss-companion-26.2-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-26.2-0.11.1.jar',
   },
   {
     minecraftVersion: '1.21.11',
     label: 'Minecraft 1.21.11',
     badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.11-0.11.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.11-0.11.0.jar',
+    href: `/downloads/mod/mapkluss-companion-1.21.11-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.11-0.11.1.jar',
   },
   {
     minecraftVersion: '1.21.8',
     label: 'Minecraft 1.21.8',
     badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.8-0.11.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.8-0.11.0.jar',
+    href: `/downloads/mod/mapkluss-companion-1.21.8-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.8-0.11.1.jar',
   },
   {
     minecraftVersion: '1.21.4',
     label: 'Minecraft 1.21.4',
     badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.4-0.11.0.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.4-0.11.0.jar',
+    href: `/downloads/mod/mapkluss-companion-1.21.4-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
+    filename: 'mapkluss-companion-1.21.4-0.11.1.jar',
   },
 ] as const;
 

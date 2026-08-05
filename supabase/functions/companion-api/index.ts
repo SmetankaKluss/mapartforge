@@ -6,6 +6,14 @@ import {
   verifyCompanionArtifactResponse,
   type VerifiedCompanionArtifact,
 } from '../_shared/companionSaveVerification.ts';
+import { mapWithConcurrency } from '../_shared/boundedConcurrency.ts';
+import {
+  chunkValues,
+  libraryPreviewKey,
+} from '../_shared/companionPreviewBatch.ts';
+import { signStorageRows } from '../_shared/companionStorageSigning.ts';
+import { classifyCompanionBearer } from '../_shared/companionAuthRouting.ts';
+import { deriveCloudArtSnapshot } from '../_shared/companionCloudSnapshot.ts';
 import {
   drainCompanionStorageDeleteOutbox,
   queueCompanionStorageDelete,
@@ -62,6 +70,14 @@ const corsHeaders = {
 
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://mapkluss.art';
 const TELEGRAM_AUTH_MAX_AGE_SECONDS = Number(Deno.env.get('TELEGRAM_AUTH_MAX_AGE_SECONDS') ?? '900');
+
+function runCompanionBackgroundTask(task: Promise<unknown>): void {
+  const tracked = task.catch(() => undefined);
+  const runtime = (globalThis as typeof globalThis & {
+    EdgeRuntime?: { waitUntil(promise: Promise<unknown>): void };
+  }).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(tracked);
+}
 
 type LibraryRow = {
   id: string;
@@ -250,18 +266,77 @@ async function createPreviewSignedUrl(
   return data?.signedUrl ?? null;
 }
 
-async function mapLibraryRow(admin: AdminClient, row: LibraryRow, isFavorite = false) {
-  return {
+async function mapLibraryRows(
+  admin: AdminClient,
+  entries: Array<{ row: LibraryRow; isFavorite?: boolean }>,
+) {
+  const eligible = entries.filter(({ row }) => (
+    Boolean(row.preview_path)
+    && Boolean(row.current_version_id)
+    && !/^(https?:|data:|blob:)/i.test(row.preview_path ?? '')
+  ));
+  const signedUrls = new Map<string, string>();
+
+  if (eligible.length > 0) {
+    const versionIds = Array.from(new Set(eligible.map(({ row }) => String(row.current_version_id))));
+    const expectedKeys = new Set(eligible.map(({ row }) => libraryPreviewKey(
+      row.id,
+      String(row.current_version_id),
+      String(row.preview_path),
+    )));
+    const artifactChunks = await Promise.all(
+      chunkValues(versionIds, 40)
+        .map(async versionChunk => {
+          const { data, error } = await admin
+            .from('art_artifacts')
+            .select('art_id,version_id,bucket_id,storage_path')
+            .eq('kind', 'preview_png')
+            .in('version_id', versionChunk);
+          if (error) throw error;
+          return data ?? [];
+        }),
+    );
+    const artifacts = artifactChunks.flat();
+
+    const signingRows: Array<{ key: string; bucket: string; path: string }> = [];
+    for (const artifact of artifacts) {
+      const key = libraryPreviewKey(
+        String(artifact.art_id),
+        String(artifact.version_id),
+        String(artifact.storage_path),
+      );
+      if (!expectedKeys.has(key)) continue;
+      signingRows.push({
+        key,
+        bucket: String(artifact.bucket_id ?? 'mapartforge'),
+        path: String(artifact.storage_path),
+      });
+    }
+
+    const batch = await signStorageRows(signingRows, 60 * 30, async (bucket, paths, expiresIn) => {
+      const { data, error } = await admin.storage.from(bucket).createSignedUrls(paths, expiresIn);
+      if (error) throw error;
+      return data ?? [];
+    }, {
+      bestEffort: true,
+      onBatchError: () => console.warn('Companion library preview signing batch failed.'),
+    });
+    for (const [key, signedUrl] of batch) signedUrls.set(key, signedUrl);
+  }
+
+  return entries.map(({ row, isFavorite = false }) => ({
     artId: row.id,
     currentVersionId: row.current_version_id,
     title: row.title,
     privacy: row.privacy,
     grid: row.map_grid,
     mode: row.map_mode,
-    previewUrl: await createPreviewSignedUrl(admin, row.id, row.current_version_id, row.preview_path),
+    previewUrl: row.current_version_id && row.preview_path
+      ? signedUrls.get(libraryPreviewKey(row.id, row.current_version_id, row.preview_path)) ?? null
+      : null,
     updatedAt: row.updated_at,
     isFavorite,
-  };
+  }));
 }
 
 function mapCollectionRow(
@@ -319,13 +394,14 @@ async function hmacSha256Hex(key: Uint8Array<ArrayBuffer>, value: string): Promi
 }
 
 async function getBearerUserId(admin: AdminClient, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-  const { data, error } = await admin.auth.getUser(token);
-  if (!error && data.user) return data.user.id;
+  const bearer = classifyCompanionBearer(req.headers.get('Authorization'));
+  if (!bearer) return null;
+  if (bearer.kind === 'website_jwt') {
+    const { data, error } = await admin.auth.getUser(bearer.token);
+    return !error && data.user ? data.user.id : null;
+  }
 
-  const tokenHash = await sha256Hex(token);
+  const tokenHash = await sha256Hex(bearer.token);
   const { data: deviceToken } = await admin
     .from('device_codes')
     .select('user_id,expires_at,status')
@@ -337,10 +413,9 @@ async function getBearerUserId(admin: AdminClient, req: Request): Promise<string
 }
 
 async function getWebsiteBearerUserId(admin: AdminClient, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-  const { data, error } = await admin.auth.getUser(token);
+  const bearer = classifyCompanionBearer(req.headers.get('Authorization'));
+  if (!bearer || bearer.kind !== 'website_jwt') return null;
+  const { data, error } = await admin.auth.getUser(bearer.token);
   return !error && data.user ? data.user.id : null;
 }
 
@@ -350,6 +425,8 @@ type CompanionSaveVerificationClaim = {
   totalSizeBytes?: unknown;
   result?: unknown;
 };
+
+const COMPANION_ARTIFACT_VERIFICATION_CONCURRENCY = 3;
 
 async function handleCompanionSaveFinalize(
   admin: AdminClient,
@@ -389,25 +466,28 @@ async function handleCompanionSaveFinalize(
       throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
     }
 
-    const verifiedArtifacts: VerifiedCompanionArtifact[] = [];
-    for (const artifact of artifacts) {
-      let response: Response;
-      try {
-        response = await fetch(companionStorageObjectUrl(supabaseUrl, artifact), {
-          method: 'GET',
-          redirect: 'error',
-          cache: 'no-store',
-          headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            apikey: serviceKey,
-            'Accept-Encoding': 'identity',
-          },
-        });
-      } catch {
-        throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
-      }
-      verifiedArtifacts.push(await verifyCompanionArtifactResponse(artifact, response));
-    }
+    const verifiedArtifacts: VerifiedCompanionArtifact[] = await mapWithConcurrency(
+      artifacts,
+      COMPANION_ARTIFACT_VERIFICATION_CONCURRENCY,
+      async artifact => {
+        let response: Response;
+        try {
+          response = await fetch(companionStorageObjectUrl(supabaseUrl, artifact), {
+            method: 'GET',
+            redirect: 'error',
+            cache: 'no-store',
+            headers: {
+              Authorization: `Bearer ${serviceKey}`,
+              apikey: serviceKey,
+              'Accept-Encoding': 'identity',
+            },
+          });
+        } catch {
+          throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
+        }
+        return verifyCompanionArtifactResponse(artifact, response);
+      },
+    );
 
     const { data: finalized, error: finalizeError } = await admin.rpc('publish_verified_companion_art_save', {
       requested_owner_id: userId,
@@ -464,48 +544,29 @@ async function listStorageObjectPaths(
 }
 
 async function refreshProfileUsage(admin: AdminClient, userId: string): Promise<void> {
-  const { count, error: countError } = await admin
-    .from('arts')
-    .select('id', { count: 'exact', head: true })
-    .eq('owner_id', userId);
-  if (countError) throw countError;
-
-  const { data: artifacts, error: artifactsError } = await admin
-    .from('art_artifacts')
-    .select('size_bytes')
-    .eq('owner_id', userId);
-  if (artifactsError) throw artifactsError;
-
-  const { data: imports, error: importsError } = await admin
-    .from('companion_imports')
-    .select('size_bytes')
-    .eq('owner_id', userId);
-  if (importsError) throw importsError;
-
-  const storageUsedBytes = [...(artifacts ?? []), ...(imports ?? [])].reduce((sum, item) => {
-    const size = Number(item.size_bytes ?? 0);
-    return Number.isFinite(size) && size > 0 ? sum + size : sum;
-  }, 0);
-
-  const { error: updateError } = await admin
-    .from('profiles')
-    .update({
-      art_count: count ?? 0,
-      storage_used_bytes: storageUsedBytes,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
-  if (updateError) throw updateError;
+  const { error } = await admin.rpc('refresh_companion_profile_usage', {
+    requested_owner_id: userId,
+  });
+  if (error) throw error;
 }
 
 async function getProfileSummary(admin: AdminClient, userId: string) {
-  await admin.from('profiles').upsert({ id: userId });
-  const { data, error } = await admin
+  const profileResult = await admin
     .from('profiles')
     .select('id,display_name,avatar_url,telegram_id,telegram_username,art_count,storage_used_bytes')
     .eq('id', userId)
-    .single();
-  if (error) throw error;
+    .maybeSingle();
+  if (profileResult.error) throw profileResult.error;
+  let data = profileResult.data;
+  if (!data) {
+    const created = await admin
+      .from('profiles')
+      .upsert({ id: userId })
+      .select('id,display_name,avatar_url,telegram_id,telegram_username,art_count,storage_used_bytes')
+      .single();
+    if (created.error) throw created.error;
+    data = created.data;
+  }
   return {
     profile: {
       userId: data.id,
@@ -554,7 +615,7 @@ async function listOwnedArts(admin: AdminClient, userId: string) {
     .eq('owner_id', userId)
     .order('updated_at', { ascending: false });
   if (error) throw error;
-  return Promise.all((data ?? []).map(row => mapLibraryRow(admin, row as LibraryRow)));
+  return mapLibraryRows(admin, (data ?? []).map(row => ({ row: row as LibraryRow })));
 }
 
 async function listFavoriteArts(admin: AdminClient, userId: string) {
@@ -564,43 +625,70 @@ async function listFavoriteArts(admin: AdminClient, userId: string) {
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  const rows = await Promise.all((data ?? [])
-    .map(row => row.arts ? mapLibraryRow(admin, row.arts as unknown as LibraryRow, true) : null));
-  return rows.filter(Boolean);
+  return mapLibraryRows(admin, (data ?? [])
+    .filter(row => Boolean(row.arts))
+    .map(row => ({ row: row.arts as unknown as LibraryRow, isFavorite: true })));
 }
 
 async function listRecentArts(admin: AdminClient, userId: string) {
-  const { data: ownedArts, error: ownedError } = await admin
-    .from('arts')
-    .select('id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at')
-    .eq('owner_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(30);
+  const [{ data: ownedArts, error: ownedError }, { data: favoriteRows, error: favoriteError }] = await Promise.all([
+    admin
+      .from('arts')
+      .select('id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at')
+      .eq('owner_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(30),
+    admin
+      .from('favorites')
+      .select('art_id,created_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30),
+  ]);
   if (ownedError) throw ownedError;
-
-  const { data: favoriteRows, error: favoriteError } = await admin
-    .from('favorites')
-    .select('art_id,created_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(30);
   if (favoriteError) throw favoriteError;
 
-  const byId = new Map<string, Awaited<ReturnType<typeof mapLibraryRow>>>();
-  for (const row of ownedArts ?? []) {
-    const item = await mapLibraryRow(admin, row as LibraryRow);
-    byId.set(item.artId, item);
-  }
-  for (const row of favoriteRows ?? []) {
-    if (!row.arts) continue;
-    const item = await mapLibraryRow(admin, row.arts as unknown as LibraryRow, true);
+  const mapped = await mapLibraryRows(admin, [
+    ...(ownedArts ?? []).map(row => ({ row: row as LibraryRow })),
+    ...(favoriteRows ?? [])
+      .filter(row => Boolean(row.arts))
+      .map(row => ({ row: row.arts as unknown as LibraryRow, isFavorite: true })),
+  ]);
+  const byId = new Map<string, (typeof mapped)[number]>();
+  for (const item of mapped) {
     const existing = byId.get(item.artId);
-    byId.set(item.artId, existing ? { ...existing, isFavorite: true } : item);
+    byId.set(item.artId, existing ? { ...existing, isFavorite: existing.isFavorite || item.isFavorite } : item);
   }
 
   return Array.from(byId.values())
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 30);
+}
+
+async function getCloudArtSnapshot(admin: AdminClient, userId: string) {
+  const [{ data: ownedRows, error: ownedError }, { data: favoriteRows, error: favoriteError }] = await Promise.all([
+    admin
+      .from('arts')
+      .select('id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at')
+      .eq('owner_id', userId)
+      .order('updated_at', { ascending: false }),
+    admin
+      .from('favorites')
+      .select('art_id,created_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+  ]);
+  if (ownedError) throw ownedError;
+  if (favoriteError) throw favoriteError;
+
+  const ownedEntries = (ownedRows ?? []).map(row => ({ row: row as LibraryRow }));
+  const favoriteEntries = (favoriteRows ?? [])
+    .filter(row => Boolean(row.arts))
+    .map(row => ({ row: row.arts as unknown as LibraryRow, isFavorite: true }));
+  const mapped = await mapLibraryRows(admin, [...ownedEntries, ...favoriteEntries]);
+  const arts = mapped.slice(0, ownedEntries.length);
+  const favorites = mapped.slice(ownedEntries.length);
+  return deriveCloudArtSnapshot(arts, favorites);
 }
 
 async function listCollections(admin: AdminClient, userId: string) {
@@ -636,26 +724,37 @@ async function listRecentImports(admin: AdminClient, userId: string) {
     .limit(12);
   if (error) throw error;
 
-  const items = [];
-  for (const row of data ?? []) {
-    const { data: signed } = await admin.storage
-      .from(String(row.bucket_id ?? 'mapartforge'))
-      .createSignedUrl(String(row.image_path), 60 * 30);
-    items.push({
+  const rows = data ?? [];
+  const signedUrls = await signStorageRows(
+    rows.map(row => ({
+      key: String(row.id),
+      bucket: String(row.bucket_id ?? 'mapartforge'),
+      path: String(row.image_path),
+    })),
+    60 * 30,
+    async (bucket, paths, expiresIn) => {
+      const { data: signed, error: signedError } = await admin.storage.from(bucket).createSignedUrls(paths, expiresIn);
+      if (signedError) throw signedError;
+      return signed ?? [];
+    },
+    {
+      bestEffort: true,
+      onBatchError: () => console.warn('Companion import preview signing batch failed.'),
+    },
+  );
+  return rows.map(row => ({
       importId: row.id,
       source: row.source,
       title: row.title,
       mapGrid: row.map_grid,
       imagePath: row.image_path,
-      signedUrl: signed?.signedUrl,
+      signedUrl: signedUrls.get(String(row.id)) ?? null,
       sizeBytes: row.size_bytes,
       sha256: row.sha256,
       createdArtId: row.created_art_id,
       metadata: row.metadata,
       createdAt: row.created_at,
-    });
-  }
-  return items;
+    }));
 }
 
 async function getCollectionOverview(admin: AdminClient, userId: string, collectionId: string) {
@@ -676,9 +775,9 @@ async function getCollectionOverview(admin: AdminClient, userId: string, collect
 
   return {
     collection: mapCollectionRow(collection, (data ?? []).length),
-    items: (await Promise.all((data ?? [])
-      .map(row => row.arts ? mapLibraryRow(admin, row.arts as unknown as LibraryRow) : null)))
-      .filter(Boolean),
+    items: await mapLibraryRows(admin, (data ?? [])
+      .filter(row => Boolean(row.arts))
+      .map(row => ({ row: row.arts as unknown as LibraryRow }))),
   };
 }
 
@@ -786,20 +885,33 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
       ]);
   }
 
+  const manifestSigningRows = manifestArtifacts.map((row, index) => ({
+    key: String(row.id ?? `${row.kind}:${index}`),
+    bucket: String(row.bucket_id ?? 'mapartforge'),
+    path: String(row.storage_path),
+  }));
+  const manifestSignedUrls = await signStorageRows(
+    manifestSigningRows,
+    60 * 10,
+    async (bucket, paths, expiresIn) => {
+      const { data, error } = await admin.storage.from(bucket).createSignedUrls(paths, expiresIn);
+      if (error) throw error;
+      return data ?? [];
+    },
+  );
   const artifactRows = [];
   let signedPreviewUrl: string | null = null;
-  for (const row of manifestArtifacts) {
-    const { data: signed, error: signedError } = await admin.storage
-      .from(String(row.bucket_id ?? 'mapartforge'))
-      .createSignedUrl(row.storage_path, 60 * 10);
-    if (signedError || !signed?.signedUrl) throw signedError ?? new Error('artifact signing failed');
-    if (row.kind === 'preview_png') signedPreviewUrl = signed?.signedUrl ?? null;
+  for (let index = 0; index < manifestArtifacts.length; index += 1) {
+    const row = manifestArtifacts[index];
+    const signedUrl = manifestSignedUrls.get(String(row.id ?? `${row.kind}:${index}`));
+    if (!signedUrl) throw new Error('artifact signing failed');
+    if (row.kind === 'preview_png') signedPreviewUrl = signedUrl;
     artifactRows.push({
       id: row.id,
       kind: row.kind,
       filename: row.filename,
       storagePath: row.storage_path,
-      signedUrl: signed.signedUrl,
+      signedUrl,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
       sha256: row.sha256,
@@ -810,19 +922,20 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
   let isFavorite = false;
   let collectionIds: string[] = [];
   if (userId) {
-    const { data: favoriteRow } = await admin
-      .from('favorites')
-      .select('art_id')
-      .eq('user_id', userId)
-      .eq('art_id', art.id)
-      .maybeSingle();
+    const [{ data: favoriteRow }, { data: collectionRows }] = await Promise.all([
+      admin
+        .from('favorites')
+        .select('art_id')
+        .eq('user_id', userId)
+        .eq('art_id', art.id)
+        .maybeSingle(),
+      admin
+        .from('collection_items')
+        .select('collection_id,collections!inner(owner_id)')
+        .eq('art_id', art.id)
+        .eq('collections.owner_id', userId),
+    ]);
     isFavorite = Boolean(favoriteRow);
-
-    const { data: collectionRows } = await admin
-      .from('collection_items')
-      .select('collection_id,collections!inner(owner_id)')
-      .eq('art_id', art.id)
-      .eq('collections.owner_id', userId);
     collectionIds = (collectionRows ?? []).map(row => String(row.collection_id));
   }
 
@@ -860,7 +973,7 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
   if (versionIds.length > 0) {
     const { data: artifacts, error: artifactsError } = await admin
       .from('art_artifacts')
-      .select('*')
+      .select('version_id,kind,bucket_id,storage_path')
       .in('version_id', versionIds);
     if (artifactsError) throw artifactsError;
     for (const artifact of artifacts ?? []) {
@@ -875,20 +988,43 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
     }
   }
 
+  const versionSigningRows: Array<{ key: string; bucket: string; path: string }> = [];
+  for (const versionId of versionIds) {
+    const previewArtifact = previewArtifacts.get(versionId);
+    if (previewArtifact?.storage_path) {
+      versionSigningRows.push({
+        key: `${versionId}:preview`,
+        bucket: String(previewArtifact.bucket_id ?? 'mapartforge'),
+        path: String(previewArtifact.storage_path),
+      });
+    }
+    const projectArtifact = projectArtifacts.get(versionId);
+    if (projectArtifact?.storage_path) {
+      versionSigningRows.push({
+        key: `${versionId}:project`,
+        bucket: String(projectArtifact.bucket_id ?? 'mapartforge'),
+        path: String(projectArtifact.storage_path),
+      });
+    }
+  }
+  const versionSignedUrls = await signStorageRows(
+    versionSigningRows,
+    60 * 10,
+    async (bucket, paths, expiresIn) => {
+      const { data, error } = await admin.storage.from(bucket).createSignedUrls(paths, expiresIn);
+      if (error) throw error;
+      return data ?? [];
+    },
+    {
+      bestEffort: true,
+      onBatchError: () => console.warn('Companion version preview signing batch failed.'),
+    },
+  );
+
   const items = [];
   for (const version of versions ?? []) {
     const versionId = String(version.id);
     const settings = (version.settings ?? {}) as Record<string, unknown>;
-    const previewArtifact = previewArtifacts.get(versionId);
-    const projectArtifact = projectArtifacts.get(versionId);
-    const previewSigned = previewArtifact
-      ? await admin.storage.from(String(previewArtifact.bucket_id ?? 'mapartforge'))
-          .createSignedUrl(String(previewArtifact.storage_path), 60 * 10)
-      : { data: null };
-    const projectSigned = projectArtifact
-      ? await admin.storage.from(String(projectArtifact.bucket_id ?? 'mapartforge'))
-          .createSignedUrl(String(projectArtifact.storage_path), 60 * 10)
-      : { data: null };
     items.push({
       id: versionId,
       versionNumber: Number(version.version_number ?? 0) || 0,
@@ -898,8 +1034,8 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
       minecraftVersion: typeof settings.minecraftVersion === 'string' ? settings.minecraftVersion : null,
       artifactCount: artifactCounts.get(versionId) ?? 0,
       isCurrent: currentVersionId === versionId,
-      previewUrl: previewSigned.data?.signedUrl ?? null,
-      projectUrl: projectSigned.data?.signedUrl ?? null,
+      previewUrl: versionSignedUrls.get(`${versionId}:preview`) ?? null,
+      projectUrl: versionSignedUrls.get(`${versionId}:project`) ?? null,
     });
   }
   return items;
@@ -1313,15 +1449,14 @@ Deno.serve(async req => {
     if (action === 'cloud_overview') {
       const userId = await getBearerUserId(admin, req);
       if (!userId) return json({ error: 'unauthorized' }, 401);
-      await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => undefined);
-      const [{ profile, usage }, arts, favorites, recent, collections, imports] = await Promise.all([
+      const [{ profile, usage }, artSnapshot, collections, imports] = await Promise.all([
         getProfileSummary(admin, userId),
-        listOwnedArts(admin, userId),
-        listFavoriteArts(admin, userId),
-        listRecentArts(admin, userId),
+        getCloudArtSnapshot(admin, userId),
         listCollections(admin, userId),
         listRecentImports(admin, userId),
       ]);
+      const { arts, favorites, recent } = artSnapshot;
+      runCompanionBackgroundTask(drainCompanionStorageDeleteOutbox(admin, userId));
       return json({ profile, usage, arts, favorites, recent, collections, imports });
     }
 
@@ -1763,7 +1898,7 @@ Deno.serve(async req => {
 
       const { data: art, error: artError } = await admin
         .from('arts')
-        .select('id,owner_id,current_version_id,map_grid')
+        .select('id,owner_id,current_version_id,map_grid,title')
         .eq('id', artId)
         .single();
       if (artError || !art || art.owner_id !== userId) return json({ error: 'not_found' }, 404);
@@ -1777,7 +1912,8 @@ Deno.serve(async req => {
       if (updateError) throw updateError;
 
       const grid = art.map_grid as { wide?: number; tall?: number };
-      if (art.current_version_id && typeof grid?.wide === 'number' && typeof grid?.tall === 'number') {
+      const titleChanged = String(art.title ?? '') !== title;
+      if (titleChanged && art.current_version_id && typeof grid?.wide === 'number' && typeof grid?.tall === 'number') {
         const renamed = await renameCurrentVersionArtifacts(admin, {
           ownerId: userId,
           versionId: String(art.current_version_id),

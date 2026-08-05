@@ -90,8 +90,10 @@ async function initializeBackend() {
 
 async function renderApplication() {
   if (buildMatch) {
-    await initializeBackend();
-    const { BuildTracker } = await import('./components/BuildTracker.tsx');
+    const [, { BuildTracker }] = await Promise.all([
+      initializeBackend(),
+      import('./components/BuildTracker.tsx'),
+    ]);
     const sessionId = buildMatch[1];
     root.render(<BuildTracker sessionId={sessionId} />);
   } else if (examplesIndex) {
@@ -109,8 +111,10 @@ async function renderApplication() {
       </LocaleProvider>,
     );
   } else if (path === '/cloud') {
-    await initializeBackend();
-    const { CompanionCloudPage } = await import('./components/CompanionCloudPage.tsx');
+    const [, { CompanionCloudPage }] = await Promise.all([
+      initializeBackend(),
+      import('./components/CompanionCloudPage.tsx'),
+    ]);
     root.render(
       <LocaleProvider>
         <CompanionCloudPage />
@@ -124,24 +128,30 @@ async function renderApplication() {
       </LocaleProvider>,
     );
   } else if (path === '/device') {
-    await initializeBackend();
-    const { DeviceApprovalPage } = await import('./components/DeviceApprovalPage.tsx');
+    const [, { DeviceApprovalPage }] = await Promise.all([
+      initializeBackend(),
+      import('./components/DeviceApprovalPage.tsx'),
+    ]);
     root.render(
       <LocaleProvider>
         <DeviceApprovalPage />
       </LocaleProvider>,
     );
   } else if (companionArtMatch) {
-    await initializeBackend();
-    const { CompanionArtPage } = await import('./components/CompanionArtPage.tsx');
+    const [, { CompanionArtPage }] = await Promise.all([
+      initializeBackend(),
+      import('./components/CompanionArtPage.tsx'),
+    ]);
     root.render(
       <LocaleProvider>
         <CompanionArtPage artId={companionArtMatch[1]} />
       </LocaleProvider>,
     );
   } else if (companionCollectionMatch) {
-    await initializeBackend();
-    const { CompanionCollectionPage } = await import('./components/CompanionCollectionPage.tsx');
+    const [, { CompanionCollectionPage }] = await Promise.all([
+      initializeBackend(),
+      import('./components/CompanionCollectionPage.tsx'),
+    ]);
     root.render(
       <LocaleProvider>
         <CompanionCollectionPage collectionId={companionCollectionMatch[1]} />
@@ -155,8 +165,10 @@ async function renderApplication() {
       </LocaleProvider>,
     );
   } else {
-    await initializeBackend();
-    const { default: App } = await import('./App.tsx');
+    const [, { default: App }] = await Promise.all([
+      initializeBackend(),
+      import('./App.tsx'),
+    ]);
     root.render(
       <LocaleProvider>
         <App />

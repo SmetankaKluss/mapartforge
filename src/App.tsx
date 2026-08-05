@@ -91,7 +91,7 @@ import { ThemeSelector } from './components/ThemeSelector';
 import { buildFinalPreview } from './lib/finalPreview';
 import type { PreviewMode } from './lib/preview3d';
 import { applyPageMeta } from './lib/meta';
-import { attachCompanionImportToArt, downloadCompanionArtVersionProjectJson, downloadCompanionProjectJson, getCompanionScanImport, getCurrentCompanionAuthUser, saveCompanionArt, setCompanionFavorite } from './lib/companionCloud';
+import { attachCompanionImportToArt, downloadCompanionArtVersionProjectJson, downloadCompanionProjectJson, getCompanionScanImport, getCurrentCompanionAuthUser, getCurrentCompanionSessionUser, saveCompanionArt, setCompanionFavorite } from './lib/companionCloud';
 import type { ArtPrivacy } from './lib/companionTypes';
 import 'driver.js/dist/driver.css';
 import './App.css';
@@ -109,7 +109,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.26.1-companion-0-11-0-2026-07-30',
+  id: 'mapkluss-v1.26.2-companion-0-11-1-2026-08-02',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2366,7 +2366,7 @@ export default function App() {
 
     setCloudSaving(true);
     try {
-      const user = await getCurrentCompanionAuthUser();
+      const user = await getCurrentCompanionSessionUser();
       if (!user) {
         setCloudSaving(false);
         await handleCloudSignInFromEditor();
@@ -2393,11 +2393,13 @@ export default function App() {
 
     setCloudSaving(true);
     try {
+      await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
+      const projectJson = buildCurrentCloudProjectJson();
       const manifest = await saveCompanionArt({
         artId: currentCloudArtId ?? undefined,
         title,
         privacy,
-        projectJson: buildCurrentCloudProjectJson(),
+        projectJson,
         // Keep Cloud construction artifacts byte-for-byte aligned with the
         // same composite buffer used by local exports. The preview may use a
         // display-specific buffer, but must not change Two-layer tile hashes.
@@ -2419,21 +2421,19 @@ export default function App() {
         buildTechnique,
       });
 
-      await setCompanionFavorite(manifest.artId, true);
-      if (currentCloudImportId) {
-        try {
-          await attachCompanionImportToArt(currentCloudImportId, manifest.artId);
-        } catch (attachError) {
-          console.warn('Failed to attach import to saved cloud art', attachError);
-        }
-      }
+      void setCompanionFavorite(manifest.artId, true).catch(favoriteError => {
+        console.warn('Failed to add saved cloud art to favorites', favoriteError);
+      });
+      if (currentCloudImportId) void attachCompanionImportToArt(currentCloudImportId, manifest.artId).catch(attachError => {
+        console.warn('Failed to attach import to saved cloud art', attachError);
+      });
 
       setCurrentCloudArtId(manifest.artId);
       setCurrentCloudTitle(manifest.title);
       setCurrentCloudPrivacy(manifest.privacy);
       setShowCloudSaveModal(false);
       window.history.replaceState(null, '', detachEditorUrlFromCloudSource(window.location.href));
-      showAppNotice(t('Арт сохранён в облако и добавлен в избранное.', 'Art saved to Cloud and added to favorites.'));
+      showAppNotice(t('Арт сохранён в облако.', 'Art saved to Cloud.'));
     } catch (err) {
       console.error('Cloud save failed', err);
       showAppNotice(err instanceof Error ? err.message : t('Не удалось сохранить арт в облако.', 'Could not save art to Cloud.'), 'error');
@@ -2928,17 +2928,17 @@ export default function App() {
             <div className="update-banner-track">
               {[0, 1].map(copy => (
                 <span className="update-banner-segment" key={copy}>
-                  <strong>{t('MAPKLUSS COMPANION 0.11.0 — НОВЫЙ ИНТЕРФЕЙС', 'MAPKLUSS COMPANION 0.11.0 — NEW INTERFACE')}</strong>
+                  <strong>{t('MAPKLUSS COMPANION 0.11.1 — БЫСТРЕЕ И ЛЕГЧЕ', 'MAPKLUSS COMPANION 0.11.1 — FASTER AND LIGHTER')}</strong>
                   <i />
-                  <span>{t('УЛУЧШЕНЫ AUTOFRAME · LENS · TWO-LAYER', 'IMPROVED AUTOFRAME · LENS · TWO-LAYER')}</span>
+                  <span>{t('БЫСТРЕЕ CLOUD · ПРЕВЬЮ · ОБНОВЛЕНИЯ', 'FASTER CLOUD · PREVIEWS · UPDATES')}</span>
                   <IconGlyph icon={mkIcons.arrowRight} size={14} />
                 </span>
               ))}
             </div>
           </div>
           <span className="update-banner-sr">
-            {t('Вышел MapKluss Companion 0.11.0 с полностью обновлённым интерфейсом и улучшениями AutoFrame, Lens и Two-layer.',
-              'MapKluss Companion 0.11.0 is out with a completely refreshed interface and improvements to AutoFrame, Lens, and Two-layer.')}
+            {t('MapKluss Companion 0.11.1 ускоряет Cloud, превью, обновление схем и работу с картами в инвентаре.',
+              'MapKluss Companion 0.11.1 speeds up Cloud, previews, schema refreshes, and map inventory handling.')}
           </span>
           <a
             className="update-banner-link"
