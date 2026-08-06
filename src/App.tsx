@@ -97,6 +97,7 @@ import type { ArtPrivacy } from './lib/companionTypes';
 import 'driver.js/dist/driver.css';
 import './App.css';
 import { trackEvent } from './lib/analytics';
+import { SUPPORT_URL } from './lib/supportPrompt';
 import {
   MAX_CANVAS_ZOOM,
   MIN_CANVAS_ZOOM,
@@ -2906,6 +2907,18 @@ export default function App() {
                 />
               </div>
           </div>
+          <a
+            href={SUPPORT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="support-btn"
+            title={t('Поддержать разработку на Boosty', 'Support development on Boosty')}
+            aria-label={t('Поддержать разработку на Boosty', 'Support development on Boosty')}
+            onClick={() => trackEvent('support_header_clicked', { destination: 'boosty' })}
+          >
+            <IconGlyph icon={mkIcons.support} />
+            <span>{t('Поддержать', 'Support')}</span>
+          </a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
           <a className="header-icon-btn" href="/wiki" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <ThemeSelector lang={lang} />
