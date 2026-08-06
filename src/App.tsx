@@ -88,6 +88,7 @@ import { IconGlyph } from './components/IconGlyph';
 import { mkIcons } from './components/mkIcons';
 import { LensController } from './components/LensController';
 import { ThemeSelector } from './components/ThemeSelector';
+import { UpdateBannerTicker } from './components/UpdateBannerTicker';
 import { buildFinalPreview } from './lib/finalPreview';
 import type { PreviewMode } from './lib/preview3d';
 import { applyPageMeta } from './lib/meta';
@@ -109,7 +110,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.26.2-companion-0-11-1-2026-08-02',
+  id: 'mapkluss-v1.26.3-companion-0-11-1-2026-08-06',
   url: 'https://t.me/mapkluss',
 };
 
@@ -2924,18 +2925,10 @@ export default function App() {
             <span>COMPANION</span>
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
-          <div className="update-banner-ticker" aria-hidden="true">
-            <div className="update-banner-track">
-              {[0, 1].map(copy => (
-                <span className="update-banner-segment" key={copy}>
-                  <strong>{t('MAPKLUSS COMPANION 0.11.1 — БЫСТРЕЕ И ЛЕГЧЕ', 'MAPKLUSS COMPANION 0.11.1 — FASTER AND LIGHTER')}</strong>
-                  <i />
-                  <span>{t('БЫСТРЕЕ CLOUD · ПРЕВЬЮ · ОБНОВЛЕНИЯ', 'FASTER CLOUD · PREVIEWS · UPDATES')}</span>
-                  <IconGlyph icon={mkIcons.arrowRight} size={14} />
-                </span>
-              ))}
-            </div>
-          </div>
+          <UpdateBannerTicker
+            headline={t('MAPKLUSS COMPANION 0.11.1 — БЫСТРЕЕ И ЛЕГЧЕ', 'MAPKLUSS COMPANION 0.11.1 — FASTER AND LIGHTER')}
+            detail={t('БЫСТРЕЕ CLOUD · ПРЕВЬЮ · ОБНОВЛЕНИЯ', 'FASTER CLOUD · PREVIEWS · UPDATES')}
+          />
           <span className="update-banner-sr">
             {t('MapKluss Companion 0.11.1 ускоряет Cloud, превью, обновление схем и работу с картами в инвентаре.',
               'MapKluss Companion 0.11.1 speeds up Cloud, previews, schema refreshes, and map inventory handling.')}

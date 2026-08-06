@@ -227,6 +227,7 @@ input, select, textarea { outline: none; }
 
 .update-banner-ticker {
   --ticker-gap: 36px;
+  --ticker-duration: 18s;
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -238,10 +239,17 @@ input, select, textarea { outline: none; }
 .update-banner-track {
   display: flex;
   align-items: center;
-  gap: var(--ticker-gap);
   width: max-content;
-  animation: updateBannerTicker 18s linear infinite;
+  animation: updateBannerTicker var(--ticker-duration) linear infinite;
   will-change: transform;
+}
+
+.update-banner-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ticker-gap);
+  flex: none;
+  padding-right: var(--ticker-gap);
 }
 
 .update-banner-segment {
@@ -268,7 +276,7 @@ input, select, textarea { outline: none; }
 .update-banner-segment svg { color: var(--cyan); }
 
 @keyframes updateBannerTicker {
-  to { transform: translateX(calc(-50% - var(--ticker-gap) / 2)); }
+  to { transform: translateX(-50%); }
 }
 
 .update-banner-link {
@@ -329,24 +337,13 @@ input, select, textarea { outline: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .update-banner,
-  .update-banner::after,
-  .update-banner-track {
+  .update-banner::after {
     animation: none !important;
   }
 
-  .update-banner-ticker {
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-
   .update-banner-track {
-    width: 100%;
-    justify-content: center;
-    transform: none !important;
-  }
-
-  .update-banner-segment:nth-child(2) {
-    display: none;
+    animation-duration: var(--ticker-duration) !important;
+    animation-iteration-count: infinite !important;
   }
 }
 
@@ -1093,6 +1090,10 @@ img[src="/logo-opt.png"] {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-dim);
+}
+.panel-collapse-toggle .mk-icon {
+  width: 12px;
+  height: 12px;
 }
 .panel-collapse-toggle-left {
   left: 0;
@@ -3322,7 +3323,6 @@ img[src="/logo-opt.png"] {
   .update-banner-badge > span { display: none; }
   .update-banner-badge b { font-size: 7px; padding-inline: 4px; }
   .update-banner-ticker { --ticker-gap: 28px; padding-inline: 10px; }
-  .update-banner-track { animation-duration: 15s; }
   .update-banner-segment { gap: 9px; font-size: 9px; letter-spacing: 0.055em; }
 
   .update-banner-link {

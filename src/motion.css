@@ -100,13 +100,6 @@
     box-shadow var(--motion-fast) var(--ease-out-quart);
 }
 
-.panel-collapse-toggle:hover .mk-icon {
-  transform: translateX(var(--motion-chevron-shift, 0));
-}
-
-.panel-collapse-toggle-left { --motion-chevron-shift: 2px; }
-.panel-collapse-toggle-right { --motion-chevron-shift: -2px; }
-
 .panel-collapse-toggle .mk-icon,
 .section-arrow .mk-icon {
   transition: transform var(--motion-base) var(--ease-out-expo);
@@ -476,8 +469,8 @@ textarea,
     transition: none !important;
   }
 
-  :where(button, a):active,
-  :where(button, a):hover,
+  :where(button:not(.panel-collapse-toggle), a):active,
+  :where(button:not(.panel-collapse-toggle), a):hover,
   .app-body.left-panel-collapsed .panel-left,
   .app-body.right-panel-collapsed .panel-right {
     transform: none !important;

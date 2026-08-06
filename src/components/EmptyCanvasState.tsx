@@ -1,5 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { EMPTY_CANVAS_REDUCED_MOTION_FRAME } from '../lib/emptyCanvasMotion';
+import { lazy, Suspense, useState } from 'react';
 import { useLocale } from '../lib/useLocale';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
@@ -16,27 +15,16 @@ function StaticMotionFallback() {
 
 export function EmptyCanvasState() {
   const { t } = useLocale();
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
   const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    if (!media) return;
-    const onChange = () => setReducedMotion(media.matches);
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
-  }, []);
-
-  const playing = !reducedMotion && !paused;
+  const playing = !paused;
 
   return (
     <div className="canvas-placeholder">
       <div className="empty-canvas-motion-shell" aria-hidden="true">
         <Suspense fallback={<StaticMotionFallback />}>
           <EmptyCanvasMotion
-            key={reducedMotion ? 'reduced' : 'animated'}
             playing={playing}
-            initialFrame={reducedMotion ? EMPTY_CANVAS_REDUCED_MOTION_FRAME : 0}
+            initialFrame={0}
           />
         </Suspense>
       </div>
@@ -45,23 +33,21 @@ export function EmptyCanvasState() {
         <p className="ph-hint">{t('или нажми, чтобы выбрать файл · Ctrl+V', 'or click to choose a file · Ctrl+V')}</p>
         <p className="ph-formats">PNG · JPG · WEBP · GIF · MAP.DAT</p>
       </div>
-      {!reducedMotion && (
-        <button
-          type="button"
-          className="empty-canvas-motion-toggle"
-          onClick={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setPaused(current => !current);
-          }}
-          onPointerDown={event => event.stopPropagation()}
-          aria-pressed={paused}
-          aria-label={playing ? t('Остановить анимацию', 'Pause animation') : t('Продолжить анимацию', 'Resume animation')}
-          title={playing ? t('Остановить анимацию', 'Pause animation') : t('Продолжить анимацию', 'Resume animation')}
-        >
-          <IconGlyph icon={playing ? mkIcons.pause : mkIcons.play} />
-        </button>
-      )}
+      <button
+        type="button"
+        className="empty-canvas-motion-toggle"
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          setPaused(current => !current);
+        }}
+        onPointerDown={event => event.stopPropagation()}
+        aria-pressed={paused}
+        aria-label={playing ? t('Остановить анимацию', 'Pause animation') : t('Продолжить анимацию', 'Resume animation')}
+        title={playing ? t('Остановить анимацию', 'Pause animation') : t('Продолжить анимацию', 'Resume animation')}
+      >
+        <IconGlyph icon={playing ? mkIcons.pause : mkIcons.play} />
+      </button>
     </div>
   );
 }
