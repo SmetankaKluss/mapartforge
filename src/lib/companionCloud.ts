@@ -489,6 +489,7 @@ export async function listCompanionCollectionItems(collectionId: string): Promis
 }
 
 export async function getCompanionCollectionOverview(collectionId: string): Promise<CompanionCollectionOverview> {
+  await getSupabaseClient().auth.getSession();
   // Use the stable production actions until the staged snapshot endpoint has
   // completed its separately approved backend rollout.
   const [collections, items] = await Promise.all([
@@ -518,6 +519,7 @@ export async function getCompanionArtManifest(artId: string, versionId?: string)
 
 export async function getCompanionArtOverview(artId: string): Promise<CompanionArtOverview> {
   const supabase = getSupabaseClient();
+  await supabase.auth.getSession();
   const { data, error } = await supabase.functions.invoke('companion-api', {
     body: { action: 'art_overview', art_id: artId },
   });
