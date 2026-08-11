@@ -768,9 +768,9 @@ async function getCollectionOverview(admin: AdminClient, userId: string, collect
 
   const { data, error } = await admin
     .from('collection_items')
-    .select('created_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
+    .select('added_at,arts(id,current_version_id,title,privacy,map_grid,map_mode,preview_path,updated_at)')
     .eq('collection_id', collectionId)
-    .order('created_at', { ascending: false });
+    .order('added_at', { ascending: false });
   if (error) throw error;
 
   return {

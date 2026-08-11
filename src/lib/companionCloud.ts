@@ -493,9 +493,9 @@ export async function getCompanionCollectionOverview(collectionId: string): Prom
   const cloud = await getCompanionCloudOverview();
   const { data, error } = await supabase
     .from('collection_items')
-    .select('art_id,created_at')
+    .select('art_id,added_at')
     .eq('collection_id', collectionId)
-    .order('created_at', { ascending: false });
+    .order('added_at', { ascending: false });
   if (error) throw error;
 
   const artIds = (data ?? []).map(row => String(row.art_id));
