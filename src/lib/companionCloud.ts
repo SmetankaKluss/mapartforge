@@ -38,7 +38,7 @@ import type {
   CompanionUsageSummary,
 } from './companionTypes';
 import { normalizeEditableArtPrivacy } from './companionTypes';
-import { buildCollectionOverview } from './companionCollection';
+import { buildCollectionOverview, selectCollectionItemsFromSnapshot } from './companionCollection';
 
 const COMPANION_BUCKET = 'mapkluss-companion-private';
 export const MAX_COMPANION_ARTS = 100;
@@ -489,14 +489,45 @@ export async function listCompanionCollectionItems(collectionId: string): Promis
 }
 
 export async function getCompanionCollectionOverview(collectionId: string): Promise<CompanionCollectionOverview> {
-  await getSupabaseClient().auth.getSession();
-  // Use the stable production actions until the staged snapshot endpoint has
-  // completed its separately approved backend rollout.
-  const [collections, items] = await Promise.all([
-    listCompanionCollections(),
-    listCompanionCollectionItems(collectionId),
-  ]);
-  return buildCollectionOverview(collections, items, collectionId);
+  const supabase = getSupabaseClient();
+  const cloud = await getCompanionCloudOverview();
+  const { data, error } = await supabase
+    .from('collection_items')
+    .select('art_id,created_at')
+    .eq('collection_id', collectionId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const artIds = (data ?? []).map(row => String(row.art_id));
+  const snapshot = selectCollectionItemsFromSnapshot(artIds, cloud.arts, cloud.favorites);
+  const resolvedMissing = await mapWithConcurrency(snapshot.missingArtIds, 4, async artId => {
+    try {
+      const { manifest } = await getCompanionArtOverview(artId);
+      return {
+        artId: manifest.artId,
+        currentVersionId: manifest.versionId || null,
+        title: manifest.title,
+        privacy: manifest.privacy,
+        grid: manifest.grid,
+        mode: manifest.mode,
+        previewUrl: manifest.previewUrl,
+        updatedAt: manifest.updatedAt,
+        isFavorite: Boolean(manifest.isFavorite),
+      } satisfies CompanionLibraryItem;
+    } catch {
+      return null;
+    }
+  });
+
+  const itemsById = new Map(snapshot.items.map(item => [item.artId, item]));
+  for (const item of resolvedMissing) {
+    if (item) itemsById.set(item.artId, item);
+  }
+  const items = artIds.flatMap(artId => {
+    const item = itemsById.get(artId);
+    return item ? [item] : [];
+  });
+  return buildCollectionOverview(cloud.collections, items, collectionId);
 }
 
 export async function setCompanionCollectionItem(collectionId: string, artId: string, selected: boolean): Promise<boolean> {

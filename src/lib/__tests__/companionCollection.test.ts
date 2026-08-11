@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCollectionOverview } from '../companionCollection';
+import { buildCollectionOverview, selectCollectionItemsFromSnapshot } from '../companionCollection';
 import type { CompanionCollection, CompanionLibraryItem } from '../companionTypes';
 
 const collection: CompanionCollection = {
@@ -32,5 +32,19 @@ describe('buildCollectionOverview', () => {
 
   it('rejects collections that are not visible to the current account', () => {
     expect(() => buildCollectionOverview([collection], [], 'missing')).toThrow('Collection is unavailable.');
+  });
+});
+
+describe('selectCollectionItemsFromSnapshot', () => {
+  it('preserves collection order and keeps the favorite state', () => {
+    const favorite = { ...item, isFavorite: true };
+    expect(selectCollectionItemsFromSnapshot(
+      ['art-b', item.artId, item.artId],
+      [item],
+      [favorite],
+    )).toEqual({
+      items: [favorite],
+      missingArtIds: ['art-b'],
+    });
   });
 });
