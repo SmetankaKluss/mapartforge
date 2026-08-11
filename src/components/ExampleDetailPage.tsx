@@ -19,7 +19,7 @@ export function ExampleDetailPage({ example }: Props) {
       description: lang === 'ru'
         ? `${example.titleRu}: проверенное сравнение исходника и результата MapKluss. Размер ${example.size}, ${modeLabel}, дизеринг ${example.trySettings.dithering}.`
         : `${example.titleEn}: a verified source-to-MapKluss comparison at ${example.size}, ${modeLabel}, using ${example.trySettings.dithering} dithering.`,
-      url: `${window.location.origin}/examples/${example.id}`,
+      url: `${window.location.origin}/examples/${example.id}/`,
       image: `${window.location.origin}${example.previewUrl}`,
       schema: [
         {
@@ -28,15 +28,15 @@ export function ExampleDetailPage({ example }: Props) {
           headline: lang === 'ru' ? example.titleRu : example.titleEn,
           description: lang === 'ru' ? example.descriptionRu : example.descriptionEn,
           image: `${window.location.origin}${example.previewUrl}`,
-          mainEntityOfPage: `${window.location.origin}/examples/${example.id}`,
+          mainEntityOfPage: `${window.location.origin}/examples/${example.id}/`,
         },
         {
           '@context': 'https://schema.org',
           '@type': 'BreadcrumbList',
           itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'MapKluss', item: `${window.location.origin}/` },
-            { '@type': 'ListItem', position: 2, name: 'Examples', item: `${window.location.origin}/examples` },
-            { '@type': 'ListItem', position: 3, name: lang === 'ru' ? example.titleRu : example.titleEn, item: `${window.location.origin}/examples/${example.id}` },
+            { '@type': 'ListItem', position: 2, name: 'Examples', item: `${window.location.origin}/examples/` },
+            { '@type': 'ListItem', position: 3, name: lang === 'ru' ? example.titleRu : example.titleEn, item: `${window.location.origin}/examples/${example.id}/` },
           ],
         },
       ],
@@ -51,7 +51,7 @@ export function ExampleDetailPage({ example }: Props) {
           <nav className="public-breadcrumbs" aria-label={t('Навигационная цепочка', 'Breadcrumb')}>
             <a href={buildTrackedHref('/')}>MapKluss</a>
             <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
-            <a href={buildTrackedHref('/examples')}>{t('Примеры', 'Examples')}</a>
+            <a href={buildTrackedHref('/examples/')}>{t('Примеры', 'Examples')}</a>
             <span className="public-breadcrumbs__separator" aria-hidden="true">/</span>
             <span aria-current="page">{t(example.titleRu, example.titleEn)}</span>
           </nav>
@@ -62,7 +62,7 @@ export function ExampleDetailPage({ example }: Props) {
             </div>
             <div className="examples-hero-actions">
               <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть сценарий', 'Open workflow')}</a>
-              <a href={buildTrackedHref('/examples')}>{t('Все примеры', 'All examples')}</a>
+              <a href={buildTrackedHref('/examples/')}>{t('Все примеры', 'All examples')}</a>
             </div>
           </div>
         </section>
@@ -149,7 +149,7 @@ export function ExampleDetailNotFound() {
         <h1>{t('Такого примера нет', 'Example not found')}</h1>
         <p>{t('Возможно, ссылка устарела. Открой актуальный каталог или начни свой арт.', 'The link may be outdated. Open the current catalogue or start your own art.')}</p>
         <div className="public-action-row">
-          <a className="public-action public-action--primary" href={buildTrackedHref('/examples')}>{t('Все примеры', 'All examples')}</a>
+          <a className="public-action public-action--primary" href={buildTrackedHref('/examples/')}>{t('Все примеры', 'All examples')}</a>
           <a className="public-action" href={buildTrackedHref('/')}>{t('Редактор', 'Editor')}</a>
         </div>
       </main>

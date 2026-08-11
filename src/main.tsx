@@ -81,7 +81,8 @@ const routeLoadError = (
   </main>
 );
 
-root.render(routeBootstrap);
+const hasStaticBootstrap = path === '/' || examplesIndex || Boolean(examplePage) || wikiPage || Boolean(seoPage);
+if (!hasStaticBootstrap) root.render(routeBootstrap);
 
 async function initializeBackend() {
   const { initializeSupabase } = await import('./lib/supabase.ts');

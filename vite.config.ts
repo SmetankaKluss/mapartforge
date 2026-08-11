@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { staticPublicRoutes } from './scripts/staticRoutes'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), staticPublicRoutes()],
   server: {
     host: true,
     port: parseInt(process.env.PORT || '5173'),

@@ -30,7 +30,7 @@ export function PublicSiteHeader({ active, lang, onToggleLanguage }: PublicSiteH
     },
     {
       id: 'examples',
-      href: '/examples',
+      href: '/examples/',
       label: isRussian ? 'Примеры' : 'Examples',
       shortLabel: isRussian ? 'Примеры' : 'Examples',
       icon: mkIcons.view,
@@ -44,7 +44,7 @@ export function PublicSiteHeader({ active, lang, onToggleLanguage }: PublicSiteH
     },
     {
       id: 'wiki',
-      href: '/wiki',
+      href: '/wiki/',
       label: 'Wiki',
       shortLabel: 'Wiki',
       icon: mkIcons.wiki,

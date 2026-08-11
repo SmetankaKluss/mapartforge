@@ -64,7 +64,7 @@ export function ExamplesPage() {
         '@type': 'ListItem',
         position: index + 1,
         name: lang === 'ru' ? example.titleRu : example.titleEn,
-        url: `${window.location.origin}/examples/${example.id}`,
+        url: `${window.location.origin}/examples/${example.id}/`,
         image: `${window.location.origin}${example.previewUrl}`,
       })),
     };
@@ -72,14 +72,14 @@ export function ExamplesPage() {
     applyPageMeta({
       title: 'Minecraft Map Art Examples | MapKluss',
       description: 'Browse Minecraft map art examples made with MapKluss. Compare original images, generated previews, Minecraft screenshots, modes, sizes, colors, and materials.',
-      url: `${window.location.origin}/examples`,
+      url: `${window.location.origin}/examples/`,
       image: `${window.location.origin}/og-image.png`,
       schema: [
         {
           '@context': 'https://schema.org',
           '@type': 'CollectionPage',
           name: 'Minecraft Map Art Examples',
-          url: `${window.location.origin}/examples`,
+          url: `${window.location.origin}/examples/`,
           description: 'Examples of Minecraft map art created with MapKluss.',
         },
         itemList,
@@ -217,7 +217,7 @@ export function ExamplesPage() {
 
             <div className="example-actions">
               <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)} aria-label={t(`Открыть сценарий «${example.titleRu}» в редакторе`, `Open “${example.titleEn}” workflow in the editor`)}>{t('Открыть в редакторе', 'Open in editor')}</a>
-              <a href={buildTrackedHref(`/examples/${example.id}`)} aria-label={t(`Подробнее о сценарии «${example.titleRu}»`, `Read details about “${example.titleEn}”`)}>{t('Подробнее', 'Read details')}</a>
+              <a href={buildTrackedHref(`/examples/${example.id}/`)} aria-label={t(`Подробнее о сценарии «${example.titleRu}»`, `Read details about “${example.titleEn}”`)}>{t('Подробнее', 'Read details')}</a>
               <button onClick={() => downloadImage(example.previewUrl, `mapkluss_${example.id}.png`)}>
                 {t('Скачать превью', 'Download preview')}
               </button>

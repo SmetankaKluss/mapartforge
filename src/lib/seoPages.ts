@@ -448,6 +448,12 @@ export const SEO_PAGES: SeoPageDefinition[] = [
   },
 ];
 
+export function canonicalPublicPath(path: string): string {
+  if (path === '/') return '/';
+  return `${path.replace(/\/+$/, '')}/`;
+}
+
 export function getSeoPageByPath(path: string): SeoPageDefinition | undefined {
-  return SEO_PAGES.find(page => page.path === path);
+  const normalizedPath = path === '/' ? path : path.replace(/\/+$/, '');
+  return SEO_PAGES.find(page => page.path === normalizedPath);
 }

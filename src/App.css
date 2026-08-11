@@ -3246,6 +3246,19 @@ img[src="/logo-opt.png"] {
 
 /* ── Status bar credit ─────────────────────────────────────────────────── */
 .status-spacer { flex: 1; }
+.status-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+.status-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.12s;
+}
+.status-links a:hover,
+.status-links a:focus-visible { color: var(--accent); }
 .status-credit { color: var(--text-muted); white-space: nowrap; }
 .status-tg {
   display: flex;
@@ -3258,6 +3271,10 @@ img[src="/logo-opt.png"] {
   font-size: 10px;
 }
 .status-tg:hover { text-decoration: underline; }
+
+@media (max-width: 1499px) {
+  .status-links { display: none; }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RESPONSIVE — Tablet (768–1099px) & Mobile (< 768px)
@@ -3559,6 +3576,7 @@ img[src="/logo-opt.png"] {
   /* Status bar: hide credit/tg link on mobile */
   .status-credit,
   .status-tg,
+  .status-links,
   .status-spacer { display: none; }
   .status-bar { gap: 8px; padding: 0 8px; font-size: 9px; }
   .app-notice {

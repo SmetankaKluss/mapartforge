@@ -346,14 +346,14 @@ export function WikiPage() {
         'Актуальная документация MapKluss: создание Minecraft map art, инструменты редактора, палитра, экспорт, Cloud, Lens и Two-layer Builder.',
         'Current MapKluss documentation for Minecraft map art, editor tools, palette, exports, Cloud, Lens, and Two-layer Builder.',
       ),
-      url: `${window.location.origin}/wiki`,
+      url: `${window.location.origin}/wiki/`,
       image: `${window.location.origin}/og-image.png`,
       schema: [{
         '@context': 'https://schema.org',
         '@type': 'TechArticle',
         name: t('Wiki MapKluss', 'MapKluss Wiki'),
         description: t('Документация редактора и мода MapKluss.', 'Documentation for the MapKluss editor and mod.'),
-        url: `${window.location.origin}/wiki`,
+        url: `${window.location.origin}/wiki/`,
         inLanguage: lang === 'ru' ? 'ru' : 'en',
       }],
     });

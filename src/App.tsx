@@ -2920,7 +2920,7 @@ export default function App() {
             <span>{t('Поддержать', 'Support')}</span>
           </a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
-          <a className="header-icon-btn" href="/wiki" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
+          <a className="header-icon-btn" href="/wiki/" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <ThemeSelector lang={lang} />
           <button className="lang-toggle-btn" onClick={toggleLang} title={t('Switch to English', 'Переключить на русский')}>{lang === 'ru' ? 'EN' : 'RU'}</button>
           <a href="https://t.me/mapkluss" target="_blank" rel="noopener noreferrer" className="header-ver" title={t('Новости MapKluss', 'MapKluss news')}>{VERSION}</a>
@@ -3977,6 +3977,11 @@ export default function App() {
           </span>
         )}
         <span className="status-spacer" />
+        <nav className="status-links" aria-label={t('Полезные страницы', 'Useful pages')}>
+          <a href="/examples/">{t('Примеры', 'Examples')}</a>
+          <a href="/wiki/">Wiki</a>
+          <a href="/minecraft-map-art-generator/">{t('Гайд', 'Guide')}</a>
+        </nav>
         <span className="status-credit">Made by SmetankaKluss</span>
         <a className="status-tg" href="https://t.me/SmetankaKluss" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true">

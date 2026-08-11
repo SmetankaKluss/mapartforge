@@ -3,7 +3,7 @@ import { useLocale } from '../lib/useLocale';
 import { applyPageMeta } from '../lib/meta';
 import { EXAMPLES } from '../lib/examples';
 import { buildTrackedHref } from '../lib/analytics';
-import { getSeoPageByPath, type SeoPageDefinition } from '../lib/seoPages';
+import { canonicalPublicPath, getSeoPageByPath, type SeoPageDefinition } from '../lib/seoPages';
 import { PublicSiteHeader } from './PublicSiteHeader';
 
 interface Props {
@@ -17,7 +17,7 @@ export function SeoLandingPage({ page }: Props) {
     [page.exampleIds],
   );
   const publishedRelatedLinks = useMemo(
-    () => page.related.filter(link => !getSeoPageByPath(link.href)),
+    () => page.related.filter(link => Boolean(getSeoPageByPath(link.href))),
     [page.related],
   );
 
@@ -25,7 +25,7 @@ export function SeoLandingPage({ page }: Props) {
     applyPageMeta({
       title: page.title,
       description: page.description,
-      url: `${window.location.origin}${page.path}`,
+      url: `${window.location.origin}${canonicalPublicPath(page.path)}`,
       image: `${window.location.origin}${exampleProjects[0]?.previewUrl ?? '/og-image.png'}`,
       schema: [
         {
@@ -34,7 +34,7 @@ export function SeoLandingPage({ page }: Props) {
           name: 'MapKluss',
           applicationCategory: 'MultimediaApplication',
           operatingSystem: 'Web',
-          url: `${window.location.origin}${page.path}`,
+          url: `${window.location.origin}${canonicalPublicPath(page.path)}`,
           description: page.description,
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
         },
@@ -81,7 +81,7 @@ export function SeoLandingPage({ page }: Props) {
               <p className="seo-hero-lead">{t(page.introRu, page.introEn)}</p>
               <div className="examples-hero-actions">
                 <a href={buildTrackedHref('/')}>{t('Открыть редактор', 'Open editor')}</a>
-                <a href={buildTrackedHref('/examples')}>{t('Проверенные примеры', 'Verified examples')}</a>
+                <a href={buildTrackedHref('/examples/')}>{t('Проверенные примеры', 'Verified examples')}</a>
               </div>
             </div>
             <p className="seo-hero-body">{t(page.bodyRu, page.bodyEn)}</p>
@@ -124,7 +124,7 @@ export function SeoLandingPage({ page }: Props) {
                 <div className="seo-doc-grid">
                   {exampleProjects.map(example => (
                     <article className="seo-doc-card" key={example.id}>
-                      <a className="seo-doc-preview" href={buildTrackedHref(`/examples/${example.id}`)} aria-label={t(`Открыть пример «${example.titleRu}»`, `Open “${example.titleEn}” example`)}>
+                      <a className="seo-doc-preview" href={buildTrackedHref(`/examples/${example.id}/`)} aria-label={t(`Открыть пример «${example.titleRu}»`, `Open “${example.titleEn}” example`)}>
                         <img src={example.previewUrl} alt="" loading="lazy" />
                       </a>
                       <div className="seo-doc-content">
@@ -139,7 +139,7 @@ export function SeoLandingPage({ page }: Props) {
                           <div><dt>{t('Дизеринг', 'Dithering')}</dt><dd>{example.trySettings.dithering}</dd></div>
                         </dl>
                         <div className="seo-doc-actions">
-                          <a href={buildTrackedHref(`/examples/${example.id}`)}>{t('Разобрать пример', 'Inspect example')}</a>
+                          <a href={buildTrackedHref(`/examples/${example.id}/`)}>{t('Разобрать пример', 'Inspect example')}</a>
                           <a href={buildTrackedHref(`/?example=${encodeURIComponent(example.id)}`)}>{t('Открыть настройки', 'Open settings')}</a>
                         </div>
                       </div>
@@ -165,7 +165,7 @@ export function SeoLandingPage({ page }: Props) {
               <section id="related" className="seo-section seo-section-last">
                 <div className="seo-section-head"><h2>{t('Продолжить', 'Continue')}</h2></div>
                 <div className="seo-related-links">
-                  {publishedRelatedLinks.map(link => <a key={link.href} href={buildTrackedHref(link.href)}>{t(link.labelRu, link.labelEn)}</a>)}
+                  {publishedRelatedLinks.map(link => <a key={link.href} href={buildTrackedHref(canonicalPublicPath(link.href))}>{t(link.labelRu, link.labelEn)}</a>)}
                 </div>
               </section>
             )}
