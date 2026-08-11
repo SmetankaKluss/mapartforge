@@ -38,6 +38,7 @@ import type {
   CompanionUsageSummary,
 } from './companionTypes';
 import { normalizeEditableArtPrivacy } from './companionTypes';
+import { buildCollectionOverview } from './companionCollection';
 
 const COMPANION_BUCKET = 'mapkluss-companion-private';
 export const MAX_COMPANION_ARTS = 100;
@@ -488,12 +489,13 @@ export async function listCompanionCollectionItems(collectionId: string): Promis
 }
 
 export async function getCompanionCollectionOverview(collectionId: string): Promise<CompanionCollectionOverview> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase.functions.invoke('companion-api', {
-    body: { action: 'collection_overview', collection_id: collectionId },
-  });
-  if (error) throw error;
-  return data as CompanionCollectionOverview;
+  // Use the stable production actions until the staged snapshot endpoint has
+  // completed its separately approved backend rollout.
+  const [collections, items] = await Promise.all([
+    listCompanionCollections(),
+    listCompanionCollectionItems(collectionId),
+  ]);
+  return buildCollectionOverview(collections, items, collectionId);
 }
 
 export async function setCompanionCollectionItem(collectionId: string, artId: string, selected: boolean): Promise<boolean> {

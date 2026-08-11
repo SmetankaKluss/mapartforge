@@ -232,15 +232,18 @@ export function CompanionArtPage({ artId }: Props) {
           setCollections(loaded.collections);
           setVersions(loaded.versions);
         }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } catch {
+        if (!cancelled) setError(t(
+          'Арт недоступен. Возможно, он приватный, удалён или у аккаунта нет доступа.',
+          'This art is unavailable. It may be private, deleted, or inaccessible to this account.',
+        ));
       } finally {
         if (!cancelled) setBusy(false);
       }
     }
     void load();
     return () => { cancelled = true; };
-  }, [artId, useMockArt]);
+  }, [artId, t, useMockArt]);
 
   async function toggleFavorite() {
     if (!manifest || favoriteBusy) return;

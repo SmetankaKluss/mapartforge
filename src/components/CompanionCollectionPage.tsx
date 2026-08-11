@@ -146,12 +146,15 @@ export function CompanionCollectionPage({ collectionId }: Props) {
       setCollection(overview.collection);
       setNameDraft(overview.collection.name);
       setItems(overview.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch {
+      setError(t(
+        'Коллекция недоступна. Возможно, она была удалена или у аккаунта нет доступа.',
+        'This collection is unavailable. It may have been deleted or the account may not have access.',
+      ));
     } finally {
       setBusy(false);
     }
-  }, [collectionId, useMockCollection]);
+  }, [collectionId, t, useMockCollection]);
 
   useEffect(() => { void reload(); }, [reload]);
 
