@@ -20,7 +20,11 @@ describe('Supabase backend routing', () => {
   });
 
   it('uses the gateway when its readiness probe succeeds', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 200 }));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      stale: false,
+      checkedAt: Date.now(),
+    }), { status: 200 }));
     const route = await selectSupabaseRoute({ gatewayUrl, directUrl, fetcher });
 
     expect(route).toEqual({ url: gatewayUrl, kind: 'gateway' });
@@ -39,6 +43,20 @@ describe('Supabase backend routing', () => {
     const route = await selectSupabaseRoute({ gatewayUrl, directUrl, fetcher });
 
     expect(route).toEqual({ url: directUrl, kind: 'direct-fallback' });
+  });
+
+  it('falls back directly when readiness is stale or malformed', async () => {
+    const staleFetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      stale: true,
+      checkedAt: Date.now(),
+    }), { status: 200 }));
+    const malformedFetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await expect(selectSupabaseRoute({ gatewayUrl, directUrl, fetcher: staleFetcher }))
+      .resolves.toEqual({ url: directUrl, kind: 'direct-fallback' });
+    await expect(selectSupabaseRoute({ gatewayUrl, directUrl, fetcher: malformedFetcher }))
+      .resolves.toEqual({ url: directUrl, kind: 'direct-fallback' });
   });
 
   it('preserves the existing production auth storage key across routes', () => {

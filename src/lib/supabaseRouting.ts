@@ -45,7 +45,16 @@ async function probeGateway(gatewayUrl: string, fetcher: typeof fetch, timeoutMs
       credentials: 'omit',
       signal: controller.signal,
     });
-    return response.ok;
+    if (!response.ok) return false;
+    const readiness = await response.json() as {
+      ok?: unknown;
+      stale?: unknown;
+      checkedAt?: unknown;
+    };
+    return readiness.ok === true
+      && readiness.stale === false
+      && typeof readiness.checkedAt === 'number'
+      && Number.isFinite(readiness.checkedAt);
   } catch {
     return false;
   } finally {

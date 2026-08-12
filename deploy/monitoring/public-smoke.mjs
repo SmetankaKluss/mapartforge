@@ -1,6 +1,7 @@
 import tls from 'node:tls';
 
 const apiUrl = normalizedUrl(process.env.MAPKLUSS_API_URL || 'https://api.mapkluss.art');
+const directApiUrl = normalizedUrl(process.env.MAPKLUSS_DIRECT_API_URL || 'https://opxgnyadxybceldaokdi.supabase.co');
 const stageUrl = normalizedUrl(process.env.MAPKLUSS_STAGE_URL || 'https://stage.mapkluss.art');
 const siteUrl = normalizedUrl(process.env.MAPKLUSS_SITE_URL || 'https://mapkluss.art');
 const anonKey = process.env.MAPKLUSS_ANON_KEY?.trim() || '';
@@ -15,23 +16,30 @@ await expectJson(`${apiUrl}/readyz`, (value) => (
 ));
 if (anonKey) {
   const headers = { apikey: anonKey, authorization: `Bearer ${anonKey}` };
-  await expectStatus(`${apiUrl}/auth/v1/health`, 200, { headers });
-  await expectStatus(`${apiUrl}/rest/v1/profiles?select=id&limit=0`, 200, { headers });
-  await expectStatus(`${apiUrl}/storage/v1/object/list/mapartforge`, 200, {
-    method: 'POST',
-    headers: { ...headers, 'content-type': 'application/json' },
-    body: JSON.stringify({ prefix: 'mapkluss-monitor-nonexistent', limit: 1 }),
-  });
-  await expectStatus(`${apiUrl}/functions/v1/companion-api`, 200, {
-    method: 'OPTIONS',
-    headers: {
-      ...headers,
-      origin: stageUrl,
-      'access-control-request-method': 'POST',
-      'access-control-request-headers': 'apikey,authorization,content-type',
-    },
-  });
-  await expectWebSocket(apiUrl, anonKey);
+  for (const dataPlaneUrl of [...new Set([apiUrl, directApiUrl])]) {
+    await expectStatus(`${dataPlaneUrl}/auth/v1/health`, 200, { headers });
+    await expectStatus(`${dataPlaneUrl}/rest/v1/profiles?select=id&limit=0`, 200, { headers });
+    await expectStatus(`${dataPlaneUrl}/storage/v1/object/list/mapartforge`, 200, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ prefix: 'mapkluss-monitor-nonexistent', limit: 1 }),
+    });
+    await expectStatus(`${dataPlaneUrl}/functions/v1/companion-api`, 200, {
+      method: 'OPTIONS',
+      headers: {
+        ...headers,
+        origin: stageUrl,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'apikey,authorization,content-type',
+      },
+    });
+    await expectStatus(`${dataPlaneUrl}/functions/v1/companion-api`, 401, {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'library' }),
+    });
+    await expectWebSocket(dataPlaneUrl, anonKey);
+  }
 }
 await expectSpa(`${stageUrl}/`);
 await expectSpa(`${stageUrl}/cloud`, { allowErrorDocument: true });
@@ -65,7 +73,8 @@ async function expectStatus(url, expectedStatus, options = {}) {
   });
   assert(response.status === expectedStatus, `${url} returned ${response.status}`);
   await response.body?.cancel();
-  console.log(`${new URL(url).pathname} data-plane ok`);
+  const target = new URL(url);
+  console.log(`${target.hostname}${target.pathname} data-plane ok`);
 }
 
 async function expectWebSocket(baseUrl, key) {
@@ -91,7 +100,7 @@ async function expectWebSocket(baseUrl, key) {
       reject(new Error(`${target.hostname} Realtime WebSocket failed`));
     }, { once: true });
   });
-  console.log(`${target.pathname} websocket ok`);
+  console.log(`${target.hostname}${target.pathname} websocket ok`);
 }
 
 async function expectSpa(url, { allowErrorDocument = false } = {}) {

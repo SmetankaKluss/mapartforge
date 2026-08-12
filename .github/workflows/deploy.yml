@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      backend_route:
+        description: Backend route for the isolated staging build
+        required: true
+        default: gateway
+        type: choice
+        options:
+          - gateway
+          - direct
 
 permissions:
   contents: write
@@ -28,12 +37,13 @@ jobs:
         env:
           VITE_CLARITY_PROJECT_ID: wolhmrblof
           VITE_TELEGRAM_BOT_USERNAME: MapKlussBot
+          VITE_SUPABASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.backend_route == 'direct' && 'https://opxgnyadxybceldaokdi.supabase.co' || '' }}
 
       - name: Add SPA fallback for GitHub Pages
         run: cp dist/index.html dist/404.html
 
       - name: Deploy to gh-pages branch
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -41,7 +51,7 @@ jobs:
           cname: mapkluss.art
 
       - name: Deploy staging site to Yandex Object Storage
-        # Staging is controlled by explicit candidate/rollback dispatches and must survive routine main pushes.
+        # Manual dispatch is staging-only and can rehearse either gateway-first or direct-only routing.
         if: github.event_name == 'workflow_dispatch'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.YC_STORAGE_ACCESS_KEY_ID }}
