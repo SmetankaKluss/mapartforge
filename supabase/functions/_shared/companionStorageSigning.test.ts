@@ -70,3 +70,22 @@ Deno.test('strict storage signing still rejects a failed batch', async () => {
   }
   assert(rejected);
 });
+
+Deno.test('dual-read keeps available primary URLs and falls back only for missing paths', async () => {
+  const fallbackPaths: string[] = [];
+  const result = await signStorageRows([
+    { key: 'primary', bucket: 'one', path: 'primary.png' },
+    { key: 'fallback', bucket: 'one', path: 'fallback.png' },
+  ], 600, async (_bucket, paths) => {
+    fallbackPaths.push(...paths);
+    return paths.map(path => ({ path, signedUrl: `https://supabase/${path}` }));
+  }, {
+    primarySignBatch: async (_bucket, paths) => paths.map(path => path === 'primary.png'
+      ? { path, signedUrl: `https://yandex/${path}` }
+      : { path, error: 'target_404' }),
+  });
+
+  assert(result.get('primary') === 'https://yandex/primary.png');
+  assert(result.get('fallback') === 'https://supabase/fallback.png');
+  assert(fallbackPaths.length === 1 && fallbackPaths[0] === 'fallback.png');
+});

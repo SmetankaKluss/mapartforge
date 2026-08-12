@@ -27,6 +27,24 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any>>;
 
+async function createStorageSignedUrl(
+  admin: AdminClient,
+  bucket: string,
+  path: string,
+  expiresIn: number,
+): Promise<string | null> {
+  const signed = await signStorageRows(
+    [{ key: 'object', bucket, path }],
+    expiresIn,
+    async (sourceBucket, paths, lifetime) => {
+      const { data, error } = await admin.storage.from(sourceBucket).createSignedUrls(paths, lifetime);
+      if (error) throw error;
+      return data ?? [];
+    },
+  );
+  return signed.get('object') ?? null;
+}
+
 type Action =
   | 'device_start'
   | 'device_poll'
@@ -260,10 +278,12 @@ async function createPreviewSignedUrl(
     .maybeSingle();
   if (artifactError) throw artifactError;
   if (!artifact) return null;
-  const { data } = await admin.storage
-    .from(String(artifact.bucket_id ?? 'mapartforge'))
-    .createSignedUrl(artifact.storage_path, 60 * 30);
-  return data?.signedUrl ?? null;
+  return createStorageSignedUrl(
+    admin,
+    String(artifact.bucket_id ?? 'mapartforge'),
+    String(artifact.storage_path),
+    60 * 30,
+  );
 }
 
 async function mapLibraryRows(
@@ -1069,10 +1089,13 @@ async function getArtVersionProject(admin: AdminClient, userId: string | null, v
   if (projectError) throw projectError;
   if (!project) return null;
 
-  const { data: signed, error: signedError } = await admin.storage
-    .from(String(project.bucket_id ?? 'mapartforge'))
-    .createSignedUrl(String(project.storage_path), 60 * 10);
-  if (signedError || !signed?.signedUrl) throw signedError ?? new Error('project signing failed');
+  const projectUrl = await createStorageSignedUrl(
+    admin,
+    String(project.bucket_id ?? 'mapartforge'),
+    String(project.storage_path),
+    60 * 10,
+  );
+  if (!projectUrl) throw new Error('project signing failed');
 
   return {
     artId: String(art.id),
@@ -1080,7 +1103,7 @@ async function getArtVersionProject(admin: AdminClient, userId: string | null, v
     versionNumber: Number(version.version_number ?? 0) || 0,
     title: String(art.title),
     createdAt: String(version.created_at),
-    projectUrl: signed.signedUrl,
+    projectUrl,
   };
 }
 
@@ -1684,16 +1707,19 @@ Deno.serve(async req => {
         .eq('owner_id', userId)
         .single();
       if (error || !data) return json({ error: 'not_found' }, 404);
-      const { data: signed } = await admin.storage
-        .from(String(data.bucket_id ?? 'mapartforge'))
-        .createSignedUrl(data.image_path, 60 * 30);
+      const signedUrl = await createStorageSignedUrl(
+        admin,
+        String(data.bucket_id ?? 'mapartforge'),
+        String(data.image_path),
+        60 * 30,
+      );
         return json({
           importId: data.id,
           source: data.source,
           title: data.title,
           mapGrid: data.map_grid,
           imagePath: data.image_path,
-          signedUrl: signed?.signedUrl,
+          signedUrl,
           sizeBytes: data.size_bytes,
           sha256: data.sha256,
           createdArtId: data.created_art_id,

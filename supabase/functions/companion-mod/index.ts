@@ -17,6 +17,24 @@ import { classifyCompanionBearer } from '../_shared/companionAuthRouting.ts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any>>;
 
+async function createStorageSignedUrl(
+  admin: AdminClient,
+  bucket: string,
+  path: string,
+  expiresIn: number,
+): Promise<string | null> {
+  const signed = await signStorageRows(
+    [{ key: 'object', bucket, path }],
+    expiresIn,
+    async (sourceBucket, paths, lifetime) => {
+      const { data, error } = await admin.storage.from(sourceBucket).createSignedUrls(paths, lifetime);
+      if (error) throw error;
+      return data ?? [];
+    },
+  );
+  return signed.get('object') ?? null;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -171,10 +189,12 @@ async function createPreviewSignedUrl(
     .maybeSingle();
   if (artifactError) throw artifactError;
   if (!artifact) return null;
-  const { data } = await admin.storage
-    .from(String(artifact.bucket_id ?? 'mapartforge'))
-    .createSignedUrl(artifact.storage_path, 60 * 30);
-  return data?.signedUrl ?? null;
+  return createStorageSignedUrl(
+    admin,
+    String(artifact.bucket_id ?? 'mapartforge'),
+    String(artifact.storage_path),
+    60 * 30,
+  );
 }
 
 async function mapLibraryRows(

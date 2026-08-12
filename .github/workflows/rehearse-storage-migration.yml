@@ -1,0 +1,112 @@
+name: Rehearse confirmed Storage migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inventory is read-only; copy requires isolated migration credentials
+        required: true
+        default: inventory
+        type: choice
+        options:
+          - inventory
+          - copy
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storage-migration-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    if: inputs.mode == 'inventory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: storage-migration
+    env:
+      MAPKLUSS_STORAGE_MANIFEST: ${{ runner.temp }}/mapkluss-storage-manifest.ndjson
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Build private exact manifest
+        env:
+          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          test -n "$SUPABASE_DB_HOST"
+          test -n "$SUPABASE_DB_USER"
+          test -n "$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          psql "host=${SUPABASE_DB_HOST} port=5432 dbname=postgres user=${SUPABASE_DB_USER} sslmode=require" \
+            -X -v ON_ERROR_STOP=1 -At \
+            -f deploy/migration/storage-object-manifest.sql >"$MAPKLUSS_STORAGE_MANIFEST"
+          chmod 600 "$MAPKLUSS_STORAGE_MANIFEST"
+          test -s "$MAPKLUSS_STORAGE_MANIFEST"
+
+      - name: Validate manifest without copying
+        run: node deploy/migration/copy-storage-manifest.mjs "$MAPKLUSS_STORAGE_MANIFEST" --dry-run
+
+      - name: Destroy private runner manifest
+        if: always()
+        run: rm -f "$MAPKLUSS_STORAGE_MANIFEST"
+
+  copy:
+    if: inputs.mode == 'copy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: storage-migration
+    env:
+      MAPKLUSS_STORAGE_MANIFEST: ${{ runner.temp }}/mapkluss-storage-manifest.ndjson
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Build private exact manifest
+        env:
+          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          test -n "$SUPABASE_DB_HOST"
+          test -n "$SUPABASE_DB_USER"
+          test -n "$SUPABASE_DB_PASSWORD"
+          echo "::add-mask::$SUPABASE_DB_PASSWORD"
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          psql "host=${SUPABASE_DB_HOST} port=5432 dbname=postgres user=${SUPABASE_DB_USER} sslmode=require" \
+            -X -v ON_ERROR_STOP=1 -At \
+            -f deploy/migration/storage-object-manifest.sql >"$MAPKLUSS_STORAGE_MANIFEST"
+          chmod 600 "$MAPKLUSS_STORAGE_MANIFEST"
+          test -s "$MAPKLUSS_STORAGE_MANIFEST"
+
+      - name: Copy and verify confirmed objects only
+        env:
+          SUPABASE_URL: https://opxgnyadxybceldaokdi.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_MIGRATION_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_MIGRATION_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          YANDEX_STORAGE_BUCKET: ${{ vars.YC_MIGRATION_BUCKET }}
+          YANDEX_STORAGE_KMS_KEY_ID: ${{ vars.YC_MIGRATION_KMS_KEY_ID }}
+          YANDEX_STORAGE_ENDPOINT: https://storage.yandexcloud.net
+        run: |
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
+          test -n "$YANDEX_STORAGE_BUCKET"
+          test -n "$YANDEX_STORAGE_KMS_KEY_ID"
+          node deploy/migration/copy-storage-manifest.mjs "$MAPKLUSS_STORAGE_MANIFEST"
+
+      - name: Destroy private runner manifest
+        if: always()
+        run: rm -f "$MAPKLUSS_STORAGE_MANIFEST"
