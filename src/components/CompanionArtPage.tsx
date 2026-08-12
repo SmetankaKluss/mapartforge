@@ -25,6 +25,21 @@ function formatDateTime(value: string, locale = undefined as string | undefined)
   });
 }
 
+function formatVersionDate(value: string, locale: string, now = new Date()): { primary: string; full: string } {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { primary: value, full: value };
+
+  const full = formatDateTime(value, locale);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysFromToday = Math.round((startOfDate.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (Math.abs(daysFromToday) > 6) return { primary: full, full };
+
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(daysFromToday, 'day');
+  const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  return { primary: `${relative}, ${time}`, full };
+}
+
 function artifactLabel(kind: CompanionArtifactManifestEntry['kind'], t: (ru: string, en: string) => string): string {
   switch (kind) {
     case 'project':
@@ -78,7 +93,7 @@ function mockDate(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 }
 
-function buildMockArtOverview(artId: string): {
+function buildMockArtOverview(artId: string, requestedTitle?: string | null): {
   manifest: CompanionArtManifest;
   owner: CompanionProfileSummary;
   collections: CompanionCollection[];
@@ -90,7 +105,7 @@ function buildMockArtOverview(artId: string): {
       artId,
       versionId,
       ownerId: 'mock-user-1234567890abcdef',
-      title: 'Neon Rabbit Server Wall',
+      title: requestedTitle?.trim().slice(0, 120) || 'Neon Rabbit Server Wall',
       privacy: 'unlisted',
       grid: { wide: 3, tall: 2 },
       mode: '2d',
@@ -155,6 +170,8 @@ function buildMockArtOverview(artId: string): {
         minecraftVersion: '1.21.4',
         artifactCount: 7,
         isCurrent: true,
+        previewUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL8WQAAAABJRU5ErkJggg==',
+        projectUrl: 'data:application/json,%7B%22mock%22%3Atrue%7D',
       },
       {
         id: 'mock-version-old',
@@ -165,6 +182,7 @@ function buildMockArtOverview(artId: string): {
         minecraftVersion: '1.21.4',
         artifactCount: 7,
         isCurrent: false,
+        projectUrl: 'data:application/json,%7B%22mock%22%3Atrue%7D',
       },
     ],
   };
@@ -192,7 +210,9 @@ export function CompanionArtPage({ artId }: Props) {
   );
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const useMockArt = import.meta.env.DEV && new URLSearchParams(window.location.search).get('artMock') === '1';
+  const mockParams = import.meta.env.DEV ? new URLSearchParams(window.location.search) : null;
+  const useMockArt = mockParams?.get('artMock') === '1';
+  const mockTitle = mockParams?.get('mockTitle');
   const deleteConfirmValid = ['УДАЛИТЬ', 'DELETE'].includes(deleteConfirmText.trim().toLocaleUpperCase('ru-RU'));
 
   useEffect(() => {
@@ -212,7 +232,7 @@ export function CompanionArtPage({ artId }: Props) {
       setError(null);
       try {
         if (useMockArt) {
-          const loaded = buildMockArtOverview(artId);
+          const loaded = buildMockArtOverview(artId, mockTitle);
           if (!cancelled) {
             setManifest(loaded.manifest);
             setOwner(loaded.owner);
@@ -243,7 +263,7 @@ export function CompanionArtPage({ artId }: Props) {
     }
     void load();
     return () => { cancelled = true; };
-  }, [artId, t, useMockArt]);
+  }, [artId, mockTitle, t, useMockArt]);
 
   async function toggleFavorite() {
     if (!manifest || favoriteBusy) return;
@@ -490,30 +510,57 @@ export function CompanionArtPage({ artId }: Props) {
             ))}
           </div>
 
-          <div className="companion-panel">
-            <h2>{t('Версии', 'Versions')}</h2>
+          <div className="companion-panel companion-versions-panel">
+            <div className="companion-section-head companion-section-head-compact companion-version-intro">
+              <div>
+                <h2>{t('История версий', 'Version history')}</h2>
+                <p className="companion-muted">{t(
+                  'Восстановление откроет выбранную версию в редакторе. Облачный арт изменится только после нового сохранения.',
+                  'Restoring opens the selected version in the editor. The cloud art changes only after you save it again.',
+                )}</p>
+              </div>
+              <span className="companion-chip">{t(`Сохранено: ${versions.length}`, `Saved: ${versions.length}`)}</span>
+            </div>
             {versions.length === 0 ? (
               <p className="companion-muted">{t('Сохранённых версий пока нет.', 'There are no saved versions yet.')}</p>
-            ) : versions.map(version => (
-              <article className="companion-art" key={version.id}>
-                <div className="companion-import-copy">
-                  <strong>
-                    v{version.versionNumber}
-                    {version.isCurrent ? t(' / текущая', ' / current') : ''}
-                  </strong>
-                  <span>{formatVersionMeta(version)}</span>
-                  <div className="companion-import-meta">
-                    <span>{formatDateTime(version.createdAt, dateLocale)}</span>
-                    {version.projectUrl && <span>{t('Проект готов', 'Project ready')}</span>}
-                  </div>
-                </div>
-                <div className="companion-actions companion-art-actions">
-                  {version.previewUrl && <a className="companion-action-link" href={version.previewUrl}>{t('Превью', 'Preview')}</a>}
-                  {version.projectUrl && <a className="companion-action-link" href={`/?artVersion=${version.id}`}>{t('Редактор', 'Editor')}</a>}
-                  {version.projectUrl && <a className="companion-action-link" href={version.projectUrl}>{t('Проект', 'Project')}</a>}
-                </div>
-              </article>
-            ))}
+            ) : (
+              <div className="companion-version-list">
+                {versions.map(version => {
+                  const date = formatVersionDate(version.createdAt, dateLocale);
+                  const hasDownload = Boolean(version.previewUrl || version.projectUrl);
+                  return (
+                    <article className={`companion-art companion-version-card${version.isCurrent ? ' is-current' : ''}`} key={version.id}>
+                      <div className="companion-version-main">
+                        <div className="companion-version-heading">
+                          <strong>{t(`Версия ${version.versionNumber}`, `Version ${version.versionNumber}`)}</strong>
+                          {version.isCurrent && <span className="companion-current-version-badge">{t('Текущая', 'Current')}</span>}
+                        </div>
+                        <time className="companion-version-date" dateTime={version.createdAt} title={date.full}>{date.primary}</time>
+                        {date.primary !== date.full && <span className="companion-version-date-detail">{date.full}</span>}
+                        <span className="companion-version-meta">{formatVersionMeta(version)}</span>
+                        <div className="companion-version-files" aria-label={t('Доступные файлы версии', 'Available version files')}>
+                          <span className="companion-version-files-label">{t(`Сохранено файлов: ${version.artifactCount}`, `Files saved: ${version.artifactCount}`)}</span>
+                          <div className="companion-chip-row">
+                            {version.previewUrl && <span className="companion-chip companion-chip-success">{t('Превью PNG', 'PNG preview')}</span>}
+                            {version.projectUrl && <span className="companion-chip companion-chip-success">{t('Проект MapKluss', 'MapKluss project')}</span>}
+                            {!hasDownload && <span className="companion-chip companion-chip-warning">{t('Скачивание недоступно', 'Downloads unavailable')}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="companion-actions companion-version-actions">
+                        {version.previewUrl && <a className="companion-action-link" href={version.previewUrl}>{t('Посмотреть превью', 'View preview')}</a>}
+                        {version.projectUrl && (
+                          <a className="companion-action-link companion-action-link--primary" href={`/?artVersion=${version.id}`}>
+                            {version.isCurrent ? t('Открыть в редакторе', 'Open in editor') : t('Восстановить в редакторе', 'Restore in editor')}
+                          </a>
+                        )}
+                        {version.projectUrl && <a className="companion-action-link" href={version.projectUrl}>{t('Скачать проект', 'Download project')}</a>}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="companion-panel">
