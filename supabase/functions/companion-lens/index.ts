@@ -3,8 +3,8 @@ import {
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2.99.3";
 import {
-  drainCompanionStorageDeleteOutbox,
   type CompanionStorageCleanupClient,
+  drainCompanionStorageDeleteOutbox,
 } from "../_shared/companionStorageCleanup.ts";
 import {
   classifyCompanionArtifactBackfillState,
@@ -15,6 +15,15 @@ import {
   type CompanionLensFacing,
   isCompanionLensFacing,
 } from "../_shared/companionLensFacing.ts";
+import {
+  deleteLensPreviewPaths,
+  lensYandexWritesEnabled,
+  listLensPreviewPaths,
+  presignLensYandexRequest,
+  readLensYandexStorageConfig,
+  signLensPreviewDownload,
+  uploadImmutableLensPreview,
+} from "../_shared/lensYandexStorage.ts";
 
 const API_VERSION = 1;
 const BUCKET = "mapkluss-lens";
@@ -31,9 +40,12 @@ const ORPHAN_SWEEP_PAGE_SIZE = 25;
 const ORPHAN_SWEEP_OWNER_PAGES = 1;
 const ORPHAN_SWEEP_SESSION_PAGE_SIZE = 100;
 const ORPHAN_SWEEP_MAX_OBJECTS = 100;
+const YANDEX_ORPHAN_SWEEP_MAX_OBJECTS = 10;
 const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_DEVICE_SESSIONS = 20;
 const CLEANUP_SESSION_BATCH_SIZE = 50;
+const lensYandexStorage = readLensYandexStorageConfig();
+const lensYandexWriteCutover = lensYandexWritesEnabled();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,6 +148,8 @@ interface LensCleanupStateRow {
   [key: string]: unknown;
   id: number;
   owner_offset: number;
+  yandex_cursor: string | null;
+  yandex_swept_at: string | null;
   updated_at: string;
 }
 
@@ -702,6 +716,32 @@ async function signedPreviewUrl(
     !session.preview_path || session.status === "closed" ||
     session.status === "expired"
   ) return undefined;
+  if (lensYandexStorage) {
+    try {
+      const probeUrl = await presignLensYandexRequest(
+        lensYandexStorage,
+        "HEAD",
+        session.preview_path,
+        15,
+      );
+      const probe = await fetch(probeUrl, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(1_500),
+      });
+      if (probe.ok) {
+        return await signLensPreviewDownload(
+          lensYandexStorage,
+          session.preview_path,
+          SIGNED_URL_SECONDS,
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "Lens Yandex preview probe failed",
+        error instanceof Error ? error.name : "unknown_error",
+      );
+    }
+  }
   const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(
     session.preview_path,
     SIGNED_URL_SECONDS,
@@ -785,26 +825,116 @@ async function removePathsBestEffort(
       console.warn("Lens Storage cleanup failed", error.message);
     } else removed += chunk.length;
   }
+  if (lensYandexStorage && paths.length) {
+    try {
+      await deleteLensPreviewPaths(lensYandexStorage, paths);
+    } catch (error) {
+      failed = true;
+      console.warn(
+        "Lens Yandex cleanup failed",
+        error instanceof Error ? error.name : "unknown_error",
+      );
+    }
+  }
   return { removed, failed };
+}
+
+async function removeSupabasePathsBestEffort(
+  admin: AdminClient,
+  paths: string[],
+): Promise<{ removed: number; failed: boolean }> {
+  let removed = 0;
+  let failed = false;
+  for (let index = 0; index < paths.length; index += 100) {
+    const chunk = paths.slice(index, index + 100);
+    const { error } = await admin.storage.from(BUCKET).remove(chunk);
+    if (error) failed = true;
+    else removed += chunk.length;
+  }
+  return { removed, failed };
+}
+
+async function removeYandexPathsBestEffort(
+  paths: string[],
+): Promise<{ removed: number; failed: boolean }> {
+  if (!lensYandexStorage || !paths.length) return { removed: 0, failed: false };
+  try {
+    return {
+      removed: await deleteLensPreviewPaths(lensYandexStorage, paths),
+      failed: false,
+    };
+  } catch (error) {
+    console.warn(
+      "Lens Yandex cleanup failed",
+      error instanceof Error ? error.name : "unknown_error",
+    );
+    return { removed: 0, failed: true };
+  }
 }
 
 async function listSessionPaths(
   admin: AdminClient,
   session: LensSessionRow,
-): Promise<{ paths: string[]; failed: boolean }> {
+): Promise<{
+  supabasePaths: string[];
+  yandexPaths: string[];
+  supabaseFailed: boolean;
+  yandexFailed: boolean;
+}> {
   const folder = `${session.owner_id}/${session.id}`;
   const { data, error } = await admin.storage.from(BUCKET).list(folder, {
     limit: 1000,
   });
+  let supabaseFailed = false;
+  let yandexFailed = false;
+  const supabasePaths: string[] = [];
+  const yandexPaths: string[] = [];
   if (error) {
     console.warn("Lens Storage list failed", error.message);
-    return { paths: [], failed: true };
+    supabaseFailed = true;
+  } else {
+    supabasePaths.push(
+      ...(data ?? []).filter((item) => item.name.endsWith(".png")).map((
+        item,
+      ) => `${folder}/${item.name}`),
+    );
+  }
+  if (lensYandexStorage) {
+    try {
+      let cursor: string | undefined;
+      for (let page = 0; page < 10; page += 1) {
+        const yandex = await listLensPreviewPaths(
+          lensYandexStorage,
+          `${folder}/`,
+          1000,
+          fetch,
+          new Date(),
+          cursor,
+        );
+        yandexPaths.push(...yandex.paths);
+        if (!yandex.truncated) break;
+        cursor = yandex.nextCursor;
+        if (page === 9) {
+          console.warn(
+            "Lens Yandex session listing exceeded cleanup bound",
+            folder,
+          );
+          yandexFailed = true;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Lens Yandex list failed",
+        error instanceof Error ? error.name : "unknown_error",
+      );
+      yandexFailed = true;
+    }
   }
   return {
-    paths: (data ?? []).filter((item) => item.name.endsWith(".png")).map((
-      item,
-    ) => `${folder}/${item.name}`),
-    failed: false,
+    supabasePaths: Array.from(new Set(supabasePaths)),
+    yandexPaths: Array.from(new Set(yandexPaths)),
+    supabaseFailed,
+    yandexFailed,
   };
 }
 
@@ -814,14 +944,21 @@ async function trimOldRevisions(
 ): Promise<void> {
   const oldestRetainedRevision = Math.max(0, Number(session.revision) - 1);
   const listed = await listSessionPaths(admin, session);
-  if (listed.failed) return;
-  const stale = listed.paths.filter((path) => {
+  const isStale = (path: string) => {
     const match = /\/(\d+)(?:-[a-f0-9]{64})?\.png$/.exec(path);
     // A future revision can already be uploaded while its DB compare-and-swap
     // is still in flight. Never delete it from a stale cleanup snapshot.
     return !!match && Number(match[1]) < oldestRetainedRevision;
-  });
-  await removePathsBestEffort(admin, stale);
+  };
+  await Promise.allSettled([
+    listed.supabaseFailed ? Promise.resolve() : removeSupabasePathsBestEffort(
+      admin,
+      listed.supabasePaths.filter(isStale),
+    ),
+    listed.yandexFailed
+      ? Promise.resolve()
+      : removeYandexPathsBestEffort(listed.yandexPaths.filter(isStale)),
+  ]);
 }
 
 async function clearClosedSessionStorage(
@@ -829,13 +966,20 @@ async function clearClosedSessionStorage(
   session: LensSessionRow,
 ): Promise<{ clean: boolean; removed: number }> {
   const before = await listSessionPaths(admin, session);
-  if (before.failed) return { clean: false, removed: 0 };
-  const removal = await removePathsBestEffort(admin, before.paths);
-  if (removal.failed) return { clean: false, removed: removal.removed };
+  const [supabaseRemoval, yandexRemoval] = await Promise.all([
+    before.supabaseFailed
+      ? Promise.resolve({ removed: 0, failed: true })
+      : removeSupabasePathsBestEffort(admin, before.supabasePaths),
+    before.yandexFailed
+      ? Promise.resolve({ removed: 0, failed: true })
+      : removeYandexPathsBestEffort(before.yandexPaths),
+  ]);
   const after = await listSessionPaths(admin, session);
   return {
-    clean: !after.failed && after.paths.length === 0,
-    removed: removal.removed,
+    clean: !supabaseRemoval.failed && !yandexRemoval.failed &&
+      !after.supabaseFailed && !after.yandexFailed &&
+      after.supabasePaths.length === 0 && after.yandexPaths.length === 0,
+    removed: supabaseRemoval.removed + yandexRemoval.removed,
   };
 }
 
@@ -1158,31 +1302,42 @@ async function handleSessionPublish(
   const nextRevision = baseRevision + 1;
   const path =
     `${principal.userId}/${sessionId}/${nextRevision}-${serverHash}.png`;
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(
-    path,
-    new Blob([bytes], { type: "image/png" }),
-    { contentType: "image/png", upsert: false, cacheControl: "60" },
-  );
-  let uploadedByThisRequest = !uploadError;
-  if (uploadError) {
-    const current = await loadSession(admin, sessionId);
-    if (current.publisher_lease_hash !== publisherLeaseHash) {
-      fail("publisher_required", 403);
-    }
-    if (Number(current.revision) !== baseRevision) {
-      fail("revision_conflict", 409);
-    }
-    // A previous invocation may have uploaded the immutable object and then
-    // stopped before the DB compare-and-swap. Reuse only a byte-identical file.
-    const { data: existing, error: downloadError } = await admin.storage.from(
-      BUCKET,
-    ).download(path);
-    if (downloadError || !existing) throw uploadError;
-    const existingHash = await sha256Hex(
-      new Uint8Array(await existing.arrayBuffer()),
+  let uploadedByThisRequest: boolean;
+  if (lensYandexStorage && lensYandexWriteCutover) {
+    const upload = await uploadImmutableLensPreview(
+      lensYandexStorage,
+      path,
+      bytes,
+      serverHash,
     );
-    if (existingHash !== serverHash) throw uploadError;
-    uploadedByThisRequest = false;
+    uploadedByThisRequest = !upload.reused;
+  } else {
+    const { error: uploadError } = await admin.storage.from(BUCKET).upload(
+      path,
+      new Blob([bytes], { type: "image/png" }),
+      { contentType: "image/png", upsert: false, cacheControl: "60" },
+    );
+    uploadedByThisRequest = !uploadError;
+    if (uploadError) {
+      const current = await loadSession(admin, sessionId);
+      if (current.publisher_lease_hash !== publisherLeaseHash) {
+        fail("publisher_required", 403);
+      }
+      if (Number(current.revision) !== baseRevision) {
+        fail("revision_conflict", 409);
+      }
+      // A previous invocation may have uploaded the immutable object and then
+      // stopped before the DB compare-and-swap. Reuse only a byte-identical file.
+      const { data: existing, error: downloadError } = await admin.storage.from(
+        BUCKET,
+      ).download(path);
+      if (downloadError || !existing) throw uploadError;
+      const existingHash = await sha256Hex(
+        new Uint8Array(await existing.arrayBuffer()),
+      );
+      if (existingHash !== serverHash) throw uploadError;
+      uploadedByThisRequest = false;
+    }
   }
 
   const timestamp = nowIso();
@@ -2052,6 +2207,67 @@ async function sweepOrphanedLensPrefixes(
   return removed;
 }
 
+async function sweepOrphanedYandexLensObjects(
+  admin: AdminClient,
+): Promise<number> {
+  if (!lensYandexStorage) return 0;
+  const { data: cleanupState, error: stateError } = await admin
+    .from("companion_lens_cleanup_state")
+    .select("yandex_cursor,yandex_swept_at")
+    .eq("id", 1)
+    .maybeSingle();
+  if (stateError) throw stateError;
+  if (
+    cleanupState?.yandex_swept_at &&
+    new Date(cleanupState.yandex_swept_at).getTime() >=
+      Date.now() - ORPHAN_SWEEP_INTERVAL_MS
+  ) return 0;
+
+  const page = await listLensPreviewPaths(
+    lensYandexStorage,
+    "",
+    YANDEX_ORPHAN_SWEEP_MAX_OBJECTS,
+    fetch,
+    new Date(),
+    cleanupState?.yandex_cursor ?? undefined,
+  );
+  const candidates = page.paths.flatMap((path) => {
+    const [ownerId, sessionId] = path.toLowerCase().split("/");
+    return UUID_PATTERN.test(ownerId) && UUID_PATTERN.test(sessionId)
+      ? [{ path, ownerId, sessionId }]
+      : [];
+  });
+  const sessionIds = Array.from(
+    new Set(candidates.map((item) => item.sessionId)),
+  );
+  const livePrefixes = new Set<string>();
+  if (sessionIds.length) {
+    const { data: liveSessions, error: sessionsError } = await admin
+      .from("companion_lens_sessions")
+      .select("id,owner_id")
+      .in("id", sessionIds);
+    if (sessionsError) throw sessionsError;
+    for (const session of liveSessions ?? []) {
+      livePrefixes.add(`${session.owner_id}/${session.id}`.toLowerCase());
+    }
+  }
+  const orphaned = candidates.filter((item) =>
+    !livePrefixes.has(`${item.ownerId}/${item.sessionId}`)
+  ).map((item) => item.path);
+  const removed = orphaned.length
+    ? await deleteLensPreviewPaths(lensYandexStorage, orphaned)
+    : 0;
+  const { error: cursorError } = await admin
+    .from("companion_lens_cleanup_state")
+    .upsert({
+      id: 1,
+      yandex_cursor: page.truncated ? page.nextCursor ?? null : null,
+      yandex_swept_at: nowIso(),
+    });
+  if (cursorError) throw cursorError;
+  return removed;
+}
+
 async function migrateLegacyCompanionImports(
   admin: CompanionStorageCleanupClient,
   limit = 5,
@@ -2080,7 +2296,9 @@ async function migrateLegacyCompanionImports(
     }
     const bytes = new Uint8Array(await source.arrayBuffer());
     const isPng = bytes.length >= 8 &&
-      [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value);
+      [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) =>
+        bytes[index] === value
+      );
     if (
       !isPng || bytes.byteLength !== expectedSize ||
       await sha256Hex(bytes) !== expectedSha
@@ -2158,7 +2376,9 @@ async function migrateLegacyCompanionArtifacts(
   const safeLimit = Math.max(1, Math.min(4, Math.trunc(limit)));
   const { data: rows, error } = await admin
     .from("art_artifacts")
-    .select("id,owner_id,kind,filename,bucket_id,storage_path,content_type,size_bytes,sha256,created_at")
+    .select(
+      "id,owner_id,kind,filename,bucket_id,storage_path,content_type,size_bytes,sha256,created_at",
+    )
     .eq("bucket_id", "mapartforge")
     .order("created_at", { ascending: true })
     .limit(safeLimit);
@@ -2196,15 +2416,27 @@ async function migrateLegacyCompanionArtifacts(
       if (promoteError) throw promoteError;
       migrated += 1;
     } catch (error) {
-      console.warn("Legacy Companion artifact backfill failed", artifact.artifactId, String(error));
+      console.warn(
+        "Legacy Companion artifact backfill failed",
+        artifact.artifactId,
+        String(error),
+      );
       const { data: current, error: reconcileError } = await admin
         .from("art_artifacts")
-        .select("id,owner_id,bucket_id,storage_path,content_type,size_bytes,sha256")
+        .select(
+          "id,owner_id,bucket_id,storage_path,content_type,size_bytes,sha256",
+        )
         .eq("id", artifact.artifactId)
         .eq("owner_id", String(row.owner_id))
         .maybeSingle();
-      if (!reconcileError
-        && classifyCompanionArtifactBackfillState(current, artifact, String(row.owner_id)) === "promoted") {
+      if (
+        !reconcileError &&
+        classifyCompanionArtifactBackfillState(
+            current,
+            artifact,
+            String(row.owner_id),
+          ) === "promoted"
+      ) {
         migrated += 1;
         continue;
       }
@@ -2212,7 +2444,11 @@ async function migrateLegacyCompanionArtifacts(
       // may have committed the promotion already. A later retry safely upserts
       // only hash-verified source bytes and verifies the private copy again.
       if (reconcileError) {
-        console.warn("Legacy Companion artifact reconciliation failed", artifact.artifactId, reconcileError.message);
+        console.warn(
+          "Legacy Companion artifact reconciliation failed",
+          artifact.artifactId,
+          reconcileError.message,
+        );
       }
       failed += 1;
     }
@@ -2263,7 +2499,11 @@ async function handleMaintenanceCleanup(
   const legacyArtifactBackfillEnabled =
     Deno.env.get("COMPANION_ARTIFACT_PRIVATE_BACKFILL_ENABLED") === "true";
   const legacyArtifactBackfill = legacyArtifactBackfillEnabled
-    ? await migrateLegacyCompanionArtifacts(cleanupAdmin, supabaseUrl, serviceKey)
+    ? await migrateLegacyCompanionArtifacts(
+      cleanupAdmin,
+      supabaseUrl,
+      serviceKey,
+    )
     : {
       migrated: 0,
       failed: 0,
@@ -2319,6 +2559,7 @@ async function handleMaintenanceCleanup(
     }
   }
   const orphanedObjects = await sweepOrphanedLensPrefixes(admin);
+  const orphanedYandexObjects = await sweepOrphanedYandexLensObjects(admin);
   const { error: limitsError } = await admin
     .from("companion_lens_rate_limits")
     .delete()
@@ -2333,6 +2574,7 @@ async function handleMaintenanceCleanup(
     removedObjects,
     trimmedObjects,
     orphanedObjects,
+    orphanedYandexObjects,
     reservationCleanup,
     companionStorageCleanup,
     legacyImportBackfill: {
@@ -2369,7 +2611,12 @@ Deno.serve(async (req) => {
       return json({ ...capabilities(), principalKind: principal.kind });
     }
     if (action === "maintenance_cleanup") {
-      return await handleMaintenanceCleanup(admin, principal, supabaseUrl, serviceKey);
+      return await handleMaintenanceCleanup(
+        admin,
+        principal,
+        supabaseUrl,
+        serviceKey,
+      );
     }
     if (Deno.env.get("LENS_ENABLED") !== "true") fail("lens_disabled", 503);
 

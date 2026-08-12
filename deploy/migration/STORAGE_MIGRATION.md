@@ -56,3 +56,42 @@ existing Supabase signer. Removing the flag restores Supabase-only reads.
 
 Do not enable dual-read until the inventory/copy rehearsal, signed-link expiry,
 guest isolation, authenticated previews/downloads, and rollback smoke all pass.
+
+## Lens preview cutover
+
+Lens preview images are temporary live-session data and are deliberately not
+part of the confirmed-artifact manifest above. Their database metadata,
+authorization, invite groups, revision compare-and-swap and Realtime wake-up
+messages remain in Supabase. Only the private PNG bytes may move to Yandex.
+
+Use a separate runtime identity and preferably a separate private bucket. Do
+not reuse either the migration writer or the generic artifact dual-read key.
+Restrict its bucket policy to list, get, put and delete only below
+`lens/v1/mapkluss-lens/`, require conditional writes, deny public ACLs and add a
+short lifecycle rule as a final safety net for abandoned temporary revisions.
+Configure these Edge Function secrets without committing their values:
+
+- `MAPKLUSS_YANDEX_LENS_STORAGE=true`
+- `YANDEX_LENS_STORAGE_ACCESS_KEY_ID`
+- `YANDEX_LENS_STORAGE_SECRET_ACCESS_KEY`
+- `YANDEX_LENS_STORAGE_BUCKET`
+- optional `YANDEX_LENS_STORAGE_PREFIX=lens/v1`
+- optional `YANDEX_LENS_STORAGE_ENDPOINT=https://storage.yandexcloud.net`
+- optional `YANDEX_LENS_STORAGE_REGION=ru-central1`
+
+With valid read credentials present, the flag controls new writes only. If the
+flag is enabled with an invalid or incomplete configuration, the function fails
+closed instead of writing to Supabase. With the switch on, new revisions use
+immutable `If-None-Match: *` writes and are read
+back to verify their exact SHA-256 before the database revision advances. A
+Yandex write failure aborts publication; it is never retried as a Supabase
+write. Reads probe Yandex first and fall back to Supabase for sessions created
+before cutover. Trim, stop and maintenance cleanup attempt both providers.
+
+Roll out only after creating the private bucket, lifecycle rule and restricted
+identity, then deploy `companion-lens` while the flag is still absent. Enable
+the secrets and flag last. Verify an authenticated editor start/publish/status,
+a device poll with a 60-second private URL, a second revision, invite/join and
+stop. Rollback consists of removing the flag while retaining the read
+credentials: new writes return to Supabase, existing Yandex-backed sessions
+remain readable, and the Yandex lifecycle rule removes temporary leftovers.

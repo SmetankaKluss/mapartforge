@@ -110,6 +110,11 @@ personal placements only.
 - PNG dimensions must equal `grid.wide * tileResolution` by `grid.tall * tileResolution`.
 - Storage uses immutable `owner/session/revision-sha256.png` objects in private `mapkluss-lens`.
   Keep the current and immediately previous revision during the signed-URL grace period.
+- The logical path above is provider-neutral. During the Yandex transition, new
+  previews may be stored below the private `lens/v1/mapkluss-lens/` prefix while
+  legacy active sessions remain readable from Supabase. Provider selection never
+  changes the API response or database path. Writes fail closed instead of being
+  replayed across providers; reads may safely fall back to Supabase.
 - The mod allows only one preview download/decode per session, keeps only the newest pending
   revision, rejects compressed bodies over 8 MiB, validates PNG dimensions before decode,
   and caps all installed Lens atlases to a shared 256 MiB texture budget.
