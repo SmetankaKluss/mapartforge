@@ -285,7 +285,7 @@ export function DeviceApprovalPage() {
             <h1>{t('Подключение MapKluss Companion', 'Connect MapKluss Companion')}</h1>
             <p>{t('Два шага: войди в аккаунт и подтверди одноразовый код из Minecraft.', 'Two steps: sign in, then approve the one-time code shown in Minecraft.')}</p>
           </div>
-          <span className={signedIn ? 'companion-session-badge is-ready' : 'companion-session-badge'}>{sessionLabel}</span>
+          <span className={signedIn ? 'companion-session-badge is-ready' : 'companion-session-badge'} title={sessionLabel}>{sessionLabel}</span>
         </header>
 
         <section className="companion-panel companion-device-panel">
@@ -305,6 +305,7 @@ export function DeviceApprovalPage() {
                         value={email}
                         onChange={event => setEmail(event.target.value)}
                         onKeyDown={event => { if (event.key === 'Enter' && !emailCooldownActive) void signInEmail(); }}
+                        aria-label={t('Электронная почта', 'Email address')}
                         placeholder="email@example.com"
                         type="email"
                         autoComplete="email"

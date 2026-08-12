@@ -216,6 +216,9 @@ body {
 }
 
 .public-breadcrumbs a {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
   color: var(--cyan);
   text-decoration: none;
 }
@@ -1165,7 +1168,7 @@ body {
 .companion-shell .companion-workbench-header h1 {
   margin: 0 0 5px;
   font-size: clamp(22px, 3vw, 30px);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .public-shell .companion-header p,
@@ -1246,8 +1249,8 @@ body {
   font-family: var(--font-ui);
   font-size: 38px;
   font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.025em;
+  line-height: 1.24;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 
@@ -1525,6 +1528,7 @@ body {
 }
 
 .public-shell .companion-device-page {
+  display: block;
   align-content: start;
 }
 
@@ -1535,6 +1539,12 @@ body {
 
 .public-shell .companion-device-header {
   margin-top: clamp(14px, 5vh, 48px);
+}
+
+.companion-shell .companion-cloud-rail .companion-mod-market-links a {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .public-shell .companion-device-panel {
@@ -1620,6 +1630,7 @@ body {
 .public-shell .companion-preview-placeholder strong {
   font-family: var(--font-ui);
   font-size: clamp(34px, 7vw, 72px);
+  line-height: 1.3;
 }
 
 .public-shell .companion-owner-avatar {
@@ -1736,7 +1747,7 @@ body {
   .companion-shell .companion-panel h2 { font-size: 17px; }
 
   .companion-shell .companion-guest-overview { padding: 24px 16px; }
-  .companion-shell .companion-guest-overview h2 { font-size: 28px; line-height: 1.12; }
+  .companion-shell .companion-guest-overview h2 { font-size: 28px; line-height: 1.22; }
   .companion-shell .companion-guest-lead { font-size: 14px; }
   .companion-shell .companion-guest-flow { margin-top: 22px; }
   .companion-shell .companion-guest-actions { display: grid; grid-template-columns: 1fr; }

@@ -585,7 +585,13 @@ export function CompanionArtPage({ artId }: Props) {
             <label className="companion-field">
               <span>{t('Новая коллекция', 'New collection')}</span>
               <div className="companion-inline-form">
-                <input value={newCollectionName} onChange={event => setNewCollectionName(event.target.value)} placeholder={t('Например, стены сервера', 'For example, server walls')} maxLength={80} />
+                <input
+                  value={newCollectionName}
+                  onChange={event => setNewCollectionName(event.target.value)}
+                  aria-label={t('Новая коллекция', 'New collection')}
+                  placeholder={t('Например, стены сервера', 'For example, server walls')}
+                  maxLength={80}
+                />
                 <button onClick={() => void createCollectionForArt()} disabled={creatingCollection || !newCollectionName.trim()}>
                   {creatingCollection ? t('Создаю...', 'Creating...') : t('Создать + добавить', 'Create + add')}
                 </button>

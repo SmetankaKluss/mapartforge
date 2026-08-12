@@ -338,9 +338,7 @@ function TelegramLoginCard(props: {
           <div id={widgetHostId} className="companion-telegram-widget" />
           {busy && <p className="companion-muted">{t('Вхожу через Telegram...', 'Signing in with Telegram...')}</p>}
         </>
-      ) : (
-        <p className="companion-muted">{t('Пока используй вход по почте.', 'Use email login for now.')}</p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -798,6 +796,7 @@ export function CompanionCloudPage() {
                   value={email}
                   onChange={event => setEmail(event.target.value)}
                   onKeyDown={event => { if (event.key === 'Enter' && !emailCooldownActive) void signInEmail(); }}
+                  aria-label={t('Электронная почта', 'Email address')}
                   placeholder="email@example.com"
                   type="email"
                   autoComplete="email"
@@ -995,7 +994,13 @@ export function CompanionCloudPage() {
               <label className="companion-field">
                 <span>{t('Название новой коллекции', 'New collection name')}</span>
                 <div className="companion-inline-form">
-                  <input value={newCollectionName} onChange={event => setNewCollectionName(event.target.value)} placeholder={t('Например, стены сервера', 'For example, server walls')} maxLength={80} />
+                  <input
+                    value={newCollectionName}
+                    onChange={event => setNewCollectionName(event.target.value)}
+                    aria-label={t('Название новой коллекции', 'New collection name')}
+                    placeholder={t('Например, стены сервера', 'For example, server walls')}
+                    maxLength={80}
+                  />
                   <button onClick={() => void createCollection()} disabled={creatingCollection || !newCollectionName.trim()}>{t('Создать', 'Create')}</button>
                 </div>
               </label>
@@ -1007,7 +1012,7 @@ export function CompanionCloudPage() {
                   <span>
                     {t('Артов', 'Arts')}: {(collection.itemCount ?? 0)} / {new Date(collection.updatedAt).toLocaleDateString(dateLocale)}
                   </span>
-                  <a href={`/collection/${collection.id}`}>{t('открыть', 'open')}</a>
+                  <a className="companion-action-link" href={`/collection/${collection.id}`}>{t('Открыть', 'Open')}</a>
                 </article>
               ))}
             </div>
