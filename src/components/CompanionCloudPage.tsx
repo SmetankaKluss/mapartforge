@@ -172,6 +172,21 @@ function importStatusChips(item: CompanionScanImport, t: (ru: string, en: string
   return chips;
 }
 
+function CompanionImportPreview({ item, compact = false }: { item: CompanionScanImport; compact?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const previewSrc = imageFailed ? null : companionPreviewSrc(item.signedUrl);
+
+  return (
+    <div className={`companion-import-preview${compact ? ' is-compact' : ''}`} aria-label={`${item.title}, ${item.mapGrid.wide}x${item.mapGrid.tall}`}>
+      {previewSrc ? (
+        <img src={previewSrc} alt="" onError={() => setImageFailed(true)} />
+      ) : (
+        <span aria-hidden="true">{item.mapGrid.wide}x{item.mapGrid.tall}</span>
+      )}
+    </div>
+  );
+}
+
 function matchesLibraryQuery(item: CompanionLibraryItem, query: string): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
@@ -940,15 +955,20 @@ export function CompanionCloudPage() {
                   </p>
                 )}
               </div>
-              {scanImport.signedUrl && (
-                <img className="companion-import-preview" src={scanImport.signedUrl} alt={scanImport.title} />
-              )}
+              <CompanionImportPreview item={scanImport} />
               <div className="companion-actions">
                 <a className="companion-action-link" href={`/?companionImport=${encodeURIComponent(scanImport.importId)}`}>
-                  {scanImport.createdArtId ? t('Обновить в редакторе', 'Update in editor') : t('Сохранить в редакторе', 'Save in editor')}
+                  {scanImport.createdArtId ? t('Открыть для обновления', 'Open to update') : t('Открыть как новый проект', 'Open as new project')}
                 </a>
                 {scanImport.createdArtId && <a className="companion-action-link" href={`/art/${scanImport.createdArtId}`}>{t('Открыть арт', 'Open art')}</a>}
                 {scanImport.signedUrl && <a className="companion-action-link" href={scanImport.signedUrl}>{t('Скачать PNG', 'Download PNG')}</a>}
+                <button
+                  className="companion-danger-mini"
+                  onClick={() => void deleteScanImport(scanImport.importId)}
+                  disabled={deletingImportId === scanImport.importId}
+                >
+                  {deletingImportId === scanImport.importId ? '...' : t('Удалить импорт', 'Delete import')}
+                </button>
               </div>
             </section>
           )}
@@ -1019,6 +1039,12 @@ export function CompanionCloudPage() {
 
             <div className="companion-panel">
               <h2>{t('Последние импорты', 'Recent imports')}</h2>
+              <p className="companion-muted">
+                {t(
+                  'Открой скан как новый проект, проверь его в редакторе и сохрани в облако. Ненужную запись импорта можно удалить отдельно.',
+                  'Open a scan as a new project, review it in the editor, then save it to Cloud. You can delete the import record separately.',
+                )}
+              </p>
               <div className="companion-filter-row">
                 <button className={importFilter === 'all' ? 'is-active' : ''} aria-pressed={importFilter === 'all'} onClick={() => setImportFilter('all')}>{t('Все', 'All')}</button>
                 <button className={importFilter === 'needs_save' ? 'is-active' : ''} aria-pressed={importFilter === 'needs_save'} onClick={() => setImportFilter('needs_save')}>{t('Нужно сохранить', 'Needs save')}</button>
@@ -1031,6 +1057,7 @@ export function CompanionCloudPage() {
                 <p className="companion-muted">{t('Под этот фильтр ничего не подходит.', 'Nothing matches this filter.')}</p>
               ) : filteredImports.map(item => (
                 <article className="companion-art companion-import-list-item" key={item.importId}>
+                  <CompanionImportPreview item={item} compact />
                   <div className="companion-import-copy">
                     <strong>{item.title}</strong>
                     <span>{item.mapGrid.wide}x{item.mapGrid.tall} / {formatImportSource(item.source, t)}</span>
@@ -1047,7 +1074,7 @@ export function CompanionCloudPage() {
                   <div className="companion-actions">
                     <a className="companion-action-link" href={`/cloud?import=${encodeURIComponent(item.importId)}`}>{t('Детали', 'Details')}</a>
                     <a className="companion-action-link" href={`/?companionImport=${encodeURIComponent(item.importId)}`}>
-                      {item.createdArtId ? t('Редактировать', 'Edit') : t('Сохранить', 'Save')}
+                      {item.createdArtId ? t('Открыть для обновления', 'Open to update') : t('Открыть как новый проект', 'Open as new project')}
                     </a>
                     {item.createdArtId && <a className="companion-action-link" href={`/art/${item.createdArtId}`}>{t('Открыть арт', 'Open art')}</a>}
                     <button

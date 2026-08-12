@@ -2426,16 +2426,27 @@ export default function App() {
       void setCompanionFavorite(manifest.artId, true).catch(favoriteError => {
         console.warn('Failed to add saved cloud art to favorites', favoriteError);
       });
-      if (currentCloudImportId) void attachCompanionImportToArt(currentCloudImportId, manifest.artId).catch(attachError => {
-        console.warn('Failed to attach import to saved cloud art', attachError);
-      });
+      let importAttached = true;
+      if (currentCloudImportId) {
+        try {
+          await attachCompanionImportToArt(currentCloudImportId, manifest.artId);
+        } catch (attachError) {
+          importAttached = false;
+          console.warn('Failed to attach import to saved cloud art', attachError);
+        }
+      }
 
       setCurrentCloudArtId(manifest.artId);
       setCurrentCloudTitle(manifest.title);
       setCurrentCloudPrivacy(manifest.privacy);
       setShowCloudSaveModal(false);
       window.history.replaceState(null, '', detachEditorUrlFromCloudSource(window.location.href));
-      showAppNotice(t('Арт сохранён в облако.', 'Art saved to Cloud.'));
+      showAppNotice(importAttached
+        ? t('Арт сохранён в облако.', 'Art saved to Cloud.')
+        : t(
+            'Арт сохранён, но запись импорта пока не привязалась. Обнови страницу Cloud и попробуй ещё раз.',
+            'The art was saved, but the import record was not linked yet. Refresh Cloud and try again.',
+          ), importAttached ? 'info' : 'error');
     } catch (err) {
       console.error('Cloud save failed', err);
       showAppNotice(err instanceof Error ? err.message : t('Не удалось сохранить арт в облако.', 'Could not save art to Cloud.'), 'error');
