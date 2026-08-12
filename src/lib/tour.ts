@@ -99,8 +99,8 @@ function createSteps(tourType: TourType, lang: 'ru' | 'en', switchTab?: (tab: Ta
   if (tourType === 'editing') {
     return [
       step('toolbar', 'settings', 'Выбери инструмент', 'Choose a tool',
-        'Здесь находятся отмена, кисть, заливка, выделения, паттерн, градиент, текст и режимы просмотра. Наведи на кнопку, чтобы увидеть горячую клавишу.',
-        'Undo, brush, fill, selections, pattern, gradient, text, and view modes live here. Hover a button to see its shortcut.',
+        'Здесь находятся отмена, кисть, заливка, выделения, паттерн, градиент и режимы просмотра. Наведи на кнопку, чтобы увидеть горячую клавишу.',
+        'Undo, brush, fill, selections, pattern, gradient, and view modes live here. Hover a button to see its shortcut.',
         'editing-tools', 'bottom'),
       step('tool-context', 'settings', 'Только нужные настройки', 'Only relevant settings',
         'Контекстная строка меняется вместе с инструментом: размер кисти, блок, оттенок, точки градиента или параметры выделения не смешиваются в одну панель.',
@@ -144,8 +144,8 @@ function createSteps(tourType: TourType, lang: 'ru' | 'en', switchTab?: (tab: Ta
         'PNG is a preview, MAP.DAT contains map data, and Litematic is a schematic. Two-layer creates a verified ZIP with every tile plan.',
         'export-files', 'left'),
       step('cloud', 'settings', 'Cloud передаёт арт в Companion', 'Cloud hands the art to Companion',
-        'Сохрани арт в аккаунт, чтобы открыть его в моде без ручного переноса файлов. Здесь же запускается Lens.',
-        'Save the art to your account to open it in the mod without manual file transfer. Lens also starts here.',
+        'Сохрани арт в аккаунт, чтобы открыть его в моде без ручного переноса файлов. Lens запускается отсюда и передаёт текущий preview в активную сессию.',
+        'Save the art to your account to open it in the mod without manual file transfer. Lens starts here and sends the current preview to an active session.',
         'cloud-companion', 'bottom'),
     ];
   }

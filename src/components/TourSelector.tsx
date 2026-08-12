@@ -35,7 +35,7 @@ export function TourSelector({ lang, hasArtwork, isWelcome = false, onSelect, on
       id: 'editing',
       icon: mkIcons.brush,
       title: t('Точная правка', 'Precise editing'),
-      description: t('Холст, инструменты, параметры, коррекция, палитра и слои.', 'Canvas, tools, settings, adjustments, palette, and layers.'),
+      description: t('Холст, кисти, выделения, коррекция, палитра и слои.', 'Canvas, brushes, selections, adjustments, palette, and layers.'),
       duration: t('≈ 1 мин', '≈ 1 min'),
       disabled: !hasArtwork,
     },
