@@ -17,8 +17,10 @@ describe('companion artifact naming', () => {
       .toBe('castle_01_3x2_two_layer.zip');
   });
 
-  it('keeps cyrillic names readable and falls back for empty names', () => {
-    expect(companionSlug('  Мой арт №1!  ')).toBe('мой_арт_1');
+  it('keeps cyrillic titles while producing storage-safe ASCII filenames', () => {
+    expect(companionSlug('  Мой арт №1!  ')).toBe('moy_art_1');
+    expect(companionArtifactFilename('Русский пейзаж', { wide: 2, tall: 3 }, 'preview_png'))
+      .toBe('russkiy_peyzazh_2x3.png');
     expect(companionSlug('***')).toBe('mapkluss_art');
   });
 });

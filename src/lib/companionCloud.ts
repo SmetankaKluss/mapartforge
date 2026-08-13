@@ -160,7 +160,17 @@ async function uploadPreparedArtifact(artifact: PreparedArtifact): Promise<void>
   if (error) throw error;
 }
 
-const COMPANION_UPLOAD_CONCURRENCY = 3;
+const SMALL_SAVE_UPLOAD_CONCURRENCY = 6;
+const LARGE_SAVE_UPLOAD_CONCURRENCY = 3;
+const LARGE_SAVE_THRESHOLD_BYTES = 32 * 1024 * 1024;
+const PARALLEL_GENERATION_MAX_MAPS = 36;
+
+function companionUploadConcurrency(artifacts: PreparedArtifact[]): number {
+  const totalBytes = artifacts.reduce((sum, artifact) => sum + artifact.manifest.sizeBytes, 0);
+  return totalBytes <= LARGE_SAVE_THRESHOLD_BYTES
+    ? SMALL_SAVE_UPLOAD_CONCURRENCY
+    : LARGE_SAVE_UPLOAD_CONCURRENCY;
+}
 
 async function removeStorageObjects(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
@@ -715,9 +725,9 @@ export async function updateCompanionTracker(sessionId: string, patch: {
 
 export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<CompanionArtManifest> {
   const supabase = getSupabaseClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw new Error('Войдите в аккаунт MapKluss перед сохранением.');
-  const ownerId = userData.user.id;
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session?.user) throw new Error('Войдите в аккаунт MapKluss перед сохранением.');
+  const ownerId = sessionData.session.user.id;
   const artId = input.artId ?? requireUuid();
   const versionId = requireUuid();
   const privacy = normalizeEditableArtPrivacy(input.privacy);
@@ -725,9 +735,8 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
   const buildTechnique = coerceBuildTechniqueForPlatform(input.buildTechnique, input.platformMode ?? 'java');
 
   const projectBlob = new Blob([input.projectJson], { type: 'application/json;charset=utf-8' });
-  const previewBlob = await blobFromImageData(previewData);
   const structure = input.mode === '3d' ? 'staircase' : 'flat';
-  const litematicBytes = await buildLitematicBytes(
+  const buildLitematic = () => buildLitematicBytes(
     input.imageData,
     input.palette,
     input.blockSelection,
@@ -738,7 +747,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     input.supportMode,
     input.minecraftVersion,
   );
-  const litematicTilesZip = await buildLitematicTilesZipBlob(
+  const buildTiles = (prebuiltSingleTile?: Uint8Array) => buildLitematicTilesZipBlob(
     input.imageData,
     input.palette,
     input.blockSelection,
@@ -748,12 +757,40 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     structure === 'staircase' ? input.supportBlock : 'air',
     input.supportMode,
     input.staircaseMode,
-    input.grid.wide === 1 && input.grid.tall === 1 ? litematicBytes : undefined,
+    prebuiltSingleTile,
   );
+  let previewBlob: Blob;
+  let litematicBytes: Uint8Array;
+  let litematicTilesZip: Blob;
+  let mapDatZip: Blob;
+  if (input.grid.wide * input.grid.tall <= PARALLEL_GENERATION_MAX_MAPS) {
+    const litematicPromise = buildLitematic();
+    const litematicTilesPromise = input.grid.wide === 1 && input.grid.tall === 1
+      ? litematicPromise.then(prebuilt => buildTiles(prebuilt))
+      : buildTiles();
+    [previewBlob, litematicBytes, litematicTilesZip, mapDatZip] = await Promise.all([
+      blobFromImageData(previewData),
+      litematicPromise,
+      litematicTilesPromise,
+      buildMapDatZipBlob(input.imageData, input.grid, input.palette, 0, input.minecraftVersion),
+    ]);
+  } else {
+    previewBlob = await blobFromImageData(previewData);
+    litematicBytes = await buildLitematic();
+    litematicTilesZip = await buildTiles(
+      input.grid.wide === 1 && input.grid.tall === 1 ? litematicBytes : undefined,
+    );
+    mapDatZip = await buildMapDatZipBlob(
+      input.imageData,
+      input.grid,
+      input.palette,
+      0,
+      input.minecraftVersion,
+    );
+  }
   const materials = countMaterials(input.imageData, input.palette, input.blockSelection);
   const materialsTxt = formatMaterialsAsText(materials, input.grid);
   const materialsCsv = formatMaterialsAsCSV(materials, input.grid);
-  const mapDatZip = await buildMapDatZipBlob(input.imageData, input.grid, input.palette, 0, input.minecraftVersion);
   const frameCommands = buildFrameFillCommands({ mapGrid: input.grid, startMapId: 0, minecraftVersion: input.minecraftVersion });
   const frameDatapack = blobFromDatapack(buildFrameFillDatapackFiles({ mapGrid: input.grid, startMapId: 0, minecraftVersion: input.minecraftVersion }));
 
@@ -851,7 +888,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
 
     await mapWithConcurrency(
       preparedArtifacts,
-      COMPANION_UPLOAD_CONCURRENCY,
+      companionUploadConcurrency(preparedArtifacts),
       async artifact => {
         await uploadPreparedArtifact(artifact);
         uploadedStoragePaths.push(artifact.manifest.storagePath);

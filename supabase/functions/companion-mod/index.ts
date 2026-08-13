@@ -105,12 +105,19 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 function companionSlug(input: string): string {
+  const cyrillicMap: Record<string, string> = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh', з: 'z',
+    и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+    с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch',
+    ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  };
   const cleaned = input
     .replace(/№/g, '')
     .trim()
     .toLowerCase()
     .normalize('NFKC')
-    .replace(/[^a-z0-9а-яё_-]+/giu, '_')
+    .replace(/[а-яё]/g, letter => cyrillicMap[letter] ?? '')
+    .replace(/[^a-z0-9_-]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
   return cleaned || 'mapkluss_art';

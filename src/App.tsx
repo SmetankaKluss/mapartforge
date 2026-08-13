@@ -2396,6 +2396,7 @@ export default function App() {
     setCloudSaving(true);
     const saveKind = currentCloudArtId ? 'update' : 'create';
     try {
+      setShowCloudSaveModal(false);
       await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
       const projectJson = buildCurrentCloudProjectJson();
       const manifest = await saveCompanionArt({
@@ -2440,7 +2441,6 @@ export default function App() {
       setCurrentCloudArtId(manifest.artId);
       setCurrentCloudTitle(manifest.title);
       setCurrentCloudPrivacy(manifest.privacy);
-      setShowCloudSaveModal(false);
       window.history.replaceState(null, '', detachEditorUrlFromCloudSource(window.location.href));
       trackEvent('cloud_save_completed', {
         save_kind: saveKind,

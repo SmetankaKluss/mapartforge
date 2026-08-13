@@ -13,17 +13,11 @@ interface CloudSaveModalProps {
   onClose: () => void;
 }
 
-function privacyOptionCopy(value: ArtPrivacy, t: (ru: string, en: string) => string): { label: string; hint: string } {
+function privacyOptionLabel(value: ArtPrivacy, t: (ru: string, en: string) => string): string {
   if (value === 'private') {
-    return {
-      label: t('Приватный', 'Private'),
-      hint: t('Доступен только тебе и модулю после входа.', 'Available only to you and the mod after sign-in.'),
-    };
+    return t('Приватный', 'Private');
   }
-  return {
-    label: t('По ссылке', 'Unlisted'),
-    hint: t('Можно открыть по ссылке, в публичной галерее не видно.', 'Accessible by link, hidden from the public gallery.'),
-  };
+  return t('По ссылке', 'Unlisted');
 }
 
 const PRIVACY_OPTIONS: ArtPrivacy[] = ['unlisted', 'private'];
@@ -34,8 +28,6 @@ export function CloudSaveModal({ defaultTitle, defaultPrivacy, isUpdate, mapGrid
   const [privacy, setPrivacy] = useState<ArtPrivacy>(() => normalizeEditableArtPrivacy(defaultPrivacy));
 
   const trimmedTitle = title.trim();
-  const selectedOption = privacyOptionCopy(privacy, t);
-
   function handleSave() {
     if (!trimmedTitle || busy) return;
     onSave({ title: trimmedTitle, privacy: normalizeEditableArtPrivacy(privacy) });
@@ -71,14 +63,10 @@ export function CloudSaveModal({ defaultTitle, defaultPrivacy, isUpdate, mapGrid
             <span>{t('Доступ', 'Privacy')}</span>
             <select value={privacy} onChange={event => setPrivacy(event.target.value as ArtPrivacy)}>
               {PRIVACY_OPTIONS.map(option => (
-                <option key={option} value={option}>{privacyOptionCopy(option, t).label}</option>
+                <option key={option} value={option}>{privacyOptionLabel(option, t)}</option>
               ))}
             </select>
           </label>
-
-          <p className="cloud-save-hint">{selectedOption.hint}</p>
-          <p className="cloud-save-meta">{t('Публичная галерея появится позже. Сейчас лучше сохранять арт приватно или по ссылке.', 'The public gallery will come later. For now, save art as private or unlisted.')}</p>
-          <p className="cloud-save-meta">{t(`${mapGrid.wide}x${mapGrid.tall} карт / новая версия будет доступна на сайте и в моде.`, `${mapGrid.wide}x${mapGrid.tall} maps / the new version will be available on the site and in the mod.`)}</p>
         </div>
 
         <div className="cloud-save-actions">
