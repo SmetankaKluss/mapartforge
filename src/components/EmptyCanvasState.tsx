@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLocale } from '../lib/useLocale';
+import { runAfterPageLoad } from '../lib/deferredWork';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 
@@ -16,17 +17,19 @@ function StaticMotionFallback() {
 export function EmptyCanvasState() {
   const { t } = useLocale();
   const [paused, setPaused] = useState(false);
+  const [motionReady, setMotionReady] = useState(false);
   const playing = !paused;
+
+  useEffect(() => runAfterPageLoad(() => setMotionReady(true), 1_200), []);
 
   return (
     <div className="canvas-placeholder">
       <div className="empty-canvas-motion-shell" aria-hidden="true">
-        <Suspense fallback={<StaticMotionFallback />}>
-          <EmptyCanvasMotion
-            playing={playing}
-            initialFrame={0}
-          />
-        </Suspense>
+        {motionReady ? (
+          <Suspense fallback={<StaticMotionFallback />}>
+            <EmptyCanvasMotion playing={playing} initialFrame={0} />
+          </Suspense>
+        ) : <StaticMotionFallback />}
       </div>
       <div className="empty-canvas-copy">
         <p className="ph-title">{t('Перетащи арт на холст', 'Drop art onto the canvas')}</p>

@@ -67,10 +67,18 @@
   if (!mapKlussIsLocalHost) {
    window.gtag('js', new Date());
    window.gtag('config', 'G-2W7QM7DL8R');
-   const analyticsScript = document.createElement('script');
-   analyticsScript.async = true;
-   analyticsScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-2W7QM7DL8R';
-   document.head.appendChild(analyticsScript);
+   const loadAnalytics = function loadAnalytics() {
+    const appendAnalytics = function appendAnalytics() {
+     const analyticsScript = document.createElement('script');
+     analyticsScript.async = true;
+     analyticsScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-2W7QM7DL8R';
+     document.head.appendChild(analyticsScript);
+    };
+    if ('requestIdleCallback' in window) window.requestIdleCallback(appendAnalytics, { timeout: 1500 });
+    else window.setTimeout(appendAnalytics, 500);
+   };
+   if (document.readyState === 'complete') loadAnalytics();
+   else window.addEventListener('load', loadAnalytics, { once: true });
   }
  </script>
  <style>

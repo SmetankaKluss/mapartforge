@@ -22,15 +22,23 @@ export function EmptyCanvasMotion({ playing, initialFrame }: EmptyCanvasMotionPr
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
+    let playHandle: number | undefined;
 
     const syncPlayback = () => {
-      if (playing && document.visibilityState === 'visible') player.play();
-      else player.pause();
+      if (playHandle !== undefined) cancelAnimationFrame(playHandle);
+      if (playing && document.visibilityState === 'visible') {
+        playHandle = requestAnimationFrame(() => player.play());
+      } else {
+        player.pause();
+      }
     };
 
     syncPlayback();
     document.addEventListener('visibilitychange', syncPlayback);
-    return () => document.removeEventListener('visibilitychange', syncPlayback);
+    return () => {
+      if (playHandle !== undefined) cancelAnimationFrame(playHandle);
+      document.removeEventListener('visibilitychange', syncPlayback);
+    };
   }, [playing]);
 
   return (

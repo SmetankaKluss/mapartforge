@@ -1,3 +1,5 @@
+import { runAfterPageLoad } from './deferredWork';
+
 type AnalyticsParams = Record<string, string | number | boolean | null | undefined>;
 type AttributionSnapshot = {
   source?: string;
@@ -128,10 +130,12 @@ export function initClarity(projectId: string | undefined): void {
     window.clarity!.q!.push(args);
   };
 
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.clarity.ms/tag/${encodeURIComponent(projectId)}`;
-  document.head.appendChild(script);
+  runAfterPageLoad(() => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.clarity.ms/tag/${encodeURIComponent(projectId)}`;
+    document.head.appendChild(script);
+  });
 }
 
 export function initAnalyticsContext(): void {
