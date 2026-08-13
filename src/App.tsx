@@ -2394,6 +2394,7 @@ export default function App() {
     }
 
     setCloudSaving(true);
+    const saveKind = currentCloudArtId ? 'update' : 'create';
     try {
       await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
       const projectJson = buildCurrentCloudProjectJson();
@@ -2441,6 +2442,15 @@ export default function App() {
       setCurrentCloudPrivacy(manifest.privacy);
       setShowCloudSaveModal(false);
       window.history.replaceState(null, '', detachEditorUrlFromCloudSource(window.location.href));
+      trackEvent('cloud_save_completed', {
+        save_kind: saveKind,
+        privacy,
+        map_mode: mapMode,
+        map_wide: mapGrid.wide,
+        map_tall: mapGrid.tall,
+        source_kind: currentCloudImportId ? 'companion_import' : 'editor',
+        import_attached: importAttached,
+      });
       showAppNotice(importAttached
         ? t('Арт сохранён в облако.', 'Art saved to Cloud.')
         : t(
@@ -2449,6 +2459,7 @@ export default function App() {
           ), importAttached ? 'info' : 'error');
     } catch (err) {
       console.error('Cloud save failed', err);
+      trackEvent('cloud_save_failed', { save_kind: saveKind, failure_stage: 'save' });
       showAppNotice(err instanceof Error ? err.message : t('Не удалось сохранить арт в облако.', 'Could not save art to Cloud.'), 'error');
     } finally {
       setCloudSaving(false);
@@ -2761,6 +2772,7 @@ export default function App() {
           scanImport.mapGrid,
           t('Импорт из мода открыт в редакторе.', 'Companion scan import opened in the editor.'),
         );
+        trackEvent('cloud_reopen_completed', { source_kind: 'companion_import', content_kind: 'preview' });
         return;
       }
 
@@ -2775,6 +2787,7 @@ export default function App() {
         setCurrentCloudArtId(downloaded.version.artId);
         setCurrentCloudTitle(downloaded.version.title);
         setCurrentCloudPrivacy('unlisted');
+        trackEvent('cloud_reopen_completed', { source_kind: 'version', content_kind: 'project' });
         return;
       }
 
@@ -2788,6 +2801,7 @@ export default function App() {
         setCurrentCloudArtId(downloaded.manifest.artId);
         setCurrentCloudTitle(downloaded.manifest.title);
         setCurrentCloudPrivacy(downloaded.manifest.privacy);
+        trackEvent('cloud_reopen_completed', { source_kind: 'art', content_kind: 'project' });
         return;
       }
 
@@ -2805,6 +2819,7 @@ export default function App() {
             'Project data was unavailable, so the art preview was opened instead.',
           ),
         );
+        trackEvent('cloud_reopen_completed', { source_kind: 'art', content_kind: 'preview_fallback' });
         return;
       }
 
@@ -2827,6 +2842,29 @@ export default function App() {
     cloudImportLoadedRef.current = true;
     void handleCloudImport();
   }, [handleCloudImport]);
+
+  useEffect(() => {
+    const target = document.querySelector<HTMLElement>('.support-btn');
+    if (!target) return;
+    let tracked = false;
+    const send = () => {
+      if (tracked) return;
+      tracked = true;
+      trackEvent('support_header_visible', { placement: 'editor_header' });
+    };
+    if (!('IntersectionObserver' in window)) {
+      if (target.getClientRects().length > 0) send();
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        send();
+        observer.disconnect();
+      }
+    }, { threshold: 0.5 });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>

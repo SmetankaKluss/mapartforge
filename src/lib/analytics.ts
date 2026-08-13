@@ -1,6 +1,10 @@
 import { runAfterPageLoad } from './deferredWork';
 
 type AnalyticsParams = Record<string, string | number | boolean | null | undefined>;
+export interface AnalyticsDebugEvent {
+  name: string;
+  params: AnalyticsParams;
+}
 type AttributionSnapshot = {
   source?: string;
   medium?: string;
@@ -15,6 +19,11 @@ type AttributionSnapshot = {
 
 const ATTRIBUTION_STORAGE_KEY = 'mapkluss_attribution_v1';
 const ATTRIBUTION_QUERY_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'] as const;
+const BLOCKED_ANALYTICS_PARAM_KEYS = new Set([
+  'access_token', 'art_id', 'device_code', 'email', 'filename', 'message', 'password',
+  'preview_url', 'refresh_token', 'session_id', 'signature', 'stack', 'stack_head',
+  'title', 'token', 'user_code', 'user_id',
+]);
 
 export function sanitizeAnalyticsPath(pathAndQuery: string): string {
   try {
@@ -41,14 +50,25 @@ declare global {
     dataLayer?: unknown[];
     gtag?: (command: 'event' | 'config' | 'js', target: string | Date, params?: AnalyticsParams) => void;
     clarity?: ((command: string, ...args: unknown[]) => void) & { q?: unknown[] };
+    mapKlussAnalyticsDebugEvents?: AnalyticsDebugEvent[];
   }
 }
 
-function cleanParams(params: AnalyticsParams = {}): AnalyticsParams {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null),
-  ) as AnalyticsParams;
+export function sanitizeAnalyticsParams(params: AnalyticsParams = {}): AnalyticsParams {
+  const result: AnalyticsParams = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || BLOCKED_ANALYTICS_PARAM_KEYS.has(key.toLowerCase())) continue;
+    if (typeof value !== 'string') {
+      result[key] = value;
+      continue;
+    }
+    const normalized = key === 'path' || key.endsWith('_path') ? sanitizeAnalyticsPath(value) : value;
+    result[key] = normalized.slice(0, 100);
+  }
+  return result;
 }
+
+const cleanParams = sanitizeAnalyticsParams;
 
 function getReferrerHost(): string | undefined {
   if (typeof document === 'undefined' || !document.referrer) return undefined;
@@ -118,8 +138,28 @@ function getAttributionParams(): AnalyticsParams {
 }
 
 export function trackEvent(name: string, params: AnalyticsParams = {}): void {
-  if (typeof window === 'undefined' || isLocalAnalyticsHost()) return;
-  window.gtag?.('event', name, cleanParams({ ...getAttributionParams(), ...params }));
+  if (typeof window === 'undefined') return;
+  const cleaned = cleanParams({ ...getAttributionParams(), ...params });
+  if (isLocalAnalyticsHost()) {
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('analyticsDebug') === '1') {
+      window.mapKlussAnalyticsDebugEvents = window.mapKlussAnalyticsDebugEvents ?? [];
+      window.mapKlussAnalyticsDebugEvents.push({ name, params: cleaned });
+    }
+    return;
+  }
+  window.gtag?.('event', name, cleaned);
+}
+
+export function trackReleaseSeen(version: string, pageType: string): void {
+  if (typeof window === 'undefined') return;
+  const storageKey = `mapkluss_release_seen:${version}`;
+  try {
+    if (window.sessionStorage.getItem(storageKey)) return;
+    window.sessionStorage.setItem(storageKey, '1');
+  } catch {
+    // A release event is still useful when session storage is unavailable.
+  }
+  trackEvent('app_release_seen', { app_version: version, page_type: pageType });
 }
 
 export function initClarity(projectId: string | undefined): void {

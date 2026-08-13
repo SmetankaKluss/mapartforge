@@ -15,6 +15,16 @@ interface NormalizedClientError {
   stackHead?: string;
 }
 
+export interface SafeClientErrorTelemetry {
+  error_category: ClientErrorCategory;
+  error_origin: 'first_party' | 'third_party' | 'unknown';
+  error_kind: 'runtime' | 'promise_rejection';
+  has_location: boolean;
+  page_type: string;
+  app_version: string;
+  user_agent_family: string;
+}
+
 let installed = false;
 
 function trim(value: string | undefined, max = 180): string | undefined {
@@ -62,6 +72,16 @@ export function getClientErrorSignature(message: string): string {
   return `${category}:${message.toLowerCase().replace(/\s+/g, ' ').slice(0, 96)}`;
 }
 
+export function getClientErrorOrigin(source: string | undefined): SafeClientErrorTelemetry['error_origin'] {
+  if (!source) return 'unknown';
+  try {
+    const url = new URL(source, window.location.origin);
+    return url.origin === window.location.origin ? 'first_party' : 'third_party';
+  } catch {
+    return 'unknown';
+  }
+}
+
 function getUserAgentFamily(): string {
   const ua = navigator.userAgent;
   if (ua.includes('YaBrowser')) return 'yandex';
@@ -83,25 +103,34 @@ function clarityEventName(category: ClientErrorCategory): string {
   }
 }
 
-function reportClientError(error: NormalizedClientError, pageType: string): void {
+export function buildSafeClientErrorTelemetry(
+  error: NormalizedClientError,
+  pageType: string,
+  kind: SafeClientErrorTelemetry['error_kind'],
+): SafeClientErrorTelemetry {
   const message = trim(error.message || 'Unknown client error') ?? 'Unknown client error';
-  const category = getClientErrorCategory(message);
-
-  trackEvent('client_error_captured', {
-    message,
-    signature: getClientErrorSignature(message),
-    source: trim(error.source, 160),
-    line: error.line,
-    column: error.column,
-    stack_head: error.stackHead,
-    path: window.location.pathname,
+  return {
+    error_category: getClientErrorCategory(message),
+    error_origin: getClientErrorOrigin(error.source),
+    error_kind: kind,
+    has_location: Boolean(error.line || error.column),
     page_type: pageType,
     app_version: VERSION,
     user_agent_family: getUserAgentFamily(),
-  });
+  };
+}
+
+function reportClientError(
+  error: NormalizedClientError,
+  pageType: string,
+  kind: SafeClientErrorTelemetry['error_kind'],
+): void {
+  const telemetry = buildSafeClientErrorTelemetry(error, pageType, kind);
+
+  trackEvent('client_error_captured', { ...telemetry });
 
   try {
-    window.clarity?.('event', clarityEventName(category));
+    window.clarity?.('event', clarityEventName(telemetry.error_category));
   } catch {
     // Clarity must never become another source of user-facing errors.
   }
@@ -112,10 +141,10 @@ export function installClientErrorReporting({ pageType }: ErrorReportingOptions)
   installed = true;
 
   window.addEventListener('error', event => {
-    reportClientError(normalizeErrorEvent(event), pageType);
+    reportClientError(normalizeErrorEvent(event), pageType, 'runtime');
   });
 
   window.addEventListener('unhandledrejection', event => {
-    reportClientError(normalizeReason(event.reason), pageType);
+    reportClientError(normalizeReason(event.reason), pageType, 'promise_rejection');
   });
 }

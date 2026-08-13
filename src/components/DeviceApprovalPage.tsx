@@ -5,6 +5,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import { useLocale } from '../lib/useLocale';
 import { applyPageMeta } from '../lib/meta';
 import { PublicSiteHeader } from './PublicSiteHeader';
+import { trackEvent } from '../lib/analytics';
 
 declare global {
   interface Window {
@@ -140,6 +141,7 @@ export function DeviceApprovalPage() {
       const nextUrl = new URL(window.location.href);
       if (code.trim()) nextUrl.searchParams.set('code', code.trim().toUpperCase());
       await signInWithCompanionEmail(trimmedEmail, nextUrl.toString());
+      trackEvent('cloud_login_requested', { method: 'email', surface: 'device' });
       const nextCooldown = Date.now() + COMPANION_EMAIL_COOLDOWN_MS;
       setEmailCooldownUntil(nextCooldown);
       setEmailCooldownNow(Date.now());
@@ -173,6 +175,7 @@ export function DeviceApprovalPage() {
       });
       if (error) throw error;
       setStatus('done');
+      trackEvent('companion_device_login_approved', { approval_mode: 'authenticated' });
       setMessage(t('Вход мода подтверждён. Можно вернуться в Minecraft.', 'Mod login approved. You can return to Minecraft.'));
     } catch (err) {
       setStatus('error');
@@ -236,6 +239,7 @@ export function DeviceApprovalPage() {
     setMessage('');
     try {
       await signInWithCompanionTelegram(auth);
+      trackEvent('cloud_login_completed', { method: 'telegram', surface: 'device' });
       await refreshSessionLabel();
       if (code.trim().length >= 4) {
         await approve();

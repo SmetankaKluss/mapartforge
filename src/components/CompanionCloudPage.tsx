@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { COMPANION_EMAIL_COOLDOWN_MS, TELEGRAM_LOGIN_BOT_USERNAME, createCompanionCollection, deleteCompanionAccount, deleteCompanionScanImport, getCompanionCloudOverview, getCompanionScanImport, getCompanionTrackerForArt, getCurrentCompanionAuthUser, isCompanionEmailRateLimitError, isTelegramLoginHostAllowed, linkCompanionTelegram, normalizeCompanionEmailError, signInWithCompanionEmail, signInWithCompanionTelegram, signOutCompanion, unlinkCompanionTelegram } from '../lib/companionCloud';
 import type { CompanionCollection, CompanionLibraryItem, CompanionProfileSummary, CompanionScanImport, CompanionUsageSummary, TelegramAuthPayload } from '../lib/companionTypes';
 import { useLocale } from '../lib/useLocale';
@@ -6,6 +6,7 @@ import { applyPageMeta } from '../lib/meta';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { PublicSiteHeader } from './PublicSiteHeader';
+import { trackEvent } from '../lib/analytics';
 
 declare global {
   interface Window {
@@ -390,12 +391,21 @@ function CompanionModDownloadPanel({
         </select>
       </label>
       <div className="companion-mod-download-actions">
-        <a className="companion-primary-download" href={selected.href} download={selected.filename}>
+        <a
+          className="companion-primary-download"
+          href={selected.href}
+          download={selected.filename}
+          onClick={() => trackEvent('companion_download_clicked', {
+            channel: 'site',
+            minecraft_version: selected.minecraftVersion,
+            mod_loader: 'fabric',
+          })}
+        >
           {t('Скачать', 'Download')}
         </a>
         <div className="companion-mod-market-links" aria-label={t('Площадки мода', 'Mod platforms')}>
-          <a href={COMPANION_MODRINTH_URL} target="_blank" rel="noopener noreferrer">Modrinth</a>
-          <a href={COMPANION_CURSEFORGE_URL} target="_blank" rel="noopener noreferrer">CurseForge</a>
+          <a href={COMPANION_MODRINTH_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('companion_marketplace_clicked', { channel: 'modrinth' })}>Modrinth</a>
+          <a href={COMPANION_CURSEFORGE_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('companion_marketplace_clicked', { channel: 'curseforge' })}>CurseForge</a>
         </div>
       </div>
     </section>
@@ -455,6 +465,7 @@ export function CompanionCloudPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cloudSessionTrackedRef = useRef(false);
   const searchParams = new URLSearchParams(window.location.search);
   const importId = searchParams.get('import');
   const useMockCloud = import.meta.env.DEV && searchParams.get('cloudMock') === '1';
@@ -637,6 +648,10 @@ export function CompanionCloudPage() {
       setUserId(user?.userId ?? null);
       setUserEmail(user?.email ?? null);
       if (user) {
+        if (!cloudSessionTrackedRef.current) {
+          cloudSessionTrackedRef.current = true;
+          trackEvent('cloud_login_completed', { method: 'session', surface: 'cloud' });
+        }
         const overview = await getCompanionCloudOverview();
         setProfile(overview.profile);
         setUsage(overview.usage);
@@ -721,6 +736,7 @@ export function CompanionCloudPage() {
     setEmailSent(false);
     try {
       await signInWithCompanionEmail(trimmedEmail, window.location.href);
+      trackEvent('cloud_login_requested', { method: 'email', surface: 'cloud' });
       const nextCooldown = Date.now() + COMPANION_EMAIL_COOLDOWN_MS;
       setEmailCooldownUntil(nextCooldown);
       setEmailCooldownNow(Date.now());

@@ -5,7 +5,8 @@ import './App.css'
 import './publicPages.css'
 import './motion.css'
 import { LocaleProvider } from './lib/LocaleProvider'
-import { initAnalyticsContext, initClarity, trackEvent } from './lib/analytics'
+import { initAnalyticsContext, initClarity, trackEvent, trackReleaseSeen } from './lib/analytics'
+import { VERSION } from './version'
 import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
 import { getExampleByPath, isExamplesIndexPath } from './lib/examples.ts'
@@ -38,6 +39,7 @@ trackEvent('app_route_opened', {
   path: window.location.pathname,
   page_type: pageType,
 });
+trackReleaseSeen(VERSION, pageType);
 
 const rootElement = document.getElementById('root')!;
 const root = createRoot(rootElement);

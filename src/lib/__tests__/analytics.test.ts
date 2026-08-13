@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeAnalyticsPath } from '../analytics';
+import { sanitizeAnalyticsParams, sanitizeAnalyticsPath } from '../analytics';
 
 describe('analytics path sanitization', () => {
   it('keeps acquisition parameters in a stable order', () => {
@@ -17,5 +17,27 @@ describe('analytics path sanitization', () => {
 
   it('returns a safe root for malformed input', () => {
     expect(sanitizeAnalyticsPath('http://%')).toBe('/');
+  });
+});
+
+describe('sanitizeAnalyticsParams', () => {
+  it('removes identifiers, credentials, raw errors, and user-created labels', () => {
+    expect(sanitizeAnalyticsParams({
+      email: 'builder@example.com',
+      art_id: 'private-uuid',
+      token: 'secret',
+      title: 'user art title',
+      message: 'request failed with token=secret',
+      stack_head: 'private stack',
+      event_surface: 'editor',
+      map_wide: 3,
+    })).toEqual({ event_surface: 'editor', map_wide: 3 });
+  });
+
+  it('sanitizes path values and bounds arbitrary strings', () => {
+    expect(sanitizeAnalyticsParams({
+      path: '/device?code=SECRET&utm_source=guide',
+      label: 'x'.repeat(140),
+    })).toEqual({ path: '/device?utm_source=guide', label: 'x'.repeat(100) });
   });
 });

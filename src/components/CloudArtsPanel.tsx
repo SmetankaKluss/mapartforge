@@ -5,6 +5,7 @@ import type { CompanionLibraryItem } from '../lib/companionTypes';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { useLocale } from '../lib/useLocale';
+import { trackEvent } from '../lib/analytics';
 
 type CloudArtTab = 'my' | 'favorites' | 'recent';
 
@@ -210,6 +211,7 @@ export function CloudArtsPanel({ onClose, onOpenArt, defaultEmail }: CloudArtsPa
     setError(null);
     try {
       await signInWithCompanionEmail(trimmedEmail, window.location.href);
+      trackEvent('cloud_login_requested', { method: 'email', surface: 'editor_art_folder' });
       const nextCooldown = Date.now() + COMPANION_EMAIL_COOLDOWN_MS;
       setEmailCooldownUntil(nextCooldown);
       setEmailCooldownNow(Date.now());
