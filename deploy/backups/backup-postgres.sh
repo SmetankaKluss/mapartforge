@@ -123,6 +123,7 @@ node -e '
     ).trim();
   } catch {}
   fs.writeFileSync(manifestPath, JSON.stringify({
+    manifestVersion: 1,
     format: "supabase-cli-sql-tar-gzip",
     postgresMajor: 17,
     createdAt,

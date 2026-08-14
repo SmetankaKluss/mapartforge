@@ -16,6 +16,15 @@ assert(manifest.format === 'supabase-cli-sql-tar-gzip', `Unexpected backup forma
 verifyFile(archivePath, manifest.archive, 'archive');
 verifyFile(inventoryPath, manifest.inventory, 'inventory');
 
+if (manifest.platformConfig) {
+  const platformPath = path.join(path.dirname(archivePath), manifest.platformConfig.file);
+  verifyFile(platformPath, manifest.platformConfig, 'platform config');
+  const platform = JSON.parse(fs.readFileSync(platformPath, 'utf8'));
+  assert(platform.format === 'mapkluss-supabase-platform-config', 'Unexpected platform config format');
+  assert(platform.version === 1, 'Unexpected platform config version');
+  assert(/^[a-f0-9]{64}$/.test(platform.projectRefSha256 || ''), 'Platform config project hash is invalid');
+}
+
 if (extractedDirectory) {
   const expectedNames = ['roles.sql', 'schema.sql', 'data.sql', 'managed-metadata.json', 'migrations.tar.gz'];
   assert(Object.keys(manifest.files).sort().join(',') === expectedNames.sort().join(','), 'Unexpected SQL file manifest');

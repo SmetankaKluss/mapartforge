@@ -29,12 +29,14 @@ jobs:
         env:
           SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
           SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           YC_BACKUP_BUCKET: ${{ vars.YC_BACKUP_BUCKET }}
           YC_BACKUP_KMS_KEY_ID: ${{ vars.YC_BACKUP_KMS_KEY_ID }}
           RESTORE_DRILL_INPUT: ${{ inputs.restore_drill }}
         run: |
           test -n "$SUPABASE_DB_HOST"
           test -n "$SUPABASE_DB_USER"
+          test -n "$SUPABASE_PROJECT_REF"
           test -n "$YC_BACKUP_BUCKET"
           test -n "$YC_BACKUP_KMS_KEY_ID"
           daily_prefix="postgres/daily/$(date -u +%Y/%m/%d)"
@@ -81,15 +83,27 @@ jobs:
           echo "::add-mask::$supabase_db_url"
           SUPABASE_DB_URL="$supabase_db_url" ./deploy/backups/backup-postgres.sh
 
+      - name: Collect redacted Supabase platform configuration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+          archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
+          node deploy/backups/collect-platform-config.mjs "$archive"
+
       - name: Validate archive and checksum
         run: |
           archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
           manifest="$archive.json"
           inventory="$archive.inventory.json"
+          platform="$archive.platform.json"
           extract_dir="${RUNNER_TEMP}/mapkluss-backup-verify"
           test -s "$archive"
           test -s "$manifest"
           test -s "$inventory"
+          test -s "$platform"
           node -e '
             const value = require(process.argv[1]);
             const failures = Object.entries(value).filter(([key, count]) => key.endsWith("_orphans") && count !== 0);
@@ -116,6 +130,7 @@ jobs:
           aws --version
           archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
           inventory="$archive.inventory.json"
+          platform="$archive.platform.json"
           manifest="$archive.json"
 
           upload_file() {
@@ -145,6 +160,7 @@ jobs:
             local prefix=$1
             upload_file "$prefix" "$archive"
             upload_file "$prefix" "$inventory"
+            upload_file "$prefix" "$platform"
             upload_file "$prefix" "$manifest"
           }
 
@@ -165,6 +181,7 @@ jobs:
         run: |
           archive=$(find "$MAPKLUSS_BACKUP_DIR" -name '*.tar.gz' -type f -print -quit)
           inventory="$archive.inventory.json"
+          platform="$archive.platform.json"
           manifest="$archive.json"
 
           verify_file() {
@@ -209,6 +226,7 @@ jobs:
             local prefix=$1
             verify_file "$prefix" "$archive"
             verify_file "$prefix" "$inventory"
+            verify_file "$prefix" "$platform"
             verify_file "$prefix" "$manifest"
           }
 
@@ -246,6 +264,7 @@ jobs:
 
           download_file "$source_archive"
           download_file "$source_archive.inventory.json"
+          download_file "$source_archive.platform.json"
           download_file "$source_archive.json"
 
           archive="${MAPKLUSS_RESTORE_DIR}/$(basename "$source_archive")"

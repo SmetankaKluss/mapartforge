@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,7 +25,8 @@ const backupAgeMs = Date.now() - Date.parse(latest.LastModified);
 assert(Number.isFinite(backupAgeMs) && backupAgeMs >= 0, 'Latest backup timestamp is invalid');
 assert(backupAgeMs <= maximumBackupAgeHours * 3_600_000, `Latest backup is older than ${maximumBackupAgeHours} hours`);
 
-for (const key of [latest.Key, `${latest.Key}.json`, `${latest.Key}.inventory.json`]) {
+const generationKeys = [latest.Key, `${latest.Key}.json`, `${latest.Key}.inventory.json`];
+for (const key of generationKeys) {
   const metadata = awsJson([
     's3api', 'head-object', '--endpoint-url', endpoint,
     '--bucket', bucket, '--key', key, '--output', 'json', '--no-cli-pager',
@@ -49,6 +51,35 @@ try {
   assert(manifest.postgresMajor === 17, 'Latest backup manifest has an unexpected PostgreSQL version');
   assert(manifest.archive?.file === path.posix.basename(latest.Key), 'Latest backup manifest does not match its archive');
   assert(/^[a-f0-9]{64}$/i.test(String(manifest.archive?.sha256 || '')), 'Latest backup manifest is missing the archive checksum');
+  if (manifest.platformConfig) {
+    const expectedPlatformKey = `${latest.Key}.platform.json`;
+    assert(manifest.platformConfig.file === path.posix.basename(expectedPlatformKey), 'Platform config filename is invalid');
+    const platformMetadata = awsJson([
+      's3api', 'head-object', '--endpoint-url', endpoint,
+      '--bucket', bucket, '--key', expectedPlatformKey, '--output', 'json', '--no-cli-pager',
+    ]);
+    assert(Number(platformMetadata.ContentLength) === manifest.platformConfig.bytes, 'Platform config size does not match the manifest');
+    assert(platformMetadata.ServerSideEncryption === 'aws:kms', 'Platform config is not KMS encrypted');
+    assert(String(platformMetadata.SSEKMSKeyId || '').endsWith(kmsKeyId), 'Platform config uses an unexpected KMS key');
+    const remoteSha256 = Object.entries(platformMetadata.Metadata || {})
+      .find(([name]) => name.toLowerCase() === 'sha256')?.[1];
+    assert(remoteSha256 === manifest.platformConfig.sha256, 'Platform config checksum metadata does not match the manifest');
+
+    const platformPath = path.join(manifestDir, 'platform.json');
+    execFileSync('aws', [
+      's3api', 'get-object', '--endpoint-url', endpoint,
+      '--bucket', bucket, '--key', expectedPlatformKey, platformPath, '--no-cli-pager',
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const platformBytes = fs.readFileSync(platformPath);
+    const platformSha256 = crypto.createHash('sha256').update(platformBytes).digest('hex');
+    assert(platformSha256 === manifest.platformConfig.sha256, 'Downloaded platform config checksum is invalid');
+    const platform = JSON.parse(platformBytes.toString('utf8'));
+    assert(platform.format === 'mapkluss-supabase-platform-config', 'Platform config format is invalid');
+    assert(platform.version === 1, 'Platform config version is invalid');
+    assert(/^[a-f0-9]{64}$/.test(platform.projectRefSha256 || ''), 'Platform config project hash is invalid');
+  } else {
+    assert(!manifest.manifestVersion || manifest.manifestVersion === 1, 'A v2 backup is missing platform config');
+  }
 } finally {
   fs.rmSync(manifestDir, { recursive: true, force: true });
 }
