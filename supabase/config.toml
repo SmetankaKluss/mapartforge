@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.companion-lens]
 verify_jwt = false
+
+[functions.companion-telemetry]
+verify_jwt = false

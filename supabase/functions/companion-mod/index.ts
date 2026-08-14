@@ -951,7 +951,7 @@ Deno.serve(async req => {
         .eq('art_version_id', art.current_version_id)
         .maybeSingle();
       if (existingError) throw existingError;
-      if (existing) return json({ session: existing });
+      if (existing) return json({ session: existing, created: false });
 
       let materials: Array<{ nbtName: string; displayName: string; count: number }> = [];
       const { data: csvArtifact } = await admin
@@ -989,7 +989,7 @@ Deno.serve(async req => {
         .select('*')
         .single();
       if (error) throw error;
-      return json({ session });
+      return json({ session, created: true });
     }
 
     if (action === 'tracker_update') {
