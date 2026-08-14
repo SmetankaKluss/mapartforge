@@ -136,5 +136,54 @@ Deno.test("artifact cleanup treats missing objects as removed and bounds concurr
     },
   );
   assertEquals(result, { removed: 13, failed: 0 });
-  assert(maximumActive <= 10);
+  assert(maximumActive <= 3);
+});
+
+Deno.test("artifact cleanup verifies a successful delete with exact listing", async () => {
+  const methods: string[] = [];
+  const urls: string[] = [];
+  const result = await removeCompanionArtifactYandexObjects(
+    config,
+    [{
+      bucketId: "mapkluss-companion-private",
+      storagePath: "companion/owner/art/version/example.png",
+    }],
+    async (input, init) => {
+      methods.push(init?.method ?? "GET");
+      urls.push(String(input));
+      return new Response(null, {
+        status: init?.method === "DELETE" ? 204 : 200,
+      });
+    },
+  );
+  assertEquals(methods, ["DELETE", "GET"]);
+  const listUrl = new URL(urls[1]);
+  assertEquals(listUrl.searchParams.get("list-type"), "2");
+  assertEquals(listUrl.searchParams.get("max-keys"), "1");
+  assertEquals(
+    listUrl.searchParams.get("prefix"),
+    "cloud/v1/mapkluss-companion-private/companion/owner/art/version/example.png",
+  );
+  assertEquals(result, { removed: 1, failed: 0 });
+});
+
+Deno.test("artifact cleanup keeps retry state when exact listing still finds the object", async () => {
+  const methods: string[] = [];
+  const result = await removeCompanionArtifactYandexObjects(
+    config,
+    [{
+      bucketId: "mapkluss-companion-private",
+      storagePath: "companion/owner/art/version/example.png",
+    }],
+    async (_input, init) => {
+      methods.push(init?.method ?? "GET");
+      if (init?.method === "DELETE") return new Response(null, { status: 204 });
+      return new Response(
+        "<ListBucketResult><Key>cloud/v1/mapkluss-companion-private/companion/owner/art/version/example.png</Key></ListBucketResult>",
+        { status: 200 },
+      );
+    },
+  );
+  assertEquals(methods, ["DELETE", "GET"]);
+  assertEquals(result, { removed: 0, failed: 1 });
 });

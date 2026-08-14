@@ -4,6 +4,8 @@ const DEFAULT_ENDPOINT = "https://storage.yandexcloud.net";
 const DEFAULT_PREFIX = "cloud/v1";
 const DEFAULT_REGION = "ru-central1";
 const MAX_PRESIGNED_SECONDS = 15 * 60;
+const MAX_LIST_RESPONSE_BYTES = 64 * 1024;
+const MAX_DELETE_CONCURRENCY = 3;
 
 type EnvironmentReader = { get(name: string): string | undefined };
 
@@ -278,6 +280,141 @@ export async function presignCompanionArtifactYandexRequest(
   return `${endpoint.origin}${canonicalUri}?${query}&X-Amz-Signature=${signature}`;
 }
 
+async function presignCompanionArtifactYandexListRequest(
+  config: CompanionArtifactYandexConfig,
+  objectKey: string,
+  now = new Date(),
+): Promise<string> {
+  const endpoint = new URL(config.endpoint);
+  const { dateStamp, amzDate } = timestamp(now);
+  const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
+  const signedHeaders = "host";
+  const canonicalHeaders = `host:${endpoint.host}\n`;
+  const query = canonicalQuery([
+    ["list-type", "2"],
+    ["max-keys", "1"],
+    ["prefix", objectKey],
+    ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
+    ["X-Amz-Credential", `${config.accessKeyId}/${credentialScope}`],
+    ["X-Amz-Date", amzDate],
+    ["X-Amz-Expires", "60"],
+    ["X-Amz-SignedHeaders", signedHeaders],
+  ]);
+  const canonicalUri = `/${awsEncode(config.bucket)}`;
+  const canonicalRequest = [
+    "GET",
+    canonicalUri,
+    query,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    await sha256Text(canonicalRequest),
+  ].join("\n");
+  const initialKey = encoder.encode(`AWS4${config.secretAccessKey}`)
+    .buffer as ArrayBuffer;
+  const dateKey = await hmac(initialKey, dateStamp);
+  const regionKey = await hmac(dateKey, config.region);
+  const serviceKey = await hmac(regionKey, "s3");
+  const signingKey = await hmac(serviceKey, "aws4_request");
+  const signature = hex(await hmac(signingKey, stringToSign));
+  return `${endpoint.origin}${canonicalUri}?${query}&X-Amz-Signature=${signature}`;
+}
+
+async function readBoundedResponseText(
+  response: Response,
+  maximum: number,
+): Promise<string> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maximum) {
+    throw new Error("Companion artifact Yandex list response is too large");
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > maximum) {
+        await reader.cancel();
+        throw new Error("Companion artifact Yandex list response is too large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function decodeXmlText(value: string): string {
+  return value.replace(
+    /&(lt|gt|amp|quot|apos|#\d+|#x[\da-fA-F]+);/g,
+    (entity) => {
+      const body = entity.slice(1, -1);
+      if (body === "lt") return "<";
+      if (body === "gt") return ">";
+      if (body === "amp") return "&";
+      if (body === "quot") return '"';
+      if (body === "apos") return "'";
+      const radix = body.startsWith("#x") ? 16 : 10;
+      const digits = body.slice(radix === 16 ? 2 : 1);
+      const codePoint = Number.parseInt(digits, radix);
+      return Number.isSafeInteger(codePoint) && codePoint >= 0 &&
+          codePoint <= 0x10ffff
+        ? String.fromCodePoint(codePoint)
+        : entity;
+    },
+  );
+}
+
+async function companionArtifactYandexObjectExists(
+  config: CompanionArtifactYandexConfig,
+  sourceBucket: string,
+  logicalPath: string,
+  fetcher: CompanionArtifactStorageFetcher,
+): Promise<boolean> {
+  const objectKey = companionArtifactYandexObjectKey(
+    config,
+    sourceBucket,
+    logicalPath,
+  );
+  const listUrl = await presignCompanionArtifactYandexListRequest(
+    config,
+    objectKey,
+  );
+  const response = await fetcher(listUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Companion artifact Yandex list failed with HTTP ${response.status}`,
+    );
+  }
+  const xml = await readBoundedResponseText(
+    response,
+    MAX_LIST_RESPONSE_BYTES,
+  );
+  for (const match of xml.matchAll(/<Key>([\s\S]*?)<\/Key>/g)) {
+    if (decodeXmlText(match[1]) === objectKey) return true;
+  }
+  return false;
+}
+
 export async function createCompanionArtifactUploadTarget(
   config: CompanionArtifactYandexConfig,
   artifact: {
@@ -337,9 +474,13 @@ export async function removeCompanionArtifactYandexObjects(
 ): Promise<{ removed: number; failed: number }> {
   let removed = 0;
   let failed = 0;
-  for (let offset = 0; offset < rows.length; offset += 10) {
+  for (
+    let offset = 0;
+    offset < rows.length;
+    offset += MAX_DELETE_CONCURRENCY
+  ) {
     await Promise.all(
-      rows.slice(offset, offset + 10).map(async (row) => {
+      rows.slice(offset, offset + MAX_DELETE_CONCURRENCY).map(async (row) => {
         try {
           const url = await presignCompanionArtifactYandexRequest(
             config,
@@ -352,7 +493,22 @@ export async function removeCompanionArtifactYandexObjects(
             method: "DELETE",
             signal: AbortSignal.timeout(5_000),
           });
-          if (response.ok || response.status === 404) removed += 1;
+          if (response.status === 404) {
+            removed += 1;
+            return;
+          }
+          if (!response.ok) {
+            failed += 1;
+            return;
+          }
+
+          const exists = await companionArtifactYandexObjectExists(
+            config,
+            row.bucketId,
+            row.storagePath,
+            fetcher,
+          );
+          if (!exists) removed += 1;
           else failed += 1;
         } catch {
           failed += 1;
