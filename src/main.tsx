@@ -11,6 +11,7 @@ import { installClientErrorReporting } from './lib/errorReporting.ts'
 import { getSeoPageByPath } from './lib/seoPages.ts'
 import { getExampleByPath, isExamplesIndexPath } from './lib/examples.ts'
 import { isWikiPath } from './lib/wiki.ts'
+import { normalizeAppRoutePath } from './lib/appRoutePath.ts'
 
 // GitHub Pages SPA routing: restore path from ?p= param if present
 const searchParams = new URLSearchParams(window.location.search);
@@ -22,7 +23,7 @@ if (encodedPath) {
 }
 
 // Simple path-based routing without react-router
-const path = window.location.pathname;
+const path = normalizeAppRoutePath(window.location.pathname);
 const buildMatch = path.match(/^\/build\/([0-9a-f-]{36})$/i);
 const companionArtMatch = path.match(/^\/art\/([0-9a-f-]{36})$/i);
 const companionCollectionMatch = path.match(/^\/collection\/([0-9a-f-]{36})$/i);

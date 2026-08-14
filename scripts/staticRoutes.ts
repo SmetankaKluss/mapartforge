@@ -18,6 +18,19 @@ interface StaticRoute {
   schema: unknown;
 }
 
+const APP_SHELL_ROUTES = [
+  {
+    routePath: '/cloud',
+    title: 'Cloud & MapKluss Companion | MapKluss',
+    description: 'Sign in to MapKluss Cloud to save map art projects, manage versions and collections, and continue in Minecraft Companion.',
+  },
+  {
+    routePath: '/device',
+    title: 'Connect MapKluss Companion | MapKluss',
+    description: 'Approve a secure device code to connect MapKluss Companion in Minecraft to your MapKluss account.',
+  },
+] as const;
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -111,6 +124,25 @@ function renderRouteHtml(template: string, route: StaticRoute): string {
   return html;
 }
 
+function renderAppShellHtml(
+  template: string,
+  route: (typeof APP_SHELL_ROUTES)[number],
+): string {
+  const canonicalUrl = `${SITE_ORIGIN}${route.routePath}`;
+  let html = template
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(route.title)}</title>`)
+    .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${canonicalUrl}" />`)
+    .replace(new RegExp(`${STATIC_START}[\\s\\S]*?${STATIC_END}`), `${STATIC_START}\n${STATIC_END}`);
+  html = replaceMeta(html, 'name', 'description', route.description);
+  html = replaceMeta(html, 'name', 'robots', 'noindex,follow');
+  html = replaceMeta(html, 'property', 'og:title', route.title);
+  html = replaceMeta(html, 'property', 'og:description', route.description);
+  html = replaceMeta(html, 'property', 'og:url', canonicalUrl);
+  html = replaceMeta(html, 'name', 'twitter:title', route.title);
+  html = replaceMeta(html, 'name', 'twitter:description', route.description);
+  return html;
+}
+
 function buildRoutes(): StaticRoute[] {
   const routes: StaticRoute[] = [
     {
@@ -189,6 +221,15 @@ export function staticPublicRoutes(): Plugin {
         const html = renderRouteHtml(template, route);
         if (!html.includes('<h1>') || !html.includes(`href="${SITE_ORIGIN}${canonicalPublicPath(route.routePath)}"`)) {
           throw new Error(`Invalid static page generated for ${route.routePath}`);
+        }
+        await writeFile(path.join(directory, 'index.html'), html, 'utf8');
+      }
+      for (const route of APP_SHELL_ROUTES) {
+        const directory = path.join(outDir, ...route.routePath.split('/').filter(Boolean));
+        await mkdir(directory, { recursive: true });
+        const html = renderAppShellHtml(template, route);
+        if (!html.includes(`<link rel="canonical" href="${SITE_ORIGIN}${route.routePath}" />`)) {
+          throw new Error(`Invalid application shell generated for ${route.routePath}`);
         }
         await writeFile(path.join(directory, 'index.html'), html, 'utf8');
       }

@@ -121,5 +121,5 @@
  *   1.26.17 — облачные арты сохраняются с кириллическими названиями, небольшие сохранения обрабатываются
  *             параллельнее, а форма сохранения больше не показывает текст о будущей галерее
  */
-// 1.26.18: privacy-safe Cloud save stage timings and Edge Server-Timing.
-export const VERSION = 'v1.26.18';
+// 1.26.19: Cloud and device auth links now have real 200 application shells.
+export const VERSION = 'v1.26.19';
