@@ -22,6 +22,10 @@ import {
   CompanionScanUploadError,
   processCompanionScanUpload,
 } from '../_shared/companionScanUpload.ts';
+import {
+  formatCompanionServerTiming,
+  type CompanionServerTimings,
+} from '../_shared/companionServerTiming.ts';
 
 // Generated database types are not available in this standalone Edge bundle.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,6 +88,8 @@ type Action =
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Expose-Headers': 'Server-Timing',
+  'Timing-Allow-Origin': '*',
 };
 
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://mapkluss.art';
@@ -379,10 +385,10 @@ function mapCollectionRow(
   };
 }
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   });
 }
 
@@ -464,26 +470,37 @@ async function handleCompanionSaveFinalize(
   supabaseUrl: string,
   serviceKey: string,
 ): Promise<Response> {
+  const startedAt = performance.now();
+  const timings: CompanionServerTimings = {};
+  const timedJson = (body: unknown, status = 200): Response => {
+    timings.total = performance.now() - startedAt;
+    return json(body, status, { 'Server-Timing': formatCompanionServerTiming(timings) });
+  };
+
+  const authStartedAt = performance.now();
   const userId = await getWebsiteBearerUserId(admin, req);
-  if (!userId) return json({ error: 'unauthorized' }, 401);
+  timings.auth = performance.now() - authStartedAt;
+  if (!userId) return timedJson({ error: 'unauthorized' }, 401);
 
   const versionId = String(payload.version_id ?? '');
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(versionId)) {
-    return json({ error: 'bad_version_id' }, 400);
+    return timedJson({ error: 'bad_version_id' }, 400);
   }
 
   const verificationToken = crypto.randomUUID();
   let claimed = false;
   try {
+    const claimStartedAt = performance.now();
     const { data: claimData, error: claimError } = await admin.rpc('begin_companion_art_save_verification', {
       requested_owner_id: userId,
       requested_version_id: versionId,
       requested_verification_token: verificationToken,
     });
+    timings.claim = performance.now() - claimStartedAt;
     if (claimError) throw claimError;
     const claim = (claimData ?? {}) as CompanionSaveVerificationClaim;
-    if (claim.state === 'published') return json(claim.result ?? { versionId });
-    if (claim.state === 'busy') return json({ error: 'save_verification_in_progress' }, 409);
+    if (claim.state === 'published') return timedJson(claim.result ?? { versionId });
+    if (claim.state === 'busy') return timedJson({ error: 'save_verification_in_progress' }, 409);
     if (claim.state !== 'claimed') {
       throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
     }
@@ -495,6 +512,7 @@ async function handleCompanionSaveFinalize(
       throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
     }
 
+    const verifyStartedAt = performance.now();
     const verifiedArtifacts: VerifiedCompanionArtifact[] = await mapWithConcurrency(
       artifacts,
       totalSizeBytes <= LARGE_SAVE_THRESHOLD_BYTES
@@ -519,16 +537,19 @@ async function handleCompanionSaveFinalize(
         return verifyCompanionArtifactResponse(artifact, response);
       },
     );
+    timings.verify = performance.now() - verifyStartedAt;
 
+    const publishStartedAt = performance.now();
     const { data: finalized, error: finalizeError } = await admin.rpc('publish_verified_companion_art_save', {
       requested_owner_id: userId,
       requested_version_id: versionId,
       requested_verification_token: verificationToken,
       verified_artifacts: verifiedArtifacts,
     });
+    timings.publish = performance.now() - publishStartedAt;
     if (finalizeError) throw finalizeError;
     claimed = false;
-    return json(finalized ?? { versionId });
+    return timedJson(finalized ?? { versionId });
   } catch (error) {
     const verificationError = error instanceof CompanionArtifactVerificationError ? error : null;
     if (claimed) {
@@ -541,10 +562,10 @@ async function handleCompanionSaveFinalize(
       if (releaseError) console.warn('Companion save verification lease release failed');
     }
     if (verificationError) {
-      return json({ error: verificationError.code }, verificationError.responseStatus);
+      return timedJson({ error: verificationError.code }, verificationError.responseStatus);
     }
     console.error('Companion save verification failed');
-    return json({ error: 'save_verification_unavailable' }, 503);
+    return timedJson({ error: 'save_verification_unavailable' }, 503);
   }
 }
 

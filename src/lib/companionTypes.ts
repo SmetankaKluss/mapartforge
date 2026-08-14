@@ -52,6 +52,18 @@ export interface CompanionArtManifest {
   collectionIds?: string[];
   artifacts: CompanionArtifactManifestEntry[];
   updatedAt: string;
+  saveTiming?: CompanionSaveTiming;
+}
+
+export interface CompanionSaveTiming {
+  totalMs: number;
+  generationMs: number;
+  hashMs: number;
+  prepareMs: number;
+  uploadMs: number;
+  finalizeMs: number;
+  artifactCount: number;
+  totalBytes: number;
 }
 
 export interface CompanionArtVersionSummary {

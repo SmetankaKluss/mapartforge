@@ -724,6 +724,7 @@ export async function updateCompanionTracker(sessionId: string, patch: {
 }
 
 export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<CompanionArtManifest> {
+  const saveStartedAt = performance.now();
   const supabase = getSupabaseClient();
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session?.user) throw new Error('Войдите в аккаунт MapKluss перед сохранением.');
@@ -733,6 +734,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
   const privacy = normalizeEditableArtPrivacy(input.privacy);
   const previewData = input.previewImageData ?? input.imageData;
   const buildTechnique = coerceBuildTechniqueForPlatform(input.buildTechnique, input.platformMode ?? 'java');
+  const generationStartedAt = performance.now();
 
   const projectBlob = new Blob([input.projectJson], { type: 'application/json;charset=utf-8' });
   const structure = input.mode === '3d' ? 'staircase' : 'flat';
@@ -843,9 +845,13 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     }
   }
 
+  const generationMs = performance.now() - generationStartedAt;
+  const hashStartedAt = performance.now();
   const preparedArtifacts = await Promise.all(
     artifacts.map(artifact => prepareArtifact(ownerId, artId, versionId, artifact)),
   );
+  const hashMs = performance.now() - hashStartedAt;
+  const totalBytes = preparedArtifacts.reduce((sum, artifact) => sum + artifact.manifest.sizeBytes, 0);
   const settings = {
     grid: input.grid,
     mode: input.mode,
@@ -871,8 +877,25 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     sha256: artifact.manifest.sha256,
   }));
   const uploadedStoragePaths: string[] = [];
+  let prepareMs = 0;
+  let uploadMs = 0;
+  let finalizeMs = 0;
+  const withTiming = (manifest: CompanionArtManifest): CompanionArtManifest => ({
+    ...manifest,
+    saveTiming: {
+      totalMs: performance.now() - saveStartedAt,
+      generationMs,
+      hashMs,
+      prepareMs,
+      uploadMs,
+      finalizeMs,
+      artifactCount: preparedArtifacts.length,
+      totalBytes,
+    },
+  });
 
   try {
+    const prepareStartedAt = performance.now();
     const { error: prepareError } = await supabase.rpc('prepare_companion_art_save', {
       requested_art_id: artId,
       requested_version_id: versionId,
@@ -884,8 +907,10 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
       requested_settings: settings,
       requested_artifacts: reservationArtifacts,
     });
+    prepareMs = performance.now() - prepareStartedAt;
     if (prepareError) throw prepareError;
 
+    const uploadStartedAt = performance.now();
     await mapWithConcurrency(
       preparedArtifacts,
       companionUploadConcurrency(preparedArtifacts),
@@ -894,11 +919,14 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
         uploadedStoragePaths.push(artifact.manifest.storagePath);
       },
     );
+    uploadMs = performance.now() - uploadStartedAt;
 
+    const finalizeStartedAt = performance.now();
     const finalResult = await finalizePreparedCompanionSave(versionId);
+    finalizeMs = performance.now() - finalizeStartedAt;
     const updatedAt = finalResult?.updatedAt ?? new Date().toISOString();
 
-    return {
+    return withTiming({
       artId,
       versionId,
       ownerId,
@@ -912,12 +940,14 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
       previewUrl: null,
       artifacts: preparedArtifacts.map(artifact => artifact.manifest),
       updatedAt,
-    };
+    });
   } catch (error) {
     if (uploadedStoragePaths.length === preparedArtifacts.length) {
       try {
+        const retryFinalizeStartedAt = performance.now();
         const retriedResult = await finalizePreparedCompanionSave(versionId);
-        return {
+        finalizeMs += performance.now() - retryFinalizeStartedAt;
+        return withTiming({
           artId,
           versionId,
           ownerId,
@@ -931,7 +961,7 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
           previewUrl: null,
           artifacts: preparedArtifacts.map(artifact => artifact.manifest),
           updatedAt: retriedResult.updatedAt ?? new Date().toISOString(),
-        };
+        });
       } catch {
         // Fall through to cancellation and cleanup.
       }

@@ -2450,6 +2450,14 @@ export default function App() {
         map_tall: mapGrid.tall,
         source_kind: currentCloudImportId ? 'companion_import' : 'editor',
         import_attached: importAttached,
+        save_total_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.totalMs / 100) * 100 : undefined,
+        save_generation_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.generationMs / 100) * 100 : undefined,
+        save_hash_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.hashMs / 100) * 100 : undefined,
+        save_prepare_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.prepareMs / 100) * 100 : undefined,
+        save_upload_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.uploadMs / 100) * 100 : undefined,
+        save_finalize_ms: manifest.saveTiming ? Math.round(manifest.saveTiming.finalizeMs / 100) * 100 : undefined,
+        artifact_count: manifest.saveTiming?.artifactCount,
+        payload_kib: manifest.saveTiming ? Math.ceil(manifest.saveTiming.totalBytes / 1024) : undefined,
       });
       showAppNotice(importAttached
         ? t('Арт сохранён в облако.', 'Art saved to Cloud.')
