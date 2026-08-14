@@ -10,6 +10,8 @@ This dependency-free Node.js Cloud Function runs outside GitHub Actions and fail
 
 The function contains no user session, database credential, service-role key, cloud key, or alert recipient. A timer invokes it every ten minutes through a dedicated service account. Yandex Monitoring owns notification recipients and recovery state.
 
+Transient HTTP and TLS failures are retried twice. Permanent failures log the exact check name with URLs and credential-like query parameters removed.
+
 Recommended alerts:
 
 1. `serverless.functions.errors_per_second` for this function: alarm when greater than zero; no-data state is OK.

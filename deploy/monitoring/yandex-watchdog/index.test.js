@@ -55,3 +55,22 @@ test('validates cached readyz freshness', () => {
     checkedAt: now - 61_000,
   }, now, 60), /too old/);
 });
+
+test('retries transient operations and returns the successful result', async () => {
+  let attempts = 0;
+  const result = await _internals.withRetries(async () => {
+    attempts += 1;
+    if (attempts < 3) throw new Error('transient');
+    return 'ok';
+  }, [0, 0]);
+  assert.equal(result, 'ok');
+  assert.equal(attempts, 3);
+});
+
+test('sanitizes URLs and credential-like query parameters from errors', () => {
+  const output = _internals.sanitizedError(new Error(
+    'fetch https://example.test/path?apikey=public&signature=hidden failed',
+  ));
+  assert.equal(output, 'fetch [url] failed');
+  assert.doesNotMatch(output, /public|hidden|example\.test/);
+});

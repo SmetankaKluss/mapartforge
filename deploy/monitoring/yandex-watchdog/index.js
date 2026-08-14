@@ -34,6 +34,7 @@ module.exports.handler = async function handler() {
   ));
 
   if (failures.length > 0) {
+    for (const failure of failures) console.error(`watchdog check failed: ${failure}`);
     throw new Error(`MapKluss watchdog failed (${failures.join('; ')})`);
   }
 
@@ -104,20 +105,22 @@ function assertWorkflowHealthy(runs, maximumAgeHours, nowMs) {
 }
 
 async function verifyCertificate(hostname) {
-  const certificate = await new Promise((resolve, reject) => {
-    const socket = tls.connect({
-      host: hostname,
-      port: 443,
-      servername: hostname,
-      timeout: timeoutMs(),
-    }, () => {
-      const peer = socket.getPeerCertificate();
-      socket.end();
-      resolve(peer);
-    });
-    socket.once('timeout', () => socket.destroy(new Error('TLS timed out')));
-    socket.once('error', reject);
-  });
+  const certificate = await withRetries(() => (
+    new Promise((resolve, reject) => {
+      const socket = tls.connect({
+        host: hostname,
+        port: 443,
+        servername: hostname,
+        timeout: timeoutMs(),
+      }, () => {
+        const peer = socket.getPeerCertificate();
+        socket.end();
+        resolve(peer);
+      });
+      socket.once('timeout', () => socket.destroy(new Error('TLS timed out')));
+      socket.once('error', reject);
+    })
+  ));
 
   assert(certificate && certificate.valid_to, 'certificate expiry is missing');
   const remainingMs = Date.parse(certificate.valid_to) - Date.now();
@@ -125,6 +128,28 @@ async function verifyCertificate(hostname) {
     remainingMs > minimumCertificateDays() * 86_400_000,
     `certificate expires within ${minimumCertificateDays()} days`,
   );
+}
+
+async function withRetries(operation, delays = [500, 1_500]) {
+  let lastError;
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt === delays.length) break;
+      await delay(delays[attempt]);
+    }
+  }
+  throw lastError || new Error('operation failed');
+}
+
+function sanitizedError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/https?:\/\/[^\s)]+/gi, '[url]')
+    .replace(/[?&](?:key|token|signature|apikey|authorization)=[^\s&)]*/gi, '')
+    .slice(0, 180);
 }
 
 async function request(url, options = {}) {
@@ -174,7 +199,7 @@ function positiveInteger(name, fallback) {
 }
 
 function safeError(error) {
-  return error instanceof Error ? error.message : String(error);
+  return sanitizedError(error);
 }
 
 function assert(condition, message) {
@@ -183,5 +208,7 @@ function assert(condition, message) {
 
 module.exports._internals = {
   assertWorkflowHealthy,
+  sanitizedError,
   validateReadyz,
+  withRetries,
 };
