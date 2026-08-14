@@ -36,8 +36,8 @@ jobs:
 
       - name: Build private exact manifest
         env:
-          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
-          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           test -n "$SUPABASE_DB_HOST"
@@ -74,8 +74,8 @@ jobs:
 
       - name: Build private exact manifest
         env:
-          SUPABASE_DB_HOST: ${{ vars.SUPABASE_DB_HOST }}
-          SUPABASE_DB_USER: ${{ vars.SUPABASE_DB_USER }}
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           test -n "$SUPABASE_DB_HOST"
