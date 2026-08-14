@@ -121,5 +121,5 @@
  *   1.26.17 — облачные арты сохраняются с кириллическими названиями, небольшие сохранения обрабатываются
  *             параллельнее, а форма сохранения больше не показывает текст о будущей галерее
  */
-// 1.26.19: Cloud and device auth links now have real 200 application shells.
-export const VERSION = 'v1.26.19';
+// 1.27.0: successful exports and Cloud saves can continue directly in Minecraft Companion.
+export const VERSION = 'v1.27.0';

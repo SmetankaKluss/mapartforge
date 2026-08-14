@@ -85,6 +85,7 @@ interface Props {
   onCreateTracker?: () => void;
   // GIF Project
   onExportGifPack?: () => void | Promise<void>;
+  onExportCompleted?: (format: string) => void;
 }
 
 
@@ -114,7 +115,7 @@ export function ExportPanel({
   platformMode,
   minecraftVersion,
   buildTechnique,
-  onCreateTracker, onExportGifPack,
+  onCreateTracker, onExportGifPack, onExportCompleted,
 }: Props) {
   const { t } = useLocale();
   const [collapsed, setCollapsed]         = useState(true);
@@ -223,6 +224,7 @@ export function ExportPanel({
       map_tall: mapGrid.tall,
       platform_mode: platformMode,
     });
+    onExportCompleted?.(format);
     if (supportPromptVisible || !shouldShowSupportPrompt(getSupportStorage())) return;
     setSupportExportFormat(format);
     setSupportPromptVisible(true);

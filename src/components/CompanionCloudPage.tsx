@@ -7,6 +7,13 @@ import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { PublicSiteHeader } from './PublicSiteHeader';
 import { trackEvent } from '../lib/analytics';
+import {
+  COMPANION_CURSEFORGE_URL,
+  COMPANION_MODRINTH_URL,
+  COMPANION_MOD_VERSION_OPTIONS,
+  companionDownloadOption,
+  type CompanionModVersion,
+} from '../lib/companionDownloads';
 
 declare global {
   interface Window {
@@ -86,44 +93,6 @@ function usageRatio(used: number, limit: number): number {
 
 type ImportFilter = 'all' | 'needs_save' | 'saved' | 'missing_maps';
 type LibraryTab = 'arts' | 'favorites' | 'recent';
-
-const COMPANION_MOD_DOWNLOAD_REV = '20260805-companion-0-11-1';
-
-const COMPANION_MOD_VERSION_OPTIONS = [
-  {
-    minecraftVersion: '26.2',
-    label: 'Minecraft 26.2',
-    badge: 'Java 25',
-    href: `/downloads/mod/mapkluss-companion-26.2-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-26.2-0.11.1.jar',
-  },
-  {
-    minecraftVersion: '1.21.11',
-    label: 'Minecraft 1.21.11',
-    badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.11-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.11-0.11.1.jar',
-  },
-  {
-    minecraftVersion: '1.21.8',
-    label: 'Minecraft 1.21.8',
-    badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.8-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.8-0.11.1.jar',
-  },
-  {
-    minecraftVersion: '1.21.4',
-    label: 'Minecraft 1.21.4',
-    badge: 'Java 21',
-    href: `/downloads/mod/mapkluss-companion-1.21.4-0.11.1.jar?v=${COMPANION_MOD_DOWNLOAD_REV}`,
-    filename: 'mapkluss-companion-1.21.4-0.11.1.jar',
-  },
-] as const;
-
-type CompanionModVersion = typeof COMPANION_MOD_VERSION_OPTIONS[number]['minecraftVersion'];
-
-const COMPANION_MODRINTH_URL = 'https://modrinth.com/mod/mapkluss-companion';
-const COMPANION_CURSEFORGE_URL = 'https://www.curseforge.com/minecraft/mc-mods/mapkluss-companion';
 
 function mockUpdatedAt(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
@@ -367,8 +336,7 @@ function CompanionModDownloadPanel({
   onSelectedVersionChange: (version: CompanionModVersion) => void;
 }) {
   const { t } = useLocale();
-  const selected = COMPANION_MOD_VERSION_OPTIONS.find(option => option.minecraftVersion === selectedVersion)
-    ?? COMPANION_MOD_VERSION_OPTIONS[0];
+  const selected = companionDownloadOption(selectedVersion);
 
   return (
     <section className="companion-panel companion-mod-download-panel">

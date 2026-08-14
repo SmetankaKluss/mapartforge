@@ -67,6 +67,7 @@ import { SaveProjectModal } from './components/SaveProjectModal';
 import { ProjectsPanel } from './components/ProjectsPanel';
 import { CloudArtsPanel } from './components/CloudArtsPanel';
 import { CloudSaveModal } from './components/CloudSaveModal';
+import { ContinueInMinecraftPrompt, type MinecraftContinuationSource } from './components/ContinueInMinecraftPrompt';
 import { createTour, markTourOfferDismissed, shouldAutoStart } from './lib/tour';
 import type { TourType } from './lib/tour';
 import { TourSelector } from './components/TourSelector';
@@ -534,6 +535,11 @@ export default function App() {
   const [currentCloudImportId, setCurrentCloudImportId] = useState<string | null>(null);
   const [currentCloudTitle, setCurrentCloudTitle] = useState<string>('');
   const [currentCloudPrivacy, setCurrentCloudPrivacy] = useState<ArtPrivacy>('unlisted');
+  const [minecraftContinuation, setMinecraftContinuation] = useState<{
+    source: MinecraftContinuationSource;
+    minecraftVersion: MinecraftVersion;
+  } | null>(null);
+  const minecraftContinuationDismissedRef = useRef(false);
 
   const showAppNotice = useCallback((message: string, tone: AppNotice['tone'] = 'info') => {
     setAppNotice({ message, tone });
@@ -544,6 +550,14 @@ export default function App() {
     const timer = window.setTimeout(() => setAppNotice(null), appNotice.tone === 'error' ? 5200 : 3200);
     return () => window.clearTimeout(timer);
   }, [appNotice]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const source = new URLSearchParams(window.location.search).get('minecraftContinue');
+    if (source === 'export' || source === 'cloud') {
+      setMinecraftContinuation({ source, minecraftVersion });
+    }
+  }, [minecraftVersion]);
 
   const refreshCloudUser = useCallback(async () => {
     const user = await getCurrentCompanionAuthUser();
@@ -2465,6 +2479,8 @@ export default function App() {
             'Арт сохранён, но запись импорта пока не привязалась. Обнови страницу Cloud и попробуй ещё раз.',
             'The art was saved, but the import record was not linked yet. Refresh Cloud and try again.',
           ), importAttached ? 'info' : 'error');
+      setMinecraftContinuation({ source: 'cloud', minecraftVersion });
+      minecraftContinuationDismissedRef.current = false;
     } catch (err) {
       console.error('Cloud save failed', err);
       trackEvent('cloud_save_failed', { save_kind: saveKind, failure_stage: 'save' });
@@ -3996,6 +4012,10 @@ export default function App() {
               buildTechnique={buildTechnique}
               onCreateTracker={compositeImageData ? () => setTrackerMaterials(sessionMaterials) : undefined}
               onExportGifPack={gifProject ? handleExportGifLitematicPack : undefined}
+              onExportCompleted={() => {
+                if (platformMode !== 'java' || minecraftContinuationDismissedRef.current) return;
+                setMinecraftContinuation({ source: 'export', minecraftVersion });
+              }}
             />
           </div>
         </aside>
@@ -4114,6 +4134,21 @@ export default function App() {
         busy={cloudSaving}
         onSave={(input) => void handleConfirmCloudSave(input)}
         onClose={() => { if (!cloudSaving) setShowCloudSaveModal(false); }}
+      />
+    )}
+
+    {minecraftContinuation && (
+      <ContinueInMinecraftPrompt
+        minecraftVersion={minecraftContinuation.minecraftVersion}
+        source={minecraftContinuation.source}
+        onSaveToCloud={() => {
+          setMinecraftContinuation(null);
+          void handleSaveCurrentArtToCloud();
+        }}
+        onClose={() => {
+          minecraftContinuationDismissedRef.current = true;
+          setMinecraftContinuation(null);
+        }}
       />
     )}
 
