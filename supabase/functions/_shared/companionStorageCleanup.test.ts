@@ -37,16 +37,19 @@ class AwaitableQuery implements PromiseLike<Result> {
 function fakeAdmin(
   removeError: unknown = null,
   dispositions: Record<string, "delete" | "referenced" | "defer"> = {},
+  storageProvider: "supabase" | "yandex" = "supabase",
 ) {
   const rows = [
     {
       id: 1,
+      storage_provider: storageProvider,
       bucket_id: "mapartforge",
       object_path: "companion/u/a.png",
       attempt_count: 0,
     },
     {
       id: 2,
+      storage_provider: storageProvider,
       bucket_id: "mapartforge",
       object_path: "companion/u/b.png",
       attempt_count: 2,
@@ -61,6 +64,7 @@ function fakeAdmin(
       assert(name === "classify_companion_storage_deletes");
       return Promise.resolve({
         data: rows.map((row) => ({
+          storage_provider: row.storage_provider,
           bucket_id: row.bucket_id,
           object_path: row.object_path,
           disposition: dispositions[row.object_path] ?? "delete",
@@ -153,6 +157,7 @@ Deno.test("explicit cleanup queue truncates reason and records the exact object"
   assert(fake.upserts.length === 1);
   assert(fake.upserts[0].reason === "x".repeat(64));
   assert(fake.upserts[0].object_path === "companion/owner/imports/a.png");
+  assert(fake.upserts[0].storage_provider === "supabase");
 });
 
 Deno.test("referenced objects are protected and live reservations are deferred", async () => {
@@ -168,4 +173,24 @@ Deno.test("referenced objects are protected and live reservations are deferred",
   assert(fake.deletedIds.length === 1 && fake.deletedIds[0][0] === 1);
   assert(fake.updates.length === 1);
   assert(fake.updates[0].last_error === "object_still_live");
+});
+
+Deno.test("Yandex cleanup stays on its provider and removes durable rows", async () => {
+  const fake = fakeAdmin(null, {}, "yandex");
+  let yandexCalls = 0;
+  const result = await drainCompanionStorageDeleteOutbox(
+    fake.admin as never,
+    "owner",
+    100,
+    {
+      removeYandex: async (rows) => {
+        yandexCalls += 1;
+        assert(rows.length === 2);
+        return { removed: rows.length, failed: 0 };
+      },
+    },
+  );
+  assert(result.removed === 2 && result.deferred === 0);
+  assert(yandexCalls === 1);
+  assert(fake.removedPaths.length === 0);
 });

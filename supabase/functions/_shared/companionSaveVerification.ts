@@ -13,11 +13,18 @@ export type ReservedCompanionArtifact = {
   contentType: string;
   sizeBytes: number;
   sha256: string;
+  storageProvider?: 'supabase' | 'yandex';
 };
 
 export type VerifiedCompanionArtifact = Pick<
   ReservedCompanionArtifact,
-  'artifactId' | 'bucketId' | 'storagePath' | 'contentType' | 'sizeBytes' | 'sha256'
+  | 'artifactId'
+  | 'bucketId'
+  | 'storagePath'
+  | 'contentType'
+  | 'sizeBytes'
+  | 'sha256'
+  | 'storageProvider'
 >;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,6 +65,7 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
       contentType: String(row.contentType ?? ''),
       sizeBytes,
       sha256: String(row.sha256 ?? ''),
+      storageProvider: row.storageProvider === 'yandex' ? 'yandex' : 'supabase',
     };
     if (
       !UUID_PATTERN.test(artifact.artifactId)
@@ -152,6 +160,7 @@ export async function verifyCompanionArtifactResponse(
     contentType: artifact.contentType,
     sizeBytes,
     sha256,
+    storageProvider: artifact.storageProvider,
   };
 }
 

@@ -22,9 +22,10 @@ async function createStorageSignedUrl(
   bucket: string,
   path: string,
   expiresIn: number,
+  storageProvider: 'supabase' | 'yandex' = 'supabase',
 ): Promise<string | null> {
   const signed = await signStorageRows(
-    [{ key: 'object', bucket, path }],
+    [{ key: 'object', bucket, path, storageProvider }],
     expiresIn,
     async (sourceBucket, paths, lifetime) => {
       const { data, error } = await admin.storage.from(sourceBucket).createSignedUrls(paths, lifetime);
@@ -201,6 +202,7 @@ async function createPreviewSignedUrl(
     String(artifact.bucket_id ?? 'mapartforge'),
     String(artifact.storage_path),
     60 * 30,
+    artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
   );
 }
 
@@ -227,7 +229,7 @@ async function mapLibraryRows(
         .map(async versionChunk => {
           const { data, error } = await admin
             .from('art_artifacts')
-            .select('art_id,version_id,bucket_id,storage_path')
+            .select('art_id,version_id,bucket_id,storage_path,storage_provider')
             .eq('kind', 'preview_png')
             .in('version_id', versionChunk);
           if (error) throw error;
@@ -236,7 +238,12 @@ async function mapLibraryRows(
     );
     const artifacts = artifactChunks.flat();
 
-    const signingRows: Array<{ key: string; bucket: string; path: string }> = [];
+    const signingRows: Array<{
+      key: string;
+      bucket: string;
+      path: string;
+      storageProvider?: 'supabase' | 'yandex';
+    }> = [];
     for (const artifact of artifacts) {
       const key = libraryPreviewKey(
         String(artifact.art_id),
@@ -248,6 +255,7 @@ async function mapLibraryRows(
         key,
         bucket: String(artifact.bucket_id ?? 'mapartforge'),
         path: String(artifact.storage_path),
+        storageProvider: artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
       });
     }
 
@@ -416,7 +424,9 @@ async function renameCurrentVersionArtifacts(
     const currentPath = String(artifact.storage_path ?? '');
     const nextPath = currentPath ? storagePathWithFilename(currentPath, nextFilename) : currentPath;
 
-    if (currentPath && nextPath && currentPath !== nextPath) {
+    const storageProvider = artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase';
+    const immutablePath = storageProvider === 'yandex';
+    if (!immutablePath && currentPath && nextPath && currentPath !== nextPath) {
       const { error: moveError } = await admin.storage
         .from(String(artifact.bucket_id ?? 'mapartforge'))
         .move(currentPath, nextPath);
@@ -427,7 +437,7 @@ async function renameCurrentVersionArtifacts(
       filename: nextFilename,
       updated_at: now,
     };
-    if (nextPath) patch.storage_path = nextPath;
+    if (!immutablePath && nextPath) patch.storage_path = nextPath;
 
     const { error } = await admin
       .from('art_artifacts')
@@ -436,8 +446,9 @@ async function renameCurrentVersionArtifacts(
       .eq('owner_id', ownerId);
     if (error) throw error;
 
-    if (kind === 'preview_png') previewPath = nextPath || currentPath || null;
-    if (kind === 'project') projectPath = nextPath || currentPath || null;
+    const effectivePath = immutablePath ? currentPath : nextPath || currentPath;
+    if (kind === 'preview_png') previewPath = effectivePath || null;
+    if (kind === 'project') projectPath = effectivePath || null;
   }
 
   const versionPatch: Record<string, unknown> = {};
@@ -488,6 +499,9 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
   if (artifactError) throw artifactError;
 
   let manifestArtifacts = artifacts ?? [];
+  const artifactProviderById = new Map(
+    manifestArtifacts.map(row => [String(row.id), row.storage_provider === 'yandex' ? 'yandex' : 'supabase']),
+  );
   const suppressionGrid = versionSettings.grid && typeof versionSettings.grid === 'object'
     ? versionSettings.grid as { wide?: unknown; tall?: unknown }
     : null;
@@ -518,6 +532,7 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
         size_bytes: bundlePin.size_bytes,
         sha256: bundlePin.sha256,
         updated_at: bundlePin.updated_at,
+        storage_provider: artifactProviderById.get(String(bundlePin.artifact_id)) ?? 'supabase',
       }]);
   } else if (versionSettings.buildTechnique === 'suppression_two_layer' && versionId === art.current_version_id) {
     const { data: pin, error: pinError } = await admin
@@ -542,6 +557,7 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
           size_bytes: pin.plan_size_bytes,
           sha256: pin.plan_sha256,
           updated_at: pin.updated_at,
+          storage_provider: artifactProviderById.get(String(pin.plan_artifact_id)) ?? 'supabase',
         },
         {
           id: pin.litematic_artifact_id,
@@ -553,14 +569,21 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
           size_bytes: pin.litematic_size_bytes,
           sha256: pin.litematic_sha256,
           updated_at: pin.updated_at,
+          storage_provider: artifactProviderById.get(String(pin.litematic_artifact_id)) ?? 'supabase',
         },
       ]);
   }
 
-  const manifestSigningRows = manifestArtifacts.map((row, index) => ({
+  const manifestSigningRows: Array<{
+    key: string;
+    bucket: string;
+    path: string;
+    storageProvider?: 'supabase' | 'yandex';
+  }> = manifestArtifacts.map((row, index) => ({
     key: String(row.id ?? `${row.kind}:${index}`),
     bucket: String(row.bucket_id ?? 'mapartforge'),
     path: String(row.storage_path),
+    storageProvider: row.storage_provider === 'yandex' ? 'yandex' : 'supabase',
   }));
   const manifestSignedUrls = await signStorageRows(
     manifestSigningRows,
@@ -962,11 +985,21 @@ Deno.serve(async req => {
         .eq('kind', 'materials_csv')
         .maybeSingle();
       if (csvArtifact?.storage_path) {
-        const { data: csvBlob, error: csvError } = await admin.storage
-          .from(String(csvArtifact.bucket_id ?? 'mapartforge'))
-          .download(csvArtifact.storage_path);
-        if (csvError) throw csvError;
-        materials = parseMaterialsCsv(await csvBlob.text());
+        const csvUrl = await createStorageSignedUrl(
+          admin,
+          String(csvArtifact.bucket_id ?? 'mapartforge'),
+          String(csvArtifact.storage_path),
+          60,
+          csvArtifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
+        );
+        if (!csvUrl) throw new Error('materials signing failed');
+        const csvResponse = await fetch(csvUrl, {
+          redirect: 'error',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!csvResponse.ok) throw new Error('materials download failed');
+        materials = parseMaterialsCsv(await csvResponse.text());
       }
 
       const imagePreview = await createPreviewSignedUrl(

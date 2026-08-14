@@ -1,5 +1,9 @@
 import { getSupabaseClient } from './supabase';
 import { mapWithConcurrency } from './boundedConcurrency';
+import {
+  uploadCompanionArtifactBlob,
+  type CompanionArtifactUploadTarget,
+} from './companionArtifactUpload';
 import { companionArtifactFilename, sha256Hex } from './companionArtifacts';
 import { buildLitematicBytes, buildLitematicTilesZipBlob } from './exportLitematic';
 import type { SupportMode } from './exportLitematic';
@@ -87,6 +91,13 @@ interface PreparedArtifact {
   blob: Blob;
 }
 
+type CompanionSaveStorageProvider = 'supabase' | 'yandex';
+
+type CompanionSavePrepareResult = {
+  storageProvider: CompanionSaveStorageProvider;
+  uploadTargets?: CompanionArtifactUploadTarget[];
+};
+
 function requireUuid(): string {
   return crypto.randomUUID();
 }
@@ -149,7 +160,18 @@ async function prepareArtifact(
   };
 }
 
-async function uploadPreparedArtifact(artifact: PreparedArtifact): Promise<void> {
+async function uploadPreparedArtifact(
+  artifact: PreparedArtifact,
+  storageProvider: CompanionSaveStorageProvider,
+  uploadTarget?: CompanionArtifactUploadTarget,
+): Promise<void> {
+  if (storageProvider === 'yandex') {
+    return uploadCompanionArtifactBlob(
+      artifact.manifest.id,
+      artifact.blob,
+      uploadTarget,
+    );
+  }
   const supabase = getSupabaseClient();
   const { error } = await supabase.storage
     .from(artifact.bucketId)
@@ -170,17 +192,6 @@ function companionUploadConcurrency(artifacts: PreparedArtifact[]): number {
   return totalBytes <= LARGE_SAVE_THRESHOLD_BYTES
     ? SMALL_SAVE_UPLOAD_CONCURRENCY
     : LARGE_SAVE_UPLOAD_CONCURRENCY;
-}
-
-async function removeStorageObjects(paths: string[]): Promise<void> {
-  if (paths.length === 0) return;
-  const supabase = getSupabaseClient();
-  const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
-  for (let index = 0; index < uniquePaths.length; index += 100) {
-    const chunk = uniquePaths.slice(index, index + 100);
-    const { error } = await supabase.storage.from(COMPANION_BUCKET).remove(chunk);
-    if (error) throw error;
-  }
 }
 
 export async function getCurrentCompanionUserId(): Promise<string | null> {
@@ -896,26 +907,38 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
 
   try {
     const prepareStartedAt = performance.now();
-    const { error: prepareError } = await supabase.rpc('prepare_companion_art_save', {
-      requested_art_id: artId,
-      requested_version_id: versionId,
-      requested_title: input.title,
-      requested_privacy: privacy,
-      requested_map_grid: input.grid,
-      requested_map_mode: input.mode,
-      requested_minecraft_version: input.minecraftVersion,
-      requested_settings: settings,
-      requested_artifacts: reservationArtifacts,
+    const { data: prepareData, error: prepareError } = await supabase.functions.invoke('companion-api', {
+      body: {
+        action: 'art_save_prepare',
+        art_id: artId,
+        version_id: versionId,
+        title: input.title,
+        privacy,
+        map_grid: input.grid,
+        map_mode: input.mode,
+        minecraft_version: input.minecraftVersion,
+        settings,
+        artifacts: reservationArtifacts,
+      },
     });
     prepareMs = performance.now() - prepareStartedAt;
-    if (prepareError) throw prepareError;
+    if (prepareError) throw new Error(await readCompanionFunctionError(prepareError));
+    const prepareResult = prepareData as CompanionSavePrepareResult;
+    const storageProvider = prepareResult.storageProvider === 'yandex' ? 'yandex' : 'supabase';
+    const uploadTargets = new Map(
+      (prepareResult.uploadTargets ?? []).map(target => [target.artifactId, target]),
+    );
 
     const uploadStartedAt = performance.now();
     await mapWithConcurrency(
       preparedArtifacts,
       companionUploadConcurrency(preparedArtifacts),
       async artifact => {
-        await uploadPreparedArtifact(artifact);
+        await uploadPreparedArtifact(
+          artifact,
+          storageProvider,
+          uploadTargets.get(artifact.manifest.id),
+        );
         uploadedStoragePaths.push(artifact.manifest.storagePath);
       },
     );
@@ -974,7 +997,12 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
       cleanupErrors.push(cancelError.message);
     } else {
       try {
-        await removeStorageObjects(uploadedStoragePaths);
+        if (uploadedStoragePaths.length > 0) {
+          const { error: drainError } = await supabase.functions.invoke('companion-api', {
+            body: { action: 'cloud_overview' },
+          });
+          if (drainError) throw drainError;
+        }
       } catch (cleanupError) {
         cleanupErrors.push(cleanupError instanceof Error ? cleanupError.message : String(cleanupError));
       }

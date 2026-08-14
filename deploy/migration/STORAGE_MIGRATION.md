@@ -57,6 +57,58 @@ existing Supabase signer. Removing the flag restores Supabase-only reads.
 Do not enable dual-read until the inventory/copy rehearsal, signed-link expiry,
 guest isolation, authenticated previews/downloads, and rollback smoke all pass.
 
+## New ordinary Cloud artifact writes
+
+New Cloud saves can use Yandex directly without changing the logical artifact
+paths or public manifests. This is separate from the legacy dual-read copy and
+from Lens. Existing rows default to `storage_provider = 'supabase'`; a complete
+save reservation uses exactly one provider.
+
+Create a separate private, versioned bucket, a KMS key, a migration writer and
+a runtime identity limited to get/put/delete below
+`cloud/v1/mapkluss-companion-private/`.
+Anonymous reads, public ACLs and bucket-policy administration must remain
+denied. Configure browser CORS for `https://mapkluss.art` with `GET`, `HEAD`
+and `PUT`, the signed upload headers and exposed `ETag`. Add an enabled
+lifecycle below `cloud/v1/` that removes non-current versions within 30 days
+and incomplete multipart uploads within 7 days; the intended production
+values are 7 days and 1 day respectively. This is required because deleting a
+key from a versioned bucket otherwise leaves charged non-current bytes.
+
+Before enabling writes, run `node deploy/migration/verify-artifact-storage.mjs`
+with the runtime Object Storage identity. The preflight fails unless private
+ACL, no bucket policy, versioning, the expected KMS key, browser CORS and
+bounded lifecycle are all present. Configure these Edge secrets without
+committing their values:
+
+- `YANDEX_ARTIFACT_STORAGE_ACCESS_KEY_ID`
+- `YANDEX_ARTIFACT_STORAGE_SECRET_ACCESS_KEY`
+- `YANDEX_ARTIFACT_STORAGE_BUCKET`
+- `YANDEX_ARTIFACT_STORAGE_KMS_KEY_ID`
+- optional `YANDEX_ARTIFACT_STORAGE_PREFIX=cloud/v1`
+- optional `YANDEX_ARTIFACT_STORAGE_ENDPOINT=https://storage.yandexcloud.net`
+- optional `YANDEX_ARTIFACT_STORAGE_REGION=ru-central1`
+
+Keep `MAPKLUSS_YANDEX_ARTIFACT_STORAGE_WRITE` absent while deploying the
+additive migration and updated `companion-api`/`companion-mod`. Valid
+credentials remain available for reads and cleanup when writes are disabled,
+which preserves rollback access to already-published Yandex rows. Enabling the
+write flag with incomplete configuration fails the save closed.
+
+The website receives short-lived immutable PUT targets from `companion-api`.
+The signed request binds content type, SHA-256 metadata, source bucket and KMS
+headers. A Yandex write is never retried through Supabase. Before publication,
+the Edge Function downloads the real object, checks MIME, exact size and
+SHA-256, and only then stores `storage_provider = 'yandex'`. Reads and durable
+cleanup follow that provider exactly.
+
+Roll out as a private canary: migration, functions with writes disabled,
+Supabase regression save, enable the flag for one owner window, then verify
+save/update/reopen, preview, every artifact download, Companion library and
+delete cleanup. Keep every Supabase object and the write flag rollback-ready
+through the observation period. Do not remove the source copies as part of
+this rollout.
+
 ## Lens preview cutover
 
 Lens preview images are temporary live-session data and are deliberately not

@@ -89,3 +89,21 @@ Deno.test('dual-read keeps available primary URLs and falls back only for missin
   assert(result.get('fallback') === 'https://supabase/fallback.png');
   assert(fallbackPaths.length === 1 && fallbackPaths[0] === 'fallback.png');
 });
+
+Deno.test('provider-pinned Yandex rows never fall back to Supabase', async () => {
+  let fallbackCalls = 0;
+  const signed = await signStorageRows([{
+    key: 'yandex',
+    bucket: 'mapkluss-companion-private',
+    path: 'companion/u/a/v/preview.png',
+    storageProvider: 'yandex',
+  }], 60, async () => {
+    fallbackCalls += 1;
+    return [{ path: 'companion/u/a/v/preview.png', signedUrl: 'https://wrong' }];
+  }, {
+    artifactSign: async (bucket, path, expiresIn) =>
+      `https://yandex.test/${bucket}/${path}?ttl=${expiresIn}`,
+  });
+  assert(fallbackCalls === 0, 'Yandex rows must never use the fallback provider');
+  assert(signed.get('yandex')?.startsWith('https://yandex.test/'));
+});

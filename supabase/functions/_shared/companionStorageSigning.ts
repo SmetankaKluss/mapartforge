@@ -8,6 +8,10 @@ import {
   readYandexStorageConfig,
   signAvailableYandexObjects,
 } from './yandexStorageSigning.ts';
+import {
+  readCompanionArtifactYandexConfig,
+  signCompanionArtifactYandexDownload,
+} from './companionArtifactYandexStorage.ts';
 
 let yandexCircuitOpenUntil = 0;
 
@@ -22,6 +26,7 @@ export type StorageSigningRow = {
   key: string;
   bucket: string;
   path: string;
+  storageProvider?: 'supabase' | 'yandex';
 };
 
 export type StorageSigningOptions = {
@@ -33,6 +38,11 @@ export type StorageSigningOptions = {
     paths: string[],
     expiresIn: number,
   ) => Promise<readonly PreviewSigningResult[]>;
+  artifactSign?: (
+    bucket: string,
+    path: string,
+    expiresIn: number,
+  ) => Promise<string>;
 };
 
 export async function signStorageRows(
@@ -45,8 +55,35 @@ export async function signStorageRows(
   ) => Promise<readonly PreviewSigningResult[]>,
   options: StorageSigningOptions = {},
 ): Promise<Map<string, string>> {
+  const yandexRows = rows.filter(row => row.storageProvider === 'yandex');
+  const legacyRows = rows.filter(row => row.storageProvider !== 'yandex');
+  const signedUrls = new Map<string, string>();
+
+  if (yandexRows.length > 0) {
+    try {
+      await mapWithConcurrency(yandexRows, options.concurrency ?? 4, async row => {
+        const signedUrl = options.artifactSign
+          ? await options.artifactSign(row.bucket, row.path, expiresIn)
+          : await (async () => {
+            const artifactConfig = readCompanionArtifactYandexConfig();
+            if (!artifactConfig) throw new Error('artifact_yandex_storage_unavailable');
+            return signCompanionArtifactYandexDownload(
+              artifactConfig,
+              row.bucket,
+              row.path,
+              expiresIn,
+            );
+          })();
+        signedUrls.set(row.key, signedUrl);
+      });
+    } catch (error) {
+      if (!options.bestEffort) throw error;
+      options.onBatchError?.(error);
+    }
+  }
+
   const byBucket = new Map<string, StorageSigningRow[]>();
-  for (const row of rows) {
+  for (const row of legacyRows) {
     const grouped = byBucket.get(row.bucket) ?? [];
     grouped.push(row);
     byBucket.set(row.bucket, grouped);
@@ -57,7 +94,6 @@ export async function signStorageRows(
     return chunkValues(uniquePaths, 50).map(paths => ({ bucket, bucketRows, paths }));
   });
 
-  const signedUrls = new Map<string, string>();
   await mapWithConcurrency(batches, options.concurrency ?? 4, async ({ bucket, bucketRows, paths }) => {
     try {
       const yandexConfig = options.primarySignBatch || Date.now() < yandexCircuitOpenUntil

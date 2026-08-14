@@ -26,6 +26,12 @@ import {
   formatCompanionServerTiming,
   type CompanionServerTimings,
 } from '../_shared/companionServerTiming.ts';
+import {
+  companionArtifactYandexWritesEnabled,
+  createCompanionArtifactUploadTarget,
+  readCompanionArtifactYandexConfig,
+  signCompanionArtifactYandexDownload,
+} from '../_shared/companionArtifactYandexStorage.ts';
 
 // Generated database types are not available in this standalone Edge bundle.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,9 +42,10 @@ async function createStorageSignedUrl(
   bucket: string,
   path: string,
   expiresIn: number,
+  storageProvider: 'supabase' | 'yandex' = 'supabase',
 ): Promise<string | null> {
   const signed = await signStorageRows(
-    [{ key: 'object', bucket, path }],
+    [{ key: 'object', bucket, path, storageProvider }],
     expiresIn,
     async (sourceBucket, paths, lifetime) => {
       const { data, error } = await admin.storage.from(sourceBucket).createSignedUrls(paths, lifetime);
@@ -83,6 +90,7 @@ type Action =
   | 'cloud_overview'
   | 'art_overview'
   | 'collection_overview'
+  | 'art_save_prepare'
   | 'art_save_finalize';
 
 const corsHeaders = {
@@ -233,7 +241,9 @@ async function renameCurrentVersionArtifacts(
     const currentPath = String(artifact.storage_path ?? '');
     const nextPath = currentPath ? storagePathWithFilename(currentPath, nextFilename) : currentPath;
 
-    if (currentPath && nextPath && currentPath !== nextPath) {
+    const storageProvider = artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase';
+    const immutablePath = storageProvider === 'yandex';
+    if (!immutablePath && currentPath && nextPath && currentPath !== nextPath) {
       const { error: moveError } = await admin.storage
         .from(String(artifact.bucket_id ?? 'mapartforge'))
         .move(currentPath, nextPath);
@@ -244,7 +254,7 @@ async function renameCurrentVersionArtifacts(
       filename: nextFilename,
       updated_at: now,
     };
-    if (nextPath) patch.storage_path = nextPath;
+    if (!immutablePath && nextPath) patch.storage_path = nextPath;
 
     const { error } = await admin
       .from('art_artifacts')
@@ -253,8 +263,9 @@ async function renameCurrentVersionArtifacts(
       .eq('owner_id', ownerId);
     if (error) throw error;
 
-    if (kind === 'preview_png') previewPath = nextPath || currentPath || null;
-    if (kind === 'project') projectPath = nextPath || currentPath || null;
+    const effectivePath = immutablePath ? currentPath : nextPath || currentPath;
+    if (kind === 'preview_png') previewPath = effectivePath || null;
+    if (kind === 'project') projectPath = effectivePath || null;
   }
 
   const versionPatch: Record<string, unknown> = {};
@@ -296,6 +307,7 @@ async function createPreviewSignedUrl(
     String(artifact.bucket_id ?? 'mapartforge'),
     String(artifact.storage_path),
     60 * 30,
+    artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
   );
 }
 
@@ -322,7 +334,7 @@ async function mapLibraryRows(
         .map(async versionChunk => {
           const { data, error } = await admin
             .from('art_artifacts')
-            .select('art_id,version_id,bucket_id,storage_path')
+            .select('art_id,version_id,bucket_id,storage_path,storage_provider')
             .eq('kind', 'preview_png')
             .in('version_id', versionChunk);
           if (error) throw error;
@@ -331,7 +343,12 @@ async function mapLibraryRows(
     );
     const artifacts = artifactChunks.flat();
 
-    const signingRows: Array<{ key: string; bucket: string; path: string }> = [];
+    const signingRows: Array<{
+      key: string;
+      bucket: string;
+      path: string;
+      storageProvider?: 'supabase' | 'yandex';
+    }> = [];
     for (const artifact of artifacts) {
       const key = libraryPreviewKey(
         String(artifact.art_id),
@@ -343,6 +360,7 @@ async function mapLibraryRows(
         key,
         bucket: String(artifact.bucket_id ?? 'mapartforge'),
         path: String(artifact.storage_path),
+        storageProvider: artifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
       });
     }
 
@@ -463,6 +481,56 @@ const SMALL_SAVE_VERIFICATION_CONCURRENCY = 6;
 const LARGE_SAVE_VERIFICATION_CONCURRENCY = 3;
 const LARGE_SAVE_THRESHOLD_BYTES = 32 * 1024 * 1024;
 
+async function handleCompanionSavePrepare(
+  req: Request,
+  payload: Record<string, unknown>,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<Response> {
+  const bearer = classifyCompanionBearer(req.headers.get('Authorization'));
+  if (!bearer || bearer.kind !== 'website_jwt') return json({ error: 'unauthorized' }, 401);
+  const requestedArtifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+  const useYandex = companionArtifactYandexWritesEnabled();
+  const yandexConfig = readCompanionArtifactYandexConfig();
+  if (useYandex && !yandexConfig) return json({ error: 'artifact_storage_unavailable' }, 503);
+  const storageProvider = useYandex ? 'yandex' : 'supabase';
+  const artifacts = requestedArtifacts.map(entry => ({
+    ...(entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}),
+    storageProvider,
+  }));
+  const userClient = createClient(supabaseUrl, serviceKey, {
+    global: { headers: { Authorization: `Bearer ${bearer.token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await userClient.rpc('prepare_companion_art_save', {
+    requested_art_id: payload.art_id,
+    requested_version_id: payload.version_id,
+    requested_title: payload.title,
+    requested_privacy: payload.privacy,
+    requested_map_grid: payload.map_grid,
+    requested_map_mode: payload.map_mode,
+    requested_minecraft_version: payload.minecraft_version,
+    requested_settings: payload.settings,
+    requested_artifacts: artifacts,
+  });
+  if (error) return json({ error: error.message }, 422);
+  const uploadTargets = useYandex && yandexConfig
+    ? await Promise.all(artifacts.map(async artifact => {
+      const row = artifact as Record<string, unknown>;
+      return {
+        artifactId: String(row.artifactId ?? ''),
+        ...await createCompanionArtifactUploadTarget(yandexConfig, {
+          bucketId: String(row.bucketId ?? ''),
+          storagePath: String(row.storagePath ?? ''),
+          contentType: String(row.contentType ?? ''),
+          sha256: String(row.sha256 ?? ''),
+        }),
+      };
+    }))
+    : [];
+  return json({ ...(data as Record<string, unknown> ?? {}), storageProvider, uploadTargets });
+}
+
 async function handleCompanionSaveFinalize(
   admin: AdminClient,
   req: Request,
@@ -521,17 +589,33 @@ async function handleCompanionSaveFinalize(
       async artifact => {
         let response: Response;
         try {
-          response = await fetch(companionStorageObjectUrl(supabaseUrl, artifact), {
+          const yandexConfig = artifact.storageProvider === 'yandex'
+            ? readCompanionArtifactYandexConfig()
+            : null;
+          if (artifact.storageProvider === 'yandex' && !yandexConfig) {
+            throw new CompanionArtifactVerificationError('artifact_storage_unavailable', true, 503);
+          }
+          const url = yandexConfig
+            ? await signCompanionArtifactYandexDownload(
+              yandexConfig,
+              artifact.bucketId,
+              artifact.storagePath,
+              60,
+            )
+            : companionStorageObjectUrl(supabaseUrl, artifact);
+          response = await fetch(url, {
             method: 'GET',
             redirect: 'error',
             cache: 'no-store',
-            headers: {
+            headers: artifact.storageProvider === 'supabase' ? {
               Authorization: `Bearer ${serviceKey}`,
               apikey: serviceKey,
               'Accept-Encoding': 'identity',
-            },
+            } : { 'Accept-Encoding': 'identity' },
+            signal: AbortSignal.timeout(30_000),
           });
-        } catch {
+        } catch (error) {
+          if (error instanceof CompanionArtifactVerificationError) throw error;
           throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
         }
         return verifyCompanionArtifactResponse(artifact, response);
@@ -868,6 +952,9 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
   if (artifactError) throw artifactError;
 
   let manifestArtifacts = artifacts ?? [];
+  const artifactProviderById = new Map(
+    manifestArtifacts.map(row => [String(row.id), row.storage_provider === 'yandex' ? 'yandex' : 'supabase']),
+  );
   const suppressionGrid = versionSettings.grid && typeof versionSettings.grid === 'object'
     ? versionSettings.grid as { wide?: unknown; tall?: unknown }
     : null;
@@ -898,6 +985,7 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
         size_bytes: bundlePin.size_bytes,
         sha256: bundlePin.sha256,
         updated_at: bundlePin.updated_at,
+        storage_provider: artifactProviderById.get(String(bundlePin.artifact_id)) ?? 'supabase',
       }]);
   } else if (versionSettings.buildTechnique === 'suppression_two_layer' && versionId === art.current_version_id) {
     const { data: pin, error: pinError } = await admin
@@ -922,6 +1010,7 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
           size_bytes: pin.plan_size_bytes,
           sha256: pin.plan_sha256,
           updated_at: pin.updated_at,
+          storage_provider: artifactProviderById.get(String(pin.plan_artifact_id)) ?? 'supabase',
         },
         {
           id: pin.litematic_artifact_id,
@@ -933,14 +1022,21 @@ async function getArtManifest(admin: AdminClient, userId: string | null, artId: 
           size_bytes: pin.litematic_size_bytes,
           sha256: pin.litematic_sha256,
           updated_at: pin.updated_at,
+          storage_provider: artifactProviderById.get(String(pin.litematic_artifact_id)) ?? 'supabase',
         },
       ]);
   }
 
-  const manifestSigningRows = manifestArtifacts.map((row, index) => ({
+  const manifestSigningRows: Array<{
+    key: string;
+    bucket: string;
+    path: string;
+    storageProvider?: 'supabase' | 'yandex';
+  }> = manifestArtifacts.map((row, index) => ({
     key: String(row.id ?? `${row.kind}:${index}`),
     bucket: String(row.bucket_id ?? 'mapartforge'),
     path: String(row.storage_path),
+    storageProvider: row.storage_provider === 'yandex' ? 'yandex' : 'supabase',
   }));
   const manifestSignedUrls = await signStorageRows(
     manifestSigningRows,
@@ -1025,7 +1121,7 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
   if (versionIds.length > 0) {
     const { data: artifacts, error: artifactsError } = await admin
       .from('art_artifacts')
-      .select('version_id,kind,bucket_id,storage_path')
+      .select('version_id,kind,bucket_id,storage_path,storage_provider')
       .in('version_id', versionIds);
     if (artifactsError) throw artifactsError;
     for (const artifact of artifacts ?? []) {
@@ -1040,7 +1136,12 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
     }
   }
 
-  const versionSigningRows: Array<{ key: string; bucket: string; path: string }> = [];
+  const versionSigningRows: Array<{
+    key: string;
+    bucket: string;
+    path: string;
+    storageProvider?: 'supabase' | 'yandex';
+  }> = [];
   for (const versionId of versionIds) {
     const previewArtifact = previewArtifacts.get(versionId);
     if (previewArtifact?.storage_path) {
@@ -1048,6 +1149,7 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
         key: `${versionId}:preview`,
         bucket: String(previewArtifact.bucket_id ?? 'mapartforge'),
         path: String(previewArtifact.storage_path),
+        storageProvider: previewArtifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
       });
     }
     const projectArtifact = projectArtifacts.get(versionId);
@@ -1056,6 +1158,7 @@ async function listArtVersions(admin: AdminClient, artId: string, currentVersion
         key: `${versionId}:project`,
         bucket: String(projectArtifact.bucket_id ?? 'mapartforge'),
         path: String(projectArtifact.storage_path),
+        storageProvider: projectArtifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
       });
     }
   }
@@ -1126,6 +1229,7 @@ async function getArtVersionProject(admin: AdminClient, userId: string | null, v
     String(project.bucket_id ?? 'mapartforge'),
     String(project.storage_path),
     60 * 10,
+    project.storage_provider === 'yandex' ? 'yandex' : 'supabase',
   );
   if (!projectUrl) throw new Error('project signing failed');
 
@@ -1363,6 +1467,10 @@ Deno.serve(async req => {
       return await handleCompanionSaveFinalize(admin, req, payload, supabaseUrl, serviceKey);
     }
 
+    if (action === 'art_save_prepare') {
+      return await handleCompanionSavePrepare(req, payload, supabaseUrl, serviceKey);
+    }
+
     if (action === 'device_approve') {
       const userId = await getBearerUserId(admin, req);
       if (!userId) return json({ error: 'unauthorized' }, 401);
@@ -1417,12 +1525,28 @@ Deno.serve(async req => {
       for (const bucketId of ['mapartforge', 'mapkluss-companion-private']) {
         pendingPaths.set(bucketId, await listStorageObjectPaths(admin, bucketId, `companion/${userId}`));
       }
+      const { data: yandexArtifacts, error: yandexArtifactError } = await admin
+        .from('art_artifacts')
+        .select('bucket_id,storage_path')
+        .eq('owner_id', userId)
+        .eq('storage_provider', 'yandex');
+      if (yandexArtifactError) throw yandexArtifactError;
       const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) throw error;
       for (const [bucketId, paths] of pendingPaths) {
         for (const path of paths) {
           await queueCompanionStorageDelete(admin, userId, bucketId, path, 'account_deleted');
         }
+      }
+      for (const artifact of yandexArtifacts ?? []) {
+        await queueCompanionStorageDelete(
+          admin,
+          userId,
+          String(artifact.bucket_id),
+          String(artifact.storage_path),
+          'account_deleted',
+          'yandex',
+        );
       }
       const cleanup = await drainCompanionStorageDeleteOutbox(admin, userId).catch(() => ({ removed: 0, deferred: 1 }));
       return json({ ok: true, removedObjects: cleanup.removed, cleanupDeferred: cleanup.deferred > 0 });
@@ -1881,11 +2005,21 @@ Deno.serve(async req => {
         .eq('kind', 'materials_csv')
         .maybeSingle();
       if (csvArtifact?.storage_path) {
-        const { data: csvBlob, error: csvError } = await admin.storage
-          .from(String(csvArtifact.bucket_id ?? 'mapartforge'))
-          .download(csvArtifact.storage_path);
-        if (csvError) throw csvError;
-        materials = parseMaterialsCsv(await csvBlob.text());
+        const csvUrl = await createStorageSignedUrl(
+          admin,
+          String(csvArtifact.bucket_id ?? 'mapartforge'),
+          String(csvArtifact.storage_path),
+          60,
+          csvArtifact.storage_provider === 'yandex' ? 'yandex' : 'supabase',
+        );
+        if (!csvUrl) throw new Error('materials signing failed');
+        const csvResponse = await fetch(csvUrl, {
+          redirect: 'error',
+          cache: 'no-store',
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!csvResponse.ok) throw new Error('materials download failed');
+        materials = parseMaterialsCsv(await csvResponse.text());
       }
 
       const imagePreview = await createPreviewSignedUrl(

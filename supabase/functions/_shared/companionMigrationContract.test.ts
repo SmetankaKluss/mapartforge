@@ -141,3 +141,30 @@ Deno.test("large Two-layer saves require one private hash-pinned bundle", async 
     "bundle pins must bind the exact artifact/version/owner tuple and stay immutable",
   );
 });
+
+Deno.test("ordinary artifact provider migration is additive and fail-closed", async () => {
+  const sql = await migration(
+    "20260814123000_add_companion_artifact_storage_provider.sql",
+  );
+  assert(
+    sql.includes("storage_provider text not null default 'supabase'") &&
+      sql.includes("storage_provider in ('supabase', 'yandex')"),
+    "existing rows and clients must remain on Supabase while provider values stay bounded",
+  );
+  assert(
+    sql.includes("coalesce(artifact ->> 'storageProvider', 'supabase')") &&
+      sql.includes("verified.value ->> 'storageProvider'") &&
+      sql.includes("expected_supabase_object_count"),
+    "reservation, verification and publication must bind the chosen provider",
+  );
+  assert(
+    sql.includes("storage_provider = 'yandex'") &&
+      sql.includes("external_published_bytes"),
+    "quota accounting must include published Yandex bytes",
+  );
+  assert(
+    sql.includes("on conflict (storage_provider, bucket_id, object_path)") &&
+      sql.includes("returns table(storage_provider text"),
+    "cleanup must preserve provider identity",
+  );
+});
