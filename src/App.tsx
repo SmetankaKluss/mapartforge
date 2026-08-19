@@ -112,7 +112,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-v1.26.3-companion-0-11-1-2026-08-06',
+  id: 'mapkluss-companion-0-13-1-2026-08-20',
   url: 'https://t.me/mapkluss',
 };
 
@@ -3012,12 +3012,12 @@ export default function App() {
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline={t('MAPKLUSS COMPANION 0.11.1 — БЫСТРЕЕ И ЛЕГЧЕ', 'MAPKLUSS COMPANION 0.11.1 — FASTER AND LIGHTER')}
-            detail={t('БЫСТРЕЕ CLOUD · ПРЕВЬЮ · ОБНОВЛЕНИЯ', 'FASTER CLOUD · PREVIEWS · UPDATES')}
+            headline={t('MAPKLUSS COMPANION 0.13.1 — НОВЫЙ ИНТЕРФЕЙС', 'MAPKLUSS COMPANION 0.13.1 — NEW INTERFACE')}
+            detail={t('БИБЛИОТЕКА · LENS · TWO-LAYER', 'LIBRARY · LENS · TWO-LAYER')}
           />
           <span className="update-banner-sr">
-            {t('MapKluss Companion 0.11.1 ускоряет Cloud, превью, обновление схем и работу с картами в инвентаре.',
-              'MapKluss Companion 0.11.1 speeds up Cloud, previews, schema refreshes, and map inventory handling.')}
+            {t('MapKluss Companion 0.13.1 получил новый интерфейс, обновлённый Lens и полный Two-layer workflow.',
+              'MapKluss Companion 0.13.1 adds a new interface, an updated Lens, and the complete Two-layer workflow.')}
           </span>
           <a
             className="update-banner-link"
