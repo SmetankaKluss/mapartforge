@@ -120,6 +120,8 @@
  *             показы поддержки и версии релиза; сырые сообщения, stack trace и идентификаторы ошибок больше не отправляются
  *   1.26.17 — облачные арты сохраняются с кириллическими названиями, небольшие сохранения обрабатываются
  *             параллельнее, а форма сохранения больше не показывает текст о будущей галерее
+ *   1.27.1 — на сайте опубликован Companion 0.13.1 с новым интерфейсом, шрифтом Inter,
+ *            добровольной анонимной статистикой и оптимизированным Lens
  */
-// 1.27.0: successful exports and Cloud saves can continue directly in Minecraft Companion.
-export const VERSION = 'v1.27.0';
+// 1.27.1: the site now serves the verified Companion 0.13.1 release for all supported targets.
+export const VERSION = 'v1.27.1';

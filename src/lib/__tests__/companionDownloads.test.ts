@@ -14,7 +14,7 @@ describe('companion downloads', () => {
       '1.21.8',
       '1.21.4',
     ]);
-    expect(COMPANION_MOD_VERSION_OPTIONS.every(option => option.href.endsWith('20260805-companion-0-11-1'))).toBe(true);
+    expect(COMPANION_MOD_VERSION_OPTIONS.every(option => option.href.endsWith('20260820-companion-0-13-1'))).toBe(true);
   });
 
   it('uses the exact target when supported and a safe 1.21.4 fallback otherwise', () => {
@@ -22,6 +22,6 @@ describe('companion downloads', () => {
     expect(companionVersionForMinecraft('1.20')).toBe('1.21.4');
     expect(isCompanionMinecraftVersion('26.2')).toBe(true);
     expect(isCompanionMinecraftVersion('1.20')).toBe(false);
-    expect(companionDownloadOption('1.21.11').filename).toContain('1.21.11-0.11.1.jar');
+    expect(companionDownloadOption('1.21.11').filename).toContain('1.21.11-0.13.1.jar');
   });
 });
