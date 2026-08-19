@@ -1,4 +1,5 @@
 import tls from 'node:tls';
+import { fetchSpaResponse } from './spa-response.mjs';
 
 const apiUrl = normalizedUrl(process.env.MAPKLUSS_API_URL || 'https://api.mapkluss.art');
 const directApiUrl = normalizedUrl(process.env.MAPKLUSS_DIRECT_API_URL || 'https://opxgnyadxybceldaokdi.supabase.co');
@@ -105,18 +106,15 @@ async function expectWebSocket(baseUrl, key) {
 }
 
 async function expectSpa(url, { allowErrorDocument = false } = {}) {
-  const response = await fetch(url, {
-    cache: 'no-store',
-    redirect: 'manual',
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const { response, finalUrl, redirectCount } = await fetchSpaResponse(url, { timeoutMs });
   const statusAccepted = response.status === 200 || (allowErrorDocument && response.status === 404);
-  assert(statusAccepted, `${url} returned ${response.status}`);
+  assert(statusAccepted, `${finalUrl} returned ${response.status}`);
   const contentType = response.headers.get('content-type') || '';
   const body = await response.text();
-  assert(contentType.includes('text/html'), `${url} is not HTML`);
-  assert(body.includes('id="root"'), `${url} is missing the React root`);
-  console.log(`${new URL(url).pathname} spa ok status=${response.status}`);
+  assert(contentType.includes('text/html'), `${finalUrl} is not HTML`);
+  assert(body.includes('id="root"'), `${finalUrl} is missing the React root`);
+  const redirectLabel = redirectCount > 0 ? ` redirects=${redirectCount}` : '';
+  console.log(`${new URL(url).pathname} spa ok status=${response.status}${redirectLabel}`);
 }
 
 async function verifyCertificate(hostname) {
