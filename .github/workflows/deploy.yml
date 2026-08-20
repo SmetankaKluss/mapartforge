@@ -50,14 +50,15 @@ jobs:
           publish_dir: ./dist
           cname: mapkluss.art
 
-      - name: Deploy staging site to Yandex Object Storage
-        # Manual dispatch is staging-only and can rehearse either gateway-first or direct-only routing.
-        if: github.event_name == 'workflow_dispatch'
+      - name: Deploy site to Yandex Object Storage
+        # Main mirrors the production build to the canonical bucket. Manual runs stay
+        # staging-only and can rehearse either gateway-first or direct-only routing.
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.YC_STORAGE_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_STORAGE_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ru-central1
-          YC_STORAGE_BUCKET: stage.mapkluss.art
+          YC_STORAGE_BUCKET: ${{ github.event_name == 'push' && 'mapkluss.art' || 'stage.mapkluss.art' }}
           YC_STORAGE_ENDPOINT: https://storage.yandexcloud.net
         run: |
           aws --version || python -m pip install awscli
