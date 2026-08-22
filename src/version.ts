@@ -125,6 +125,7 @@
  *   1.28.0 — экспортные файлы одной работы дополнительно и приватно архивируются
  *            в отдельной короткоживущей сессии для проверки результата
  *   1.28.1 — исправлен фоновый upload закрытого архива для гостевого экспорта
+ *   1.28.2 — новые временные экспортные архивы группируются в Storage по UTC-дате и времени
  */
-// 1.28.1: guest export archives bind signed uploads to their reserved artifact.
-export const VERSION = 'v1.28.1';
+// 1.28.2: export archive paths are chronological and human-inspectable in private Storage.
+export const VERSION = 'v1.28.2';

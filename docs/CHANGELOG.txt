@@ -5,6 +5,9 @@ v1.28.1
 -------
 - Исправлена фоновая загрузка закрытого архива для гостевых экспортов: preview.png и скачанный файл теперь сохраняются в одной сессии
 
+v1.28.2
+- New private editor export archive folders are grouped by UTC date and time, with ordered filenames for easier inspection in Yandex Object Storage.
+
 v1.28.0
 -------
 - Скачанные из редактора файлы одной работы теперь дополнительно собираются в закрытую временную экспортную сессию вместе с preview.png

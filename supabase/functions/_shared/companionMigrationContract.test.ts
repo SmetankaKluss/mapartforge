@@ -172,6 +172,7 @@ Deno.test("ordinary artifact provider migration is additive and fail-closed", as
 Deno.test("private export archives use opaque capabilities and keep browser roles out", async () => {
   const sql = await migration("20260822181549_add_private_export_archives.sql");
   const repair = await migration("20260822215500_fix_export_archive_session_expiry_ambiguity.sql");
+  const chronologicalPaths = await migration("20260822223000_make_export_archive_paths_chronological.sql");
   assert(
     sql.includes("export_archive_sessions") &&
       sql.includes("export_archive_files") &&
@@ -196,5 +197,12 @@ Deno.test("private export archives use opaque capabilities and keep browser role
     repair.includes("archive_session.expires_at > now()") &&
       repair.includes("when requested_owner_id is null then interval '24 hours'"),
     "anonymous archive expiry must be unambiguous and limited to one day",
+  );
+  assert(
+    chronologicalPaths.includes("'YYYY-MM-DD'") &&
+      chronologicalPaths.includes("'HH24-MI-SS'") &&
+      chronologicalPaths.includes("lpad(file_index::text, 2, '0')") &&
+      chronologicalPaths.includes("left(requested_session_id::text, 8)"),
+    "new export archive paths must group files by sortable UTC date/time while retaining a collision-safe suffix",
   );
 });
