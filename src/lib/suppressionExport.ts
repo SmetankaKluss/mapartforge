@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { Zip, ZipDeflate } from 'fflate';
 import { companionSlug, sha256Hex } from './companionArtifacts';
+import { downloadExportBlob } from './exportDownload';
 import { extractTile, writeLitematicNbt } from './exportLitematic';
 import {
   SUPPRESSION_MAX_BUNDLE_BYTES,
@@ -489,11 +490,5 @@ export async function buildSuppressionMultiMapZipBlob(bundle: SuppressionMultiMa
 }
 
 export function downloadSuppressionZip(blob: Blob, title: string, grid: MapGrid = { wide: 1, tall: 1 }): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `${companionSlug(title)}_${grid.wide}x${grid.tall}_two_layer.zip`,
-  });
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, `${companionSlug(title)}_${grid.wide}x${grid.tall}_two_layer.zip`);
 }

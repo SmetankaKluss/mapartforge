@@ -168,3 +168,33 @@ Deno.test("ordinary artifact provider migration is additive and fail-closed", as
     "cleanup must preserve provider identity",
   );
 });
+
+Deno.test("private export archives use opaque capabilities and keep browser roles out", async () => {
+  const sql = await migration("20260822181549_add_private_export_archives.sql");
+  const repair = await migration("20260822215500_fix_export_archive_session_expiry_ambiguity.sql");
+  assert(
+    sql.includes("export_archive_sessions") &&
+      sql.includes("export_archive_files") &&
+      sql.includes("access_token_hash") &&
+      sql.includes("client_key_hash"),
+    "export archives need a session, file manifest and only hashed capabilities",
+  );
+  assert(
+    sql.includes("enable row level security") &&
+      sql.includes("revoke all on table public.export_archive_sessions from public, anon, authenticated") &&
+      sql.includes("grant execute on function public.prepare_private_export_archive_file") &&
+      sql.includes("to service_role"),
+    "browser roles must not directly read archive metadata or write storage reservations",
+  );
+  assert(
+    sql.includes("file_count >= 25") &&
+      sql.includes("total_size_bytes + requested_size_bytes > 67108864") &&
+      sql.includes("requested_size_bytes not between 1 and 33554432"),
+    "archive uploads need bounded file, session and single-object limits",
+  );
+  assert(
+    repair.includes("archive_session.expires_at > now()") &&
+      repair.includes("when requested_owner_id is null then interval '24 hours'"),
+    "anonymous archive expiry must be unambiguous and limited to one day",
+  );
+});

@@ -11,6 +11,7 @@ import { processImage } from '../lib/processor';
 import type { GifFrameConfig } from '../lib/gifProject';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { downloadExportBlob } from '../lib/exportDownload';
 
 interface Props {
   gifFrames: GifFrames;
@@ -125,10 +126,7 @@ export function GifModal({
     if (!cancelRef.current) {
       setStatusMsg('Создание ZIP архива…');
       const blob = await zip.generateAsync({ type: 'blob' });
-      const url  = URL.createObjectURL(blob);
-      const a    = Object.assign(document.createElement('a'), { href: url, download: 'mapart_frames.zip' });
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadExportBlob(blob, 'mapart_frames.zip');
       setStatusMsg('Готово!');
     } else {
       setStatusMsg('Отменено');

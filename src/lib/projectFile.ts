@@ -3,6 +3,7 @@ import type { MapGrid } from './types';
 import { base64ToBytes, bytesToBase64 } from './base64';
 import type { TextLayerMeta } from '../components/previewCanvasShared';
 import { coerceBuildTechnique, type BuildTechnique } from './buildTechnique';
+import { downloadExportBlob } from './exportDownload';
 
 interface SerializedLayer {
   id: string;
@@ -226,10 +227,5 @@ export function deserializeFullProject(json: string): {
 
 export function downloadProject(json: string, filename = 'project.mapkluss'): void {
   const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, filename);
 }

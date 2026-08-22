@@ -4,6 +4,7 @@ import type { ComputedPalette } from './dithering';
 import type { MapGrid } from './types';
 import { buildFrameFillCommands, buildFrameFillDatapackFiles } from './exportFrameCommands';
 import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
+import { downloadExportBlob } from './exportDownload';
 
 const MAP_SIZE = 128;
 
@@ -66,10 +67,7 @@ export function buildMapNbt(colors: Uint8Array, minecraftVersion?: MinecraftVers
 }
 
 function triggerBlobDownload(blob: Blob, filename: string) {
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, filename);
 }
 
 /**

@@ -122,6 +122,8 @@
  *             параллельнее, а форма сохранения больше не показывает текст о будущей галерее
  *   1.27.1 — на сайте опубликован Companion 0.13.1 с новым интерфейсом, шрифтом Inter,
  *            добровольной анонимной статистикой и оптимизированным Lens
+ *   1.28.0 — экспортные файлы одной работы дополнительно и приватно архивируются
+ *            в отдельной короткоживущей сессии для проверки результата
  */
-// 1.27.1: the site now serves the verified Companion 0.13.1 release for all supported targets.
-export const VERSION = 'v1.27.1';
+// 1.28.0: editor exports may be privately archived without delaying local downloads.
+export const VERSION = 'v1.28.0';

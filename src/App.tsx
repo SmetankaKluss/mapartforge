@@ -50,6 +50,7 @@ import { decodePalette, PALETTE_PARAM } from './lib/paletteShare';
 import { getExampleById } from './lib/examples';
 import { downloadPng } from './lib/exportPng';
 import { exportLitematicHybrid } from './lib/exportLitematic';
+import { downloadExportBlob } from './lib/exportDownload';
 import { NumInput } from './components/NumInput';
 import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
@@ -1209,10 +1210,7 @@ export default function App() {
       zip.file(`frame_${pad}.litematic`, bytes);
     }
     const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement('a'), { href: url, download: 'gif_mapart.zip' });
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadExportBlob(blob, 'gif_mapart.zip');
   }, [gifProject, minecraftVersion, platformMode, colorMatch, mapGrid]);
 
   const handleCropApply = useCallback((croppedImg: HTMLImageElement) => {

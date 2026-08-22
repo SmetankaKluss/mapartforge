@@ -33,6 +33,7 @@ import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
 import { NbtWriterLE } from './nbtLE';
 import { toBedrockBlock, BEDROCK_BLOCK_VERSION } from './bedrockBlockNames';
+import { downloadExportBlob } from './exportDownload';
 
 function writeMcStructure(
   sizeX: number,
@@ -140,8 +141,5 @@ export async function exportMcStructureZip(
     }
   }
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: zipFilename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, zipFilename);
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ComputedPalette } from '../lib/dithering';
 import type { DitheringMode } from '../lib/dithering';
 import type { MapGrid } from '../lib/types';
@@ -38,6 +38,7 @@ import {
   shouldShowSupportPrompt,
   SUPPORT_URL,
 } from '../lib/supportPrompt';
+import { setExportArchivePreview } from '../lib/exportArchive';
 
 // Helper: convert ImageData to HTMLImageElement (async to ensure image loads)
 function imageDataToHtmlImage(data: ImageData): Promise<HTMLImageElement> {
@@ -145,6 +146,11 @@ export function ExportPanel({
     : t('Сначала обработай изображение.', 'Process an image first.');
 
   const previewData = compareMode ? null : (previewImageData ?? imageData);
+  const archivePreview = compareMode ? (compareData?.left ?? null) : (previewImageData ?? imageData);
+
+  useEffect(() => {
+    setExportArchivePreview(archivePreview);
+  }, [archivePreview]);
   const suppressionEligibility = useMemo(() => {
     if (!imageData) return null;
     return evaluateSuppressionEligibility({

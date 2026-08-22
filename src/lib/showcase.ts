@@ -1,5 +1,6 @@
 import type { DitheringMode } from './dithering';
 import type { MapGrid } from './types';
+import { downloadExportBlob } from './exportDownload';
 
 export interface ShowcaseOptions {
   originalImage: HTMLImageElement | null;
@@ -134,8 +135,5 @@ export async function generateShowcaseImage(options: ShowcaseOptions): Promise<B
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, filename);
 }

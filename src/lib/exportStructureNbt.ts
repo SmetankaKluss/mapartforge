@@ -23,6 +23,7 @@ import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
 import { NbtWriter, gzipBytes } from './nbt';
 import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
+import { downloadExportBlob } from './exportDownload';
 
 function writeStructureNbt(
   sizeX: number,
@@ -127,8 +128,5 @@ export async function exportStructureNbtZip(
     }
   }
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: zipFilename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, zipFilename);
 }

@@ -5,6 +5,7 @@ import type { BlockSelection } from './paletteBlocks';
 import { getPreferredBlockNbt, isMandatorySupport } from './paletteBlocks';
 import type { MapGrid } from './types';
 import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
+import { downloadExportBlob } from './exportDownload';
 
 /**
  * Blocks that require specific block-state Properties in the palette entry
@@ -241,10 +242,7 @@ function packBlockStates(indices: Uint32Array, paletteSize: number): BigInt64Arr
 
 export function triggerDownload(bytes: Uint8Array, filename: string) {
   const blob = new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, filename);
 }
 
 /** Extract a 128×128 tile from a full ImageData (col/row in tile units). */
@@ -1021,10 +1019,7 @@ export async function exportLitematicZip(
   }
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: zipFilename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, zipFilename);
 }
 
 export async function buildLitematicTilesZipBlob(

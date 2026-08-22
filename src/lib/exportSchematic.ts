@@ -23,6 +23,7 @@ import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
 import type { MapGrid } from './types';
 import { minecraftDataVersion, type MinecraftVersion } from './versionPresets';
+import { downloadExportBlob } from './exportDownload';
 import { NbtWriter, gzipBytes, encodeVarint } from './nbt';
 import { getLegacyBlockId } from './legacyBlockIds';
 
@@ -184,10 +185,7 @@ export async function exportSchematicZip(
     }
   }
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: zipFilename });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, zipFilename);
 }
 
 /** Human-readable format label for the export button. */

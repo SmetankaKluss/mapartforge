@@ -1,5 +1,6 @@
 import type { MapGrid } from './types';
 import { minecraftDataPackFormat, usesMapIdComponent, type MinecraftVersion } from './versionPresets';
+import { downloadExportBlob } from './exportDownload';
 
 export interface FrameCommandOptions {
   mapGrid: MapGrid;
@@ -121,11 +122,5 @@ export function buildFrameFillDatapackFiles(options: FrameCommandOptions): Datap
 export function downloadFrameFillCommands(options: FrameCommandOptions): void {
   const content = buildFrameFillCommands(options);
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `mapkluss_frame_fill_${options.mapGrid.wide}x${options.mapGrid.tall}_maps_${clampStartMapId(options.startMapId)}.mcfunction`,
-  });
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExportBlob(blob, `mapkluss_frame_fill_${options.mapGrid.wide}x${options.mapGrid.tall}_maps_${clampStartMapId(options.startMapId)}.mcfunction`);
 }
