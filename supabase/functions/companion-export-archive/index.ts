@@ -203,7 +203,12 @@ Deno.serve(async (request) => {
         contentType: file.content_type,
         sha256: file.sha256,
       });
-      return json({ artifactId: file.id, uploadTarget });
+      return json({
+        artifactId: file.id,
+        // The shared browser uploader rejects a target that is not bound to
+        // the exact reserved artifact. Keep that binding in the response too.
+        uploadTarget: { ...uploadTarget, artifactId: file.id },
+      });
     }
 
     if (payload.action === "file_complete") {

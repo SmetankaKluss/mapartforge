@@ -124,6 +124,7 @@
  *            добровольной анонимной статистикой и оптимизированным Lens
  *   1.28.0 — экспортные файлы одной работы дополнительно и приватно архивируются
  *            в отдельной короткоживущей сессии для проверки результата
+ *   1.28.1 — исправлен фоновый upload закрытого архива для гостевого экспорта
  */
-// 1.28.0: editor exports may be privately archived without delaying local downloads.
-export const VERSION = 'v1.28.0';
+// 1.28.1: guest export archives bind signed uploads to their reserved artifact.
+export const VERSION = 'v1.28.1';
