@@ -126,6 +126,7 @@
  *            в отдельной короткоживущей сессии для проверки результата
  *   1.28.1 — исправлен фоновый upload закрытого архива для гостевого экспорта
  *   1.28.2 — новые временные экспортные архивы группируются в Storage по UTC-дате и времени
+ *   1.28.3 — SEO fallback главной страницы заменён на theme-aware boot-экран редактора
  */
-// 1.28.2: export archive paths are chronological and human-inspectable in private Storage.
-export const VERSION = 'v1.28.2';
+// 1.28.3: the editor starts from a themed boot shell instead of a visible SEO page.
+export const VERSION = 'v1.28.3';

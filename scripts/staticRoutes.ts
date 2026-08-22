@@ -8,6 +8,8 @@ import { WIKI_ARTICLES } from '../src/lib/wiki';
 const SITE_ORIGIN = 'https://mapkluss.art';
 const STATIC_START = '<!-- mapkluss-static:start -->';
 const STATIC_END = '<!-- mapkluss-static:end -->';
+const ROOT_SEO_START = '<!-- mapkluss-root-seo:start -->';
+const ROOT_SEO_END = '<!-- mapkluss-root-seo:end -->';
 
 interface StaticRoute {
   routePath: string;
@@ -108,6 +110,7 @@ function renderRouteHtml(template: string, route: StaticRoute): string {
   const canonicalUrl = `${SITE_ORIGIN}${canonicalPublicPath(route.routePath)}`;
   const schemaJson = JSON.stringify(route.schema).replaceAll('<', '\\u003c');
   let html = template
+    .replace(new RegExp(`${ROOT_SEO_START}[\\s\\S]*?${ROOT_SEO_END}`), '')
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(route.title)}</title>`)
     .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${canonicalUrl}" />`)
     .replace(new RegExp(`${STATIC_START}[\\s\\S]*?${STATIC_END}`), `${STATIC_START}\n${route.content}\n${STATIC_END}`)
@@ -130,6 +133,7 @@ function renderAppShellHtml(
 ): string {
   const canonicalUrl = `${SITE_ORIGIN}${route.routePath}`;
   let html = template
+    .replace(new RegExp(`${ROOT_SEO_START}[\\s\\S]*?${ROOT_SEO_END}`), '')
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(route.title)}</title>`)
     .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${canonicalUrl}" />`)
     .replace(new RegExp(`${STATIC_START}[\\s\\S]*?${STATIC_END}`), `${STATIC_START}\n${STATIC_END}`);
