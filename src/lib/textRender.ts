@@ -40,12 +40,40 @@ export interface TextLayout {
 
 export const TEXT_FONTS = [
   { label: 'MapKluss Mono', value: '"JetBrains Mono", "Cascadia Mono", "Courier New", monospace' },
+  { label: 'Hardpixel', value: '"MapKluss Text Hardpixel", monospace' },
+  { label: 'Press Start 2P', value: '"MapKluss Text Press Start", monospace' },
+  { label: 'Tektur', value: '"MapKluss Text Tektur", sans-serif' },
+  { label: 'Handjet', value: '"MapKluss Text Handjet", monospace' },
+  { label: 'Jura', value: '"MapKluss Text Jura", sans-serif' },
+  { label: 'Russo One', value: '"MapKluss Text Russo", sans-serif' },
+  { label: 'Rubik Mono One', value: '"MapKluss Text Rubik Mono", sans-serif' },
+  { label: 'Unbounded', value: '"MapKluss Text Unbounded", sans-serif' },
+  { label: 'IBM Plex Mono', value: '"MapKluss Text IBM Plex Mono", monospace' },
+  { label: 'Fira Code', value: '"MapKluss Text Fira Code", monospace' },
+  { label: 'PT Mono', value: '"MapKluss Text PT Mono", monospace' },
+  { label: 'Play', value: '"MapKluss Text Play", sans-serif' },
   { label: 'Sans', value: 'system-ui, Arial, sans-serif' },
   { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
   { label: 'Impact', value: 'Impact, Haettenschweiler, sans-serif' },
   { label: 'Round', value: '"Trebuchet MS", Verdana, sans-serif' },
   { label: 'Courier New', value: '"Courier New", monospace' },
 ] as const;
+
+const LOCAL_TEXT_FONT_VALUES = new Set<string>(TEXT_FONTS.slice(1, 13).map(font => font.value));
+
+/** Load a bundled face before a canvas redraw; returns true only after a new load. */
+export async function ensureTextFont(font: string): Promise<boolean> {
+  if (!LOCAL_TEXT_FONT_VALUES.has(font) || typeof document === 'undefined' || !document.fonts) return false;
+  const descriptor = `400 16px ${font}`;
+  const sample = 'MapKluss Текст Ёё';
+  if (document.fonts.check(descriptor, sample)) return false;
+  try {
+    await document.fonts.load(descriptor, sample);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const DEFAULT_META: Omit<TextLayerMeta, 'x' | 'y'> = {
   value: 'Text',

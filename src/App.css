@@ -3,6 +3,27 @@
    Fonts: Press Start 2P (headers) · JetBrains Mono (body)
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Local text-tool faces. They deliberately use MapKluss-only family names so the
+   editor's regular UI typography continues to use its existing font stack. */
+@font-face {
+  font-family: 'MapKluss Text Hardpixel';
+  src: url('/fonts/hardpixel.otf') format('opentype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+@font-face { font-family: 'MapKluss Text Press Start'; src: url('/fonts/press-start-2p.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: 'MapKluss Text Tektur'; src: url('/fonts/tektur.ttf') format('truetype'); font-style: normal; font-weight: 400 900; font-display: block; }
+@font-face { font-family: 'MapKluss Text Handjet'; src: url('/fonts/handjet.ttf') format('truetype'); font-style: normal; font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'MapKluss Text Jura'; src: url('/fonts/jura.ttf') format('truetype'); font-style: normal; font-weight: 300 700; font-display: block; }
+@font-face { font-family: 'MapKluss Text Russo'; src: url('/fonts/russo-one.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: 'MapKluss Text Rubik Mono'; src: url('/fonts/rubik-mono-one.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: 'MapKluss Text Unbounded'; src: url('/fonts/unbounded.ttf') format('truetype'); font-style: normal; font-weight: 200 900; font-display: block; }
+@font-face { font-family: 'MapKluss Text IBM Plex Mono'; src: url('/fonts/ibm-plex-mono.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: 'MapKluss Text Fira Code'; src: url('/fonts/fira-code.ttf') format('truetype'); font-style: normal; font-weight: 300 700; font-display: block; }
+@font-face { font-family: 'MapKluss Text PT Mono'; src: url('/fonts/pt-mono.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: 'MapKluss Text Play'; src: url('/fonts/play.ttf') format('truetype'); font-style: normal; font-weight: 400; font-display: block; }
+
 /* ── CSS Variables ─────────────────────────────────────────────────────── */
 :root {
   /* Interface colours live in theme.css; this block owns typography/layout. */

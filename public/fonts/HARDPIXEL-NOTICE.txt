@@ -1,0 +1,8 @@
+Hardpixel
+Copyright (c) 2010 by Anton Kudin & Jovanny Lemonad (prod.).
+
+Source: https://www.dafont.com/hardpixel.font
+The author note on the source page states that this libre font collection may
+be used, shared, changed and improved free of charge.
+
+Bundled unchanged as hardpixel.otf for MapKluss editable text exports.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTextMeta, normalizeTextMeta, textLocalVector } from '../textRender';
+import { createTextMeta, normalizeTextMeta, TEXT_FONTS, textLocalVector } from '../textRender';
 
 describe('text layer metadata', () => {
   it('normalizes unsafe and legacy values to bounded editable settings', () => {
@@ -15,5 +15,14 @@ describe('text layer metadata', () => {
     const local = textLocalVector(0, 10, 90);
     expect(Math.round(local.x)).toBe(10);
     expect(Math.round(local.y)).toBe(0);
+  });
+
+  it('offers the local Cyrillic-safe Hardpixel face for editable text', () => {
+    expect(TEXT_FONTS).toContainEqual({ label: 'Hardpixel', value: '"MapKluss Text Hardpixel", monospace' });
+  });
+
+  it('ships a substantial local type library instead of relying on browser fonts', () => {
+    expect(TEXT_FONTS).toHaveLength(18);
+    expect(TEXT_FONTS.map(font => font.label)).toEqual(expect.arrayContaining(['Press Start 2P', 'Tektur', 'Handjet', 'Jura', 'Russo One', 'Fira Code', 'PT Mono']));
   });
 });

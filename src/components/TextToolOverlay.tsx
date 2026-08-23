@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { BlockIcon } from './BlockIcon';
-import { TEXT_FONTS, getTextLayout, textLocalVector, type TextLayerMeta } from '../lib/textRender';
+import { TEXT_FONTS, ensureTextFont, getTextLayout, textLocalVector, type TextLayerMeta } from '../lib/textRender';
 import { useLocale } from '../lib/useLocale';
 import { useDraggablePanel } from './useDraggablePanel';
 
@@ -78,6 +78,8 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
   const layout = useMemo(() => meta ? getTextLayout(meta) : null, [meta]);
   const onChangeRef = useRef(onChange);
   const onTransformPreviewRef = useRef(onTransformPreview);
+  const metaRef = useRef(meta);
+  const activeFont = meta?.font;
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -86,6 +88,20 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
   useEffect(() => {
     onTransformPreviewRef.current = onTransformPreview;
   }, [onTransformPreview]);
+
+  useEffect(() => {
+    metaRef.current = meta;
+  }, [meta]);
+
+  useEffect(() => {
+    if (!activeFont) return;
+    let active = true;
+    void ensureTextFont(activeFont).then(loaded => {
+      const current = metaRef.current;
+      if (active && loaded && current?.font === activeFont) onChangeRef.current(current);
+    });
+    return () => { active = false; };
+  }, [activeFont]);
 
   useEffect(() => {
     if (isNew) requestAnimationFrame(() => textareaRef.current?.focus());
