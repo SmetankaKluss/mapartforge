@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { BlockIcon } from './BlockIcon';
@@ -213,9 +214,20 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
   const boxWidth = Math.max(12, layout.width * meta.scaleX * viewScale);
   const boxHeight = Math.max(12, layout.height * meta.scaleY * viewScale);
   const panelTop = Math.max(8, Math.min(window.innerHeight - 236, canvasRect.top + 10));
-  const panelLeft = Math.max(8, Math.min(window.innerWidth - 340, canvasRect.left + 12));
+  const paletteRect = window.matchMedia('(min-width: 721px)').matches
+    ? document.querySelector<HTMLElement>('.panel-right')?.getBoundingClientRect()
+    : null;
+  const paletteLeft = paletteRect && paletteRect.width > 0 && paletteRect.left > 16 && paletteRect.left < window.innerWidth
+    ? paletteRect.left
+    : null;
+  // The canvas is centred inside the workspace, so its left edge can be too
+  // close to a visible palette for a fixed-width form. Keep the default form
+  // entirely out of the palette; the user can still drag it afterwards.
+  const panelWidth = paletteLeft ? Math.min(424, Math.max(0, paletteLeft - 16)) : undefined;
+  const panelMaxLeft = paletteLeft && panelWidth ? Math.max(8, paletteLeft - panelWidth - 8) : window.innerWidth - 340;
+  const panelLeft = Math.max(8, Math.min(panelMaxLeft, canvasRect.left + 12));
 
-  return (
+  return createPortal(
     <>
       <div
         ref={transformBoxRef}
@@ -237,7 +249,7 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
       <section
         ref={panelRef}
         className={`text-tool-panel${isDragged ? ' is-dragged' : ''}`}
-        style={draggedStyle ?? { left: panelLeft, top: panelTop }}
+        style={draggedStyle ?? { left: panelLeft, top: panelTop, ...(panelWidth ? { width: panelWidth } : {}) }}
         onPointerDown={event => event.stopPropagation()}
         onMouseDown={event => event.stopPropagation()}
         aria-label={t('Параметры текста', 'Text settings')}
@@ -305,6 +317,7 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
           <button className="text-tool-cancel" onClick={onCancel} aria-label={t('Закрыть текст', 'Close text')}><IconGlyph icon={mkIcons.close} /></button>
         </div>
       </section>
-    </>
+    </>,
+    document.body,
   );
 }
