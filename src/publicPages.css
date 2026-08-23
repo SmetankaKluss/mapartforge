@@ -160,8 +160,15 @@ body {
 }
 
 .public-site-github {
+  width: 30px;
+  min-width: 30px;
+  padding: 5px;
+  justify-content: center;
+  gap: 0;
   text-decoration: none;
 }
+
+.public-site-github span { display: none; }
 
 .public-site-github .mk-icon {
   width: 16px;
