@@ -56,9 +56,6 @@ import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
 const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
 const GifModal = lazy(() => import('./components/GifModal').then(m => ({ default: m.GifModal })));
-const DevSponsorPreviewBanner = import.meta.env.DEV
-  ? lazy(() => import('./components/dev/SponsorPreviewBanner').then(m => ({ default: m.SponsorPreviewBanner })))
-  : null;
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
@@ -282,8 +279,6 @@ function imageToImageData(img: HTMLImageElement): ImageData {
 
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
-  const sponsorPreviewEnabled = import.meta.env.DEV
-    && new URLSearchParams(window.location.search).get('sponsorPreview') === 'sp';
 
   useEffect(() => {
     applyPageMeta({
@@ -3046,13 +3041,7 @@ export default function App() {
         </div>
       </header>
 
-      {DevSponsorPreviewBanner && sponsorPreviewEnabled && (
-        <Suspense fallback={null}>
-          <DevSponsorPreviewBanner lang={lang} />
-        </Suspense>
-      )}
-
-      {showAnnouncement && !sponsorPreviewEnabled && (
+      {showAnnouncement && (
         <div
           className="update-banner update-banner--companion"
           role="region"
