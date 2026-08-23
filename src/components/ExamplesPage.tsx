@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { EXAMPLES } from '../lib/examples';
-import { applyPageMeta } from '../lib/meta';
+import { applyPageMeta, defaultSocialImageUrl } from '../lib/meta';
 import { useLocale } from '../lib/useLocale';
 import { buildTrackedHref } from '../lib/analytics';
 import { PublicSiteHeader } from './PublicSiteHeader';
@@ -73,7 +73,7 @@ export function ExamplesPage() {
       title: 'Minecraft Map Art Examples | MapKluss',
       description: 'Browse Minecraft map art examples made with MapKluss. Compare original images, generated previews, Minecraft screenshots, modes, sizes, colors, and materials.',
       url: `${window.location.origin}/examples/`,
-      image: `${window.location.origin}/og-image.png`,
+      image: defaultSocialImageUrl(window.location.origin),
       schema: [
         {
           '@context': 'https://schema.org',

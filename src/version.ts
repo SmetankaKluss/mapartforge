@@ -7,7 +7,7 @@
  *   PATCH — фикс бага / мелкое улучшение
  *
  * History:
- *   1.29.6 — исправлен масштаб иконок блоков в палитре инструмента текста
+ *   1.29.7 — обновлён URL карточки сайта для Telegram, Discord и других мессенджеров
  *   1.0.0  — базовый запуск: дизеринг, палитра, экспорт PNG / litematic
  *   1.1.0  — artist mode: слои, кисть, ластик, заливка, текст, смена опасити
  *   1.2.0  — настройки по слоям (mapMode/staircaseMode/dithering) + гибридный litematic экспорт
@@ -134,5 +134,5 @@
  *   1.29.3 — трансформации текста также обновляются покадрово
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.29.6: text palette block icons use the correct spritesheet tile scale.
-export const VERSION = 'v1.29.6';
+// 1.29.7: social previews use a versioned Open Graph image URL.
+export const VERSION = 'v1.29.7';

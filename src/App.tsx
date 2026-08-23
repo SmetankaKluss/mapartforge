@@ -94,7 +94,7 @@ import { ThemeSelector } from './components/ThemeSelector';
 import { UpdateBannerTicker } from './components/UpdateBannerTicker';
 import { buildFinalPreview } from './lib/finalPreview';
 import type { PreviewMode } from './lib/preview3d';
-import { applyPageMeta } from './lib/meta';
+import { applyPageMeta, defaultSocialImageUrl } from './lib/meta';
 import { attachCompanionImportToArt, downloadCompanionArtVersionProjectJson, downloadCompanionProjectJson, getCompanionScanImport, getCurrentCompanionAuthUser, getCurrentCompanionSessionUser, saveCompanionArt, setCompanionFavorite } from './lib/companionCloud';
 import type { ArtPrivacy } from './lib/companionTypes';
 import 'driver.js/dist/driver.css';
@@ -291,7 +291,7 @@ export default function App() {
         'MapKluss is a browser-based Minecraft map art generator. Upload images, tune palette and dithering, preview 2D or 3D stair results, and export Litematic, MAP.DAT, and materials.',
       ),
       url: window.location.origin,
-      image: `${window.location.origin}/og-image.png`,
+      image: defaultSocialImageUrl(window.location.origin),
       schema: [
         {
           '@context': 'https://schema.org',
@@ -306,7 +306,7 @@ export default function App() {
           applicationCategory: 'MultimediaApplication',
           operatingSystem: 'Web',
           url: window.location.origin,
-          image: `${window.location.origin}/og-image.png`,
+          image: defaultSocialImageUrl(window.location.origin),
           description: t(
             'Браузерный генератор Minecraft map art с экспортом Litematic, MAP.DAT и списком материалов.',
             'Browser-based Minecraft map art generator with Litematic, MAP.DAT, and materials export.',

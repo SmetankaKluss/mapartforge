@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useLocale } from '../lib/useLocale';
-import { applyPageMeta } from '../lib/meta';
+import { applyPageMeta, DEFAULT_SOCIAL_IMAGE_PATH } from '../lib/meta';
 import { EXAMPLES } from '../lib/examples';
 import { buildTrackedHref } from '../lib/analytics';
 import { canonicalPublicPath, getSeoPageByPath, type SeoPageDefinition } from '../lib/seoPages';
@@ -26,7 +26,7 @@ export function SeoLandingPage({ page }: Props) {
       title: page.title,
       description: page.description,
       url: `${window.location.origin}${canonicalPublicPath(page.path)}`,
-      image: `${window.location.origin}${exampleProjects[0]?.previewUrl ?? '/og-image.png'}`,
+      image: `${window.location.origin}${exampleProjects[0]?.previewUrl ?? DEFAULT_SOCIAL_IMAGE_PATH}`,
       schema: [
         {
           '@context': 'https://schema.org',

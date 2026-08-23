@@ -8,6 +8,13 @@ interface PageMeta {
   schema?: unknown;
 }
 
+// Keep this filename versioned: social platforms cache Open Graph images by URL.
+export const DEFAULT_SOCIAL_IMAGE_PATH = '/og-mapkluss-20260823.png';
+
+export function defaultSocialImageUrl(origin: string): string {
+  return `${origin}${DEFAULT_SOCIAL_IMAGE_PATH}`;
+}
+
 function upsertMeta(name: string, content: string, attr: 'name' | 'property' = 'name'): void {
   let el = document.querySelector<HTMLMetaElement>(`meta[${attr}="${name}"]`);
   if (!el) {

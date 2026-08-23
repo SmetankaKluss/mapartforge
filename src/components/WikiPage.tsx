@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { applyPageMeta } from '../lib/meta';
+import { applyPageMeta, defaultSocialImageUrl } from '../lib/meta';
 import { useLocale } from '../lib/useLocale';
 import {
   getWikiArticle,
@@ -348,7 +348,7 @@ export function WikiPage() {
         'Current MapKluss documentation for Minecraft map art, editor tools, palette, exports, Cloud, Lens, and Two-layer Builder.',
       ),
       url: `${window.location.origin}/wiki/`,
-      image: `${window.location.origin}/og-image.png`,
+      image: defaultSocialImageUrl(window.location.origin),
       schema: [{
         '@context': 'https://schema.org',
         '@type': 'TechArticle',
