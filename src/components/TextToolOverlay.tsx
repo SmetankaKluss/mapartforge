@@ -50,15 +50,17 @@ function PaletteBlockHint({ block, label }: { block: TextPaletteBlock | null | u
   return (
     <span className="text-tool-palette-match" title={block.displayName}>
       <span className="text-tool-palette-label">{label}</span>
-      <BlockIcon
-        nbtName={block.nbtName}
-        blockId={block.blockId}
-        csId={block.csId}
-        r={block.r}
-        g={block.g}
-        b={block.b}
-        className="text-tool-palette-icon"
-      />
+      <span className="text-tool-palette-icon-wrap" aria-hidden="true">
+        <BlockIcon
+          nbtName={block.nbtName}
+          blockId={block.blockId}
+          csId={block.csId}
+          r={block.r}
+          g={block.g}
+          b={block.b}
+          className="text-tool-palette-icon"
+        />
+      </span>
       <span className="text-tool-palette-name">{block.displayName}</span>
     </span>
   );

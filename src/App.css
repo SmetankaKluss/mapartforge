@@ -2217,12 +2217,20 @@ img[src="/logo-opt.png"] {
   white-space: nowrap;
 }
 .text-tool-palette-label { color: var(--text-dim); }
-.text-tool-palette-icon {
+.text-tool-palette-icon-wrap {
   flex: 0 0 12px;
   width: 12px;
   height: 12px;
-  background-size: 192px 192px;
+  overflow: hidden;
+}
+.text-tool-palette-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+  background-repeat: no-repeat;
   image-rendering: pixelated;
+  transform: scale(0.375);
+  transform-origin: 0 0;
 }
 .text-tool-palette-name {
   overflow: hidden;
