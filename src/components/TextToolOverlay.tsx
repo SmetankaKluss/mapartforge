@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { BlockIcon } from './BlockIcon';
 import { TEXT_FONTS, getTextLayout, textLocalVector, type TextLayerMeta } from '../lib/textRender';
 import { useLocale } from '../lib/useLocale';
 import { useDraggablePanel } from './useDraggablePanel';
 
 type TransformKind = 'move' | 'scale' | 'rotate';
+
+export interface TextPaletteBlock {
+  csId: number;
+  blockId: number;
+  nbtName: string;
+  displayName: string;
+  r: number;
+  g: number;
+  b: number;
+}
 
 interface Props {
   canvasRect: DOMRect | null;
@@ -15,6 +26,8 @@ interface Props {
   onBeginEdit: () => void;
   onChange: (meta: TextLayerMeta) => void;
   onTransformPreview?: (meta: TextLayerMeta) => void;
+  fillPaletteBlock?: TextPaletteBlock | null;
+  strokePaletteBlock?: TextPaletteBlock | null;
   onPlace: () => void;
   onCancel: () => void;
 }
@@ -32,7 +45,26 @@ const number = (value: string, fallback: number, min: number, max: number) => {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 };
 
-export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdit, onChange, onTransformPreview, onPlace, onCancel }: Props) {
+function PaletteBlockHint({ block, label }: { block: TextPaletteBlock | null | undefined; label: string }) {
+  if (!block) return null;
+  return (
+    <span className="text-tool-palette-match" title={block.displayName}>
+      <span className="text-tool-palette-label">{label}</span>
+      <BlockIcon
+        nbtName={block.nbtName}
+        blockId={block.blockId}
+        csId={block.csId}
+        r={block.r}
+        g={block.g}
+        b={block.b}
+        className="text-tool-palette-icon"
+      />
+      <span className="text-tool-palette-name">{block.displayName}</span>
+    </span>
+  );
+}
+
+export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdit, onChange, onTransformPreview, fillPaletteBlock, strokePaletteBlock, onPlace, onCancel }: Props) {
   const { t } = useLocale();
   const dragRef = useRef<DragState | null>(null);
   const transformFrameRef = useRef<number | null>(null);
@@ -225,10 +257,12 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
           <label className="text-tool-color">
             <span>{t('Цвет', 'Color')}</span>
             <input type="color" value={meta.fillColor} onPointerDown={beginFieldEdit} onChange={event => change({ fillColor: event.target.value })} aria-label={t('Цвет текста', 'Text color')} />
+            <PaletteBlockHint block={fillPaletteBlock} label={t('Блок', 'Block')} />
           </label>
           <label className="text-tool-color">
             <span>{t('Контур', 'Outline')}</span>
             <input type="color" value={meta.strokeColor} onPointerDown={beginFieldEdit} onChange={event => change({ strokeColor: event.target.value })} aria-label={t('Цвет контура', 'Outline color')} />
+            <PaletteBlockHint block={strokePaletteBlock} label={t('Блок', 'Block')} />
           </label>
           <label>
             <span>{t('Толщина', 'Width')}</span>

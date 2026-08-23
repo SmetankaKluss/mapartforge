@@ -12,11 +12,13 @@ import type { GradientStop } from '../lib/gradientTool';
 import { type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
 import { createTextMeta, getTextLayout, renderTextLayer, textLocalVector } from '../lib/textRender';
 import { TextToolOverlay } from './TextToolOverlay';
+import type { TextPaletteBlock } from './TextToolOverlay';
 import { CANVAS_PAN_THRESHOLD } from '../lib/canvasViewport';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
 import { rgbToOklab, oklabDistance } from '../lib/oklab';
+import { colorCoords } from '../lib/colorMatch';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { useLocale } from '../lib/useLocale';
@@ -128,6 +130,41 @@ function buildColorLookup(cp: ComputedPalette, sel: BlockSelection): Map<number,
     });
   }
   return map;
+}
+
+function findTextPaletteBlock(hex: string, cp: ComputedPalette, sel: BlockSelection): TextPaletteBlock | null {
+  const parsed = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!parsed || cp.colors.length === 0) return null;
+
+  const rgb = Number.parseInt(parsed[1], 16);
+  const r = rgb >> 16;
+  const g = (rgb >> 8) & 0xff;
+  const b = rgb & 0xff;
+  const exactIndex = cp.exactLookup.get((r << 16) | (g << 8) | b);
+  let paletteIndex = exactIndex ?? 0;
+
+  if (exactIndex === undefined) {
+    const [x, y, z] = colorCoords(r, g, b, cp.matchMode);
+    let bestDistance = Infinity;
+    for (let index = 0; index < cp.colors.length; index++) {
+      const dx = x - cp.coords[index * 3];
+      const dy = y - cp.coords[index * 3 + 1];
+      const dz = z - cp.coords[index * 3 + 2];
+      const distance = dx * dx + dy * dy + dz * dz;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        paletteIndex = index;
+      }
+    }
+  }
+
+  const color = cp.colors[paletteIndex];
+  const row = COLOUR_ROWS.find(candidate => candidate.baseId === color.baseId);
+  if (!row) return null;
+  const activeBlockIds = sel[row.csId] ?? [];
+  const block = row.blocks.find(candidate => activeBlockIds.includes(candidate.blockId)) ?? row.blocks[0];
+  if (!block) return null;
+  return { csId: row.csId, blockId: block.blockId, nbtName: block.nbtName, displayName: block.displayName, r: color.r, g: color.g, b: color.b };
 }
 
 function buildRepaintEntries(r: number, g: number, b: number, cp: ComputedPalette, sel: BlockSelection): RepaintEntry[] {
@@ -1948,6 +1985,8 @@ export function PreviewCanvas({
           viewScale={viewScale}
           meta={textDraft}
           isNew={textDraftIsNew}
+          fillPaletteBlock={textDraft ? findTextPaletteBlock(textDraft.fillColor, cp, blockSelection) : null}
+          strokePaletteBlock={textDraft ? findTextPaletteBlock(textDraft.strokeColor, cp, blockSelection) : null}
           onBeginEdit={() => {
             if (!textDraftIsNew) onTextBeginEdit?.();
           }}

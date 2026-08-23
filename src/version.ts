@@ -7,6 +7,7 @@
  *   PATCH — фикс бага / мелкое улучшение
  *
  * History:
+ *   1.29.5 — текстовый инструмент показывает активный Minecraft-блок для выбранного цвета
  *   1.0.0  — базовый запуск: дизеринг, палитра, экспорт PNG / litematic
  *   1.1.0  — artist mode: слои, кисть, ластик, заливка, текст, смена опасити
  *   1.2.0  — настройки по слоям (mapMode/staircaseMode/dithering) + гибридный litematic экспорт
@@ -133,5 +134,5 @@
  *   1.29.3 — трансформации текста также обновляются покадрово
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.29.4: text transform preview bypasses parent re-renders until pointer release.
-export const VERSION = 'v1.29.4';
+// 1.29.5: text color controls show their nearest active-palette Minecraft blocks.
+export const VERSION = 'v1.29.5';
