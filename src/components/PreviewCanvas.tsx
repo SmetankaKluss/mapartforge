@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { MapCanvas } from './MapCanvas';
 import { drawImageData } from '../lib/drawImageData';
 import { type MagicWandMatchMode, type SelectionMask, maskFromRect, maskFromPolygon, maskFromMagicWand, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
@@ -10,7 +10,7 @@ import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
 import { type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
-import { createTextMeta, getTextLayout, textLocalVector } from '../lib/textRender';
+import { createTextMeta, getTextLayout, renderTextLayer, textLocalVector } from '../lib/textRender';
 import { TextToolOverlay } from './TextToolOverlay';
 import { CANVAS_PAN_THRESHOLD } from '../lib/canvasViewport';
 
@@ -542,6 +542,16 @@ export function PreviewCanvas({
     mainCanvasRef.current = c;
     return c;
   }
+
+  const previewTextTransform = useCallback((meta: TextLayerMeta) => {
+    const canvas = getMainCanvas();
+    if (!canvas) return;
+    const activeText = renderTextLayer(meta, width, height);
+    const preview = otherLayersData
+      ? compositeTwo(otherLayersData, activeText, width, height)
+      : activeText;
+    drawImageData(canvas, preview, width, height, scale, showGrid);
+  }, [height, otherLayersData, scale, showGrid, width]);
 
   useEffect(() => {
     if (activeTool !== 'text') {
@@ -1945,6 +1955,7 @@ export function PreviewCanvas({
             setTextDraft(next);
             if (!textDraftIsNew) onTextUpdate?.(next);
           }}
+          onTransformPreview={previewTextTransform}
           onPlace={() => {
             if (!textDraft?.value.trim()) return;
             if (textDraftIsNew) {

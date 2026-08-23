@@ -14,6 +14,7 @@ interface Props {
   isNew: boolean;
   onBeginEdit: () => void;
   onChange: (meta: TextLayerMeta) => void;
+  onTransformPreview?: (meta: TextLayerMeta) => void;
   onPlace: () => void;
   onCancel: () => void;
 }
@@ -31,30 +32,43 @@ const number = (value: string, fallback: number, min: number, max: number) => {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 };
 
-export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdit, onChange, onPlace, onCancel }: Props) {
+export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdit, onChange, onTransformPreview, onPlace, onCancel }: Props) {
   const { t } = useLocale();
   const dragRef = useRef<DragState | null>(null);
   const transformFrameRef = useRef<number | null>(null);
   const pendingTransformRef = useRef<TextLayerMeta | null>(null);
-  const emittedTransformRef = useRef<TextLayerMeta | null>(null);
   const inputSessionRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const transformBoxRef = useRef<HTMLDivElement>(null);
   const { panelRef, draggedStyle, isDragged, onDragHandlePointerDown } = useDraggablePanel();
   const layout = useMemo(() => meta ? getTextLayout(meta) : null, [meta]);
   const onChangeRef = useRef(onChange);
+  const onTransformPreviewRef = useRef(onTransformPreview);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
   useEffect(() => {
+    onTransformPreviewRef.current = onTransformPreview;
+  }, [onTransformPreview]);
+
+  useEffect(() => {
     if (isNew) requestAnimationFrame(() => textareaRef.current?.focus());
   }, [isNew]);
 
   useEffect(() => {
-    const emitTransform = (next: TextLayerMeta) => {
-      emittedTransformRef.current = next;
-      onChangeRef.current(next);
+    const previewTransform = (next: TextLayerMeta) => {
+      const drag = dragRef.current;
+      const box = transformBoxRef.current;
+      if (drag && box && canvasRect) {
+        box.style.left = `${canvasRect.left + next.x * viewScale}px`;
+        box.style.top = `${canvasRect.top + next.y * viewScale}px`;
+        box.style.width = `${Math.max(12, drag.layout.width * next.scaleX * viewScale)}px`;
+        box.style.height = `${Math.max(12, drag.layout.height * next.scaleY * viewScale)}px`;
+        box.style.transform = `translate(-50%, -50%) rotate(${next.rotation}deg)`;
+      }
+      onTransformPreviewRef.current?.(next);
     };
     const scheduleTransform = (next: TextLayerMeta) => {
       pendingTransformRef.current = next;
@@ -62,7 +76,7 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
       transformFrameRef.current = requestAnimationFrame(() => {
         transformFrameRef.current = null;
         const pending = pendingTransformRef.current;
-        if (pending) emitTransform(pending);
+        if (pending) previewTransform(pending);
       });
     };
     function move(event: PointerEvent) {
@@ -99,9 +113,8 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
         cancelAnimationFrame(transformFrameRef.current);
         transformFrameRef.current = null;
       }
-      if (pending && pending !== emittedTransformRef.current) emitTransform(pending);
+      if (pending) onChangeRef.current(pending);
       pendingTransformRef.current = null;
-      emittedTransformRef.current = null;
       dragRef.current = null;
       document.body.classList.remove('text-transforming');
     }
@@ -111,7 +124,6 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
     return () => {
       if (transformFrameRef.current !== null) cancelAnimationFrame(transformFrameRef.current);
       pendingTransformRef.current = null;
-      emittedTransformRef.current = null;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
@@ -156,6 +168,7 @@ export function TextToolOverlay({ canvasRect, viewScale, meta, isNew, onBeginEdi
   return (
     <>
       <div
+        ref={transformBoxRef}
         className="text-transform-box"
         style={{ left: centerLeft, top: centerTop, width: boxWidth, height: boxHeight, transform: `translate(-50%, -50%) rotate(${meta.rotation}deg)` }}
         onPointerDown={event => beginTransform(event, 'move')}

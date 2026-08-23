@@ -131,6 +131,7 @@
  *   1.29.1 — текст выбирается курсором, клики панели изолированы от холста, панели перетаскиваются за шапку
  *   1.29.2 — перенос панелей обновляется по кадрам без тяжёлых React-перерисовок
  *   1.29.3 — трансформации текста также обновляются покадрово
+ *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.29.3: text transforms are coalesced to one visual update per frame.
-export const VERSION = 'v1.29.3';
+// 1.29.4: text transform preview bypasses parent re-renders until pointer release.
+export const VERSION = 'v1.29.4';
