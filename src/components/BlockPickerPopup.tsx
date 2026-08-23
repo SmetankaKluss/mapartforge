@@ -8,6 +8,7 @@ import { TRANSPARENT_PAINT_BLOCK } from './previewCanvasShared';
 import { SPRITE_URL } from './BlockCanvas';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { useDraggablePanel } from './useDraggablePanel';
 
 interface Props {
   blockSelection: BlockSelection;
@@ -21,7 +22,7 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   const { t } = useLocale();
   const [search, setSearch] = useState('');
   void mapMode; // reserved for future use
-  const ref = useRef<HTMLDivElement>(null);
+  const { panelRef, draggedStyle, isDragged, onDragHandlePointerDown } = useDraggablePanel();
   const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -34,12 +35,12 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   // Close on outside click
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
     }
     // Slight delay so the button click that opened the popup doesn't immediately close it
     const id = setTimeout(() => document.addEventListener('mousedown', onDown), 0);
     return () => { clearTimeout(id); document.removeEventListener('mousedown', onDown); };
-  }, [onClose]);
+  }, [onClose, panelRef]);
 
   // Close on Escape
   useEffect(() => {
@@ -74,8 +75,8 @@ export function BlockPickerPopup({ blockSelection, current, onSelect, onClose, m
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="block-picker-popup" ref={ref} role="dialog" aria-modal="false" aria-label={t('Выбор блока', 'Block picker')}>
-      <div className="block-picker-header">
+    <div className={`block-picker-popup${isDragged ? ' is-dragged' : ''}`} ref={panelRef} style={draggedStyle} role="dialog" aria-modal="false" aria-label={t('Выбор блока', 'Block picker')}>
+      <div className="block-picker-header" onPointerDown={onDragHandlePointerDown}>
         <span className="block-picker-title">{t('Выбери блок', 'Choose block')}</span>
         <button className="block-picker-close" onClick={onClose} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
       </div>

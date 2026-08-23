@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Layer, LayerGroup } from '../layers';
 import { deserializeFullProject, serializeFullProject, type FullProjectSettings } from '../projectFile';
+import { createTextMeta } from '../textRender';
 
 const settings: FullProjectSettings = {
   dithering: 'floyd-steinberg',
@@ -54,7 +55,17 @@ describe('full project format', () => {
     expect(restored?.settings.supportMode).toBe(2);
   });
 
-  it('continues to read legacy version 2 projects with safe defaults', () => {
+  it('round-trips an editable text layer without flattening its transform', () => {
+    const text = createTextMeta(24, 36, 'Карта');
+    const layers: Layer[] = [{
+      id: 'text-1', name: 'Text', visible: true, locked: false, opacity: 100,
+      groupId: null, imageData: null, buildMode: '2d', isText: true, text: { ...text, rotation: 25, scaleX: 1.5 },
+    }];
+    const restored = deserializeFullProject(serializeFullProject(layers, 'text-1', { wide: 1, tall: 1 }, settings));
+    expect(restored?.layers[0].text).toMatchObject({ value: 'Карта', x: 24, y: 36, rotation: 25, scaleX: 1.5 });
+  });
+
+  it('continues to read legacy version 2 text layers with safe editable defaults', () => {
     const legacy = JSON.stringify({
       version: 2,
       project: {
@@ -70,6 +81,8 @@ describe('full project format', () => {
           imageDataB64: null,
           width: 0,
           height: 0,
+          isText: true,
+          text: { px: 8, py: 9, value: 'Legacy title' },
         }],
       },
       settings,
@@ -78,6 +91,10 @@ describe('full project format', () => {
     const restored = deserializeFullProject(legacy);
     expect(restored?.groups).toEqual([]);
     expect(restored?.layers[0]).toMatchObject({ opacity: 100, buildMode: '2d' });
+    expect(restored?.layers[0]).toMatchObject({
+      isText: true,
+      text: { x: 8, y: 9, value: 'Legacy title', fillColor: '#ffffff' },
+    });
     expect(restored?.settings.buildTechnique).toBe('suppression_two_layer');
   });
 

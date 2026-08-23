@@ -45,7 +45,8 @@ export function estimateAutosaveSnapshotBytes(layers: Layer[], originalData: Ima
   for (const layer of layers) {
     rawImageBytes += layer.imageData?.data.byteLength ?? 0;
     storedStringBytes += (layer.sourceDataUrl?.length ?? 0) * 2;
-    storedStringBytes += (layer.name.length + (layer.text?.value.length ?? 0)) * 2;
+    storedStringBytes += layer.name.length * 2;
+    storedStringBytes += layer.text ? JSON.stringify(layer.text).length * 2 : 0;
   }
   const base64Bytes = Math.ceil(rawImageBytes * 4 / 3);
   return base64Bytes + storedStringBytes + AUTOSAVE_METADATA_ALLOWANCE;

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createLayer, mergeLayersDown, mergeVisible } from '../layers';
+import { createTextMeta } from '../textRender';
 
 class TestImageData {
   data: Uint8ClampedArray;
@@ -33,15 +34,20 @@ describe('layer merging', () => {
     const top = { ...createLayer('Top', pixel(0, 0, 255)), opacity: 50 };
     const [merged] = mergeLayersDown([bottom, top], top.id, 1, 1);
     expect(merged.opacity).toBe(100);
-    expect(merged.isText).toBe(false);
     expect(merged.imageData?.data[3]).toBeGreaterThan(0);
   });
 
-  it('normalizes opacity and text metadata when merging visible layers', () => {
-    const bottom = { ...createLayer('Bottom', pixel(255, 0, 0)), opacity: 35, isText: true };
+  it('normalizes opacity when merging visible layers', () => {
+    const bottom = { ...createLayer('Bottom', pixel(255, 0, 0)), opacity: 35 };
     const top = { ...createLayer('Top', pixel(0, 255, 0)), opacity: 80 };
     const [merged] = mergeVisible([bottom, top], 1, 1);
     expect(merged.opacity).toBe(100);
+  });
+
+  it('flattens editable text metadata when text is merged into ordinary pixels', () => {
+    const bottom = createLayer('Bottom', pixel(255, 0, 0));
+    const text = { ...createLayer('Text', pixel(255, 255, 255), true), text: createTextMeta(0, 0) };
+    const [merged] = mergeLayersDown([bottom, text], text.id, 1, 1);
     expect(merged.isText).toBe(false);
     expect(merged.text).toBeUndefined();
   });

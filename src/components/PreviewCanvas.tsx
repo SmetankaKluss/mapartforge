@@ -1,19 +1,17 @@
-import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { MapCanvas } from './MapCanvas';
 import { drawImageData } from '../lib/drawImageData';
 import { type MagicWandMatchMode, type SelectionMask, maskFromRect, maskFromPolygon, maskFromMagicWand, unionMask, subtractMask, drawMarchingAnts } from '../lib/selectionMask';
 import { BlockCanvas } from './BlockCanvas';
-import { SPRITE_URL } from './BlockCanvas';
 import { BlockIcon } from './BlockIcon';
-import { BlockPickerPopup } from './BlockPickerPopup';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
 import { forEachLinePoint, paintWithPatternTile, paintWithPatternStamp } from '../lib/patternTool';
 import type { PatternDefinition } from '../lib/patternTool';
 import { applyGradient } from '../lib/gradientTool';
 import type { GradientStop } from '../lib/gradientTool';
-import { TEXT_FONTS, type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
-import { renderTextBitmap, scaleMask, dilateMask, type TextBitmap } from '../lib/textRender';
+import { type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCanvasShared';
+import { createTextMeta, getTextLayout, textLocalVector } from '../lib/textRender';
+import { TextToolOverlay } from './TextToolOverlay';
 import { CANVAS_PAN_THRESHOLD } from '../lib/canvasViewport';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
@@ -48,23 +46,14 @@ interface RepaintEntry {
   dist: number;
 }
 
-type CanvasDrag = {
-  type: 'move' | 'tl' | 'tr' | 'bl' | 'br';
-  startPx: number; startPy: number;
-  startScaleX: number; startScaleY: number;
-  startMouseX: number; startMouseY: number;  // viewport clientX/Y
-  baseW: number; baseH: number;
-};
-
 type CanvasPointEvent = { clientX: number; clientY: number };
 type CanvasDownEvent = CanvasPointEvent & {
   button: number;
   shiftKey: boolean;
   altKey: boolean;
+  target: EventTarget | null;
   preventDefault: () => void;
 };
-
-type TextState = TextLayerMeta | null;
 
 interface Props {
   mode: 'pixel' | 'block';
@@ -85,17 +74,18 @@ interface Props {
   paintBlock: PaintBlock | null;
   patternBlocks: PaintBlock[];
   brushSize: number;
-  textSize: number;
-  otherLayersData?: ImageData | null;
-  /** True when the active layer is an editable text layer. */
-  activeLayerIsText?: boolean;
-  /** The active text layer's editable text description (for re-editing). */
   activeTextMeta?: TextLayerMeta | null;
+  activeTextLocked?: boolean;
+  textLayers?: Array<{ id: string; text: TextLayerMeta; locked: boolean }>;
+  otherLayersData?: ImageData | null;
   onRemoveBlock: (csId: number) => void;
   onImageUpdate: (data: ImageData) => void;
   onToolChange: (tool: PaintTool | null) => void;
   onPaintBlockChange: (block: PaintBlock) => void;
-  onTextCommit?: (textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => void;
+  onTextCreate?: (meta: TextLayerMeta) => void;
+  onTextUpdate?: (meta: TextLayerMeta) => void;
+  onTextBeginEdit?: () => void;
+  onTextLayerSelect?: (id: string) => void;
   splitPos?: number;
   onSplitPosChange?: (p: number) => void;
   selectionMask?: SelectionMask | null;
@@ -228,41 +218,6 @@ function paintPatternBrush(
       const block = patternBlocks[Math.floor(Math.random() * patternBlocks.length)];
       if (block.baseId === -1) erasePixelInBuffer(buf, bx, by, mask);
       else paintPixelInBuffer(buf, bx, by, block.baseId, block.shade, cp, mask);
-    }
-  }
-}
-
-/** Paint a pre-rendered text coverage bitmap into `buf`, mapping coverage to palette blocks. */
-function stampTextBitmap(
-  buf: ImageData, bm: TextBitmap, originX: number, originY: number,
-  fillBlock: PaintBlock, strokeWidth: number, strokeBlock: PaintBlock | null,
-  cp: ComputedPalette,
-): void {
-  const { fill, width: w, height: h } = bm;
-  if (w === 0 || h === 0) return;
-
-  // Outline pass: dilate glyph coverage, paint only the ring outside the glyph.
-  if (strokeWidth > 0 && strokeBlock && strokeBlock.baseId !== -1) {
-    const dil = dilateMask(fill, w, h, strokeWidth);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = y * w + x;
-        if (!dil[idx] || fill[idx]) continue;
-        const bx = originX + x, by = originY + y;
-        if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
-        paintPixelInBuffer(buf, bx, by, strokeBlock.baseId, strokeBlock.shade, cp);
-      }
-    }
-  }
-
-  // Glyph fill pass on top.
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (!fill[y * w + x]) continue;
-      const bx = originX + x, by = originY + y;
-      if (bx < 0 || bx >= buf.width || by < 0 || by >= buf.height) continue;
-      if (fillBlock.baseId === -1) erasePixelInBuffer(buf, bx, by);
-      else paintPixelInBuffer(buf, bx, by, fillBlock.baseId, fillBlock.shade, cp);
     }
   }
 }
@@ -474,11 +429,10 @@ function drawBrushLine(
 export function PreviewCanvas({
   mode, imageData, paintData, originalData, showOriginal, showGrid,
   width, height, scale, viewScale, cp, blockSelection,
-  activeTool, paintBlock, patternBlocks, brushSize, textSize,
+  activeTool, paintBlock, patternBlocks, brushSize, activeTextMeta = null, activeTextLocked = false, textLayers = [],
   otherLayersData,
-  activeLayerIsText, activeTextMeta,
   onRemoveBlock, onImageUpdate, onToolChange, onPaintBlockChange,
-  onTextCommit,
+  onTextCreate, onTextUpdate, onTextBeginEdit, onTextLayerSelect,
   splitPos, onSplitPosChange,
   selectionMask, onSelectionChange,
   magicWandTolerance = 0.04,
@@ -509,6 +463,12 @@ export function PreviewCanvas({
   const [repaintTarget, setRepaintTarget]   = useState<RepaintEntry | null>(null);
   const [isPinned, setIsPinned]             = useState(false);
   const isPinnedRef                         = useRef(false);
+  // Text is kept as a separate, editable layer. The local draft lets its
+  // controls respond immediately while the parent re-renders its baked RGBA
+  // layer for the normal MapKluss processing/export pipeline.
+  const [textDraft, setTextDraft] = useState<TextLayerMeta | null>(null);
+  const [textDraftIsNew, setTextDraftIsNew] = useState(false);
+  const [textCanvasRect, setTextCanvasRect] = useState<DOMRect | null>(null);
   const is3D = useMemo(() => cp.colors.some(c => c.shade !== 2), [cp]);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -558,38 +518,6 @@ export function PreviewCanvas({
     curPx:   { x: number; y: number };
   } | null>(null);
 
-  // Text tool state
-  const [textState, setTextState] = useState<TextState>(null);
-  const [showStrokePicker, setShowStrokePicker] = useState(false);
-  const [showFillPicker, setShowFillPicker] = useState(false);
-  const [textCursor, setTextCursor] = useState<string | null>(null);
-  const textStateRef    = useRef<TextState>(null);
-  textStateRef.current  = textState;
-  const setTextStateRef = useRef(setTextState);
-  setTextStateRef.current = setTextState;
-  const textBaseRef     = useRef<ImageData | null>(null);
-  // True while the current text editing session is re-editing the active text
-  // layer (commit replaces that layer in place rather than creating a new one).
-  const editingActiveRef = useRef(false);
-  // canvasDrag lives in a ref (not state) — avoids React commit-timing issues during drag
-  const canvasDragRef   = useRef<CanvasDrag | null>(null);
-
-  // Cached glyph bitmap — recomputed only when style/value changes, not on move/scale.
-  const textBmRef = useRef<{ sig: string; bm: TextBitmap } | null>(null);
-  function baseBitmap(st: NonNullable<TextState>): TextBitmap {
-    const sig = [st.value, st.font, st.size, st.bold, st.italic, st.align, st.lineHeight, st.letterSpacing, st.smooth].join('|');
-    if (!textBmRef.current || textBmRef.current.sig !== sig) {
-      textBmRef.current = { sig, bm: renderTextBitmap(st.value || ' ', {
-        font: st.font, size: st.size, bold: st.bold, italic: st.italic,
-        align: st.align, lineHeight: st.lineHeight, letterSpacing: st.letterSpacing, smooth: st.smooth,
-      }) };
-    }
-    return textBmRef.current.bm;
-  }
-  function scaledBitmap(st: NonNullable<TextState>): TextBitmap {
-    return scaleMask(baseBitmap(st), st.scaleX, st.scaleY);
-  }
-
   // Split slider state
   const isDraggingSplitRef   = useRef(false);
   const splitContainerRef    = useRef<HTMLDivElement>(null);
@@ -615,11 +543,31 @@ export function PreviewCanvas({
     return c;
   }
 
+  useEffect(() => {
+    if (activeTool !== 'text') {
+      setTextDraft(null);
+      setTextDraftIsNew(false);
+      setTextCanvasRect(null);
+      return;
+    }
+    if (activeTextMeta && !textDraftIsNew) {
+      setTextDraft(activeTextMeta);
+    } else if (!activeTextMeta && !textDraftIsNew) {
+      setTextDraft(null);
+    }
+    const updateRect = () => setTextCanvasRect(getMainCanvas()?.getBoundingClientRect() ?? null);
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [activeTextMeta, activeTool, height, textDraftIsNew, viewScale, width]);
+
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
-  const onTextCommitRef = useRef(onTextCommit);
-  onTextCommitRef.current = onTextCommit;
   const canvasZoneRef = useRef<HTMLDivElement>(null);
   const imageDataRef  = useRef<ImageData | null>(null);
   imageDataRef.current = imageData;
@@ -697,45 +645,6 @@ export function PreviewCanvas({
     if (buf && otherLayersData) return compositeTwo(otherLayersData, buf, width, height);
     return buf ?? imageData;
   })();
-
-  // ── Text preview effect — draws text overlay + selection box ───────────────
-  // useLayoutEffect runs synchronously before paint — keeps canvas in sync
-  useLayoutEffect(() => {
-    const canvas = canvasZoneRef.current?.querySelector('canvas');
-    if (!(canvas instanceof HTMLCanvasElement)) return;
-    const { width: w, height: h, scale: s, showGrid: sg, activeTool: at, otherLayersData: oLD } = propsRef.current;
-
-    if (!textState || !textBaseRef.current || at !== 'text') return;
-    const fillBlock = textState.fillBlock ?? paintBlock;
-
-    const preview = new ImageData(new Uint8ClampedArray(textBaseRef.current.data), textBaseRef.current.width, textBaseRef.current.height);
-    const bm = scaledBitmap(textState);
-    if (textState.value.trim() && fillBlock && fillBlock.baseId !== -1) {
-      stampTextBitmap(preview, bm, textState.px, textState.py, fillBlock, textState.strokeWidth, textState.strokeBlock, cp);
-    }
-    const display = oLD ? compositeTwo(oLD, preview, w, h) : preview;
-    drawImageData(canvas, display, w, h, s, sg);
-
-    // Draw selection box on top of the canvas
-    const ctx = canvas.getContext('2d')!;
-    const sw = bm.width;
-    const sh = bm.height;
-    const x1 = textState.px * s, y1 = textState.py * s;
-    const x2 = x1 + sw * s,     y2 = y1 + sh * s;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(87,255,110,0.9)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 3]);
-    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-    ctx.setLineDash([]);
-    const hs = 9;
-    for (const [hx, hy] of [[x1,y1],[x2,y1],[x1,y2],[x2,y2]] as [number,number][]) {
-      ctx.fillStyle = '#161623';
-      ctx.fillRect(hx - hs/2, hy - hs/2, hs, hs);
-      ctx.strokeRect(hx - hs/2, hy - hs/2, hs, hs);
-    }
-    ctx.restore();
-  });
 
   // ── Cleanup timers ──────────────────────────────────────────────────────────
 
@@ -896,24 +805,11 @@ export function PreviewCanvas({
     if (activeTool) { cancelHoverFrame(); setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); }
   }, [activeTool]);
 
-  // ── Finalize text when switching away from the text tool ────────────────────
-  // The committed text stays on its layer (movable via Move tool, re-editable by
-  // re-selecting the text tool and clicking it) instead of being lost.
-  const prevToolRef = useRef(activeTool);
-  useEffect(() => {
-    if (prevToolRef.current === 'text' && activeTool !== 'text' && textStateRef.current) {
-      confirmText();
-    }
-    prevToolRef.current = activeTool;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool]);
-
   // ── Escape key ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        if (textStateRef.current) { cancelText(); return; }
         // Cancel floating selection — restore original canvas display (paintData unchanged since no onImageUpdate was called)
         if (floatingSelRef.current) {
           floatingSelRef.current = null;
@@ -966,27 +862,6 @@ export function PreviewCanvas({
             prevHoverKeyRef.current = '';
           }
         }
-      }
-
-      // Canvas drag for text tool (move / scale handles)
-      if (canvasDragRef.current) {
-        const cd = canvasDragRef.current;
-        const { viewScale: s } = propsRef.current;
-        const dx = (e.clientX - cd.startMouseX) / s;
-        const dy = (e.clientY - cd.startMouseY) / s;
-        let px = cd.startPx, py = cd.startPy;
-        let sx = cd.startScaleX, sy = cd.startScaleY;
-        if (cd.type === 'move') {
-          px = Math.max(0, cd.startPx + dx);
-          py = Math.max(0, cd.startPy + dy);
-        } else {
-          if (cd.type === 'br') { sx = Math.max(0.1, cd.startScaleX + dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY + dy / cd.baseH); }
-          else if (cd.type === 'bl') { sx = Math.max(0.1, cd.startScaleX - dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY + dy / cd.baseH); px = cd.startPx + dx; }
-          else if (cd.type === 'tr') { sx = Math.max(0.1, cd.startScaleX + dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY - dy / cd.baseH); py = cd.startPy + dy; }
-          else { sx = Math.max(0.1, cd.startScaleX - dx / cd.baseW); sy = Math.max(0.1, cd.startScaleY - dy / cd.baseH); px = cd.startPx + dx; py = cd.startPy + dy; }
-        }
-        setTextStateRef.current(st => st ? { ...st, px, py, scaleX: sx, scaleY: sy } : st);
-        return;
       }
 
       // Split drag takes priority — update DOM directly to avoid React re-renders per mousemove
@@ -1194,8 +1069,6 @@ export function PreviewCanvas({
     }
 
     function onGlobalMouseUp(e: CanvasPointEvent) {
-      if (canvasDragRef.current) { canvasDragRef.current = null; return; }
-
       // Commit floating selection
       if (floatingSelRef.current) {
         const fs = floatingSelRef.current;
@@ -1525,54 +1398,57 @@ export function PreviewCanvas({
 
   function handleContainerMouseEnter() { if (splitPos != null) showSplitLabels(); }
 
-  // ── Text tool helpers ───────────────────────────────────────────────────────
-
-  function confirmText() {
-    if (!textState) return;
-    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
-    const fillBlock = textState.fillBlock ?? paintBlock;
-    const meta: TextLayerMeta = { ...textState };
-    const replaceActive = editingActiveRef.current;
-    const hasContent = !!textState.value.trim() && !!fillBlock && fillBlock.baseId !== -1;
-    if (hasContent || replaceActive) {
-      // Create text-only transparent ImageData (empty when there's no content)
-      const textOnly = new ImageData(w, h);  // all transparent
-      if (hasContent) {
-        stampTextBitmap(textOnly, scaledBitmap(textState), textState.px, textState.py, fillBlock!, textState.strokeWidth, textState.strokeBlock, cp);
-      }
-      onTextCommitRef.current?.(textOnly, 'Текст', meta, replaceActive);
-    }
-    editingActiveRef.current = false;
-    setTextState(null);
-    textBaseRef.current = null;
-    canvasDragRef.current = null;
-    // restore canvas
-    const canvas = canvasZoneRef.current?.querySelector('canvas');
-    if (canvas instanceof HTMLCanvasElement && imageDataRef.current) {
-      drawImageData(canvas, imageDataRef.current, w, h, s, sg);
-    }
-  }
-
-  function cancelText() {
-    editingActiveRef.current = false;
-    setTextState(null);
-    textBaseRef.current = null;
-    canvasDragRef.current = null;
-    const { width: w, height: h, scale: s, showGrid: sg } = propsRef.current;
-    const canvas = canvasZoneRef.current?.querySelector('canvas');
-    if (canvas instanceof HTMLCanvasElement && imageDataRef.current) {
-      drawImageData(canvas, imageDataRef.current, w, h, s, sg);
-    }
-  }
-
   // ── Paint tool handler ──────────────────────────────────────────────────────
 
   function handleZoneMouseDown(e: CanvasDownEvent) {
     if (isDraggingSplitRef.current) return;
+    if (e.target instanceof Element && e.target.closest('.text-tool-panel, .text-transform-box')) return;
+
+    const selectTextAtPoint = (point: { px: number; py: number }) => {
+      const hit = [...textLayers].reverse().find(candidate => {
+        const layout = getTextLayout(candidate.text);
+        const local = textLocalVector(
+          point.px - candidate.text.x,
+          point.py - candidate.text.y,
+          candidate.text.rotation,
+        );
+        return Math.abs(local.x) <= (layout.width * candidate.text.scaleX) / 2
+          && Math.abs(local.y) <= (layout.height * candidate.text.scaleY) / 2;
+      });
+      if (!hit) return false;
+      onTextLayerSelect?.(hit.id);
+      setTextDraft(hit.text);
+      setTextDraftIsNew(false);
+      setTextCanvasRect(getMainCanvas()?.getBoundingClientRect() ?? null);
+      return true;
+    };
+
+    // A normal cursor click also reselects placed text, so the user does not
+    // have to find the layer in the Layers panel before making an adjustment.
+    if (activeTool === null) {
+      const point = getPixelCoords(e);
+      if (point && selectTextAtPoint(point)) {
+        e.preventDefault();
+        onToolChange('text');
+        return;
+      }
+    }
+
+    if (activeTool === 'text') {
+      e.preventDefault();
+      const point = getPixelCoords(e);
+      if (!point) return;
+      setTextCanvasRect(getMainCanvas()?.getBoundingClientRect() ?? null);
+      if (selectTextAtPoint(point)) return;
+      if (editingDisabled) return;
+      setTextDraft(createTextMeta(point.px, point.py, t('Текст', 'Text')));
+      setTextDraftIsNew(true);
+      return;
+    }
 
     const mutatingTool = activeTool === 'move' || activeTool === 'brush' || activeTool === 'fill'
       || activeTool === 'eraser' || activeTool === 'pattern' || activeTool === 'pattern-tile'
-      || activeTool === 'gradient' || activeTool === 'text';
+      || activeTool === 'gradient';
     if (editingDisabled && mutatingTool) {
       e.preventDefault();
       return;
@@ -1679,76 +1555,6 @@ export function PreviewCanvas({
       return;
     }
 
-    if (activeTool === 'text') {
-      if (!paintData) return;
-      const pos = getPixelCoords(e);
-
-      if (textState) {
-        const base = baseBitmap(textState);
-        const scaled = scaleMask(base, textState.scaleX, textState.scaleY);
-        const bw = base.width, bh = base.height;
-        const sw = scaled.width, sh = scaled.height;
-        const hs = Math.max(3, Math.round(9 / viewScale));  // handle size in canvas pixels
-
-        // Corner hit test (scale handles)
-        const corners: Array<['tl'|'tr'|'bl'|'br', number, number]> = [
-          ['tl', textState.px,      textState.py],
-          ['tr', textState.px + sw, textState.py],
-          ['bl', textState.px,      textState.py + sh],
-          ['br', textState.px + sw, textState.py + sh],
-        ];
-        if (pos) {
-          for (const [id, hx, hy] of corners) {
-            if (Math.abs(pos.px - hx) <= hs && Math.abs(pos.py - hy) <= hs) {
-              e.preventDefault();
-              canvasDragRef.current = { type: id, startPx: textState.px, startPy: textState.py, startScaleX: textState.scaleX, startScaleY: textState.scaleY, startMouseX: e.clientX, startMouseY: e.clientY, baseW: bw, baseH: bh };
-              return;
-            }
-          }
-          // Inside box → move
-          if (pos.px >= textState.px && pos.px <= textState.px + sw && pos.py >= textState.py && pos.py <= textState.py + sh) {
-            e.preventDefault();
-            canvasDragRef.current = { type: 'move', startPx: textState.px, startPy: textState.py, startScaleX: textState.scaleX, startScaleY: textState.scaleY, startMouseX: e.clientX, startMouseY: e.clientY, baseW: bw, baseH: bh };
-            return;
-          }
-        }
-        // Click outside the box → finalize the current text (stays on canvas, editable later)
-        confirmText();
-        return;
-      }
-
-      // Not currently editing. If the active layer is a text layer, clicking on
-      // its glyphs re-opens it for moving/editing.
-      if (activeLayerIsText && activeTextMeta && pos) {
-        const st: NonNullable<TextState> = { ...activeTextMeta };
-        textBmRef.current = null;
-        const scaled = scaledBitmap(st);
-        if (pos.px >= st.px && pos.px <= st.px + scaled.width && pos.py >= st.py && pos.py <= st.py + scaled.height) {
-          e.preventDefault();
-          editingActiveRef.current = true;
-          // A text layer holds only the text, so the edit backdrop is empty.
-          textBaseRef.current = new ImageData(width, height);
-          canvasDragRef.current = null;
-          textBmRef.current = null;
-          setTextState(st);
-          return;
-        }
-      }
-
-      if (!pos) return;
-      // Create new text at click (no global block required — colour is picked in-panel)
-      editingActiveRef.current = false;
-      textBaseRef.current = new ImageData(new Uint8ClampedArray(paintData.data), paintData.width, paintData.height);
-      canvasDragRef.current = null;
-      textBmRef.current = null;
-      setTextState({
-        px: pos.px, py: pos.py, value: '', font: 'monospace', size: textSize,
-        bold: false, italic: false, align: 'left', lineHeight: 1, letterSpacing: 0, smooth: false,
-        fillBlock: paintBlock, strokeWidth: 0, strokeBlock: null, scaleX: 1, scaleY: 1,
-      });
-      return;
-    }
-
     if (!paintData) return;
     if (activeTool !== 'eraser' && activeTool !== 'fill' && activeTool !== 'pattern' && activeTool !== 'pattern-tile' && activeTool !== 'gradient' && !paintBlock) return;
     if (activeTool === 'pattern' && patternBlocks.length === 0) return;
@@ -1851,6 +1657,7 @@ export function PreviewCanvas({
       button: 0,
       shiftKey: false,
       altKey: false,
+      target: e.target,
       preventDefault: () => {},
     });
   }
@@ -1890,35 +1697,6 @@ export function PreviewCanvas({
       }
     }
     if (isDraggingRef.current) { cancelHide(); return; }
-
-    // Text cursor: detect hit area
-    if (activeTool === 'text' && textState) {
-      const canvas = canvasZoneRef.current?.querySelector('canvas');
-      if (canvas instanceof HTMLCanvasElement) {
-        const rect = canvas.getBoundingClientRect();
-        const px = (e.clientX - rect.left) / viewScale;
-        const py = (e.clientY - rect.top)  / viewScale;
-        const scaled = scaleMask(baseBitmap(textState), textState.scaleX, textState.scaleY);
-        const sw = scaled.width;
-        const sh = scaled.height;
-        const hs = Math.max(3, 9 / viewScale);
-        const corners: Array<[string, number, number]> = [
-          ['nwse-resize', textState.px,      textState.py],
-          ['nesw-resize', textState.px + sw, textState.py],
-          ['nesw-resize', textState.px,      textState.py + sh],
-          ['nwse-resize', textState.px + sw, textState.py + sh],
-        ];
-        let cur: string | null = null;
-        for (const [cursor, hx, hy] of corners) {
-          if (Math.abs(px - hx) <= hs && Math.abs(py - hy) <= hs) { cur = cursor; break; }
-        }
-        if (!cur && px >= textState.px && px <= textState.px + sw && py >= textState.py && py <= textState.py + sh) {
-          cur = 'move';
-        }
-        setTextCursor(cur);
-      }
-      return;
-    }
 
     if (activeTool === 'select-magic') {
       const pos = getPixelCoords(e);
@@ -1980,7 +1758,6 @@ export function PreviewCanvas({
     }
     if (brushCursorWrapperRef.current) brushCursorWrapperRef.current.style.visibility = 'hidden';
     if (stampCursorWrapperRef.current) stampCursorWrapperRef.current.style.visibility = 'hidden';
-    if (activeTool === 'text') setTextCursor(null);
   }
   function handleTooltipEnter() { cancelHide(); }
   function handleTooltipLeave() { if (!isPinned) scheduleHide(); }
@@ -2037,12 +1814,12 @@ export function PreviewCanvas({
   const hasBrushCursor = activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'fill' || activeTool === 'pattern' || activeTool === 'pattern-tile';
   const zoneCursor = hasBrushCursor
     ? 'none'
-    : activeTool === 'text'
-    ? (textCursor ?? 'crosshair')
     : activeTool === 'eyedropper'
     ? 'crosshair'
     : activeTool === 'gradient'
     ? 'crosshair'
+    : activeTool === 'text'
+    ? 'text'
     : (activeTool === 'select-rect' || activeTool === 'select-lasso' || activeTool === 'select-magic' || activeTool === 'select-pixel')
     ? 'crosshair'
     : activeTool === 'move'
@@ -2155,6 +1932,40 @@ export function PreviewCanvas({
     >
       {inner}
 
+      {activeTool === 'text' && !activeTextLocked && (
+        <TextToolOverlay
+          canvasRect={textCanvasRect}
+          viewScale={viewScale}
+          meta={textDraft}
+          isNew={textDraftIsNew}
+          onBeginEdit={() => {
+            if (!textDraftIsNew) onTextBeginEdit?.();
+          }}
+          onChange={next => {
+            setTextDraft(next);
+            if (!textDraftIsNew) onTextUpdate?.(next);
+          }}
+          onPlace={() => {
+            if (!textDraft?.value.trim()) return;
+            if (textDraftIsNew) {
+              onTextCreate?.(textDraft);
+              setTextDraftIsNew(false);
+            } else {
+              onTextUpdate?.(textDraft);
+            }
+          }}
+          onCancel={() => {
+            if (textDraftIsNew) {
+              setTextDraft(null);
+              setTextDraftIsNew(false);
+            } else {
+              setTextDraft(activeTextMeta);
+              onToolChange(null);
+            }
+          }}
+        />
+      )}
+
       {/* Brush cursor — position set imperatively via transform (no layout reflow) */}
       <div
         ref={brushCursorWrapperRef}
@@ -2190,112 +2001,6 @@ export function PreviewCanvas({
             </svg>
           </div>
         );
-      })()}
-
-      {/* ── Text toolbar (top-center bar, visible when textState active) ── */}
-      {textState !== null && activeTool === 'text' && (() => {
-        const ts = textState;
-        const upd = (patch: Partial<NonNullable<TextState>>) => setTextState(s => s ? { ...s, ...patch } : s);
-        const fieldStyle: React.CSSProperties = { background: 'var(--color-field-bg)', border: '1px solid rgb(var(--color-accent-rgb) / 0.42)', color: 'var(--color-accent)', borderRadius: 4, fontSize: 12, padding: '2px 4px' };
-        const toggle = (active: boolean): React.CSSProperties => ({
-          background: active ? 'rgb(var(--color-accent-rgb) / 0.22)' : 'var(--color-field-bg)',
-          border: `1px solid rgb(var(--color-accent-rgb) / ${active ? 0.6 : 0.42})`,
-          color: 'var(--color-accent)',
-          borderRadius: 4, fontSize: 12, fontWeight: 700, lineHeight: 1,
-          padding: '3px 7px', cursor: 'pointer', minWidth: 26,
-        });
-        return createPortal(
-        <div
-          className="text-toolbar"
-          style={{ position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 10002, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', maxWidth: '94vw', background: 'var(--color-surface-elevated)', border: '1px solid var(--color-border-strong)', borderRadius: 8, padding: '6px 10px', boxShadow: '0 4px 16px rgb(var(--color-shadow-rgb) / 0.6)' }}
-          onMouseDown={e => e.stopPropagation()}
-        >
-          {/* Text input (multi-line: Shift+Enter) */}
-          <textarea
-            className="text-toolbar-input"
-            autoFocus
-            rows={1}
-            value={ts.value}
-            onChange={e => upd({ value: e.target.value })}
-            onKeyDown={e => {
-              if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmText(); }
-            }}
-            placeholder="Текст… (Shift+Enter — новая строка)"
-            style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 4, outline: 'none', color: 'var(--color-text-primary)', fontFamily: ts.font, fontSize: 13, minWidth: 150, maxWidth: 260, resize: 'none', lineHeight: 1.3, padding: '3px 6px' }}
-          />
-          {/* Font selector */}
-          <select value={ts.font} onChange={e => upd({ font: e.target.value })} title="Шрифт" style={fieldStyle}>
-            {TEXT_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
-          {/* Size */}
-          <input type="number" min={4} max={128} value={ts.size} title="Размер"
-            onChange={e => upd({ size: Math.max(4, Math.min(128, +e.target.value)) })}
-            style={{ ...fieldStyle, width: 50, textAlign: 'center' }}
-          />
-          {/* Bold / Italic */}
-          <button title="Жирный" style={{ ...toggle(ts.bold), fontStyle: 'normal' }} onClick={() => upd({ bold: !ts.bold })}>B</button>
-          <button title="Курсив" style={{ ...toggle(ts.italic), fontStyle: 'italic' }} onClick={() => upd({ italic: !ts.italic })}>I</button>
-          {/* Alignment */}
-          <div style={{ display: 'flex', gap: 2 }}>
-            <button title="По левому краю" aria-label="По левому краю" style={toggle(ts.align === 'left')} onClick={() => upd({ align: 'left' })}><IconGlyph icon={mkIcons.alignLeft} /></button>
-            <button title="По центру" aria-label="По центру" style={toggle(ts.align === 'center')} onClick={() => upd({ align: 'center' })}><IconGlyph icon={mkIcons.alignCenter} /></button>
-            <button title="По правому краю" aria-label="По правому краю" style={toggle(ts.align === 'right')} onClick={() => upd({ align: 'right' })}><IconGlyph icon={mkIcons.alignRight} /></button>
-          </div>
-          {/* Line height */}
-          <input type="number" min={0.6} max={3} step={0.1} value={ts.lineHeight} title="Межстрочный интервал"
-            onChange={e => upd({ lineHeight: Math.max(0.6, Math.min(3, +e.target.value)) })}
-            style={{ ...fieldStyle, width: 46, textAlign: 'center' }}
-          />
-          {/* Letter spacing */}
-          <input type="number" min={-4} max={16} step={1} value={ts.letterSpacing} title="Межбуквенный интервал"
-            onChange={e => upd({ letterSpacing: Math.max(-4, Math.min(16, +e.target.value)) })}
-            style={{ ...fieldStyle, width: 46, textAlign: 'center' }}
-          />
-          {/* Smooth edges toggle */}
-          <button title="Сглаживание краёв" style={toggle(ts.smooth)} onClick={() => upd({ smooth: !ts.smooth })}>AA</button>
-          {/* Fill colour picker */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Цвет</span>
-            {(ts.fillBlock ?? paintBlock)
-              ? <span className="paint-swatch-icon text-stroke-swatch"
-                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${(ts.fillBlock ?? paintBlock)!.blockId * 32}px -${(ts.fillBlock ?? paintBlock)!.csId * 32}px` }}
-                  title={(ts.fillBlock ?? paintBlock)!.displayName} onClick={() => setShowFillPicker(v => !v)} />
-              : <button type="button" className="paint-swatch-icon text-stroke-swatch text-stroke-swatch--none"
-                  title="Выбрать цвет текста" aria-label="Выбрать цвет текста" onClick={() => setShowFillPicker(v => !v)}><IconGlyph icon={mkIcons.plus} /></button>
-            }
-            {showFillPicker && (
-              <BlockPickerPopup blockSelection={blockSelection} current={ts.fillBlock ?? paintBlock}
-                onSelect={b => { upd({ fillBlock: b }); setShowFillPicker(false); }}
-                onClose={() => setShowFillPicker(false)} />
-            )}
-          </div>
-          {/* Stroke width */}
-          <input type="number" min={0} max={6} value={ts.strokeWidth} title="Толщина обводки"
-            onChange={e => upd({ strokeWidth: Math.max(0, Math.min(6, +e.target.value)) })}
-            style={{ ...fieldStyle, width: 40, textAlign: 'center' }}
-          />
-          {/* Stroke block picker */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Обводка</span>
-            {ts.strokeBlock
-              ? <span className="paint-swatch-icon text-stroke-swatch"
-                  style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${ts.strokeBlock.blockId * 32}px -${ts.strokeBlock.csId * 32}px` }}
-                  title={ts.strokeBlock.displayName} onClick={() => setShowStrokePicker(v => !v)} />
-              : <button type="button" className="paint-swatch-icon text-stroke-swatch text-stroke-swatch--none"
-                  title="Выбрать цвет обводки" aria-label="Выбрать цвет обводки" onClick={() => setShowStrokePicker(v => !v)}><IconGlyph icon={mkIcons.plus} /></button>
-            }
-            {showStrokePicker && (
-              <BlockPickerPopup blockSelection={blockSelection} current={ts.strokeBlock}
-                onSelect={b => { upd({ strokeBlock: b }); setShowStrokePicker(false); }}
-                onClose={() => setShowStrokePicker(false)} />
-            )}
-          </div>
-          {/* Confirm / Cancel */}
-          <button onClick={confirmText} title="Применить (Enter)" aria-label="Применить" style={{ background: 'rgb(var(--color-accent-rgb) / 0.15)', border: '1px solid rgb(var(--color-accent-rgb) / 0.5)', color: 'var(--color-accent)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.check} /></button>
-          <button onClick={cancelText} title="Отмена (Esc)" aria-label="Отмена" style={{ background: 'var(--color-control-hover)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontSize: 14 }}><IconGlyph icon={mkIcons.close} /></button>
-        </div>
-        , document.body);
       })()}
 
       {hoverInfo && !activeTool && (

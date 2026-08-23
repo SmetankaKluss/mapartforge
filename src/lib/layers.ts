@@ -1,5 +1,5 @@
 import type { DitheringMode } from './dithering';
-import type { TextLayerMeta } from '../components/previewCanvasShared';
+import type { TextLayerMeta } from './textRender';
 
 export type LayerBuildMode = '2d' | '3d-classic' | '3d-optimized';
 
@@ -9,8 +9,8 @@ export interface Layer {
   visible: boolean;
   locked: boolean;
   opacity: number;       // 0–100, default 100
-  isText?: boolean;      // true for text layers
-  /** For text layers: the editable text description, so it can be re-edited/moved. */
+  /** Text layers retain their source settings so they can be edited after placement. */
+  isText?: boolean;
   text?: TextLayerMeta;
   groupId: string | null;
   imageData: ImageData | null;
@@ -39,7 +39,7 @@ function genId(): string {
   return `layer-${Date.now()}-${_idCounter++}`;
 }
 
-export function createLayer(name: string, imageData: ImageData | null = null, isText?: boolean): Layer {
+export function createLayer(name: string, imageData: ImageData | null = null, isText = false): Layer {
   return {
     id: genId(),
     name,

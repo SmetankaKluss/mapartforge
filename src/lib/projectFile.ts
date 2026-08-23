@@ -1,7 +1,7 @@
 import type { Layer, LayerBuildMode, LayerGroup } from './layers';
+import { normalizeTextMeta, type TextLayerMeta } from './textRender';
 import type { MapGrid } from './types';
 import { base64ToBytes, bytesToBase64 } from './base64';
-import type { TextLayerMeta } from '../components/previewCanvasShared';
 import { coerceBuildTechnique, type BuildTechnique } from './buildTechnique';
 import { downloadExportBlob } from './exportDownload';
 
@@ -66,19 +66,22 @@ function serializeLayer(layer: Layer): SerializedLayer {
 }
 
 function deserializeLayer(layer: SerializedLayer): Layer {
+  const text = layer.isText && layer.text
+    ? normalizeTextMeta(layer.text, Math.max(0, layer.width / 2), Math.max(0, layer.height / 2))
+    : undefined;
   return {
     id: layer.id,
     name: layer.name,
     visible: layer.visible,
     locked: layer.locked,
     opacity: layer.opacity ?? 100,
+    isText: Boolean(text),
+    text,
     buildMode: layer.buildMode ?? '2d',
     groupId: layer.groupId,
     imageData: layer.imageDataB64 && layer.width > 0 && layer.height > 0
       ? base64ToImageData(layer.imageDataB64, layer.width, layer.height)
       : null,
-    isText: layer.isText,
-    text: layer.text,
     sourceDataUrl: layer.sourceDataUrl,
     dithering: layer.dithering,
     ditheringIntensity: layer.ditheringIntensity,

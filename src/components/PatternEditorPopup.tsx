@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { PaintBlock } from './previewCanvasShared';
 import type { ComputedPalette } from '../lib/dithering';
 import type { PatternDefinition } from '../lib/patternTool';
@@ -7,6 +7,7 @@ import type { BlockSelection } from '../lib/paletteBlocks';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { useLocale } from '../lib/useLocale';
+import { useDraggablePanel } from './useDraggablePanel';
 
 interface Props {
   pattern: PatternDefinition;
@@ -34,10 +35,7 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
   const [isErasing, setIsErasing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Drag-to-move state
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragStartRef = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
+  const { panelRef, draggedStyle, isDragged, onDragHandlePointerDown } = useDraggablePanel();
 
   // Close on Escape only (no outside-click close — allows other popups to stay open)
   useEffect(() => {
@@ -45,29 +43,6 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  // Header drag handlers
-  const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    dragStartRef.current = { mx: e.clientX, my: e.clientY, px: rect.left, py: rect.top };
-
-    function onMove(ev: MouseEvent) {
-      if (!dragStartRef.current) return;
-      const dx = ev.clientX - dragStartRef.current.mx;
-      const dy = ev.clientY - dragStartRef.current.my;
-      setPos({ x: dragStartRef.current.px + dx, y: dragStartRef.current.py + dy });
-    }
-    function onUp() {
-      dragStartRef.current = null;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, []);
 
   function applySize() {
     const w = Math.max(1, Math.min(16, parseInt(widthInput) || pattern.width));
@@ -105,15 +80,11 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
 
   const CELL_SIZE = Math.max(20, Math.min(48, Math.floor(240 / Math.max(pattern.width, pattern.height))));
 
-  const style: React.CSSProperties = pos
-    ? { position: 'fixed', left: pos.x, top: pos.y, transform: 'none' }
-    : {};
-
   return (
     <div
-      ref={ref}
-      className="pattern-editor-popup"
-      style={style}
+      ref={panelRef}
+      className={`pattern-editor-popup${isDragged ? ' is-dragged' : ''}`}
+      style={draggedStyle}
       onMouseUp={handleMouseUp}
       onContextMenu={e => e.preventDefault()}
       role="dialog"
@@ -122,8 +93,7 @@ export function PatternEditorPopup({ pattern: initialPattern, paintBlock, cp, bl
     >
       <div
         className="pattern-editor-header"
-        onMouseDown={onHeaderMouseDown}
-        style={{ cursor: 'grab' }}
+        onPointerDown={onDragHandlePointerDown}
       >
         <span className="pattern-editor-title" id="pattern-editor-title">{t('Редактор паттерна', 'Pattern editor')}</span>
         <button className="pattern-editor-close" onClick={onClose} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>

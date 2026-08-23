@@ -56,10 +56,14 @@ import { CropModal } from './components/CropModal';
 import { lazy, Suspense } from 'react';
 const PerspectiveModal = lazy(() => import('./components/PerspectiveModal').then(m => ({ default: m.PerspectiveModal })));
 const GifModal = lazy(() => import('./components/GifModal').then(m => ({ default: m.GifModal })));
+const DevSponsorPreviewBanner = import.meta.env.DEV
+  ? lazy(() => import('./components/dev/SponsorPreviewBanner').then(m => ({ default: m.SponsorPreviewBanner })))
+  : null;
 import { NewCanvasModal } from './components/NewCanvasModal';
 import { LayersPanel } from './components/LayersPanel';
 import type { Layer, LayerGroup } from './lib/layers';
 import { createLayer, compositeLayersToImageData, mergeLayersDown, mergeVisible, scaleImageData } from './lib/layers';
+import { renderTextLayer } from './lib/textRender';
 import { deserializeProject, downloadProject, serializeFullProject, deserializeFullProject, imageDataToBase64, base64ToImageData } from './lib/projectFile';
 import type { FullProjectSettings } from './lib/projectFile';
 import { saveProject, loadProject } from './lib/projectStorage';
@@ -278,6 +282,8 @@ function imageToImageData(img: HTMLImageElement): ImageData {
 
 export default function App() {
   const { lang, toggle: toggleLang, t } = useLocale();
+  const sponsorPreviewEnabled = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).get('sponsorPreview') === 'sp';
 
   useEffect(() => {
     applyPageMeta({
@@ -359,10 +365,13 @@ export default function App() {
       // (dirty=true path = dithering-change with alpha mask preservation — still allowed)
       if (targetLayer?.locked && (dirty || fromProcess)) return prev;
       if (fromProcess && !dirty && targetLayer?.isDirty) return prev;
+      const rasterizeText = Boolean(dirty && targetLayer?.isText);
       return {
         ...prev,
         layers: prev.layers.map(l =>
-          l.id === targetId ? { ...l, imageData: data, isDirty: dirty } : l,
+          l.id === targetId
+            ? { ...l, imageData: data, isDirty: dirty, isText: rasterizeText ? false : l.isText, text: rasterizeText ? undefined : l.text }
+            : l,
         ),
       };
     });
@@ -478,7 +487,6 @@ export default function App() {
   const [gradientDithering, setGradientDithering] = useState<'none' | 'ordered'>('ordered');
   const [showGradientStopPicker, setShowGradientStopPicker] = useState<number | null>(null);
   const [showGradientAddPicker, setShowGradientAddPicker] = useState(false);
-  const [textSize]                       = useState<number>(8);
   const [showBlockPicker, setShowBlockPicker]   = useState(false);
   const [viewBanner,    setViewBanner]    = useState(false);
   const [paletteBanner, setPaletteBanner] = useState(false);
@@ -875,7 +883,7 @@ export default function App() {
         case 'KeyB': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'brush' ? null : 'brush'); break;
         case 'KeyF': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'fill' ? null : 'fill'); break;
         case 'KeyX': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'eraser' ? null : 'eraser'); break;
-        case 'KeyT': /* text tool hidden — to be reworked */ break;
+        case 'KeyT': if (ensureActiveLayerEditable()) setActiveTool(t => t === 'text' ? null : 'text'); break;
         case 'KeyR': if (editorMode === 'artist') setActiveTool(t => t === 'select-rect' ? null : 'select-rect'); break;
         case 'KeyL': if (editorMode === 'artist') setActiveTool(t => t === 'select-lasso' ? null : 'select-lasso'); break;
         case 'KeyW': if (editorMode === 'artist') setActiveTool(t => t === 'select-magic' ? null : 'select-magic'); break;
@@ -917,6 +925,7 @@ export default function App() {
       case 'brush': return { icon: mkIcons.brush, name: t('Кисть', 'Brush'), key: 'B', hint: t('Рисуй выбранным блоком. Shift + клик — прямая линия.', 'Paint with the selected block. Shift + click draws a straight line.') };
       case 'fill': return { icon: mkIcons.fill, name: t('Заливка', 'Fill'), key: 'F', hint: t('Заполни связанную область выбранным блоком.', 'Fill a connected area with the selected block.') };
       case 'eraser': return { icon: mkIcons.eraser, name: t('Ластик', 'Eraser'), key: 'X', hint: t('Удали пиксели активного слоя.', 'Erase pixels from the active layer.') };
+      case 'text': return { icon: mkIcons.text, name: t('Текст', 'Text'), key: 'T', hint: t('Кликни по холсту, введи текст и размести его. Затем перетаскивай и меняй размер.', 'Click the canvas, type and place text. Then drag it or resize it.') };
       case 'move': return { icon: mkIcons.move, name: t('Перемещение слоя', 'Move layer'), key: 'V', hint: t('Сдвинь активный слой. Space + ЛКМ двигает только холст.', 'Move the active layer. Space + LMB pans only the canvas.') };
       case 'select-rect': return { icon: mkIcons.selectRect, name: t('Прямоугольное выделение', 'Rectangular selection'), key: 'R', hint: t('Shift добавляет область, Alt вычитает.', 'Shift adds to the selection, Alt subtracts.') };
       case 'select-lasso': return { icon: mkIcons.lasso, name: t('Лассо', 'Lasso'), key: 'L', hint: t('Обведи область вручную. Shift добавляет, Alt вычитает.', 'Draw a freeform selection. Shift adds, Alt subtracts.') };
@@ -1291,7 +1300,23 @@ export default function App() {
       ...prev,
       layers: prev.layers.map(l => {
         if (!l.imageData) return l; // empty layers stay empty
-        return { ...l, imageData: scaleImageData(l.imageData, newW, newH) };
+        const scaleX = newW / l.imageData.width;
+        const scaleY = newH / l.imageData.height;
+        return {
+          ...l,
+          imageData: scaleImageData(l.imageData, newW, newH),
+          // Keep the editable text bounds aligned with its raster preview after
+          // a map-size change. This also preserves non-square grid changes.
+          text: l.text
+            ? {
+              ...l.text,
+              x: l.text.x * scaleX,
+              y: l.text.y * scaleY,
+              scaleX: l.text.scaleX * scaleX,
+              scaleY: l.text.scaleY * scaleY,
+            }
+            : undefined,
+        };
       }),
     }));
     // Undo entries contain ImageData at old dimensions — clear to avoid size mismatch
@@ -1507,6 +1532,49 @@ export default function App() {
     setImageData(data, true);  // manual paint → mark dirty
   }, [ensureActiveLayerEditable, pushToHistory]);
 
+  const handleTextBeginEdit = useCallback(() => {
+    if (!ensureActiveLayerEditable()) return;
+    pushToHistory();
+  }, [ensureActiveLayerEditable, pushToHistory]);
+
+  const handleTextUpdate = useCallback((meta: TextLayerMeta) => {
+    if (!ensureActiveLayerEditable()) return;
+    setLayerState(prev => {
+      const active = prev.layers.find(layer => layer.id === prev.activeLayerId);
+      if (!active?.isText) return prev;
+      const layerWidth = active.imageData?.width ?? gridPixelWidth(mapGrid);
+      const layerHeight = active.imageData?.height ?? gridPixelHeight(mapGrid);
+      const imageData = renderTextLayer(meta, layerWidth, layerHeight);
+      const title = meta.value.trim().replace(/\s+/g, ' ').slice(0, 28) || t('Текст', 'Text');
+      return {
+        ...prev,
+        layers: prev.layers.map(layer => layer.id === prev.activeLayerId
+          ? { ...layer, name: `${t('Текст', 'Text')} — ${title}`, imageData, isText: true, text: meta, isDirty: true }
+          : layer),
+      };
+    });
+  }, [ensureActiveLayerEditable, mapGrid, t]);
+
+  const handleTextCreate = useCallback((meta: TextLayerMeta) => {
+    if (!ensureActiveLayerEditable()) return;
+    pushToHistory();
+    setLayerState(prev => {
+      const layerWidth = gridPixelWidth(mapGrid);
+      const layerHeight = gridPixelHeight(mapGrid);
+      const title = meta.value.trim().replace(/\s+/g, ' ').slice(0, 28) || t('Текст', 'Text');
+      const layer = createLayer(`${t('Текст', 'Text')} — ${title}`, renderTextLayer(meta, layerWidth, layerHeight), true);
+      layer.text = meta;
+      layer.isDirty = true;
+      const currentIndex = prev.layers.findIndex(item => item.id === prev.activeLayerId);
+      const insertAt = currentIndex >= 0 ? currentIndex + 1 : prev.layers.length;
+      return {
+        ...prev,
+        layers: [...prev.layers.slice(0, insertAt), layer, ...prev.layers.slice(insertAt)],
+        activeLayerId: layer.id,
+      };
+    });
+  }, [ensureActiveLayerEditable, mapGrid, pushToHistory, t]);
+
   // ── Selection operations ─────────────────────────────────────────────────────
 
   const handleDeleteSelection = useCallback(() => {
@@ -1718,26 +1786,6 @@ export default function App() {
       layers: prev.layers.map(l => l.groupId === groupId ? { ...l, groupId: null } : l),
     }));
   }, [pushToHistory]);
-
-  const handleTextCommit = useCallback((textImageData: ImageData, layerName: string, meta: TextLayerMeta, replaceActive: boolean) => {
-    if (replaceActive && !ensureActiveLayerEditable()) return;
-    pushToHistory();
-    setLayerState(prev => {
-      if (replaceActive) {
-        // Re-editing an existing text layer: replace its pixels + metadata in place.
-        const layers = prev.layers.map(l => l.id === prev.activeLayerId
-          ? { ...l, imageData: textImageData, isText: true, text: meta, isDirty: true }
-          : l);
-        return { ...prev, layers };
-      }
-      const newLayer = createLayer(layerName, textImageData, true);
-      newLayer.text = meta;
-      const idx = prev.layers.findIndex(l => l.id === prev.activeLayerId);
-      const insertAt = idx >= 0 ? idx + 1 : prev.layers.length;
-      const newLayers = [...prev.layers.slice(0, insertAt), newLayer, ...prev.layers.slice(insertAt)];
-      return { ...prev, layers: newLayers, activeLayerId: newLayer.id };
-    });
-  }, [ensureActiveLayerEditable, pushToHistory]);
 
   // ── Export shortcuts (stable — uses exportRef for fresh state) ───────────
   const handleExportPng = useCallback(() => {
@@ -2998,7 +3046,13 @@ export default function App() {
         </div>
       </header>
 
-      {showAnnouncement && (
+      {DevSponsorPreviewBanner && sponsorPreviewEnabled && (
+        <Suspense fallback={null}>
+          <DevSponsorPreviewBanner lang={lang} />
+        </Suspense>
+      )}
+
+      {showAnnouncement && !sponsorPreviewEnabled && (
         <div
           className="update-banner update-banner--companion"
           role="region"
@@ -3257,7 +3311,9 @@ export default function App() {
                   <button className={`tool-btn${activeTool === 'eraser' ? ' active' : ''}`} onClick={() => setActiveTool(t => t === 'eraser' ? null : 'eraser')} title={t('Ластик (X)', 'Eraser (X)')} aria-label={t('Ластик', 'Eraser')} aria-pressed={activeTool === 'eraser'} aria-keyshortcuts="X" disabled={activeLayerLocked}>
                     <IconGlyph icon={mkIcons.eraser} />
                   </button>
-                  {/* text tool hidden — to be reworked */}
+                  <button className={`tool-btn${activeTool === 'text' ? ' active' : ''}`} onClick={() => setActiveTool(tool => tool === 'text' ? null : 'text')} title={t('Текст (T)', 'Text (T)')} aria-label={t('Текст', 'Text')} aria-pressed={activeTool === 'text'} aria-keyshortcuts="T" disabled={activeLayerLocked}>
+                    <IconGlyph icon={mkIcons.text} />
+                  </button>
                   {/* pattern tool hidden — work in progress */}
                 </div>
 
@@ -3446,6 +3502,7 @@ export default function App() {
                   <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
                   <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
                   <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
+                  <div className="shortcut-row"><kbd>T</kbd><span>{t('Текст', 'Text')}</span></div>
                   <div className="shortcut-row"><kbd>V</kbd><span>{t('Перемещение слоя', 'Move layer')}</span></div>
                   <div className="shortcut-row"><kbd>R</kbd><span>{t('Прямоугольное выделение', 'Rectangular selection')}</span></div>
                   <div className="shortcut-row"><kbd>L</kbd><span>{t('Лассо', 'Lasso')}</span></div>
@@ -3751,15 +3808,20 @@ export default function App() {
                   paintBlock={paintBlock}
                   patternBlocks={patternBlocks}
                   brushSize={brushSize}
-                  textSize={textSize}
+                  activeTextMeta={activeLayer?.isText ? activeLayer.text ?? null : null}
+                  activeTextLocked={activeLayerLocked}
+                  textLayers={layers
+                    .filter(layer => layer.visible && layer.isText && layer.text)
+                    .map(layer => ({ id: layer.id, text: layer.text!, locked: layer.locked }))}
                   otherLayersData={otherLayersData}
-                  activeLayerIsText={!!activeLayer?.isText}
-                  activeTextMeta={activeLayer?.text ?? null}
                   onRemoveBlock={handleRemoveBlock}
                   onImageUpdate={handleImageUpdate}
                   onToolChange={setActiveTool}
                   onPaintBlockChange={setPaintBlock}
-                  onTextCommit={handleTextCommit}
+                  onTextCreate={handleTextCreate}
+                  onTextUpdate={handleTextUpdate}
+                  onTextBeginEdit={handleTextBeginEdit}
+                  onTextLayerSelect={id => setLayerState(previous => ({ ...previous, activeLayerId: id }))}
                   splitPos={imageData && originalData && showSplitLine ? splitPos : undefined}
                   onSplitPosChange={setSplitPos}
                   selectionMask={selectionMask}
