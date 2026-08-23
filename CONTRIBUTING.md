@@ -1,15 +1,32 @@
 # Contributing to MapKluss
 
-Thanks for helping improve MapKluss. The project is focused on practical Minecraft map art workflows: image conversion, palette control, editing, exporting, examples, and build tracking.
+MapKluss is built for people who make map art in real worlds, so the most useful contributions usually start with a concrete annoyance: a palette that gives the wrong result, an export that is awkward to use, or a step that makes a build take longer than it should.
 
-## Local Setup
+## Before writing code
+
+Open an issue first for anything larger than a focused fix. A screenshot, browser version and short reproduction path are often enough to turn a vague report into something we can fix.
+
+Useful contributions include:
+
+- Bugs in image conversion, palettes, editor tools, exports or Cloud workflows
+- Carefully tested map-art examples with their source image and Minecraft result
+- Small improvements that make a repeated builder workflow clearer or faster
+- Documentation corrections, especially where a current Minecraft version behaves differently
+
+## Gallery examples
+
+Please include the original image, the MapKluss PNG, a Minecraft screenshot when possible, map size, build mode, dithering choice and any important palette restrictions. This gives other builders something they can reproduce rather than just admire.
+
+## Local work
+
+Install Node.js 22 or newer, then run:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Before opening a pull request, run:
+Before opening a pull request:
 
 ```bash
 npm test
@@ -17,30 +34,6 @@ npm run lint
 npm run build
 ```
 
-## Useful Contributions
+Keep a pull request focused. Say what changed, why it matters, and what you tested. Add or update tests whenever behavior changes.
 
-- Bug reports with a screenshot, browser name, and steps to reproduce
-- Feature ideas for map art creation, editing, palette control, export, or building workflow
-- Curated gallery examples with original image, MapKluss preview, Minecraft screenshot, mode, size, and palette notes
-- Small focused code improvements with clear before/after behavior
-
-## Example Submissions
-
-For gallery examples, include:
-
-- Original image
-- MapKluss output PNG
-- Minecraft screenshot if available
-- Mode: 2D Flat or 3D Stair
-- Size: 1x1, 2x2, 4x4 maps, or another grid
-- Dithering mode and important settings
-- Main materials or palette restrictions
-
-## Pull Request Style
-
-- Keep changes focused on one topic.
-- Explain what changed and why.
-- Include validation commands you ran.
-- Add or update tests when behavior changes.
-- Do not commit local screenshots, exported `.litematic` files, `.dat` files, or `.env` files.
-- Do not include credentials, personal paths, editor state, logs, or private project notes.
+Never commit credentials, local environment files, logs, personal paths, editor state, temporary screenshots, exported `.litematic` or `.dat` files, or private project notes.
