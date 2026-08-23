@@ -111,7 +111,8 @@ body {
 
 .public-site-nav__link,
 .public-site-language,
-.public-site-version {
+.public-site-version,
+.public-site-github {
   min-height: 30px;
   border: 1px solid var(--border);
   background: var(--bg-input);
@@ -132,6 +133,7 @@ body {
 .public-site-nav__link:hover,
 .public-site-language:hover,
 .public-site-version:hover,
+.public-site-github:hover,
 :root:not([data-theme='classic']) .public-site-nav__link.is-active {
   border-color: rgb(var(--accent-rgb) / 0.64);
   background: var(--accent-dim);
@@ -155,6 +157,15 @@ body {
   color: var(--public-text-tertiary);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+}
+
+.public-site-github {
+  text-decoration: none;
+}
+
+.public-site-github .mk-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .public-content-page,
@@ -1676,6 +1687,7 @@ body {
   .public-site-nav__link .mk-icon { width: 19px; height: 19px; }
   .public-site-nav__short-label { display: none; }
   .public-site-version { display: none; }
+  .public-site-github { display: none; }
 
   .public-page-intro,
   .public-section,

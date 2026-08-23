@@ -78,6 +78,17 @@ export function PublicSiteHeader({ active, lang, onToggleLanguage }: PublicSiteH
           ))}
         </nav>
 
+        <a
+          className="public-site-github"
+          href="https://github.com/SmetankaKluss/mapartforge"
+          target="_blank"
+          rel="noopener noreferrer"
+          title={isRussian ? 'Исходный код сайта на GitHub' : 'Website source code on GitHub'}
+          aria-label={isRussian ? 'Открыть исходный код сайта на GitHub' : 'Open website source code on GitHub'}
+        >
+          <IconGlyph icon={mkIcons.github} />
+          <span>GitHub</span>
+        </a>
         <button
           className="public-site-language"
           type="button"
