@@ -117,7 +117,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-companion-0-13-1-2026-08-20',
+  id: 'mapkluss-text-tool-1-29-3-2026-08-23',
   url: 'https://t.me/mapkluss',
 };
 
@@ -3056,20 +3056,20 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новости MapKluss Companion, новых версий и тем', 'MapKluss Companion, new versions, and themes announcement')}
+          aria-label={t('Новое обновление редактора MapKluss', 'New MapKluss editor update')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
-            <span>COMPANION</span>
+            <span>EDITOR</span>
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline={t('MAPKLUSS COMPANION 0.13.1 — НОВЫЙ ИНТЕРФЕЙС', 'MAPKLUSS COMPANION 0.13.1 — NEW INTERFACE')}
-            detail={t('БИБЛИОТЕКА · LENS · TWO-LAYER', 'LIBRARY · LENS · TWO-LAYER')}
+            headline={t('НОВЫЙ ИНСТРУМЕНТ «ТЕКСТ»', 'NEW TEXT TOOL')}
+            detail={t('ШРИФТЫ · ЦВЕТ · КОНТУР · ТРАНСФОРМАЦИИ', 'FONTS · COLOUR · OUTLINE · TRANSFORMS')}
           />
           <span className="update-banner-sr">
-            {t('MapKluss Companion 0.13.1 получил новый интерфейс, обновлённый Lens и полный Two-layer workflow.',
-              'MapKluss Companion 0.13.1 adds a new interface, an updated Lens, and the complete Two-layer workflow.')}
+            {t('В редакторе появился новый инструмент текста: шрифты, цвет, контур и свободное перемещение.',
+              'The editor now has a text tool with fonts, colour, outline, and free transforms.')}
           </span>
           <a
             className="update-banner-link"
@@ -3082,7 +3082,7 @@ export default function App() {
             }}
           >
             <span>{t('В TELEGRAM', 'TELEGRAM')}</span>
-            <IconGlyph icon={mkIcons.arrowRight} size={13} />
+            <IconGlyph icon={mkIcons.arrowLeft} size={13} />
           </a>
           <button
             className="update-banner-close"
