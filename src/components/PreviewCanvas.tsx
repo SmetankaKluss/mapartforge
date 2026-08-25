@@ -48,7 +48,12 @@ interface RepaintEntry {
   dist: number;
 }
 
-type CanvasPointEvent = { clientX: number; clientY: number };
+type CanvasPointEvent = {
+  clientX: number;
+  clientY: number;
+  shiftKey?: boolean;
+  buttons?: number;
+};
 type CanvasDownEvent = CanvasPointEvent & {
   button: number;
   shiftKey: boolean;
@@ -514,6 +519,11 @@ export function PreviewCanvas({
   const isDraggingRef    = useRef(false);
   const paintedSetRef    = useRef<Set<number>>(new Set());
   const lastBrushPosRef  = useRef<{ px: number; py: number } | null>(null);
+  // Shift + held primary button keeps the eyedropper active and samples only
+  // when the cursor enters a new pixel. A ref avoids a re-render for every
+  // sampled color while the user moves across the art.
+  const eyedropperDragRef = useRef<{ px: number; py: number } | null>(null);
+  const isEyedropperSamplingRef = useRef(false);
   // Last pixel painted during a drag — used to interpolate gaps between mousemove events
   const lastDragPixelRef = useRef<{ px: number; py: number } | null>(null);
   const patternAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -615,6 +625,9 @@ export function PreviewCanvas({
   // Stable refs so global listeners never capture stale closures
   const onImageUpdateRef = useRef(onImageUpdate);
   onImageUpdateRef.current = onImageUpdate;
+  const onPaintBlockChangeRef = useRef(onPaintBlockChange);
+  onPaintBlockChangeRef.current = onPaintBlockChange;
+  const lookupAtEventRef = useRef<(event: CanvasPointEvent) => HoverInfo | null>(() => null);
   const canvasZoneRef = useRef<HTMLDivElement>(null);
   const imageDataRef  = useRef<ImageData | null>(null);
   imageDataRef.current = imageData;
@@ -850,6 +863,10 @@ export function PreviewCanvas({
 
   useEffect(() => {
     if (activeTool) { cancelHoverFrame(); setIsPinned(false); setHoverInfo(null); setShowRepaint(false); setRepaintTarget(null); }
+    if (activeTool !== 'eyedropper') {
+      isEyedropperSamplingRef.current = false;
+      eyedropperDragRef.current = null;
+    }
   }, [activeTool]);
 
   // ── Escape key ──────────────────────────────────────────────────────────────
@@ -921,6 +938,28 @@ export function PreviewCanvas({
         return;
       }
       const { activeTool, paintBlock, patternBlocks, scale, viewScale: visualScale, width, height, cp, brushSize, showGrid } = propsRef.current;
+
+      if (isEyedropperSamplingRef.current) {
+        if (activeTool !== 'eyedropper' || !e.shiftKey || (e.buttons ?? 0) !== 1) {
+          isEyedropperSamplingRef.current = false;
+          eyedropperDragRef.current = null;
+          return;
+        }
+        const info = lookupAtEventRef.current(e);
+        if (!info) return;
+        const previous = eyedropperDragRef.current;
+        if (previous?.px === info.pixelX && previous.py === info.pixelY) return;
+        eyedropperDragRef.current = { px: info.pixelX, py: info.pixelY };
+        onPaintBlockChangeRef.current({
+          csId: info.csId,
+          blockId: info.blockId,
+          baseId: info.baseId,
+          shade: info.shade,
+          displayName: info.displayName,
+          colourName: info.colourName,
+        });
+        return;
+      }
 
       // Get canvas + rect once for the entire handler — no repeated querySelector / getBoundingClientRect
       const cvs = getMainCanvas();
@@ -1116,6 +1155,12 @@ export function PreviewCanvas({
     }
 
     function onGlobalMouseUp(e: CanvasPointEvent) {
+      if (isEyedropperSamplingRef.current) {
+        isEyedropperSamplingRef.current = false;
+        eyedropperDragRef.current = null;
+        return;
+      }
+
       // Commit floating selection
       if (floatingSelRef.current) {
         const fs = floatingSelRef.current;
@@ -1210,6 +1255,8 @@ export function PreviewCanvas({
     // Pointer left the document entirely (e.g. flicked off-window) — drop any
     // non-pinned hover tooltip so it can't stay orphaned.
     function onDocMouseLeave() {
+      isEyedropperSamplingRef.current = false;
+      eyedropperDragRef.current = null;
       cancelHoverFrame();
       if (prevHoverKeyRef.current !== '' && !isPinnedRef.current) {
         cancelHide();
@@ -1376,6 +1423,7 @@ export function PreviewCanvas({
   function lookupAtEvent(e: CanvasPointEvent): HoverInfo | null {
     return lookupAtClient(e.clientX, e.clientY);
   }
+  lookupAtEventRef.current = lookupAtEvent;
 
   function lookupAtClient(cx: number, cy: number): HoverInfo | null {
     if (showOriginal || !displayImageData) return null;
@@ -1597,7 +1645,12 @@ export function PreviewCanvas({
       const info = lookupAtEvent(e);
       if (info) {
         onPaintBlockChange({ csId: info.csId, blockId: info.blockId, baseId: info.baseId, shade: info.shade, displayName: info.displayName, colourName: info.colourName });
-        onToolChange('brush');
+        if (e.shiftKey) {
+          isEyedropperSamplingRef.current = true;
+          eyedropperDragRef.current = { px: info.pixelX, py: info.pixelY };
+        } else {
+          onToolChange('brush');
+        }
       }
       return;
     }

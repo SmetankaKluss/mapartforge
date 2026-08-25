@@ -69,11 +69,6 @@ function formatPrivacy(privacy: CompanionLibraryItem['privacy'], t: (ru: string,
   return t('По ссылке', 'Unlisted');
 }
 
-function formatShortId(value: string): string {
-  if (value.length <= 18) return value;
-  return `${value.slice(0, 8)}...${value.slice(-6)}`;
-}
-
 function artThumbLabel(art: CompanionLibraryItem): string {
   return `${art.grid.wide}x${art.grid.tall}`;
 }
@@ -238,9 +233,7 @@ function TelegramLinkCard(props: {
       <h2>Telegram</h2>
       {telegramLinked ? (
         <>
-          <p className="companion-muted">
-            {t('Привязан', 'Linked')} {profile?.telegramUsername ? `@${profile.telegramUsername}` : `Telegram ID ${profile?.telegramId}`}.
-          </p>
+          <p className="companion-muted">{profile?.telegramUsername ? `@${profile.telegramUsername}` : t('Привязан', 'Linked')}</p>
           <div className="companion-actions">
             <button onClick={() => void unlinkTelegram()} disabled={busy}>
               {busy ? t('Отвязываю...', 'Unlinking...') : t('Отвязать Telegram', 'Unlink Telegram')}
@@ -249,12 +242,11 @@ function TelegramLinkCard(props: {
         </>
       ) : telegramEnabled && telegramDomainAllowed ? (
         <>
-          <p className="companion-muted">{t('Привяжи Telegram к этому профилю. Мод всё равно входит через код устройства, а основной вход на сайте остаётся через почту.', 'Link Telegram to this profile. The mod still signs in through a device code, while the main site login remains email-based.')}</p>
           <div id={widgetHostId} className="companion-telegram-widget" />
           {busy && <p className="companion-muted">{t('Проверяю Telegram...', 'Checking Telegram...')}</p>}
         </>
       ) : (
-        <p className="companion-muted">{t('Telegram можно привязать после входа на официальном сайте MapKluss.', 'Telegram can be linked after signing in on the official MapKluss site.')}</p>
+        <p className="companion-muted">{t('Недоступен', 'Unavailable')}</p>
       )}
     </section>
   );
@@ -306,24 +298,13 @@ function TelegramLoginCard(props: {
     };
   }, [handleTelegramLogin, telegramDomainAllowed, telegramEnabled]);
 
+  if (!telegramEnabled || !telegramDomainAllowed) return null;
+
   return (
     <div className="companion-telegram-login">
-      <div className="companion-section-head">
-        <div>
-          <h3>Telegram</h3>
-          <p className="companion-muted">
-            {telegramEnabled
-              ? t('Если Telegram уже привязан к аккаунту, можно войти без письма.', 'If Telegram is already linked to your account, you can sign in without email.')
-              : t('Пока используй вход по почте.', 'Use email login for now.')}
-          </p>
-        </div>
-      </div>
-      {telegramEnabled && telegramDomainAllowed ? (
-        <>
-          <div id={widgetHostId} className="companion-telegram-widget" />
-          {busy && <p className="companion-muted">{t('Вхожу через Telegram...', 'Signing in with Telegram...')}</p>}
-        </>
-      ) : null}
+      <h3>Telegram</h3>
+      <div id={widgetHostId} className="companion-telegram-widget" />
+      {busy && <p className="companion-muted">{t('Вхожу...', 'Signing in...')}</p>}
     </div>
   );
 }
@@ -439,7 +420,6 @@ export function CompanionCloudPage() {
   const useMockCloud = import.meta.env.DEV && searchParams.get('cloudMock') === '1';
   const emailCooldownRemaining = Math.max(0, Math.ceil((emailCooldownUntil - emailCooldownNow) / 1000));
   const emailCooldownActive = emailCooldownRemaining > 0;
-  const libraryArtCount = new Set([...arts, ...favorites].map(item => item.artId)).size;
 
   useEffect(() => {
     applyPageMeta({
@@ -727,69 +707,21 @@ export function CompanionCloudPage() {
 
       <main className="companion-page companion-cloud-workbench">
         <header className="companion-header companion-workbench-header">
-          <div>
-            <h1>{t('Облако и мод', 'Cloud and mod')}</h1>
-            <p>{t('Аккаунт MapKluss, папка артов, мод Minecraft Companion, импорты и коллекции.', 'MapKluss account, art folder, Minecraft Companion mod, imports, and collections.')}</p>
-          </div>
-          <div className="companion-workbench-status" aria-label={t('Статус облака', 'Cloud status')}>
-            <span>{userId ? t('Вход выполнен', 'Signed in') : t('Вход не выполнен', 'Signed out')}</span>
-            <strong>{userId ? (userEmail ?? t('Аккаунт MapKluss', 'MapKluss account')) : t('Гостевой режим', 'Guest mode')}</strong>
-          </div>
+          <h1>{userId ? t('Папка артов', 'Art folder') : t('Облако', 'Cloud')}</h1>
         </header>
 
       {!userId ? (
-        <section className="companion-cloud-guest" aria-labelledby="cloud-guest-title">
-          <div className="companion-guest-overview">
-            <div className="companion-guest-purpose">
-              <IconGlyph icon={mkIcons.cloud} />
-              <span>{t('Единый аккаунт MapKluss', 'One MapKluss account')}</span>
-            </div>
-            <h2 id="cloud-guest-title">{t('Продолжай арт между браузером и Minecraft', 'Continue your art between the browser and Minecraft')}</h2>
-            <p className="companion-guest-lead">
-              {t('Войди один раз, чтобы сохранять проекты, открывать их в моде и не терять прогресс стройки.', 'Sign in once to save projects, open them in the mod, and keep your build progress in sync.')}
-            </p>
-
-            <ol className="companion-guest-flow">
-              <li>
-                <span className="companion-guest-flow__icon"><IconGlyph icon={mkIcons.projectEditor} /></span>
-                <div>
-                  <strong>{t('Создай в редакторе', 'Create in the editor')}</strong>
-                  <span>{t('Настрой палитру, дизеринг и размер карты.', 'Tune the palette, dithering, and map size.')}</span>
-                </div>
-              </li>
-              <li>
-                <span className="companion-guest-flow__icon"><IconGlyph icon={mkIcons.cloud} /></span>
-                <div>
-                  <strong>{t('Сохрани в облако', 'Save to Cloud')}</strong>
-                  <span>{t('Версии, избранное и коллекции останутся в одном профиле.', 'Keep versions, favorites, and collections in one profile.')}</span>
-                </div>
-              </li>
-              <li>
-                <span className="companion-guest-flow__icon"><IconGlyph icon={mkIcons.map} /></span>
-                <div>
-                  <strong>{t('Продолжи в Minecraft', 'Continue in Minecraft')}</strong>
-                  <span>{t('Companion покажет арты, схемы, материалы и трекер стройки.', 'Companion brings your art, schematics, materials, and build tracker into the game.')}</span>
-                </div>
-              </li>
-            </ol>
-
-            <div className="companion-guest-actions">
-              <a className="public-action public-action--primary" href="/"><IconGlyph icon={mkIcons.projectEditor} /> {t('Открыть редактор', 'Open editor')}</a>
-              <a className="public-action" href="/device"><IconGlyph icon={mkIcons.login} /> {t('Подключить мод', 'Connect mod')}</a>
-            </div>
-          </div>
-
+        <section className="companion-cloud-guest companion-cloud-guest--compact" aria-labelledby="cloud-guest-title">
           <div className="companion-guest-access">
             <section className="companion-panel companion-login-primary" id="cloud-sign-in">
               <div className="companion-guest-auth-title">
                 <span className="companion-guest-auth-icon"><IconGlyph icon={mkIcons.login} /></span>
                 <div>
-                  <h2>{t('Войти в MapKluss', 'Sign in to MapKluss')}</h2>
-                  <p className="companion-muted">{t('Пароль не нужен — пришлём одноразовую ссылку на почту.', 'No password needed—we will send a one-time link to your email.')}</p>
+                  <h2 id="cloud-guest-title">{t('Вход', 'Sign in')}</h2>
                 </div>
               </div>
               <label className="companion-field">
-              <span>{t('Электронная почта', 'Email address')}</span>
+              <span>{t('Почта', 'Email')}</span>
               <div className="companion-inline-form">
                 <input
                   value={email}
@@ -805,39 +737,28 @@ export function CompanionCloudPage() {
                 </button>
               </div>
             </label>
-              <p className="companion-guest-auth-note"><IconGlyph icon={mkIcons.lock} /> {t('Ссылка одноразовая и ведёт обратно на MapKluss.', 'The link is single-use and returns you directly to MapKluss.')}</p>
             <TelegramLoginCard onLoggedIn={() => { void reload(); }} onError={setError} />
-            {emailSent && <p className="companion-status" role="status">{t('Проверь почту и открой ссылку для входа.', 'Check your email and open the sign-in link.')}</p>}
+            {emailSent && <p className="companion-status" role="status">{t('Ссылка отправлена', 'Link sent')}</p>}
             {error && <p className="companion-status companion-status--error companion-login-error" role="alert">{error}</p>}
             </section>
-
             <CompanionModDownloadPanel
               selectedVersion={selectedModVersion}
               onSelectedVersionChange={setSelectedModVersion}
             />
+            <div className="companion-cloud-guest-links">
+              <a href="/"><IconGlyph icon={mkIcons.projectEditor} /> {t('Редактор', 'Editor')}</a>
+              <a href="/device"><IconGlyph icon={mkIcons.login} /> {t('Вход в моде', 'Mod login')}</a>
+            </div>
           </div>
         </section>
       ) : (
         <>
-          <section className="companion-panel companion-cloud-flow-panel">
-            <div className="companion-editor-banner-copy">
-              <strong>{t('Рабочий поток MapKluss', 'MapKluss workflow')}</strong>
-              <span>{t('Создавай арт в редакторе, сохраняй его в папку, а мод подтянет избранное, схемы и прогресс стройки.', 'Create art in the editor, save it to your folder, and the mod will sync favorites, schematics, and build progress.')}</span>
-            </div>
-            <div className="companion-workflow-actions">
-              <a href="/">{t('Редактор', 'Editor')}</a>
-              <a href="/?cloudFolder=1">{t('Папка артов', 'Art folder')}</a>
-              <a href="/device">{t('Вход мода', 'Mod login')}</a>
-            </div>
-          </section>
-
           <section className="companion-cloud-layout">
             <aside className="companion-cloud-rail">
           <section className="companion-panel companion-account-bar companion-cloud-account-panel">
             <div className="companion-account-identity">
               <h2>{t('Аккаунт', 'Account')}</h2>
               {userEmail && <p className="companion-muted">{userEmail}</p>}
-              <p className="companion-muted companion-user-id" title={userId}>{t('Профиль', 'Profile')}: {formatShortId(userId)}</p>
               {profile?.displayName && profile.displayName !== userEmail && <p className="companion-muted">{profile.displayName}</p>}
             </div>
             <div className="companion-account-methods" aria-label="Connected auth methods">
@@ -857,37 +778,6 @@ export function CompanionCloudPage() {
 
             <div className="companion-cloud-main">
 
-          <section className="companion-panel companion-mod-panel">
-            <div className="companion-section-head">
-              <div>
-                <h2>{t('Мод Minecraft', 'Minecraft mod')}</h2>
-                <p className="companion-muted">{t('Сессия мода, сканы из игры, папка сохранённых артов и синхронизация файлов.', 'Mod session, in-game scans, saved art folder, and file sync.')}</p>
-              </div>
-            </div>
-            <div className="companion-mod-grid">
-              <article>
-                <span>{t('Вход', 'Login')}</span>
-                <strong>{t('Код', 'Code')}</strong>
-                <small>{t('Почта / Telegram', 'Email / Telegram')}</small>
-              </article>
-              <article>
-                <span>{t('Библиотека', 'Library')}</span>
-                <strong>{libraryArtCount}</strong>
-                <small>{t('уникальных артов', 'unique arts')}</small>
-              </article>
-              <article>
-                <span>{t('Импорты', 'Imports')}</span>
-                <strong>{imports.length}</strong>
-                <small>{t('сканы из Minecraft', 'Minecraft scans')}</small>
-              </article>
-              <article>
-                <span>{t('Файлы', 'Files')}</span>
-                <strong>Litematic</strong>
-                <small>{t('установлены из мода', 'installed by mod')}</small>
-              </article>
-            </div>
-          </section>
-
           {usage && (
             <section className="companion-summary-strip">
               <div className="companion-summary-card">
@@ -903,14 +793,6 @@ export function CompanionCloudPage() {
                 <div className="companion-usage-bar" aria-hidden="true">
                   <span style={{ width: `${usageRatio(usage.storageUsedBytes, usage.storageLimitBytes)}%` }} />
                 </div>
-              </div>
-              <div className="companion-summary-card">
-                <span>{t('Коллекции', 'Collections')}</span>
-                <strong>{collections.length}</strong>
-              </div>
-              <div className="companion-summary-card">
-                <span>{t('Импорты', 'Imports')}</span>
-                <strong>{imports.length}</strong>
               </div>
             </section>
           )}
@@ -960,26 +842,20 @@ export function CompanionCloudPage() {
           <section className="companion-panel companion-library-panel">
             <div className="companion-section-head">
               <div>
-                <h2>{t('Библиотека для мода', 'Mod library')}</h2>
-                <p className="companion-muted">
-                  {t('Здесь лежат арты, которые видит Minecraft Companion. Создавать и обновлять арт лучше прямо из редактора.', 'These are the arts visible to Minecraft Companion. Create and update art directly from the editor.')}
-                </p>
-                <p className="companion-muted">
-                  {t(`Найдено: ${filteredArts.length} своих / ${filteredFavorites.length} избранных / ${filteredRecent.length} недавних.`, `Found: ${filteredArts.length} own / ${filteredFavorites.length} favorites / ${filteredRecent.length} recent.`)}
-                </p>
+                <h2>{t('Арты', 'Arts')}</h2>
               </div>
               <div className="companion-tab-row">
-                <button className={libraryTab === 'arts' ? 'is-active' : ''} aria-pressed={libraryTab === 'arts'} onClick={() => setLibraryTab('arts')}>{t('Мои арты', 'My arts')}</button>
-                <button className={libraryTab === 'favorites' ? 'is-active' : ''} aria-pressed={libraryTab === 'favorites'} onClick={() => setLibraryTab('favorites')}>{t('Избранное', 'Favorites')}</button>
-                <button className={libraryTab === 'recent' ? 'is-active' : ''} aria-pressed={libraryTab === 'recent'} onClick={() => setLibraryTab('recent')}>{t('Недавние', 'Recent')}</button>
+                <button className={libraryTab === 'arts' ? 'is-active' : ''} aria-pressed={libraryTab === 'arts'} onClick={() => setLibraryTab('arts')}>{t(`Мои ${filteredArts.length}`, `Mine ${filteredArts.length}`)}</button>
+                <button className={libraryTab === 'favorites' ? 'is-active' : ''} aria-pressed={libraryTab === 'favorites'} onClick={() => setLibraryTab('favorites')}>{t(`Избранное ${filteredFavorites.length}`, `Favorites ${filteredFavorites.length}`)}</button>
+                <button className={libraryTab === 'recent' ? 'is-active' : ''} aria-pressed={libraryTab === 'recent'} onClick={() => setLibraryTab('recent')}>{t(`Недавние ${filteredRecent.length}`, `Recent ${filteredRecent.length}`)}</button>
               </div>
             </div>
             <label className="companion-field">
-              <span>{t('Поиск в библиотеке', 'Search library')}</span>
               <div className="companion-inline-form">
                 <input
                   value={libraryQuery}
                   onChange={event => setLibraryQuery(event.target.value)}
+                  aria-label={t('Поиск артов', 'Search arts')}
                   placeholder={t('Название, размер или режим', 'Title, size, or mode')}
                   maxLength={80}
                   type="search"
@@ -996,13 +872,12 @@ export function CompanionCloudPage() {
             <div className="companion-panel">
               <h2>{t('Коллекции', 'Collections')}</h2>
               <label className="companion-field">
-                <span>{t('Название новой коллекции', 'New collection name')}</span>
                 <div className="companion-inline-form">
                   <input
                     value={newCollectionName}
                     onChange={event => setNewCollectionName(event.target.value)}
                     aria-label={t('Название новой коллекции', 'New collection name')}
-                    placeholder={t('Например, стены сервера', 'For example, server walls')}
+                  placeholder={t('Новая коллекция', 'New collection')}
                     maxLength={80}
                   />
                   <button onClick={() => void createCollection()} disabled={creatingCollection || !newCollectionName.trim()}>{t('Создать', 'Create')}</button>
@@ -1023,12 +898,6 @@ export function CompanionCloudPage() {
 
             <div className="companion-panel">
               <h2>{t('Последние импорты', 'Recent imports')}</h2>
-              <p className="companion-muted">
-                {t(
-                  'Открой скан как новый проект, проверь его в редакторе и сохрани в облако. Ненужную запись импорта можно удалить отдельно.',
-                  'Open a scan as a new project, review it in the editor, then save it to Cloud. You can delete the import record separately.',
-                )}
-              </p>
               <div className="companion-filter-row">
                 <button className={importFilter === 'all' ? 'is-active' : ''} aria-pressed={importFilter === 'all'} onClick={() => setImportFilter('all')}>{t('Все', 'All')}</button>
                 <button className={importFilter === 'needs_save' ? 'is-active' : ''} aria-pressed={importFilter === 'needs_save'} onClick={() => setImportFilter('needs_save')}>{t('Нужно сохранить', 'Needs save')}</button>

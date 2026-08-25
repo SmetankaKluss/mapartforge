@@ -19,7 +19,7 @@ import { buildComputedPalette, DEFAULT_KLUSS_PARAMS } from './lib/dithering';
 import type { ComputedPalette } from './lib/dithering';
 import { gridPixelWidth, gridPixelHeight, gridScale } from './lib/types';
 import type { MapGrid } from './lib/types';
-import { buildPaletteFromSelection, DEFAULT_SELECTION } from './lib/paletteBlocks';
+import { buildPaletteFromSelection, COLOUR_ROWS, DEFAULT_SELECTION } from './lib/paletteBlocks';
 import type { BlockSelection } from './lib/paletteBlocks';
 import { MINECRAFT_VERSIONS, getVersionLabel, type MinecraftVersion } from './lib/versionPresets';
 import { sanitizeSelectionForPlatform } from './lib/platformMode';
@@ -114,7 +114,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-text-tool-1-29-3-2026-08-23',
+  id: 'mapkluss-dense-workbench-1-31-0-2026-08-24',
   url: 'https://t.me/mapkluss',
 };
 
@@ -376,8 +376,25 @@ export default function App() {
   const [editorMode, setEditorMode] = useState<'simple' | 'artist'>(
     () => (localStorage.getItem('mapartforge-editor-mode') as 'simple' | 'artist' | null) ?? 'simple',
   );
+  // The compact workbench is the standard editor layout. Side panels may still
+  // be resized independently without ever taking the canvas below its safe width.
+  const workbenchMode = true;
+  const [panelWidths, setPanelWidths] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('mapkluss-editor-panel-widths') ?? '{}') as Partial<{ left: number; right: number }>;
+      return {
+        left: typeof stored.left === 'number' ? stored.left : 300,
+        right: typeof stored.right === 'number' ? stored.right : 340,
+      };
+    } catch {
+      return { left: 300, right: 340 };
+    }
+  });
+  const panelResizeRef = useRef<{ side: 'left' | 'right'; startX: number; startWidth: number; otherWidth: number; pointerId: number } | null>(null);
+  const [paletteFocus, setPaletteFocus] = useState<{ csId: number; blockId: number; token: number } | null>(null);
   const [splitPos, setSplitPos] = useState(50);
-  const [showSplitLine, setShowSplitLine] = useState(true);
+  // The comparison divider is useful on demand, but must never cover a fresh canvas.
+  const [showSplitLine, setShowSplitLine] = useState(false);
   const [showGrid, setShowGrid]         = useState(false);
   const [zoom, setZoom]                 = useState(100);
   const VALID_VERSIONS = MINECRAFT_VERSIONS;
@@ -771,6 +788,76 @@ export default function App() {
     setBuildTechnique(previous => coerceBuildTechniqueForPlatform(previous, platformMode));
   }, [platformMode]);
   useEffect(() => { localStorage.setItem('mapartforge-editor-mode', editorMode); }, [editorMode]);
+  useEffect(() => { localStorage.setItem('mapkluss-editor-panel-widths', JSON.stringify(panelWidths)); }, [panelWidths]);
+  useEffect(() => {
+    const keepCanvasReachable = () => {
+      if (window.innerWidth < 1100) return;
+      setPanelWidths(current => {
+        const minimumCanvas = 440;
+        const resizers = 16;
+        const availablePanels = window.innerWidth - minimumCanvas - resizers;
+        const leftMaximum = Math.max(280, Math.min(520, availablePanels - 300));
+        const left = Math.max(280, Math.min(leftMaximum, current.left));
+        const rightMaximum = Math.max(300, Math.min(560, availablePanels - left));
+        const right = Math.max(300, Math.min(rightMaximum, current.right));
+        return left === current.left && right === current.right ? current : { left, right };
+      });
+    };
+    window.addEventListener('resize', keepCanvasReachable);
+    keepCanvasReachable();
+    return () => window.removeEventListener('resize', keepCanvasReachable);
+  }, []);
+  const updatePanelWidth = useCallback((side: 'left' | 'right', requestedWidth: number, otherWidth: number) => {
+    const minimum = side === 'left' ? 280 : 300;
+    const maximum = side === 'left' ? 520 : 560;
+    const minimumCanvas = 440;
+    const resizers = 16;
+    const canvasSafeMaximum = window.innerWidth - otherWidth - minimumCanvas - resizers;
+    return Math.max(minimum, Math.min(maximum, canvasSafeMaximum, requestedWidth));
+  }, []);
+  const handlePanelResizeStart = useCallback((side: 'left' | 'right', event: React.PointerEvent<HTMLDivElement>) => {
+    if (window.innerWidth < 1100) return;
+    const currentWidth = side === 'left' ? panelWidths.left : panelWidths.right;
+    const otherWidth = side === 'left' ? panelWidths.right : panelWidths.left;
+    panelResizeRef.current = { side, startX: event.clientX, startWidth: currentWidth, otherWidth, pointerId: event.pointerId };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    document.body.classList.add('panel-resizing');
+  }, [panelWidths]);
+  const handlePanelResizeMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const session = panelResizeRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const delta = event.clientX - session.startX;
+    const requestedWidth = session.side === 'left'
+      ? session.startWidth + delta
+      : session.startWidth - delta;
+    const nextWidth = updatePanelWidth(session.side, requestedWidth, session.otherWidth);
+    setPanelWidths(current => session.side === 'left'
+      ? { ...current, left: nextWidth }
+      : { ...current, right: nextWidth });
+  }, [updatePanelWidth]);
+  const handlePanelResizeEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (panelResizeRef.current?.pointerId !== event.pointerId) return;
+    panelResizeRef.current = null;
+    document.body.classList.remove('panel-resizing');
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }, []);
+  const handlePanelResizeKeyDown = useCallback((side: 'left' | 'right', event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const min = side === 'left' ? 280 : 300;
+    const max = side === 'left' ? 520 : 560;
+    const step = event.shiftKey ? 32 : 16;
+    setPanelWidths(current => {
+      const currentWidth = side === 'left' ? current.left : current.right;
+      const otherWidth = side === 'left' ? current.right : current.left;
+      const direction = side === 'left'
+        ? (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0)
+        : (event.key === 'ArrowLeft' ? 1 : event.key === 'ArrowRight' ? -1 : 0);
+      const requested = event.key === 'Home' ? min : event.key === 'End' ? max : currentWidth + direction * step;
+      const nextWidth = updatePanelWidth(side, requested, otherWidth);
+      return side === 'left' ? { ...current, left: nextWidth } : { ...current, right: nextWidth };
+    });
+  }, [updatePanelWidth]);
   useEffect(() => {
     if (editorMode === 'artist') return;
     if (activeTool === 'move' || activeTool === 'select-rect' || activeTool === 'select-lasso'
@@ -916,7 +1003,7 @@ export default function App() {
   const activeLayerLocked = Boolean(activeLayer?.locked);
   const activeToolUi = (() => {
     switch (activeTool) {
-      case 'eyedropper': return { icon: mkIcons.eyedropper, name: t('Пипетка', 'Eyedropper'), key: 'E', hint: t('Выбери цвет прямо с арта.', 'Pick a color directly from the art.') };
+      case 'eyedropper': return { icon: mkIcons.eyedropper, name: t('Пипетка', 'Eyedropper'), key: 'E', hint: t('Клик: взять блок. Shift + ЛКМ: брать по ходу курсора.', 'Click: sample a block. Shift + LMB: sample along the cursor.') };
       case 'brush': return { icon: mkIcons.brush, name: t('Кисть', 'Brush'), key: 'B', hint: t('Рисуй выбранным блоком. Shift + клик — прямая линия.', 'Paint with the selected block. Shift + click draws a straight line.') };
       case 'fill': return { icon: mkIcons.fill, name: t('Заливка', 'Fill'), key: 'F', hint: t('Заполни связанную область выбранным блоком.', 'Fill a connected area with the selected block.') };
       case 'eraser': return { icon: mkIcons.eraser, name: t('Ластик', 'Eraser'), key: 'X', hint: t('Удали пиксели активного слоя.', 'Erase pixels from the active layer.') };
@@ -930,6 +1017,7 @@ export default function App() {
       default: return { icon: mkIcons.select, name: t('Курсор', 'Cursor'), key: 'Esc', hint: t('Клик — действия с блоком, перетаскивание — навигация по арту.', 'Click for block actions, drag to navigate the art.') };
     }
   })();
+  const toolUsesSharedPaintBlock = activeTool === 'eyedropper' || activeTool === 'brush' || activeTool === 'fill';
 
   // exportRef is updated below, after compositeImageData is computed
 
@@ -1511,6 +1599,7 @@ export default function App() {
 
   const handleRemoveBlock = useCallback((csId: number) => {
     pushToHistory();
+    setPaletteFocus(current => current?.csId === csId ? null : current);
     const next: BlockSelection = { ...blockSelection, [csId]: [] };
     setBlockSelection(next);
     const shades = mapMode === '2d' ? [1] : [0, 1, 2];
@@ -1520,6 +1609,31 @@ export default function App() {
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
   }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
+
+  const handleReplaceBlock = useCallback((previousCsId: number, previousBlockId: number, nextCsId: number, nextBlockId: number) => {
+    if (previousCsId === nextCsId && previousBlockId === nextBlockId) return;
+    const targetRow = COLOUR_ROWS.find(candidate => candidate.csId === nextCsId);
+    if (!targetRow?.blocks.some(block => block.blockId === nextBlockId)) return;
+    pushToHistory();
+    setPaletteFocus({ csId: nextCsId, blockId: nextBlockId, token: Date.now() });
+    const next: BlockSelection = {
+      ...blockSelection,
+      [previousCsId]: previousCsId === nextCsId ? [nextBlockId] : [],
+      [nextCsId]: [nextBlockId],
+    };
+    setBlockSelection(next);
+    trackEvent('material_replaced', { color_group: previousCsId, previous_block_id: previousBlockId, next_color_group: nextCsId, next_block_id: nextBlockId });
+    const shades = mapMode === '2d' ? [1] : [0, 1, 2];
+    const newPalette = buildComputedPalette(buildPaletteFromSelection(next, shades, minecraftVersion, platformMode), colorMatch);
+    if (sourceImage) {
+      processTargetLayerIdRef.current = latestRef.current.activeLayerId;
+      runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
+    }
+  }, [blockSelection, mapMode, sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, pushToHistory, runProcess]);
+
+  const handleFocusPaletteBlock = useCallback((csId: number, blockId: number) => {
+    setPaletteFocus({ csId, blockId, token: Date.now() });
+  }, []);
 
   const handleImageUpdate = useCallback((data: ImageData) => {
     if (!ensureActiveLayerEditable()) return;
@@ -3065,12 +3179,12 @@ export default function App() {
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline={t('НОВЫЙ ИНСТРУМЕНТ «ТЕКСТ»', 'NEW TEXT TOOL')}
-            detail={t('ШРИФТЫ · ЦВЕТ · КОНТУР · ТРАНСФОРМАЦИИ', 'FONTS · COLOUR · OUTLINE · TRANSFORMS')}
+            headline={t('ПЛОТНЫЙ РАБОЧИЙ РЕЖИМ', 'DENSE WORKBENCH MODE')}
+            detail={t('МАТЕРИАЛЫ РЯДОМ С ПАЛИТРОЙ · БЫСТРАЯ ПИПЕТКА', 'MATERIALS NEXT TO PALETTE · FAST EYEDROPPER')}
           />
           <span className="update-banner-sr">
-            {t('В редакторе появился новый инструмент текста: шрифты, цвет, контур и свободное перемещение.',
-              'The editor now has a text tool with fonts, colour, outline, and free transforms.')}
+            {t('В редакторе появился добровольный плотный рабочий режим: быстрые материалы рядом с палитрой и серия выборок пипеткой.',
+              'The editor now has an optional dense workbench mode: quick materials beside the palette and repeat eyedropper sampling.')}
           </span>
           <a
             className="update-banner-link"
@@ -3131,8 +3245,9 @@ export default function App() {
       )}
 
       <div
-        className={`app-body${leftPanelCollapsed ? ' left-panel-collapsed' : ''}${rightPanelCollapsed ? ' right-panel-collapsed' : ''}`}
+        className={`app-body${leftPanelCollapsed ? ' left-panel-collapsed' : ''}${rightPanelCollapsed ? ' right-panel-collapsed' : ''} workbench-mode`}
         data-tab={mobileTab}
+        style={{ '--panel-left': `${panelWidths.left}px`, '--panel-right': `${panelWidths.right}px` } as React.CSSProperties}
       >
         {/* ── LEFT PANEL ── */}
         <aside id="editor-settings-panel" className="panel panel-left" data-tour="settings-panel">
@@ -3233,6 +3348,113 @@ export default function App() {
             </div>
           </div>
           <div className="panel-footer">
+            <div className="workspace-quick-actions" aria-label={t('Рабочие действия редактора', 'Editor workspace actions')}>
+              {hasContent && (
+                <>
+                  <button
+                    className="workspace-action-btn"
+                    title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
+                    aria-label={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
+                    onClick={() => updateCanvasZoom(100)}
+                  ><IconGlyph icon={mkIcons.zoomReset} /></button>
+                  {!compareMode && (
+                    <button
+                      className={`workspace-action-btn${textureMode === 'block' ? ' active' : ''}`}
+                      onClick={() => setTextureMode(mode => mode === 'block' ? 'pixel' : 'block')}
+                      title={t('Текстуры блоков', 'Block textures')}
+                      aria-label={t('Текстуры блоков', 'Block textures')}
+                      aria-pressed={textureMode === 'block'}
+                    ><IconGlyph icon={mkIcons.blockTextures} /></button>
+                  )}
+                  <button
+                    className={`workspace-action-btn${showGrid ? ' active' : ''}`}
+                    onClick={() => setShowGrid(value => !value)}
+                    title={t('Сетка', 'Grid')}
+                    aria-label={t('Сетка', 'Grid')}
+                    aria-pressed={showGrid}
+                  ><IconGlyph icon={mkIcons.grid} /></button>
+                  <button
+                    className={`workspace-action-btn${compareMode ? ' active' : ''}`}
+                    onClick={() => handleCompareModeChange(!compareMode)}
+                    title={t('Сравнение', 'Comparison')}
+                    aria-label={t('Сравнение', 'Comparison')}
+                    aria-pressed={compareMode}
+                  ><IconGlyph icon={mkIcons.compare} /></button>
+                  <button
+                    className={`workspace-action-btn${showSplitLine ? ' active' : ''}`}
+                    title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
+                    aria-label={t('Полоса сравнения', 'Comparison split')}
+                    onClick={() => setShowSplitLine(value => !value)}
+                    aria-pressed={showSplitLine}
+                  ><IconGlyph icon={mkIcons.compare} /></button>
+                  <button
+                    className="workspace-action-btn"
+                    title={t('Сбросить разделитель', 'Reset split to center')}
+                    aria-label={t('Сбросить разделитель', 'Reset split to center')}
+                    onClick={() => setSplitPos(50)}
+                  ><IconGlyph icon={mkIcons.layoutCenter} /></button>
+                  <button
+                    className="workspace-action-btn"
+                    onClick={() => setShowPerspective(true)}
+                    title={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}
+                    aria-label={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}
+                  ><IconGlyph icon={mkIcons.view} /></button>
+                </>
+              )}
+              <button
+                className={`workspace-action-btn${showShortcuts ? ' active' : ''}`}
+                onClick={() => setShowShortcuts(value => !value)}
+                title={t('Клавиатурные сочетания', 'Keyboard shortcuts')}
+                aria-label={t('Клавиатурные сочетания', 'Keyboard shortcuts')}
+                aria-expanded={showShortcuts}
+              ><IconGlyph icon={mkIcons.keyboard} /></button>
+              <button
+                className={`workspace-action-btn workspace-action-btn-artist${editorMode === 'artist' ? ' active' : ''}`}
+                onClick={() => {
+                  setEditorMode(mode => {
+                    const next = mode === 'simple' ? 'artist' : 'simple';
+                    trackEvent('artist_mode_toggled', { enabled: next === 'artist' });
+                    return next;
+                  });
+                }}
+                title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
+                aria-label={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника', 'Artist mode')}
+                aria-pressed={editorMode === 'artist'}
+              ><IconGlyph icon={mkIcons.artist} /></button>
+            </div>
+            {showShortcuts && (
+              <div className="shortcuts-panel">
+                <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
+                <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>{t('Отменить', 'Undo')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>{t('Повторить', 'Redo')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>{t('Экспорт PNG', 'Export PNG')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>{t('Экспорт .litematic', 'Export .litematic')}</span></div>
+                <div className="shortcuts-divider" />
+                <div className="shortcut-row"><kbd>Z</kbd><span>{t('Сетка', 'Grid')}</span></div>
+                <div className="shortcut-row"><kbd>O</kbd><span>{t('Сброс разделителя', 'Reset split')}</span></div>
+                <div className="shortcut-row"><kbd>C</kbd><span>{t('Режим сравнения', 'Compare mode')}</span></div>
+                <div className="shortcut-row"><kbd>1 – 9</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
+                <div className="shortcuts-divider" />
+                <div className="shortcut-row"><kbd>E</kbd><span>{t('Пипетка', 'Eyedropper')}</span></div>
+                <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
+                <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
+                <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
+                <div className="shortcut-row"><kbd>T</kbd><span>{t('Текст', 'Text')}</span></div>
+                <div className="shortcut-row"><kbd>V</kbd><span>{t('Перемещение слоя', 'Move layer')}</span></div>
+                <div className="shortcut-row"><kbd>R</kbd><span>{t('Прямоугольное выделение', 'Rectangular selection')}</span></div>
+                <div className="shortcut-row"><kbd>L</kbd><span>{t('Лассо', 'Lasso')}</span></div>
+                <div className="shortcut-row"><kbd>W</kbd><span>{t('Волшебная палочка', 'Magic wand')}</span></div>
+                <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
+                <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
+                <div className="shortcut-row"><kbd>Shift + клик</kbd><span>{t('Прямая линия кистью', 'Straight brush line')}</span></div>
+                <div className="shortcut-row"><kbd>Shift + ЛКМ</kbd><span>{t('Пипетка по ходу курсора', 'Sample along the cursor')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+A</kbd><span>{t('Выделить всё', 'Select all')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+D</kbd><span>{t('Снять выделение', 'Deselect')}</span></div>
+                <div className="shortcut-row"><kbd>Ctrl+I</kbd><span>{t('Инвертировать выделение', 'Invert selection')}</span></div>
+                <div className="shortcut-row"><kbd>Space + ЛКМ</kbd><span>{t('Временно перемещать холст', 'Temporarily pan canvas')}</span></div>
+                <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
+              </div>
+            )}
             <button
               className={`reset-defaults-btn${resetDefaultsPending ? ' pending' : ''}`}
               disabled={processing}
@@ -3252,6 +3474,19 @@ export default function App() {
             </button>
           </div>
         </aside>
+
+        <div
+          className="panel-resizer panel-resizer-left"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('Изменить ширину панели настроек', 'Resize settings panel')}
+          tabIndex={0}
+          onPointerDown={event => handlePanelResizeStart('left', event)}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={handlePanelResizeEnd}
+          onPointerCancel={handlePanelResizeEnd}
+          onKeyDown={event => handlePanelResizeKeyDown('left', event)}
+        />
 
         {/* ── CENTER PANEL ── */}
         <main className="panel panel-center" ref={previewSectionRef}>
@@ -3440,37 +3675,6 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW TOGGLES — only when content */}
-            {hasContent && (
-              <>
-                <div className="toolbar-sep" />
-                <div className="toolbar-group">
-                  <button
-                    className="tool-btn tool-btn-zoom-reset"
-                    title={t('Сбросить масштаб до 100%', 'Reset zoom to 100%')}
-                    onClick={() => updateCanvasZoom(100)}
-                  ><IconGlyph icon={mkIcons.zoomReset} /></button>
-                  <button
-                    className={`tool-btn${showSplitLine ? ' active' : ''}`}
-                    title={t('Показать/скрыть полоску сравнения', 'Show/hide split line')}
-                    onClick={() => setShowSplitLine(v => !v)}
-                    aria-label={t('Полоса сравнения', 'Comparison split')} aria-pressed={showSplitLine}
-                  ><IconGlyph icon={mkIcons.compare} /></button>
-                  <button
-                    className="tool-btn"
-                    title={t('Сбросить разделитель', 'Reset split to center')}
-                    onClick={() => setSplitPos(50)}
-                  ><IconGlyph icon={mkIcons.layoutCenter} /></button>
-                  {!compareMode && (
-                    <button className={`tool-btn${textureMode === 'block' ? ' active' : ''}`} onClick={() => setTextureMode(m => m === 'block' ? 'pixel' : 'block')} title={t('Текстуры блоков', 'Block textures')} aria-label={t('Текстуры блоков', 'Block textures')} aria-pressed={textureMode === 'block'}><IconGlyph icon={mkIcons.blockTextures} /></button>
-                  )}
-                  <button className={`tool-btn${compareMode ? ' active' : ''}`} onClick={() => handleCompareModeChange(!compareMode)} title={t('Сравнение', 'Comparison')} aria-label={t('Сравнение', 'Comparison')} aria-pressed={compareMode}><IconGlyph icon={mkIcons.compare} /></button>
-                  <button className={`tool-btn${showGrid ? ' active' : ''}`} onClick={() => setShowGrid(g => !g)} title={t('Сетка', 'Grid')} aria-label={t('Сетка', 'Grid')} aria-pressed={showGrid}><IconGlyph icon={mkIcons.grid} /></button>
-                  <button className="tool-btn" onClick={() => setShowPerspective(true)} title={t('Предпросмотр схематики и сцены', 'Schematic and scene preview')}><IconGlyph icon={mkIcons.view} /></button>
-                </div>
-              </>
-            )}
-
             {/* TABLET DRAWER TOGGLE */}
             <div className="toolbar-sep tablet-right-sep" />
             <button
@@ -3482,59 +3686,6 @@ export default function App() {
               aria-controls="editor-palette-panel"
             ><IconGlyph icon={mkIcons.package} /></button>
 
-            {/* SHORTCUTS */}
-            <div className="toolbar-sep" />
-            <div className="toolbar-group shortcuts-wrap">
-              <button className={`tool-btn${showShortcuts ? ' active' : ''}`} onClick={() => setShowShortcuts(v => !v)} title={t('Клавиатурные сочетания', 'Keyboard shortcuts')} aria-label={t('Клавиатурные сочетания', 'Keyboard shortcuts')} aria-expanded={showShortcuts}><IconGlyph icon={mkIcons.keyboard} /></button>
-              {showShortcuts && (
-                <div className="shortcuts-panel">
-                  <div className="shortcuts-panel-title">{t('ГОРЯЧИЕ КЛАВИШИ', 'KEYBOARD SHORTCUTS')}</div>
-                  <div className="shortcut-row"><kbd>Ctrl+Z</kbd><span>{t('Отменить', 'Undo')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Y</kbd><span>{t('Повторить', 'Redo')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+S</kbd><span>{t('Экспорт PNG', 'Export PNG')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+Shift+S</kbd><span>{t('Экспорт .litematic', 'Export .litematic')}</span></div>
-                  <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>Z</kbd><span>{t('Сетка', 'Grid')}</span></div>
-                  <div className="shortcut-row"><kbd>O</kbd><span>{t('Сброс разделителя', 'Reset split')}</span></div>
-                  <div className="shortcut-row"><kbd>C</kbd><span>{t('Режим сравнения', 'Compare mode')}</span></div>
-                  <div className="shortcut-row"><kbd>1 – 9</kbd><span>{t('Выбор дизеринга', 'Select dithering')}</span></div>
-                  <div className="shortcuts-divider" />
-                  <div className="shortcut-row"><kbd>E</kbd><span>{t('Пипетка', 'Eyedropper')}</span></div>
-                  <div className="shortcut-row"><kbd>B</kbd><span>{t('Кисть', 'Brush')}</span></div>
-                  <div className="shortcut-row"><kbd>F</kbd><span>{t('Заливка', 'Fill')}</span></div>
-                  <div className="shortcut-row"><kbd>X</kbd><span>{t('Ластик', 'Eraser')}</span></div>
-                  <div className="shortcut-row"><kbd>T</kbd><span>{t('Текст', 'Text')}</span></div>
-                  <div className="shortcut-row"><kbd>V</kbd><span>{t('Перемещение слоя', 'Move layer')}</span></div>
-                  <div className="shortcut-row"><kbd>R</kbd><span>{t('Прямоугольное выделение', 'Rectangular selection')}</span></div>
-                  <div className="shortcut-row"><kbd>L</kbd><span>{t('Лассо', 'Lasso')}</span></div>
-                  <div className="shortcut-row"><kbd>W</kbd><span>{t('Волшебная палочка', 'Magic wand')}</span></div>
-                  <div className="shortcut-row"><kbd>P</kbd><span>{t('Паттерн', 'Pattern tile')}</span></div>
-                  <div className="shortcut-row"><kbd>G</kbd><span>{t('Градиент', 'Gradient')}</span></div>
-                  <div className="shortcut-row"><kbd>Shift + клик</kbd><span>{t('Прямая линия кистью', 'Straight brush line')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+A</kbd><span>{t('Выделить всё', 'Select all')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+D</kbd><span>{t('Снять выделение', 'Deselect')}</span></div>
-                  <div className="shortcut-row"><kbd>Ctrl+I</kbd><span>{t('Инвертировать выделение', 'Invert selection')}</span></div>
-                  <div className="shortcut-row"><kbd>Space + ЛКМ</kbd><span>{t('Временно перемещать холст', 'Temporarily pan canvas')}</span></div>
-                  <div className="shortcut-row"><kbd>Esc</kbd><span>{t('Снять инструмент', 'Deselect tool')}</span></div>
-                </div>
-              )}
-            </div>
-            <div className="toolbar-sep" />
-            <div className="toolbar-group">
-              <button
-                className={`tool-btn artist-toolbar-toggle${editorMode === 'artist' ? ' active' : ''}`}
-                onClick={() => setEditorMode(m => {
-                  const next = m === 'simple' ? 'artist' : 'simple';
-                  trackEvent('artist_mode_toggled', { enabled: next === 'artist' });
-                  return next;
-                })}
-                title={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника: слои и расширенные инструменты', 'Artist mode: layers & advanced tools')}
-                aria-label={editorMode === 'artist' ? t('Выключить режим художника', 'Exit artist mode') : t('Режим художника', 'Artist mode')}
-                aria-pressed={editorMode === 'artist'}
-              >
-                <IconGlyph icon={mkIcons.artist} />
-              </button>
-            </div>
           </div>
 
           {!compareMode && imageData && (
@@ -3547,6 +3698,47 @@ export default function App() {
                 </span>
                 <kbd>{activeToolUi.key}</kbd>
               </div>
+
+              {toolUsesSharedPaintBlock && (
+                <div className="editor-tool-shared-paint-block">
+                  <span className="editor-tool-setting-label">{t('Материал', 'Material')}</span>
+                  <button
+                    type="button"
+                    className="editor-tool-shared-paint-button"
+                    onClick={() => setShowBlockPicker(value => !value)}
+                    aria-expanded={showBlockPicker}
+                    aria-label={paintBlock
+                      ? t(`Выбранный материал: ${paintBlock.displayName}, цвет ${paintBlock.colourName}. Изменить`, `Selected material: ${paintBlock.displayName}, colour ${paintBlock.colourName}. Change`)
+                      : t('Выбрать материал', 'Choose material')}
+                    title={paintBlock
+                      ? t(`${paintBlock.displayName} · ${paintBlock.colourName}`, `${paintBlock.displayName} · ${paintBlock.colourName}`)
+                      : t('Выбрать материал', 'Choose material')}
+                    disabled={activeLayerLocked}
+                  >
+                    {paintBlock?.baseId === -1 ? (
+                      <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon block-picker-icon-transparent" /></span>
+                    ) : paintBlock ? (
+                      <span className="paint-swatch-icon-wrap"><span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} /></span>
+                    ) : (
+                      <span className="editor-tool-shared-paint-empty" aria-hidden="true" />
+                    )}
+                    <span className="editor-tool-shared-paint-copy">
+                      <strong>{paintBlock?.displayName ?? t('Блок не выбран', 'No block selected')}</strong>
+                      <small>{paintBlock?.colourName ?? t('Выбери материал или возьми его пипеткой', 'Choose a material or sample it')}</small>
+                    </span>
+                    <IconGlyph icon={mkIcons.chevronDown} />
+                  </button>
+                  {showBlockPicker && (
+                    <BlockPickerPopup
+                      blockSelection={blockSelection}
+                      current={paintBlock}
+                      onSelect={block => { setPaintBlock(block); setShowBlockPicker(false); }}
+                      onClose={() => setShowBlockPicker(false)}
+                      mapMode={mapMode}
+                    />
+                  )}
+                </div>
+              )}
 
               {activeLayerLocked && (
                 <div className="editor-tool-lock" role="status">
@@ -3572,38 +3764,6 @@ export default function App() {
                   />
                   <output>{brushSize}px</output>
                 </label>
-              )}
-
-              {(activeTool === 'brush' || activeTool === 'fill' || activeTool === 'pattern-tile') && (
-                <div className="editor-tool-block-control">
-                  <span className="editor-tool-setting-label">
-                    {activeTool === 'pattern-tile' ? t('Блок паттерна', 'Pattern block') : t('Блок', 'Block')}
-                  </span>
-                  <button
-                    type="button"
-                    className="editor-tool-block-button"
-                    onClick={() => setShowBlockPicker(value => !value)}
-                    aria-expanded={showBlockPicker}
-                    disabled={activeLayerLocked}
-                  >
-                    {paintBlock?.baseId === -1 ? (
-                      <span className="paint-swatch-icon block-picker-icon-transparent" />
-                    ) : paintBlock ? (
-                      <span className="paint-swatch-icon" style={{ backgroundImage: `url(${SPRITE_URL})`, backgroundPosition: `-${paintBlock.blockId * 32}px -${paintBlock.csId * 32}px` }} />
-                    ) : null}
-                    <span>{paintBlock?.displayName ?? t('Выбрать блок', 'Choose block')}</span>
-                    <IconGlyph icon={mkIcons.chevronDown} />
-                  </button>
-                  {showBlockPicker && (
-                    <BlockPickerPopup
-                      blockSelection={blockSelection}
-                      current={paintBlock}
-                      onSelect={block => { setPaintBlock(block); setShowBlockPicker(false); }}
-                      onClose={() => setShowBlockPicker(false)}
-                      mapMode={mapMode}
-                    />
-                  )}
-                </div>
               )}
 
               {mapMode === '3d' && (activeTool === 'brush' || activeTool === 'fill') && paintBlock && paintBlock.baseId !== -1 && (
@@ -3873,6 +4033,19 @@ export default function App() {
           />
         )}
 
+        <div
+          className="panel-resizer panel-resizer-right"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('Изменить ширину панели палитры', 'Resize palette panel')}
+          tabIndex={0}
+          onPointerDown={event => handlePanelResizeStart('right', event)}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={handlePanelResizeEnd}
+          onPointerCancel={handlePanelResizeEnd}
+          onKeyDown={event => handlePanelResizeKeyDown('right', event)}
+        />
+
         {/* ── RIGHT PANEL ── */}
         {tabletRightOpen && <div className="tablet-drawer-backdrop" onClick={() => setTabletRightOpen(false)} />}
         <aside id="editor-palette-panel" className={`panel panel-right${tabletRightOpen ? ' drawer-open' : ''}${editorMode === 'artist' ? ' artist-mode' : ''}`} data-tour="palette-panel">
@@ -3910,6 +4083,20 @@ export default function App() {
               </>
             )}
             <div className="mobile-palette-content">
+              {workbenchMode && (
+                <MaterialsList
+                  compact
+                  imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
+                  cp={activePalette}
+                  blockSelection={blockSelection}
+                  mapGrid={mapGrid}
+                  onFocusPalette={handleFocusPaletteBlock}
+                  onExcludeFromPalette={handleRemoveBlock}
+                  onReplaceInPalette={handleReplaceBlock}
+                  minecraftVersion={minecraftVersion}
+                  platformMode={platformMode}
+                />
+              )}
               <div className="version-selector-row" data-tour="minecraft-version">
                 <span className="version-selector-label">{t('Версия', 'Version')}</span>
                 <select
@@ -3949,6 +4136,8 @@ export default function App() {
                 minecraftVersion={minecraftVersion}
                 platformMode={platformMode}
                 suppressionMode={buildTechnique === 'suppression_two_layer'}
+                compact={workbenchMode}
+                focusBlock={paletteFocus}
               />
               <div className="panel-divider"></div>
               {mapMode === '3d' && (
@@ -4015,25 +4204,21 @@ export default function App() {
               )}
             </div>
             <div className="mobile-export-content">
-              {buildTechnique === 'suppression_two_layer' ? (
-                <div className="suppression-materials-note">
-                  {t(
-                    'Точные материалы и количество возвращаемых блоков будут в Two-layer ZIP.',
-                    'Exact materials and recoverable block counts are included in the Two-layer ZIP.',
-                  )}
-                </div>
-              ) : (
-                <MaterialsList
-                  imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
-                  cp={activePalette}
-                  blockSelection={blockSelection}
-                  mapGrid={mapGrid}
-                  mapMode={mapMode}
-                  staircaseMode={staircaseMode}
-                  supportBlock={supportBlock}
-                  supportMode={supportMode}
-                />
-              )}
+              <MaterialsList
+                imageData={compareMode ? (compareData?.left ?? null) : compositeImageData}
+                cp={activePalette}
+                blockSelection={blockSelection}
+                mapGrid={mapGrid}
+                mapMode={mapMode}
+                staircaseMode={staircaseMode}
+                supportBlock={buildTechnique === 'suppression_two_layer' ? 'air' : supportBlock}
+                supportMode={buildTechnique === 'suppression_two_layer' ? undefined : supportMode}
+                onFocusPalette={handleFocusPaletteBlock}
+                onExcludeFromPalette={handleRemoveBlock}
+                onReplaceInPalette={handleReplaceBlock}
+                minecraftVersion={minecraftVersion}
+                platformMode={platformMode}
+              />
             </div>
           </div>
           <div className="panel-footer mobile-export-content">

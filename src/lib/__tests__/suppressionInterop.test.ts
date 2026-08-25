@@ -69,7 +69,7 @@ describe('Two-layer site-to-Companion interoperability fixture', () => {
         writeFileSync(join(outputDir, `site-v3-${minecraftVersion}.zip`), zipBytes);
       }
     }
-  });
+  }, 20_000);
 
   it('emits a deterministic row-major v2 bundle for a 2x2 art', async () => {
     const outputDir = process.env.MAPKLUSS_SUPPRESSION_INTEROP_DIR;

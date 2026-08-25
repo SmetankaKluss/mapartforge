@@ -1435,6 +1435,103 @@ body {
   align-items: center;
 }
 
+/* Compact Cloud keeps sign-in and download controls, without the onboarding mural. */
+.companion-shell .companion-cloud-guest--compact {
+  width: min(820px, 100%);
+  margin: clamp(26px, 8vh, 88px) auto 0;
+  display: block;
+  border: 0;
+  background: transparent;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 248px);
+  gap: 10px;
+  align-items: start;
+  padding: 0;
+  background: transparent;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-login-primary {
+  min-height: 0;
+  gap: 10px;
+  padding: 14px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-auth-title {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 8px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-auth-icon {
+  width: 30px;
+  height: 30px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-auth-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-auth-title h2 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-inline-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-inline-form button {
+  min-width: 136px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-telegram-login {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.companion-shell .companion-cloud-guest--compact .companion-telegram-login h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access > .companion-mod-download-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin: 0;
+  padding: 12px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-mod-version-field,
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-mod-download-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-guest-access .companion-mod-market-links {
+  justify-content: space-between;
+  gap: 8px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-cloud-guest-links {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+}
+.companion-shell .companion-cloud-guest--compact .companion-cloud-guest-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+.companion-shell .companion-cloud-guest--compact .companion-cloud-guest-links a:hover {
+  color: var(--accent);
+}
+
 .companion-shell .companion-cloud-flow-panel {
   border-color: rgb(var(--accent-rgb) / 0.44);
   background: var(--bg-panel);
@@ -1855,4 +1952,17 @@ body {
   .companion-shell .companion-summary-card strong
 ) {
   color: var(--color-value);
+}
+
+@media (max-width: 720px) {
+  .companion-shell .companion-cloud-guest--compact {
+    width: min(520px, 100%);
+    margin-top: 18px;
+  }
+  .companion-shell .companion-cloud-guest--compact .companion-guest-access {
+    grid-template-columns: 1fr;
+  }
+  .companion-shell .companion-cloud-guest--compact .companion-cloud-guest-links {
+    grid-column: auto;
+  }
 }

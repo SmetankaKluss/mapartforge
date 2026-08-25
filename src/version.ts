@@ -138,5 +138,5 @@
  *   1.29.3 — трансформации текста также обновляются покадрово
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.30.3: Public GitHub control matches the compact editor header treatment.
-export const VERSION = 'v1.30.3';
+// 1.31.0: Standard dense workbench shortens the palette/material workflow.
+export const VERSION = 'v1.31.0';

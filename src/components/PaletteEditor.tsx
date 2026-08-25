@@ -32,6 +32,12 @@ function selectionKey(selection: BlockSelection): string {
   );
 }
 
+function selectedColourRows(selection: BlockSelection): number[] {
+  return COLOUR_ROWS
+    .filter(row => (selection[row.csId] ?? []).length > 0)
+    .map(row => row.csId);
+}
+
 interface Props {
   blockSelection: BlockSelection;
   onSelectionChange: (sel: BlockSelection) => void;
@@ -40,9 +46,21 @@ interface Props {
   minecraftVersion?: MinecraftVersion;
   platformMode?: PlatformMode;
   suppressionMode?: boolean;
+  compact?: boolean;
+  focusBlock?: { csId: number; blockId: number; token: number } | null;
 }
 
-export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, disabled, minecraftVersion, platformMode = 'java', suppressionMode = false }: Props) {
+export function PaletteEditor({
+  blockSelection,
+  onSelectionChange,
+  paletteSize,
+  disabled,
+  minecraftVersion,
+  platformMode = 'java',
+  suppressionMode = false,
+  compact = false,
+  focusBlock = null,
+}: Props) {
   const { t } = useLocale();
   const [customPresets,   setCustomPresets]   = useState<Record<string, BlockSelection>>(loadStoredPresets);
   const [searchQuery,     setSearchQuery]     = useState('');
@@ -50,8 +68,12 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   const [modalName,       setModalName]       = useState('');
   const [clearPending,    setClearPending]    = useState(false);
   const [paletteUrl,      setPaletteUrl]      = useState<string | null>(null);
+  const [focusedCsId,     setFocusedCsId]     = useState<number | null>(null);
+  const [visibleSetRows,  setVisibleSetRows]  = useState<number[] | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const modalInputRef = useRef<HTMLInputElement>(null);
+  const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const builtInPresetNames = Object.keys(BUILTIN_PRESETS)
     .filter(name => !suppressionMode || name !== 'Carpet Only');
@@ -77,6 +99,23 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
     if (showSaveModal) modalInputRef.current?.focus();
   }, [showSaveModal]);
 
+  useEffect(() => {
+    if (!focusBlock) return;
+    const frame = requestAnimationFrame(() => {
+      setSearchQuery('');
+      setFocusedCsId(focusBlock.csId);
+      requestAnimationFrame(() => {
+        rowRefs.current[focusBlock.csId]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+    if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    focusTimerRef.current = setTimeout(() => setFocusedCsId(current => current === focusBlock.csId ? null : current), 1600);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    };
+  }, [focusBlock]);
+
   const persistPresets = useCallback((p: Record<string, BlockSelection>) => {
     setCustomPresets(p);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
@@ -92,12 +131,23 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
       const emptySelection = Object.fromEntries(
         COLOUR_ROWS.map(row => [row.csId, []])
       );
+      if (visibleSetRows) setVisibleSetRows(selectedColourRows(emptySelection));
       onSelectionChange(emptySelection);
       return;
     }
     if (name in contextualPresets) {
-      onSelectionChange(contextualPresets[name]);
+      const selection = contextualPresets[name];
+      if (visibleSetRows) setVisibleSetRows(selectedColourRows(selection));
+      onSelectionChange(selection);
     }
+  }
+
+  function toggleVisibleSetFilter() {
+    setVisibleSetRows(current => {
+      const enabled = current === null;
+      trackEvent('palette_set_filter_changed', { enabled });
+      return enabled ? selectedColourRows(blockSelection) : null;
+    });
   }
 
   function handleDelete() {
@@ -184,15 +234,18 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   // ── Search filtering ─────────────────────────────────────────────────────
 
   const q = searchQuery.trim().toLowerCase();
+  const setFilteredRows = visibleSetRows === null
+    ? versionRows
+    : versionRows.filter(row => visibleSetRows.includes(row.csId));
   const filteredRows = q
-    ? versionRows.filter(row =>
+    ? setFilteredRows.filter(row =>
         row.colourName.toLowerCase().includes(q) ||
         row.blocks.some(b =>
           b.displayName.toLowerCase().includes(q) ||
           b.nbtName.toLowerCase().includes(q),
         ),
       )
-    : versionRows;
+    : setFilteredRows;
 
   // ── Derived counts ───────────────────────────────────────────────────────
 
@@ -203,7 +256,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
   const modalNameInvalid = modalName.trim() in BUILTIN_PRESETS;
 
   return (
-    <section className="sidebar-section">
+    <section className={`sidebar-section palette-editor${compact ? ' palette-editor--workbench' : ''}`}>
       {/* Section header */}
       <h2 className="section-title">
         {t('Палитра', 'Palette')}
@@ -262,6 +315,18 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
           )}
         </div>
         <button
+          className={`pe-filter-btn${visibleSetRows !== null ? ' active' : ''}`}
+          onClick={toggleVisibleSetFilter}
+          disabled={disabled}
+          title={visibleSetRows !== null
+            ? t('Показать все цвета', 'Show all colours')
+            : t('Показывать только цвета текущей палитры', 'Show only colours in the current palette')}
+          aria-label={visibleSetRows !== null
+            ? t('Показать все цвета', 'Show all colours')
+            : t('Показывать только цвета текущей палитры', 'Show only colours in the current palette')}
+          aria-pressed={visibleSetRows !== null}
+        ><IconGlyph icon={visibleSetRows !== null ? mkIcons.eyeOff : mkIcons.eye} /></button>
+        <button
           className="pe-save-btn"
           onClick={openSaveModal}
           disabled={disabled}
@@ -292,7 +357,6 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
         ) : (
           filteredRows.map(row => {
             const activeIds = blockSelection[row.csId] ?? [];
-            const allOn = activeIds.length === row.blocks.length;
             const rowOn = activeIds.length > 0;
 
             // When searching, filter blocks within the row too
@@ -305,22 +369,30 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
               : row.blocks;
 
             return (
-              <div key={row.csId} className={`pe-row${rowOn ? '' : ' row-off'}`}>
+              <div
+                key={row.csId}
+                ref={node => { rowRefs.current[row.csId] = node; }}
+                className={`pe-row${rowOn ? '' : ' row-off'}${focusedCsId === row.csId || focusBlock?.csId === row.csId ? ' pe-row-focus' : ''}`}
+              >
                 <div className="pe-row-header">
-                  <div
-                    className="pe-swatch"
-                    style={{ background: `rgb(${row.r},${row.g},${row.b})` }}
-                    title={`#${[row.r, row.g, row.b].map(v => v.toString(16).padStart(2, '0')).join('')}`}
-                  />
-                  <span className="pe-row-name">{row.colourName}</span>
                   <button
-                    className="pe-row-toggle"
+                    className={`pe-swatch-toggle${rowOn ? ' is-active' : ' is-inactive'}`}
                     onClick={() => !disabled && toggleRow(row.csId)}
                     disabled={disabled}
-                    title={allOn ? t('Снять всё', 'Deselect all') : t('Выбрать всё', 'Select all')}
-                    aria-pressed={allOn}
-                    aria-label={allOn ? t('Снять всё', 'Deselect all') : t('Выбрать всё', 'Select all')}
-                  ><IconGlyph icon={activeIds.length === 0 ? mkIcons.circle : allOn ? mkIcons.circleFilled : mkIcons.circleHalf} /></button>
+                    title={rowOn
+                      ? t(`Исключить ${row.colourName} из палитры`, `Exclude ${row.colourName} from the palette`)
+                      : t(`Вернуть ${row.colourName} в палитру`, `Restore ${row.colourName} to the palette`)}
+                    aria-pressed={rowOn}
+                    aria-label={rowOn
+                      ? t(`Исключить ${row.colourName} из палитры`, `Exclude ${row.colourName} from the palette`)
+                      : t(`Вернуть ${row.colourName} в палитру`, `Restore ${row.colourName} to the palette`)}
+                  >
+                    <span
+                      className="pe-swatch"
+                      style={{ background: `rgb(${row.r},${row.g},${row.b})` }}
+                    />
+                  </button>
+                  <span className="pe-row-name">{row.colourName}</span>
                 </div>
 
                 <div className="pe-block-grid">
@@ -329,7 +401,7 @@ export function PaletteEditor({ blockSelection, onSelectionChange, paletteSize, 
                     return (
                       <div
                         key={block.blockId}
-                        className={`pe-block${isOn ? ' on' : ' off'}`}
+                        className={`pe-block${isOn ? ' on' : ' off'}${focusBlock?.csId === row.csId && focusBlock.blockId === block.blockId ? ' pe-block-focus' : ''}`}
                         onClick={() => !disabled && toggleBlock(row.csId, block.blockId)}
                         title={`${block.displayName}\nminecraft:${block.nbtName}`}
                       >

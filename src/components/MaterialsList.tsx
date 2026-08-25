@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
@@ -12,6 +13,8 @@ import { trackEvent } from '../lib/analytics';
 import { computeRawMaterials } from '../lib/sessionMaterials';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { isBlockAvailable, type MinecraftVersion } from '../lib/versionPresets';
+import { isBlockAvailableOnPlatform, type PlatformMode } from '../lib/platformMode';
 
 interface Props {
   imageData: ImageData | null;
@@ -22,6 +25,12 @@ interface Props {
   staircaseMode?: 'classic' | 'optimized';
   supportBlock?: string;
   supportMode?: SupportMode;
+  compact?: boolean;
+  onFocusPalette?: (csId: number, blockId: number) => void;
+  onExcludeFromPalette?: (csId: number) => void;
+  onReplaceInPalette?: (previousCsId: number, previousBlockId: number, nextCsId: number, nextBlockId: number) => void;
+  minecraftVersion?: MinecraftVersion;
+  platformMode?: PlatformMode;
 }
 
 interface MaterialEntry {
@@ -83,10 +92,38 @@ function buildCopyText(entries: MaterialEntry[], total: number, maxPerMap: boole
   return lines.join('\n');
 }
 
-export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode, staircaseMode, supportBlock, supportMode }: Props) {
+export function MaterialsList({
+  imageData,
+  cp,
+  blockSelection,
+  mapGrid,
+  mapMode,
+  staircaseMode,
+  supportBlock,
+  supportMode,
+  compact = false,
+  onFocusPalette,
+  onExcludeFromPalette,
+  onReplaceInPalette,
+  minecraftVersion,
+  platformMode = 'java',
+}: Props) {
   const { t } = useLocale();
   const [copied,     setCopied]     = useState(false);
-  const [maxPerMap,  setMaxPerMap]  = useState(false);
+  // The compact workbench answers "what do I need for one map section?".
+  // The full export-oriented materials view keeps its total-art default.
+  const [maxPerMap,  setMaxPerMap]  = useState(compact);
+  const [replacementTarget, setReplacementTarget] = useState<MaterialEntry | null>(null);
+  const [replacementSearch, setReplacementSearch] = useState('');
+
+  useEffect(() => {
+    if (!replacementTarget) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReplacementTarget(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [replacementTarget]);
 
   // Heavy computation: raw data with per-section counts
   const rawData = useMemo(() => {
@@ -117,6 +154,146 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
 
   const total = materials.reduce((s, e) => s + e.count, 0);
   const numMaps = mapGrid.wide * mapGrid.tall;
+  // Keep the normal material order here: it already reflects the actual build
+  // workload, and the horizontal strip remains useful for both large and tiny arts.
+  const workbenchMaterials = materials;
+  const replacementChoices = COLOUR_ROWS.flatMap(row => row.blocks
+    .filter(block =>
+      (!minecraftVersion || isBlockAvailable(block.nbtName, minecraftVersion))
+      && isBlockAvailableOnPlatform(block.nbtName, platformMode),
+    )
+    .map(block => ({ row, block })),
+  ).filter(({ row, block }) => {
+    const query = replacementSearch.trim().toLowerCase();
+    return !query || row.colourName.toLowerCase().includes(query)
+      || block.displayName.toLowerCase().includes(query)
+      || block.nbtName.toLowerCase().includes(query);
+  });
+
+  function openReplacement(entry: MaterialEntry) {
+    if (!onReplaceInPalette) return;
+    trackEvent('material_replacement_opened', { color_group: entry.csId, block_id: entry.blockId });
+    setReplacementSearch('');
+    setReplacementTarget(entry);
+  }
+
+  const replacementPopup = replacementTarget && typeof document !== 'undefined'
+    ? createPortal(
+      <div className="material-replace-backdrop" onMouseDown={() => setReplacementTarget(null)}>
+        <section
+          className="material-replace-popup"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t(`Заменить цвет ${replacementTarget.displayName}`, `Replace ${replacementTarget.displayName}'s colour`)}
+          onMouseDown={event => event.stopPropagation()}
+        >
+          <header className="material-replace-header">
+            <span>{t('Заменить цвет', 'Replace colour')}</span>
+            <button type="button" onClick={() => setReplacementTarget(null)} aria-label={t('Закрыть', 'Close')}><IconGlyph icon={mkIcons.close} /></button>
+          </header>
+          <div className="material-replace-search-wrap">
+            <input
+              className="material-replace-search"
+              value={replacementSearch}
+              onChange={event => setReplacementSearch(event.target.value)}
+              placeholder={t('Найти цвет или блок…', 'Find a colour or block…')}
+              aria-label={t('Найти цвет или блок', 'Find a colour or block')}
+              autoFocus
+            />
+          </div>
+          <div className="material-replace-grid" role="listbox" aria-label={t('Блоки для замены', 'Replacement blocks')}>
+            {replacementChoices.map(({ row, block }) => (
+              <button
+                type="button"
+                key={`${row.csId}_${block.blockId}`}
+                className={`material-replace-choice${row.csId === replacementTarget.csId && block.blockId === replacementTarget.blockId ? ' active' : ''}`}
+                onClick={() => {
+                  if (row.csId !== replacementTarget.csId || block.blockId !== replacementTarget.blockId) {
+                    onReplaceInPalette?.(replacementTarget.csId, replacementTarget.blockId, row.csId, block.blockId);
+                  }
+                  setReplacementTarget(null);
+                }}
+                role="option"
+                aria-selected={row.csId === replacementTarget.csId && block.blockId === replacementTarget.blockId}
+                title={`${row.colourName}: ${block.displayName}`}
+              >
+                <span className="material-replace-colour" style={{ background: `rgb(${row.r}, ${row.g}, ${row.b})` }} />
+                <BlockIcon
+                  nbtName={block.nbtName}
+                  blockId={block.blockId}
+                  csId={row.csId}
+                  r={row.r} g={row.g} b={row.b}
+                  className="material-replace-icon"
+                />
+                <span><b>{block.displayName}</b><small>{row.colourName}</small></span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>,
+      document.body,
+    )
+    : null;
+
+  if (compact) {
+    return (
+      <section className="workbench-materials" aria-label={t('Материалы в работе', 'Active materials')}>
+        <div className="workbench-material-grid">
+          {workbenchMaterials.map(entry => {
+            const row = COLOUR_ROWS[entry.csId];
+            return (
+              <div className="workbench-material" key={`${entry.csId}_${entry.blockId}`}>
+                <button
+                  type="button"
+                  className="workbench-material-main"
+                  onClick={() => onFocusPalette?.(entry.csId, entry.blockId)}
+                  title={t(`Найти ${entry.displayName} в палитре`, `Find ${entry.displayName} in the palette`)}
+                  disabled={!onFocusPalette}
+                >
+                  <span className="mat-icon-wrap">
+                    <BlockIcon
+                      nbtName={entry.nbtName}
+                      blockId={entry.blockId}
+                      csId={entry.csId}
+                      r={row?.r ?? 128} g={row?.g ?? 128} b={row?.b ?? 128}
+                      className="mat-icon"
+                    />
+                  </span>
+                  <span className="workbench-material-copy">
+                    <strong>{entry.displayName}</strong>
+                    <small>{fmtStacks(entry.count)}</small>
+                  </span>
+                </button>
+                {(onExcludeFromPalette || onReplaceInPalette) && (
+                  <span className="workbench-material-actions">
+                    {onExcludeFromPalette && (
+                      <button
+                        type="button"
+                        className="workbench-material-exclude"
+                        onClick={() => onExcludeFromPalette(entry.csId)}
+                        title={t(`Исключить ${entry.displayName} и этот цвет из палитры`, `Exclude ${entry.displayName} and its colour from the palette`)}
+                        aria-label={t(`Исключить ${entry.displayName}`, `Exclude ${entry.displayName}`)}
+                      ><IconGlyph icon={mkIcons.close} /></button>
+                    )}
+                    {onReplaceInPalette && (
+                      <button
+                        type="button"
+                        className="workbench-material-replace"
+                        onClick={() => openReplacement(entry)}
+                        title={t(`Заменить ${entry.displayName}`, `Replace ${entry.displayName}`)}
+                        aria-label={t(`Заменить ${entry.displayName}`, `Replace ${entry.displayName}`)}
+                      ><IconGlyph icon={mkIcons.invert} /></button>
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {replacementPopup}
+      </section>
+    );
+  }
 
   function handleCopy() {
     trackEvent('materials_copied', { max_per_map: maxPerMap, map_wide: mapGrid.wide, map_tall: mapGrid.tall });
@@ -199,8 +376,38 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
                           className="mat-icon"
                         />
                       </span>
-                      <span className="mat-name">{e.displayName}</span>
-                    </div>
+                       <span className="mat-name">{e.displayName}</span>
+                       {(onFocusPalette || onExcludeFromPalette || onReplaceInPalette) && (
+                         <span className="mat-block-actions">
+                           {onFocusPalette && (
+                             <button
+                               type="button"
+                               onClick={() => onFocusPalette(e.csId, e.blockId)}
+                               title={t(`Найти ${e.displayName} в палитре`, `Find ${e.displayName} in the palette`)}
+                               aria-label={t(`Найти ${e.displayName} в палитре`, `Find ${e.displayName} in the palette`)}
+                             ><IconGlyph icon={mkIcons.link} /></button>
+                           )}
+                           {onExcludeFromPalette && (
+                             <button
+                               type="button"
+                               className="mat-block-exclude"
+                               onClick={() => onExcludeFromPalette(e.csId)}
+                               title={t(`Исключить цвет ${e.displayName} из палитры`, `Exclude ${e.displayName}'s colour from the palette`)}
+                               aria-label={t(`Исключить ${e.displayName}`, `Exclude ${e.displayName}`)}
+                             ><IconGlyph icon={mkIcons.close} /></button>
+                           )}
+                           {onReplaceInPalette && (
+                             <button
+                               type="button"
+                               className="mat-block-replace"
+                               onClick={() => openReplacement(e)}
+                               title={t(`Заменить ${e.displayName}`, `Replace ${e.displayName}`)}
+                               aria-label={t(`Заменить ${e.displayName}`, `Replace ${e.displayName}`)}
+                             ><IconGlyph icon={mkIcons.invert} /></button>
+                           )}
+                         </span>
+                       )}
+                     </div>
                   </td>
                   <td className="mat-col-num mat-num-cell">{fmtN(e.count)}</td>
                   <td className="mat-col-stacks mat-num-cell">{fmtStacks(e.count)}</td>
@@ -245,6 +452,7 @@ export function MaterialsList({ imageData, cp, blockSelection, mapGrid, mapMode,
           <IconGlyph icon={mkIcons.export} /> {t('СКАЧАТЬ', 'DOWNLOAD')}
         </button>
       </div>
+      {replacementPopup}
     </section>
   );
 }
