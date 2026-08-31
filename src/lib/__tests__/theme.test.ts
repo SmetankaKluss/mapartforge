@@ -114,13 +114,14 @@ describe('MapKluss interface themes', () => {
     expect(readStoredTheme({ getItem: () => { throw new Error('blocked'); } })).toBe('classic');
   });
 
-  it('keeps Midnight hidden from the picker and available only through its URL key', () => {
+  it('keeps Midnight hidden from the picker and persists it after its URL opt-in', () => {
     expect(isThemeId(SECRET_THEME_ID)).toBe(true);
     expect(THEME_OPTIONS.some(option => option.id === SECRET_THEME_ID)).toBe(false);
     expect(getThemeOption(SECRET_THEME_ID).label).toBe('Midnight');
     expect(getSecretThemeFromSearch('?theme=midnight')).toBe(SECRET_THEME_ID);
     expect(getSecretThemeFromSearch('?theme=classic')).toBeNull();
-    expect(readStoredTheme({ getItem: () => SECRET_THEME_ID })).toBe('classic');
+    expect(readStoredTheme({ getItem: () => SECRET_THEME_ID })).toBe(SECRET_THEME_ID);
+    expect(resolveTheme('unknown', SECRET_THEME_ID)).toBe(SECRET_THEME_ID);
 
     const tokens = tokensFor(SECRET_THEME_ID);
     for (const token of REQUIRED_TOKENS) expect(tokens[token], `midnight: ${token}`).toMatch(/^#[0-9a-f]{6}$/);
@@ -132,6 +133,8 @@ describe('MapKluss interface themes', () => {
 
     expect(indexHtml).toContain("theme = 'midnight'");
     expect(indexHtml).toContain("midnight: '#111214'");
+    expect(indexHtml).toContain("localStorage.setItem('mapkluss_ui_theme', theme)");
+    expect(indexHtml).toContain('window.history.replaceState(null, \'\', cleanUrl)');
   });
 
   it('defines the complete semantic token contract for every theme', () => {

@@ -138,5 +138,5 @@
  *   1.29.3 — трансформации текста также обновляются покадрово
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.31.1: Faster Cloud finalization and the hidden Midnight theme.
-export const VERSION = 'v1.31.1';
+// 1.31.2: Midnight is a persistent browser theme after URL opt-in.
+export const VERSION = 'v1.31.2';

@@ -152,7 +152,7 @@ export function getSecretThemeFromSearch(search: string): SecretThemeId | null {
 
 export function resolveTheme(attributeValue: unknown, storedValue: unknown): ThemeId {
   if (isThemeId(attributeValue)) return attributeValue;
-  if (isPublicThemeId(storedValue)) return storedValue;
+  if (isThemeId(storedValue)) return storedValue;
   return 'classic';
 }
 
@@ -174,8 +174,6 @@ export function readStoredTheme(storage?: Pick<Storage, 'getItem'> | null): Them
 }
 
 export function getAppliedTheme(root: HTMLElement = document.documentElement): ThemeId {
-  const secretTheme = getSecretThemeFromSearch(globalThis.location?.search ?? '');
-  if (secretTheme) return secretTheme;
   const storage = getBrowserStorage();
   try {
     return resolveTheme(root.dataset.theme, storage?.getItem(THEME_STORAGE_KEY));
@@ -194,12 +192,10 @@ export function applyTheme(
   root.style.colorScheme = option?.colorScheme ?? 'dark';
 
   const target = storage === undefined ? getBrowserStorage() : storage;
-  if (theme !== SECRET_THEME_ID) {
-    try {
-      target?.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // The theme still applies for this tab when storage is unavailable.
-    }
+  try {
+    target?.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // The theme still applies for this tab when storage is unavailable.
   }
 
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');

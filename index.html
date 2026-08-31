@@ -7,7 +7,7 @@
  <meta name="theme-color" content="#111116" />
  <script>
   (function applySavedMapKlussTheme() {
-   var allowedThemes = ['classic', 'deep-ocean', 'ember-forge', 'amethyst', 'acid-grove', 'cobalt-pulse', 'signal-white', 'cobalt-print', 'solar-punch', 'rose-oxide'];
+   var allowedThemes = ['classic', 'deep-ocean', 'ember-forge', 'amethyst', 'acid-grove', 'cobalt-pulse', 'midnight', 'signal-white', 'cobalt-print', 'solar-punch', 'rose-oxide'];
    var themeColors = {
     classic: '#111116',
     'deep-ocean': '#07141b',
@@ -29,8 +29,13 @@
    } catch (_) {
     // Local storage can be unavailable in hardened/private browser contexts.
    }
+   var midnightRequested = false;
    try {
-    if (new URLSearchParams(window.location.search).get('theme') === 'midnight') theme = 'midnight';
+    midnightRequested = new URLSearchParams(window.location.search).get('theme') === 'midnight';
+    if (midnightRequested) {
+     theme = 'midnight';
+     localStorage.setItem('mapkluss_ui_theme', theme);
+    }
    } catch (_) {
     // URLSearchParams is available in supported browsers; Classic remains a safe fallback.
    }
@@ -38,6 +43,10 @@
    document.documentElement.style.colorScheme = lightThemes.indexOf(theme) !== -1 ? 'light' : 'dark';
    var meta = document.querySelector('meta[name="theme-color"]');
    if (meta) meta.setAttribute('content', themeColors[theme]);
+   if (midnightRequested && window.history?.replaceState) {
+    var cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState(null, '', cleanUrl);
+   }
   }());
  </script>
  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
