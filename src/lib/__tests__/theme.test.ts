@@ -2,8 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   isThemeId,
+  getSecretThemeFromSearch,
+  getThemeOption,
   readStoredTheme,
   resolveTheme,
+  SECRET_THEME_ID,
   THEME_IDS,
   THEME_OPTIONS,
   THEME_STORAGE_KEY,
@@ -109,6 +112,26 @@ describe('MapKluss interface themes', () => {
     expect(isThemeId('rose-oxide')).toBe(true);
     expect(isThemeId('unknown')).toBe(false);
     expect(readStoredTheme({ getItem: () => { throw new Error('blocked'); } })).toBe('classic');
+  });
+
+  it('keeps Midnight hidden from the picker and available only through its URL key', () => {
+    expect(isThemeId(SECRET_THEME_ID)).toBe(true);
+    expect(THEME_OPTIONS.some(option => option.id === SECRET_THEME_ID)).toBe(false);
+    expect(getThemeOption(SECRET_THEME_ID).label).toBe('Midnight');
+    expect(getSecretThemeFromSearch('?theme=midnight')).toBe(SECRET_THEME_ID);
+    expect(getSecretThemeFromSearch('?theme=classic')).toBeNull();
+    expect(readStoredTheme({ getItem: () => SECRET_THEME_ID })).toBe('classic');
+
+    const tokens = tokensFor(SECRET_THEME_ID);
+    for (const token of REQUIRED_TOKENS) expect(tokens[token], `midnight: ${token}`).toMatch(/^#[0-9a-f]{6}$/);
+    for (const foreground of READABLE_TOKENS) {
+      for (const background of SURFACE_TOKENS) {
+        expect(contrast(tokens[foreground], tokens[background]), `midnight: ${foreground} on ${background}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+
+    expect(indexHtml).toContain("theme = 'midnight'");
+    expect(indexHtml).toContain("midnight: '#111214'");
   });
 
   it('defines the complete semantic token contract for every theme', () => {

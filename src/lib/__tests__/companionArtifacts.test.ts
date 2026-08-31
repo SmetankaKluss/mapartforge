@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { companionArtifactFilename, companionSlug } from '../companionArtifacts';
+import { companionArtifactChecksums, companionArtifactFilename, companionSlug } from '../companionArtifacts';
 
 describe('companion artifact naming', () => {
   it('builds stable filenames from art title, grid, and artifact kind', () => {
@@ -22,5 +22,12 @@ describe('companion artifact naming', () => {
     expect(companionArtifactFilename('Русский пейзаж', { wide: 2, tall: 3 }, 'preview_png'))
       .toBe('russkiy_peyzazh_2x3.png');
     expect(companionSlug('***')).toBe('mapkluss_art');
+  });
+
+  it('produces the SHA-256 and Content-MD5 pair used by signed Yandex uploads', async () => {
+    await expect(companionArtifactChecksums('abc')).resolves.toEqual({
+      sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      contentMd5: 'kAFQmDzST7DWlj99KOF/cg==',
+    });
   });
 });

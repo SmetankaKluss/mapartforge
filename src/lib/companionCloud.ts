@@ -4,7 +4,7 @@ import {
   uploadCompanionArtifactBlob,
   type CompanionArtifactUploadTarget,
 } from './companionArtifactUpload';
-import { companionArtifactFilename, sha256Hex } from './companionArtifacts';
+import { companionArtifactChecksums, companionArtifactFilename } from './companionArtifacts';
 import { buildLitematicBytes, buildLitematicTilesZipBlob } from './exportLitematic';
 import type { SupportMode } from './exportLitematic';
 import { buildMapDatZipBlob } from './exportMapDat';
@@ -43,6 +43,7 @@ import type {
 } from './companionTypes';
 import { normalizeEditableArtPrivacy } from './companionTypes';
 import { buildCollectionOverview, selectCollectionItemsFromSnapshot } from './companionCollection';
+import { createLocalCloudTimingTrace } from './cloudTiming';
 
 const COMPANION_BUCKET = 'mapkluss-companion-private';
 export const MAX_COMPANION_ARTS = 100;
@@ -89,6 +90,7 @@ interface PreparedArtifact {
   manifest: CompanionArtifactManifestEntry;
   bucketId: string;
   blob: Blob;
+  contentMd5: string;
 }
 
 type CompanionSaveStorageProvider = 'supabase' | 'yandex';
@@ -139,7 +141,7 @@ async function prepareArtifact(
   payload: ArtifactPayload,
 ): Promise<PreparedArtifact> {
   const sizeBytes = bodySize(payload.body);
-  const sha256 = await sha256Hex(payload.body);
+  const { sha256, contentMd5 } = await companionArtifactChecksums(payload.body);
   const storagePath = `companion/${ownerId}/${artId}/${versionId}/${payload.filename}`;
   const blob = bodyToBlob(payload.body, payload.contentType);
   const artifactId = requireUuid();
@@ -147,6 +149,7 @@ async function prepareArtifact(
   return {
     bucketId: COMPANION_BUCKET,
     blob,
+    contentMd5,
     manifest: {
       id: artifactId,
       kind: payload.kind,
@@ -736,6 +739,7 @@ export async function updateCompanionTracker(sessionId: string, patch: {
 
 export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<CompanionArtManifest> {
   const saveStartedAt = performance.now();
+  const localTimingTrace = createLocalCloudTimingTrace('companion_save');
   const supabase = getSupabaseClient();
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session?.user) throw new Error('Войдите в аккаунт MapKluss перед сохранением.');
@@ -886,14 +890,14 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     contentType: artifact.manifest.contentType,
     sizeBytes: artifact.manifest.sizeBytes,
     sha256: artifact.manifest.sha256,
+    integrity: 'yandex-payload-v1',
+    contentMd5: artifact.contentMd5,
   }));
   const uploadedStoragePaths: string[] = [];
   let prepareMs = 0;
   let uploadMs = 0;
   let finalizeMs = 0;
-  const withTiming = (manifest: CompanionArtManifest): CompanionArtManifest => ({
-    ...manifest,
-    saveTiming: {
+  const currentTiming = () => ({
       totalMs: performance.now() - saveStartedAt,
       generationMs,
       hashMs,
@@ -902,8 +906,28 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
       finalizeMs,
       artifactCount: preparedArtifacts.length,
       totalBytes,
-    },
   });
+  const completeLocalTiming = (outcome: 'ready' | 'failed') => {
+    const timing = currentTiming();
+    localTimingTrace?.complete({
+      outcome,
+      stages: {
+        generation: timing.generationMs,
+        hash: timing.hashMs,
+        prepare: timing.prepareMs,
+        upload: timing.uploadMs,
+        finalize: timing.finalizeMs,
+        total: timing.totalMs,
+      },
+      artifactCount: timing.artifactCount,
+      payloadKiB: Math.ceil(timing.totalBytes / 1024),
+    });
+  };
+  const withTiming = (manifest: CompanionArtManifest): CompanionArtManifest => {
+    const saveTiming = currentTiming();
+    completeLocalTiming('ready');
+    return { ...manifest, saveTiming };
+  };
 
   try {
     const prepareStartedAt = performance.now();
@@ -1009,8 +1033,10 @@ export async function saveCompanionArt(input: SaveCompanionArtInput): Promise<Co
     }
     if (cleanupErrors.length > 0) {
       const original = error instanceof Error ? error.message : String(error);
+      completeLocalTiming('failed');
       throw new Error(`${original} (cleanup failed: ${cleanupErrors.join('; ')})`);
     }
+    completeLocalTiming('failed');
     throw error;
   }
 }

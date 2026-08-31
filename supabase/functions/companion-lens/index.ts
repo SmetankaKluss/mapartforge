@@ -1780,6 +1780,7 @@ async function handleSessionPoll(
     0,
     Number.MAX_SAFE_INTEGER,
   );
+  const needsPreview = payload.needsPreview === true;
   const { serverHash, dimensionId } = normalizeServerContext(payload, false);
   const session = await loadSession(admin, sessionId);
   if (session.status === "closed" || session.status === "expired") {
@@ -1807,7 +1808,7 @@ async function handleSessionPoll(
   return json({
     changed,
     session: await mapSession(admin, session, undefined, principal.userId),
-    ...(changed && placements.length > 0
+    ...((changed || needsPreview) && placements.length > 0
       ? { signedPreviewUrl: await signedPreviewUrl(admin, session) }
       : {}),
     placements,

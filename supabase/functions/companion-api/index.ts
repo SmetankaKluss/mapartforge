@@ -4,6 +4,7 @@ import {
   companionStorageObjectUrl,
   parseReservedCompanionArtifacts,
   verifyCompanionArtifactResponse,
+  verifyCompanionArtifactYandexHeadResponse,
   type VerifiedCompanionArtifact,
 } from '../_shared/companionSaveVerification.ts';
 import { mapWithConcurrency } from '../_shared/boundedConcurrency.ts';
@@ -31,6 +32,7 @@ import {
   createCompanionArtifactUploadTarget,
   readCompanionArtifactYandexConfig,
   signCompanionArtifactYandexDownload,
+  signCompanionArtifactYandexHead,
 } from '../_shared/companionArtifactYandexStorage.ts';
 
 // Generated database types are not available in this standalone Edge bundle.
@@ -588,6 +590,7 @@ async function handleCompanionSaveFinalize(
         : LARGE_SAVE_VERIFICATION_CONCURRENCY,
       async artifact => {
         let response: Response;
+        let useYandexHeadVerification = false;
         try {
           const yandexConfig = artifact.storageProvider === 'yandex'
             ? readCompanionArtifactYandexConfig()
@@ -595,8 +598,11 @@ async function handleCompanionSaveFinalize(
           if (artifact.storageProvider === 'yandex' && !yandexConfig) {
             throw new CompanionArtifactVerificationError('artifact_storage_unavailable', true, 503);
           }
+          useYandexHeadVerification = Boolean(
+            yandexConfig && artifact.integrity === 'yandex-payload-v1' && artifact.contentMd5,
+          );
           const url = yandexConfig
-            ? await signCompanionArtifactYandexDownload(
+            ? await (useYandexHeadVerification ? signCompanionArtifactYandexHead : signCompanionArtifactYandexDownload)(
               yandexConfig,
               artifact.bucketId,
               artifact.storagePath,
@@ -604,7 +610,7 @@ async function handleCompanionSaveFinalize(
             )
             : companionStorageObjectUrl(supabaseUrl, artifact);
           response = await fetch(url, {
-            method: 'GET',
+            method: useYandexHeadVerification ? 'HEAD' : 'GET',
             redirect: 'error',
             cache: 'no-store',
             headers: artifact.storageProvider === 'supabase' ? {
@@ -618,7 +624,9 @@ async function handleCompanionSaveFinalize(
           if (error instanceof CompanionArtifactVerificationError) throw error;
           throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
         }
-        return verifyCompanionArtifactResponse(artifact, response);
+        return useYandexHeadVerification
+          ? verifyCompanionArtifactYandexHeadResponse(artifact, response)
+          : await verifyCompanionArtifactResponse(artifact, response);
       },
     );
     timings.verify = performance.now() - verifyStartedAt;

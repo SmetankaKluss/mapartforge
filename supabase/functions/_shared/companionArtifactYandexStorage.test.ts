@@ -8,6 +8,7 @@ import {
   readCompanionArtifactYandexConfig,
   removeCompanionArtifactYandexObjects,
   signCompanionArtifactYandexDownload,
+  signCompanionArtifactYandexHead,
 } from "./companionArtifactYandexStorage.ts";
 
 function environment(values: Record<string, string>) {
@@ -66,10 +67,14 @@ Deno.test("artifact upload target is immutable, encrypted and checksum-bound", a
     storagePath: "companion/owner/art/version/example.png",
     contentType: "image/png",
     sha256: "a".repeat(64),
+    integrity: { contentMd5: "kAFQmDzST7DWlj99KOF/cg==" },
   }, new Date("2026-08-14T00:00:00Z"));
   assertEquals(target.method, "PUT");
   assertEquals(target.headers["if-none-match"], "*");
   assertEquals(target.headers["x-amz-meta-sha256"], "a".repeat(64));
+  assertEquals(target.headers["x-amz-meta-integrity"], "yandex-payload-v1");
+  assertEquals(target.headers["x-amz-content-sha256"], "a".repeat(64));
+  assertEquals(target.headers["content-md5"], "kAFQmDzST7DWlj99KOF/cg==");
   assertEquals(target.headers["x-amz-server-side-encryption"], "aws:kms");
   assertEquals(
     target.headers["x-amz-server-side-encryption-aws-kms-key-id"],
@@ -82,8 +87,10 @@ Deno.test("artifact upload target is immutable, encrypted and checksum-bound", a
     url.searchParams.get("X-Amz-SignedHeaders") ?? "",
   );
   assert(signedHeaders.includes("content-type"));
+  assert(signedHeaders.includes("content-md5"));
   assert(signedHeaders.includes("if-none-match"));
   assert(signedHeaders.includes("x-amz-meta-sha256"));
+  assert(signedHeaders.includes("x-amz-content-sha256"));
   assert(signedHeaders.includes("x-amz-server-side-encryption"));
   assert(!target.url.includes(config.secretAccessKey));
 });
@@ -98,6 +105,20 @@ Deno.test("artifact download signature is private and expiry is bounded", async 
   );
   const parsed = new URL(url);
   assertEquals(parsed.searchParams.get("X-Amz-Expires"), "900");
+  assert(parsed.searchParams.has("X-Amz-Signature"));
+  assert(!url.includes(config.secretAccessKey));
+});
+
+Deno.test("artifact HEAD signature stays private and uses the metadata-only method", async () => {
+  const url = await signCompanionArtifactYandexHead(
+    config,
+    "mapkluss-companion-private",
+    "companion/owner/art/version/example.png",
+    60,
+    new Date("2026-08-14T00:00:00Z"),
+  );
+  const parsed = new URL(url);
+  assertEquals(parsed.searchParams.get("X-Amz-Expires"), "60");
   assert(parsed.searchParams.has("X-Amz-Signature"));
   assert(!url.includes(config.secretAccessKey));
 });

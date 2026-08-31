@@ -69,7 +69,8 @@ a runtime identity limited to get/put/delete below
 `cloud/v1/mapkluss-companion-private/`.
 Anonymous reads, public ACLs and bucket-policy administration must remain
 denied. Configure browser CORS for `https://mapkluss.art` with `GET`, `HEAD`
-and `PUT`, the signed upload headers and exposed `ETag`. Add an enabled
+and `PUT`, including `content-md5`, `x-amz-content-sha256`, the signed upload
+headers and exposed `ETag`. Add an enabled
 lifecycle below `cloud/v1/` that removes non-current versions within 30 days
 and incomplete multipart uploads within 7 days; the intended production
 values are 7 days and 1 day respectively. This is required because deleting a

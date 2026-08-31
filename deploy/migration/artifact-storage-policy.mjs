@@ -40,7 +40,10 @@ export function validateArtifactStoragePolicy({
       && ['GET', 'HEAD', 'PUT'].every(method => includesCaseInsensitive(methods, method))
       && [
         'content-type',
+        'content-md5',
         'if-none-match',
+        'x-amz-content-sha256',
+        'x-amz-meta-integrity',
         'x-amz-meta-sha256',
         'x-amz-meta-source-bucket',
         'x-amz-server-side-encryption',

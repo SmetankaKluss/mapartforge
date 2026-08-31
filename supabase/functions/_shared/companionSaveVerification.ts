@@ -14,6 +14,8 @@ export type ReservedCompanionArtifact = {
   sizeBytes: number;
   sha256: string;
   storageProvider?: 'supabase' | 'yandex';
+  integrity?: 'yandex-payload-v1';
+  contentMd5?: string;
 };
 
 export type VerifiedCompanionArtifact = Pick<
@@ -66,6 +68,8 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
       sizeBytes,
       sha256: String(row.sha256 ?? ''),
       storageProvider: row.storageProvider === 'yandex' ? 'yandex' : 'supabase',
+      integrity: row.integrity === 'yandex-payload-v1' ? 'yandex-payload-v1' : undefined,
+      contentMd5: typeof row.contentMd5 === 'string' ? row.contentMd5 : undefined,
     };
     if (
       !UUID_PATTERN.test(artifact.artifactId)
@@ -78,6 +82,8 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
       || sizeBytes < 1
       || sizeBytes > MAX_COMPANION_ARTIFACT_BYTES
       || !SHA256_PATTERN.test(artifact.sha256)
+      || (artifact.integrity === 'yandex-payload-v1'
+        && (!artifact.contentMd5 || !/^[A-Za-z0-9+/]{22}==$/.test(artifact.contentMd5)))
     ) {
       throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
     }
@@ -93,6 +99,43 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
     throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
   }
   return artifacts;
+}
+
+function contentMd5Hex(value: string): string {
+  const bytes = Uint8Array.from(atob(value), character => character.charCodeAt(0));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function assertVerifiedArtifactHeaders(
+  artifact: ReservedCompanionArtifact,
+  response: Response,
+): void {
+  const encoding = (response.headers.get('content-encoding') ?? 'identity').trim().toLowerCase();
+  if (encoding && encoding !== 'identity') {
+    throw new CompanionArtifactVerificationError('artifact_encoding_mismatch', false, 422);
+  }
+  if (normalizeMime(response.headers.get('content-type')) !== normalizeMime(artifact.contentType)) {
+    throw new CompanionArtifactVerificationError('artifact_mime_mismatch', false, 422);
+  }
+  const contentLength = response.headers.get('content-length');
+  if (contentLength !== null) {
+    const parsedLength = Number(contentLength);
+    if (!Number.isSafeInteger(parsedLength) || parsedLength !== artifact.sizeBytes) {
+      throw new CompanionArtifactVerificationError('artifact_size_mismatch', false, 422);
+    }
+  }
+}
+
+function verifiedArtifact(artifact: ReservedCompanionArtifact): VerifiedCompanionArtifact {
+  return {
+    artifactId: artifact.artifactId,
+    bucketId: artifact.bucketId,
+    storagePath: artifact.storagePath,
+    contentType: artifact.contentType,
+    sizeBytes: artifact.sizeBytes,
+    sha256: artifact.sha256,
+    storageProvider: artifact.storageProvider,
+  };
 }
 
 export async function verifyCompanionArtifactResponse(
@@ -111,21 +154,7 @@ export async function verifyCompanionArtifactResponse(
     throw new CompanionArtifactVerificationError('artifact_download_failed', true, 503);
   }
 
-  const encoding = (response.headers.get('content-encoding') ?? 'identity').trim().toLowerCase();
-  if (encoding && encoding !== 'identity') {
-    throw new CompanionArtifactVerificationError('artifact_encoding_mismatch', false, 422);
-  }
-  if (normalizeMime(response.headers.get('content-type')) !== normalizeMime(artifact.contentType)) {
-    throw new CompanionArtifactVerificationError('artifact_mime_mismatch', false, 422);
-  }
-
-  const contentLength = response.headers.get('content-length');
-  if (contentLength !== null) {
-    const parsedLength = Number(contentLength);
-    if (!Number.isSafeInteger(parsedLength) || parsedLength !== artifact.sizeBytes) {
-      throw new CompanionArtifactVerificationError('artifact_size_mismatch', false, 422);
-    }
-  }
+  assertVerifiedArtifactHeaders(artifact, response);
 
   const hash = createHash('sha256');
   const reader = response.body.getReader();
@@ -153,15 +182,31 @@ export async function verifyCompanionArtifactResponse(
     throw new CompanionArtifactVerificationError('artifact_sha256_mismatch', false, 422);
   }
 
-  return {
-    artifactId: artifact.artifactId,
-    bucketId: artifact.bucketId,
-    storagePath: artifact.storagePath,
-    contentType: artifact.contentType,
-    sizeBytes,
-    sha256,
-    storageProvider: artifact.storageProvider,
-  };
+  return verifiedArtifact(artifact);
+}
+
+export function verifyCompanionArtifactYandexHeadResponse(
+  artifact: ReservedCompanionArtifact,
+  response: Response,
+): VerifiedCompanionArtifact {
+  if (!response.ok) {
+    const retryable = response.status === 408 || response.status === 425 || response.status === 429 || response.status >= 500;
+    throw new CompanionArtifactVerificationError(
+      response.status === 404 ? 'reserved_artifact_missing' : 'artifact_download_failed',
+      retryable,
+      retryable ? 503 : 422,
+    );
+  }
+  if (artifact.storageProvider !== 'yandex' || artifact.integrity !== 'yandex-payload-v1' || !artifact.contentMd5) {
+    throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
+  }
+  assertVerifiedArtifactHeaders(artifact, response);
+  if ((response.headers.get('x-amz-meta-integrity') ?? '').trim() !== 'yandex-payload-v1'
+    || (response.headers.get('x-amz-meta-sha256') ?? '').trim().toLowerCase() !== artifact.sha256
+    || (response.headers.get('etag') ?? '').trim().replace(/^"|"$/g, '').toLowerCase() !== contentMd5Hex(artifact.contentMd5)) {
+    throw new CompanionArtifactVerificationError('artifact_integrity_mismatch', false, 422);
+  }
+  return verifiedArtifact(artifact);
 }
 
 export function companionStorageObjectUrl(supabaseUrl: string, artifact: ReservedCompanionArtifact): string {

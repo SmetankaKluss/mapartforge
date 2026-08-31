@@ -383,6 +383,70 @@
   --theme-header-overlay-opacity: 0.42;
 }
 
+/* Hidden URL-only theme: ?theme=midnight. Its neutral depth is inspired by Discord's darkest shell. */
+:root[data-theme='midnight'] {
+  --color-app-bg: #111214;
+  --color-app-bg-rgb: 17 18 20;
+  --color-surface-primary: #1e1f22;
+  --color-surface-primary-rgb: 30 31 34;
+  --color-surface-secondary: #2b2d31;
+  --color-surface-secondary-rgb: 43 45 49;
+  --color-surface-elevated: #35373c;
+  --color-surface-elevated-rgb: 53 55 60;
+  --color-field-bg: #0c0d0f;
+  --color-field-bg-rgb: 12 13 15;
+
+  --color-text-primary: #f2f3f5;
+  --color-text-primary-rgb: 242 243 245;
+  --color-text-secondary: #c2c6ce;
+  --color-text-secondary-rgb: 194 198 206;
+  --color-text-disabled: #a8acb4;
+  --color-text-disabled-rgb: 168 172 180;
+  --color-on-accent: #111214;
+
+  --color-border: #4e5058;
+  --color-border-rgb: 78 80 88;
+  --color-border-subtle: #35373c;
+  --color-border-subtle-rgb: 53 55 60;
+  --color-border-strong: #6d6f78;
+  --color-border-strong-rgb: 109 111 120;
+
+  --color-accent: #a4adff;
+  --color-accent-rgb: 164 173 255;
+  --color-accent-hover: #bcc3ff;
+  --color-accent-active: #7c86ff;
+  --color-focus: #d9ddff;
+  --color-focus-rgb: 217 221 255;
+  --color-success: #43b581;
+  --color-success-rgb: 67 181 129;
+  --color-warning: #f0b232;
+  --color-warning-rgb: 240 178 50;
+  --color-error: #ff9a9a;
+  --color-error-rgb: 255 154 154;
+  --color-info: #5ab8ff;
+  --color-info-rgb: 90 184 255;
+  --color-loading: #b6c3ff;
+  --color-loading-rgb: 182 195 255;
+  --color-export: #e6a34a;
+  --color-export-rgb: 230 163 74;
+  --color-technical: #83c9ff;
+  --color-technical-rgb: 131 201 255;
+  --color-value: #f0b232;
+  --color-value-rgb: 240 178 50;
+  --color-support: #f08bbb;
+  --color-support-rgb: 240 139 187;
+  --color-shadow-rgb: 0 0 0;
+  --canvas-workspace-bg: #0b0c0e;
+  --canvas-grid-line: rgb(242 243 245 / 0.028);
+  --canvas-grid-major: rgb(164 173 255 / 0.07);
+  --canvas-grid-size: 10px;
+  --canvas-empty-primary: #a4adff;
+  --canvas-empty-secondary: #f0b232;
+  --theme-header-shadow: inset 0 -2px 0 rgb(164 173 255 / 0.18);
+  --theme-panel-inset: inset 1px 0 0 rgb(242 243 245 / 0.03);
+  --theme-header-overlay-opacity: 0.3;
+}
+
 :root[data-theme='signal-white'] {
   color-scheme: light;
   --color-app-bg: #dfe3e1;

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Lang } from '../lib/localeContext';
-import { applyTheme, getAppliedTheme, isThemeId, THEME_OPTIONS, type ThemeId } from '../lib/theme';
+import { applyTheme, getAppliedTheme, getSecretThemeFromSearch, getThemeOption, isThemeId, THEME_OPTIONS, type ThemeId } from '../lib/theme';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 
@@ -13,19 +13,29 @@ export function ThemeSelector({ lang }: ThemeSelectorProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>(() => getAppliedTheme());
+  const [theme, setTheme] = useState<ThemeId>(() => getSecretThemeFromSearch(window.location.search) ?? getAppliedTheme());
   const menuId = useId();
   const initialFocusRef = useRef<'selected' | 'first' | 'last'>('selected');
   const isRussian = lang === 'ru';
-  const current = THEME_OPTIONS.find(option => option.id === theme) ?? THEME_OPTIONS[0];
+  const current = getThemeOption(theme);
 
   useEffect(() => {
+    const secretTheme = getSecretThemeFromSearch(window.location.search);
     const onThemeChange = (event: Event) => {
       const next = (event as CustomEvent<ThemeId>).detail;
+      if (secretTheme && next !== secretTheme) {
+        applyTheme(secretTheme, document.documentElement, null);
+        return;
+      }
       if (next) setTheme(next);
     };
     const onStorage = (event: StorageEvent) => {
       if (event.key !== 'mapkluss_ui_theme') return;
+      if (secretTheme) {
+        applyTheme(secretTheme, document.documentElement, null);
+        setTheme(secretTheme);
+        return;
+      }
       const next = isThemeId(event.newValue) ? event.newValue : 'classic';
       applyTheme(next, document.documentElement, null);
       setTheme(next);
@@ -48,7 +58,7 @@ export function ThemeSelector({ lang }: ThemeSelectorProps) {
         : initialFocusRef.current === 'last'
           ? options.at(-1)
           : options.find(option => option.getAttribute('aria-checked') === 'true');
-      target?.focus();
+      (target ?? options[0])?.focus();
       initialFocusRef.current = 'selected';
     });
 

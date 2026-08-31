@@ -27,6 +27,10 @@ export type CompanionArtifactUploadTarget = {
   headers: Record<string, string>;
 };
 
+export type CompanionArtifactIntegrity = {
+  contentMd5: string;
+};
+
 export type CompanionArtifactYandexMethod = "GET" | "HEAD" | "PUT" | "DELETE";
 
 function readEnvironment(
@@ -214,6 +218,7 @@ export async function presignCompanionArtifactYandexRequest(
   expiresIn = MAX_PRESIGNED_SECONDS,
   additionalSignedHeaders: Readonly<Record<string, string>> = {},
   now = new Date(),
+  payloadHash = "UNSIGNED-PAYLOAD",
 ): Promise<string> {
   const endpoint = new URL(config.endpoint);
   const objectKey = companionArtifactYandexObjectKey(
@@ -256,13 +261,16 @@ export async function presignCompanionArtifactYandexRequest(
     ["X-Amz-SignedHeaders", signedHeaders],
   ];
   const query = canonicalQuery(entries);
+  const canonicalPayloadHash = payloadHash === "UNSIGNED-PAYLOAD"
+    ? payloadHash
+    : normalizedSha256(payloadHash);
   const canonicalRequest = [
     method,
     canonicalUri,
     query,
     canonicalHeaders,
     signedHeaders,
-    "UNSIGNED-PAYLOAD",
+    canonicalPayloadHash,
   ].join("\n");
   const stringToSign = [
     "AWS4-HMAC-SHA256",
@@ -422,11 +430,12 @@ export async function createCompanionArtifactUploadTarget(
     storagePath: string;
     contentType: string;
     sha256: string;
+    integrity?: CompanionArtifactIntegrity;
   },
   now = new Date(),
 ): Promise<CompanionArtifactUploadTarget> {
   const sha256 = normalizedSha256(artifact.sha256);
-  const headers = {
+  const headers: Record<string, string> = {
     "content-type": artifact.contentType,
     "if-none-match": "*",
     "x-amz-meta-sha256": sha256,
@@ -434,6 +443,15 @@ export async function createCompanionArtifactUploadTarget(
     "x-amz-server-side-encryption": "aws:kms",
     "x-amz-server-side-encryption-aws-kms-key-id": config.kmsKeyId,
   };
+  if (artifact.integrity) {
+    const contentMd5 = artifact.integrity.contentMd5.trim();
+    if (!/^[A-Za-z0-9+/]{22}==$/.test(contentMd5)) {
+      throw new Error("Companion artifact Yandex MD5 is invalid");
+    }
+    headers["content-md5"] = contentMd5;
+    headers["x-amz-content-sha256"] = sha256;
+    headers["x-amz-meta-integrity"] = "yandex-payload-v1";
+  }
   return {
     method: "PUT",
     url: await presignCompanionArtifactYandexRequest(
@@ -444,6 +462,7 @@ export async function createCompanionArtifactUploadTarget(
       MAX_PRESIGNED_SECONDS,
       headers,
       now,
+      artifact.integrity ? sha256 : undefined,
     ),
     headers,
   };
@@ -459,6 +478,24 @@ export async function signCompanionArtifactYandexDownload(
   return presignCompanionArtifactYandexRequest(
     config,
     "GET",
+    sourceBucket,
+    logicalPath,
+    expiresIn,
+    {},
+    now,
+  );
+}
+
+export async function signCompanionArtifactYandexHead(
+  config: CompanionArtifactYandexConfig,
+  sourceBucket: string,
+  logicalPath: string,
+  expiresIn = 60 * 30,
+  now = new Date(),
+): Promise<string> {
+  return presignCompanionArtifactYandexRequest(
+    config,
+    "HEAD",
     sourceBucket,
     logicalPath,
     expiresIn,

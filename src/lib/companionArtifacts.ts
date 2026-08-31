@@ -1,3 +1,4 @@
+import { md5 } from '@noble/hashes/legacy';
 import type { MapGrid } from './types';
 import type { CompanionArtifactKind } from './companionTypes';
 
@@ -64,17 +65,32 @@ export function companionArtifactFilename(
   return `${slug}_${middle}.${KIND_EXTENSIONS[kind]}`;
 }
 
-export async function sha256Hex(data: Blob | ArrayBuffer | Uint8Array | string): Promise<string> {
-  let buffer: ArrayBuffer;
+async function bytesFromArtifactData(data: Blob | ArrayBuffer | Uint8Array | string): Promise<Uint8Array> {
   if (typeof data === 'string') {
-    buffer = new TextEncoder().encode(data).buffer;
-  } else if (data instanceof Blob) {
-    buffer = await data.arrayBuffer();
-  } else if (data instanceof Uint8Array) {
-    buffer = new Uint8Array(data).buffer;
-  } else {
-    buffer = data;
+    return new TextEncoder().encode(data);
   }
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
+  if (data instanceof Uint8Array) return new Uint8Array(data);
+  return new Uint8Array(data);
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export async function companionArtifactChecksums(
+  data: Blob | ArrayBuffer | Uint8Array | string,
+): Promise<{ sha256: string; contentMd5: string }> {
+  const bytes = await bytesFromArtifactData(data);
+  const digestInput = new Uint8Array(bytes.byteLength);
+  digestInput.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', digestInput.buffer);
+  const sha256 = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  return { sha256, contentMd5: bytesToBase64(md5(bytes)) };
+}
+
+export async function sha256Hex(data: Blob | ArrayBuffer | Uint8Array | string): Promise<string> {
+  return (await companionArtifactChecksums(data)).sha256;
 }

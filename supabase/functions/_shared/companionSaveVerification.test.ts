@@ -5,6 +5,7 @@ import {
   parseReservedCompanionArtifacts,
   type ReservedCompanionArtifact,
   verifyCompanionArtifactResponse,
+  verifyCompanionArtifactYandexHeadResponse,
 } from "./companionSaveVerification.ts";
 import { createHash } from "node:crypto";
 
@@ -140,6 +141,44 @@ Deno.test("strictly parses the server manifest and encodes Storage paths", () =>
       storagePath: "companion/a folder/file#.json",
     }) ===
       "https://example.supabase.co/storage/v1/object/authenticated/mapkluss-companion-private/companion/a%20folder/file%23.json",
+  );
+});
+
+Deno.test("accepts Yandex metadata only when the signed payload integrity proof matches", async () => {
+  const bytes = new TextEncoder().encode("123");
+  const artifact = artifactFor(bytes, {
+    storageProvider: "yandex",
+    integrity: "yandex-payload-v1",
+    contentMd5: "ICy5YqxZB1uWSwcVLSNLcA==",
+  });
+  const verified = verifyCompanionArtifactYandexHeadResponse(
+    artifact,
+    new Response(null, {
+      headers: {
+        "content-type": "application/json",
+        "content-length": "3",
+        "etag": '"202cb962ac59075b964b07152d234b70"',
+        "x-amz-meta-integrity": "yandex-payload-v1",
+        "x-amz-meta-sha256": artifact.sha256,
+      },
+    }),
+  );
+  assert(verified.sha256 === artifact.sha256);
+
+  await expectCode(
+    Promise.resolve().then(() => verifyCompanionArtifactYandexHeadResponse(
+      artifact,
+      new Response(null, {
+        headers: {
+          "content-type": "application/json",
+          "content-length": "3",
+          "etag": '"00000000000000000000000000000000"',
+          "x-amz-meta-integrity": "yandex-payload-v1",
+          "x-amz-meta-sha256": artifact.sha256,
+        },
+      }),
+    )),
+    "artifact_integrity_mismatch",
   );
 });
 

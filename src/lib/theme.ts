@@ -13,7 +13,12 @@ export const THEME_IDS = [
   'rose-oxide',
 ] as const;
 
-export type ThemeId = (typeof THEME_IDS)[number];
+export const SECRET_THEME_ID = 'midnight' as const;
+
+type PublicThemeId = (typeof THEME_IDS)[number];
+type SecretThemeId = typeof SECRET_THEME_ID;
+
+export type ThemeId = PublicThemeId | SecretThemeId;
 
 export interface ThemeOption {
   id: ThemeId;
@@ -118,13 +123,36 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   },
 ] as const;
 
+const SECRET_THEME_OPTION: ThemeOption = {
+  id: SECRET_THEME_ID,
+  label: 'Midnight',
+  labelRu: 'Полночь',
+  description: 'Discord-inspired deepest dark',
+  descriptionRu: 'Самая тёмная гамма в духе Discord',
+  themeColor: '#111214',
+  colorScheme: 'dark',
+};
+
+function isPublicThemeId(value: unknown): value is PublicThemeId {
+  return typeof value === 'string' && THEME_IDS.includes(value as PublicThemeId);
+}
+
 export function isThemeId(value: unknown): value is ThemeId {
-  return typeof value === 'string' && THEME_IDS.includes(value as ThemeId);
+  return value === SECRET_THEME_ID || isPublicThemeId(value);
+}
+
+export function getThemeOption(theme: ThemeId): ThemeOption {
+  if (theme === SECRET_THEME_ID) return SECRET_THEME_OPTION;
+  return THEME_OPTIONS.find(option => option.id === theme) ?? THEME_OPTIONS[0];
+}
+
+export function getSecretThemeFromSearch(search: string): SecretThemeId | null {
+  return new URLSearchParams(search).get('theme') === SECRET_THEME_ID ? SECRET_THEME_ID : null;
 }
 
 export function resolveTheme(attributeValue: unknown, storedValue: unknown): ThemeId {
   if (isThemeId(attributeValue)) return attributeValue;
-  if (isThemeId(storedValue)) return storedValue;
+  if (isPublicThemeId(storedValue)) return storedValue;
   return 'classic';
 }
 
@@ -146,6 +174,8 @@ export function readStoredTheme(storage?: Pick<Storage, 'getItem'> | null): Them
 }
 
 export function getAppliedTheme(root: HTMLElement = document.documentElement): ThemeId {
+  const secretTheme = getSecretThemeFromSearch(globalThis.location?.search ?? '');
+  if (secretTheme) return secretTheme;
   const storage = getBrowserStorage();
   try {
     return resolveTheme(root.dataset.theme, storage?.getItem(THEME_STORAGE_KEY));
@@ -160,14 +190,16 @@ export function applyTheme(
   storage?: Pick<Storage, 'setItem'> | null,
 ): void {
   root.dataset.theme = theme;
-  const option = THEME_OPTIONS.find(candidate => candidate.id === theme);
+  const option = getThemeOption(theme);
   root.style.colorScheme = option?.colorScheme ?? 'dark';
 
   const target = storage === undefined ? getBrowserStorage() : storage;
-  try {
-    target?.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // The theme still applies for this tab when storage is unavailable.
+  if (theme !== SECRET_THEME_ID) {
+    try {
+      target?.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // The theme still applies for this tab when storage is unavailable.
+    }
   }
 
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
