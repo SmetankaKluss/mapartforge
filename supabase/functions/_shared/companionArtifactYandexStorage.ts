@@ -464,7 +464,8 @@ export async function createCompanionArtifactUploadTarget(
       MAX_PRESIGNED_SECONDS,
       headers,
       now,
-      artifact.integrity ? sha256 : undefined,
+      // Yandex presigned URLs require this terminator; SHA remains a signed header.
+      "UNSIGNED-PAYLOAD",
     ),
     headers,
   };
