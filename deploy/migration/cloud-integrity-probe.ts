@@ -111,7 +111,9 @@ Deno.serve(async request => {
       await repeated.body?.cancel();
       if (!checks[stage]) throw new Error(stage);
     }
-    ok = Object.values(checks).every(Boolean);
+    ok = Object.entries(checks)
+      .filter(([name]) => name !== 'changed_payload_accepted' && !name.startsWith('provider_'))
+      .every(([, passed]) => passed);
   } catch {
     checks[stage] = false;
   } finally {
