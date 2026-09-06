@@ -496,10 +496,11 @@ async function handleCompanionSavePrepare(
   const yandexConfig = readCompanionArtifactYandexConfig();
   if (useYandex && !yandexConfig) return json({ error: 'artifact_storage_unavailable' }, 503);
   const storageProvider = useYandex ? 'yandex' : 'supabase';
-  const artifacts = requestedArtifacts.map(entry => ({
-    ...(entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}),
-    storageProvider,
-  }));
+  const artifacts = requestedArtifacts.map(entry => {
+    const row = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
+    const hasChecksum = typeof row.contentMd5 === 'string' && /^[A-Za-z0-9+/]{22}==$/.test(row.contentMd5);
+    return { ...row, storageProvider, integrity: useYandex && hasChecksum ? 'yandex-payload-v2' : undefined };
+  });
   const userClient = createClient(supabaseUrl, serviceKey, {
     global: { headers: { Authorization: `Bearer ${bearer.token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
@@ -526,8 +527,8 @@ async function handleCompanionSavePrepare(
           storagePath: String(row.storagePath ?? ''),
           contentType: String(row.contentType ?? ''),
           sha256: String(row.sha256 ?? ''),
-          integrity: row.integrity === 'yandex-payload-v1'
-            ? { contentMd5: String(row.contentMd5 ?? '') }
+          integrity: row.integrity === 'yandex-payload-v2'
+            ? { contentMd5: String(row.contentMd5 ?? ''), protocol: 'yandex-payload-v2' }
             : undefined,
         }),
       };
@@ -602,7 +603,7 @@ async function handleCompanionSaveFinalize(
             throw new CompanionArtifactVerificationError('artifact_storage_unavailable', true, 503);
           }
           useYandexHeadVerification = Boolean(
-            yandexConfig && artifact.integrity === 'yandex-payload-v1' && artifact.contentMd5,
+            yandexConfig && artifact.integrity === 'yandex-payload-v2' && artifact.contentMd5,
           );
           const url = yandexConfig
             ? await (useYandexHeadVerification ? signCompanionArtifactYandexHead : signCompanionArtifactYandexDownload)(

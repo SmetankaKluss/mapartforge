@@ -35,7 +35,7 @@ Deno.serve(async request => {
     bucketId: 'mapkluss-companion-private', storagePath: `qa/integrity-probe/${run}/${name}.bin`,
     contentType: 'application/octet-stream', sizeBytes: bytes.length,
     sha256: createHash('sha256').update(bytes).digest('hex'), storageProvider: 'yandex',
-    ...(name === 'marked' ? { integrity: 'yandex-payload-v1' as const, contentMd5 } : {}),
+    ...(name === 'marked' ? { integrity: 'yandex-payload-v2' as const, contentMd5 } : {}),
   }));
   let stage = 'start';
   const checks: Record<string, boolean> = {};
@@ -43,23 +43,13 @@ Deno.serve(async request => {
   const send: typeof fetch = (input, init = {}) => fetch(input, {
     ...init, signal: AbortSignal.timeout(15000),
   });
-  // Isolated protocol experiment, not a browser upload contract.
-  const nativeTarget = async (target: { url: string; headers: Record<string, string> }) => {
-    const url = new URL(target.url);
-    url.search = '';
-    const aws = new AwsClient({ ...config, service: 's3', retries: 0 });
-    const signed = await aws.sign(url.toString(), {
-      method: 'PUT', headers: target.headers, aws: { allHeaders: true },
-    });
-    return { ...target, url: signed.url, headers: Object.fromEntries(signed.headers) };
-  };
   let ok = false;
   try {
     for (const row of rows) {
       const marked = !!row.integrity;
       const name = marked ? 'marked' : 'legacy';
-      let target = await createCompanionArtifactUploadTarget(config, {
-        ...row, integrity: marked ? { contentMd5 } : undefined,
+      const target = await createCompanionArtifactUploadTarget(config, {
+        ...row, integrity: marked ? { contentMd5, protocol: 'yandex-payload-v2' } : undefined,
       });
       if (marked) {
         stage = 'browser_cors';
@@ -78,14 +68,13 @@ Deno.serve(async request => {
           && methods.includes('PUT') && Object.keys(target.headers).every(header => headers.includes('*') || headers.includes(header.toLowerCase()));
         await cors.body?.cancel();
         if (!checks.browser_cors) throw new Error(stage);
-        target = await nativeTarget(target);
         stage = 'changed_payload';
         const changed = bytes.slice();
         changed[0] ^= 1;
         // A matching MD5 cannot excuse a mismatched signed SHA-256 payload.
-        const wrongTarget = await nativeTarget(await createCompanionArtifactUploadTarget(config, {
-          ...row, integrity: { contentMd5: createHash('md5').update(changed).digest('base64') },
-        }));
+        const wrongTarget = await createCompanionArtifactUploadTarget(config, {
+          ...row, integrity: { contentMd5: createHash('md5').update(changed).digest('base64'), protocol: 'yandex-payload-v2' },
+        });
         const rejected = await send(wrongTarget.url, { method: 'PUT', headers: wrongTarget.headers, body: changed });
         checks.changed_payload_rejected = [400, 403].includes(rejected.status);
         checks.changed_payload_accepted = rejected.ok;

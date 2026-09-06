@@ -29,6 +29,7 @@ export type CompanionArtifactUploadTarget = {
 
 export type CompanionArtifactIntegrity = {
   contentMd5: string;
+  protocol?: "yandex-payload-v2";
 };
 
 export type CompanionArtifactYandexMethod = "GET" | "HEAD" | "PUT" | "DELETE";
@@ -452,7 +453,28 @@ export async function createCompanionArtifactUploadTarget(
     }
     headers["content-md5"] = contentMd5;
     headers["x-amz-content-sha256"] = sha256;
-    headers["x-amz-meta-integrity"] = "yandex-payload-v1";
+    headers["x-amz-meta-integrity"] = artifact.integrity.protocol ?? "yandex-payload-v1";
+  }
+  if (artifact.integrity?.protocol === "yandex-payload-v2") {
+    const endpoint = new URL(config.endpoint);
+    const objectKey = companionArtifactYandexObjectKey(config, artifact.bucketId, artifact.storagePath);
+    const canonicalUri = `/${awsEncode(config.bucket)}/${encodePath(objectKey)}`;
+    const { dateStamp, amzDate } = timestamp(now);
+    const scope = `${dateStamp}/${config.region}/s3/aws4_request`;
+    headers["x-amz-date"] = amzDate;
+    const entries = Object.entries({ ...headers, host: endpoint.host })
+      .map(([name, value]) => [name, value.trim().replace(/\s+/g, " ")])
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+    const signedHeaders = entries.map(([name]) => name).join(";");
+    const canonicalHeaders = entries.map(([name, value]) => `${name}:${value}`).join("\n") + "\n";
+    const canonical = ["PUT", canonicalUri, "", canonicalHeaders, signedHeaders, sha256].join("\n");
+    const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, await sha256Text(canonical)].join("\n");
+    const dateKey = await hmac(encoder.encode(`AWS4${config.secretAccessKey}`).buffer as ArrayBuffer, dateStamp);
+    const regionKey = await hmac(dateKey, config.region);
+    const serviceKey = await hmac(regionKey, "s3");
+    const signingKey = await hmac(serviceKey, "aws4_request");
+    headers.authorization = `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${hex(await hmac(signingKey, stringToSign))}`;
+    return { method: "PUT", url: `${endpoint.origin}${canonicalUri}`, headers };
   }
   return {
     method: "PUT",

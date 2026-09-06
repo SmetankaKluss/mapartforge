@@ -1,4 +1,5 @@
 import { assert, assertEquals, assertRejects } from "jsr:@std/assert@1";
+import { AwsClient } from "npm:aws4fetch@1.0.20";
 import {
   type CompanionArtifactYandexConfig,
   companionArtifactYandexObjectKey,
@@ -88,6 +89,23 @@ Deno.test("artifact upload target is immutable, encrypted and checksum-bound", a
   );
   assertEquals(signedHeaders, "content-md5;content-type;host;if-none-match;x-amz-content-sha256;x-amz-meta-integrity;x-amz-meta-sha256;x-amz-meta-source-bucket;x-amz-server-side-encryption;x-amz-server-side-encryption-aws-kms-key-id");
   assert(!target.url.includes(config.secretAccessKey));
+});
+
+Deno.test("v2 upload signature matches an independent native SigV4 implementation", async () => {
+  const now = new Date("2026-09-07T00:00:00Z");
+  const target = await createCompanionArtifactUploadTarget(config, {
+    bucketId: "mapkluss-companion-private", storagePath: "companion/test/a space.png",
+    contentType: "image/png", sha256: "a".repeat(64),
+    integrity: { contentMd5: "kAFQmDzST7DWlj99KOF/cg==", protocol: "yandex-payload-v2" },
+  }, now);
+  const { authorization, ...headers } = target.headers;
+  const independent = await new AwsClient({ ...config, service: "s3", retries: 0 }).sign(target.url, {
+    method: "PUT", headers, aws: { allHeaders: true, datetime: "20260907T000000Z" },
+  });
+  assertEquals(authorization, independent.headers.get("authorization"));
+  assertEquals(new URL(target.url).search, "");
+  assertEquals(headers["x-amz-meta-integrity"], "yandex-payload-v2");
+  assert(!JSON.stringify(target).includes(config.secretAccessKey));
 });
 
 Deno.test("artifact download signature is private and expiry is bounded", async () => {

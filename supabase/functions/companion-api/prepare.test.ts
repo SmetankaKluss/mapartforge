@@ -58,13 +58,14 @@ Deno.test('real prepare handler preserves the upload integrity contract', async 
       assertEquals(response.status, 200);
       const result = await response.json();
       assertEquals(result.storageProvider, 'yandex');
-      assertEquals(reserved[0].integrity, 'yandex-payload-v1');
+      assertEquals(reserved[0].integrity, 'yandex-payload-v2');
       const target = result.uploadTargets[0];
       assertEquals(target.headers['content-md5'], 'kAFQmDzST7DWlj99KOF/cg==');
       assertEquals(target.headers['x-amz-content-sha256'], artifact.sha256);
-      assertEquals(target.headers['x-amz-meta-integrity'], 'yandex-payload-v1');
+      assertEquals(target.headers['x-amz-meta-integrity'], 'yandex-payload-v2');
       assertEquals(target.headers['if-none-match'], '*');
-      const signed = new URL(target.url).searchParams.get('X-Amz-SignedHeaders')!.split(';');
+      assertEquals(new URL(target.url).search, '');
+      const signed = target.headers.authorization.split('SignedHeaders=')[1].split(',')[0].split(';');
       for (const header of ['content-md5', 'x-amz-content-sha256', 'x-amz-meta-integrity', 'if-none-match']) {
         assert(signed.includes(header));
       }
@@ -75,6 +76,11 @@ Deno.test('real prepare handler preserves the upload integrity contract', async 
       assertEquals(headers['x-amz-meta-integrity'], undefined);
       assertEquals(headers['content-md5'], undefined);
       assertEquals(headers['x-amz-content-sha256'], undefined);
+    });
+    await t.step('client cannot force the trusted marker without a checksum', async () => {
+      const result = await (await send({ integrity: 'yandex-payload-v2' })).json();
+      assertEquals(reserved[0].integrity, undefined);
+      assertEquals(result.uploadTargets[0].headers.authorization, undefined);
     });
     await t.step('rejected ownership never receives an upload URL', async () => {
       rejectReservation = true;

@@ -148,7 +148,7 @@ Deno.test("accepts Yandex metadata only when the signed payload integrity proof 
   const bytes = new TextEncoder().encode("123");
   const artifact = artifactFor(bytes, {
     storageProvider: "yandex",
-    integrity: "yandex-payload-v1",
+    integrity: "yandex-payload-v2",
     contentMd5: "ICy5YqxZB1uWSwcVLSNLcA==",
   });
   const verified = verifyCompanionArtifactYandexHeadResponse(
@@ -158,12 +158,18 @@ Deno.test("accepts Yandex metadata only when the signed payload integrity proof 
         "content-type": "application/json",
         "content-length": "3",
         "etag": '"202cb962ac59075b964b07152d234b70"',
-        "x-amz-meta-integrity": "yandex-payload-v1",
+        "x-amz-meta-integrity": "yandex-payload-v2",
         "x-amz-meta-sha256": artifact.sha256,
       },
     }),
   );
   assert(verified.sha256 === artifact.sha256);
+  await expectCode(
+    Promise.resolve().then(() => verifyCompanionArtifactYandexHeadResponse(
+      { ...artifact, integrity: "yandex-payload-v1" }, new Response(null),
+    )),
+    "invalid_reserved_manifest",
+  );
 
   await expectCode(
     Promise.resolve().then(() => verifyCompanionArtifactYandexHeadResponse(
@@ -172,7 +178,7 @@ Deno.test("accepts Yandex metadata only when the signed payload integrity proof 
         headers: {
           "content-type": "application/json",
           "etag": '"202cb962ac59075b964b07152d234b70"',
-          "x-amz-meta-integrity": "yandex-payload-v1",
+          "x-amz-meta-integrity": "yandex-payload-v2",
           "x-amz-meta-sha256": artifact.sha256,
         },
       }),
@@ -188,7 +194,7 @@ Deno.test("accepts Yandex metadata only when the signed payload integrity proof 
           "content-type": "application/json",
           "content-length": "3",
           "etag": '"00000000000000000000000000000000"',
-          "x-amz-meta-integrity": "yandex-payload-v1",
+          "x-amz-meta-integrity": "yandex-payload-v2",
           "x-amz-meta-sha256": artifact.sha256,
         },
       }),

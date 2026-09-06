@@ -14,7 +14,7 @@ export type ReservedCompanionArtifact = {
   sizeBytes: number;
   sha256: string;
   storageProvider?: 'supabase' | 'yandex';
-  integrity?: 'yandex-payload-v1';
+  integrity?: 'yandex-payload-v1' | 'yandex-payload-v2';
   contentMd5?: string;
 };
 
@@ -68,7 +68,7 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
       sizeBytes,
       sha256: String(row.sha256 ?? ''),
       storageProvider: row.storageProvider === 'yandex' ? 'yandex' : 'supabase',
-      integrity: row.integrity === 'yandex-payload-v1' ? 'yandex-payload-v1' : undefined,
+      integrity: row.integrity === 'yandex-payload-v1' || row.integrity === 'yandex-payload-v2' ? row.integrity : undefined,
       contentMd5: typeof row.contentMd5 === 'string' ? row.contentMd5 : undefined,
     };
     if (
@@ -82,7 +82,7 @@ export function parseReservedCompanionArtifacts(value: unknown): ReservedCompani
       || sizeBytes < 1
       || sizeBytes > MAX_COMPANION_ARTIFACT_BYTES
       || !SHA256_PATTERN.test(artifact.sha256)
-      || (artifact.integrity === 'yandex-payload-v1'
+      || (artifact.integrity
         && (!artifact.contentMd5 || !/^[A-Za-z0-9+/]{22}==$/.test(artifact.contentMd5)))
     ) {
       throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
@@ -197,14 +197,14 @@ export function verifyCompanionArtifactYandexHeadResponse(
       retryable ? 503 : 422,
     );
   }
-  if (artifact.storageProvider !== 'yandex' || artifact.integrity !== 'yandex-payload-v1' || !artifact.contentMd5) {
+  if (artifact.storageProvider !== 'yandex' || artifact.integrity !== 'yandex-payload-v2' || !artifact.contentMd5) {
     throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
   }
   if (response.headers.get('content-length') === null) {
     throw new CompanionArtifactVerificationError('artifact_size_mismatch', false, 422);
   }
   assertVerifiedArtifactHeaders(artifact, response);
-  if ((response.headers.get('x-amz-meta-integrity') ?? '').trim() !== 'yandex-payload-v1'
+  if ((response.headers.get('x-amz-meta-integrity') ?? '').trim() !== 'yandex-payload-v2'
     || (response.headers.get('x-amz-meta-sha256') ?? '').trim().toLowerCase() !== artifact.sha256
     || (response.headers.get('etag') ?? '').trim().replace(/^"|"$/g, '').toLowerCase() !== contentMd5Hex(artifact.contentMd5)) {
     throw new CompanionArtifactVerificationError('artifact_integrity_mismatch', false, 422);
