@@ -25,7 +25,10 @@ const auth = {
 test('collects a redacted platform snapshot', async () => {
   const fixtures = new Map([
     ['/config/auth', auth],
-    ['/config/realtime', { max_concurrent_users: 100, presence_enabled: true }],
+    ['/config/realtime', {
+      max_concurrent_users: 100, presence_enabled: true,
+      connection_pool: 5, postgres_changes_pool: 2, private_only: false,
+    }],
     ['/config/storage', {
       fileSizeLimit: 1024,
       features: { imageTransformation: { enabled: true } },
@@ -53,6 +56,10 @@ test('collects a redacted platform snapshot', async () => {
   assert.equal(snapshot.storage.externalConfigured, true);
   assert.equal(snapshot.auth.providers.google.enabled, false);
   assert.equal(snapshot.auth.smtpConfigured, true);
+  assert.deepEqual(snapshot.realtime, {
+    connection_pool: 5, postgres_changes_pool: 2, private_only: false,
+    max_concurrent_users: 100, presence_enabled: true,
+  });
   assert.deepEqual(snapshot.secretNames, ['TELEGRAM_BOT_TOKEN']);
   assert.deepEqual(snapshot.apiKeys, [{ name: 'anon', type: 'legacy', createdAt: null, updatedAt: null }]);
   assert.doesNotMatch(JSON.stringify(snapshot), /must-not-leak/);
@@ -72,6 +79,47 @@ test('fails closed for an unknown Auth field', async () => {
       fixtures[new URL(url).pathname.replace('/v1/projects/abcdefghijklmnopqrst', '')],
     )),
   }), /Unclassified Auth fields: brand_new_unclassified_setting/);
+});
+
+async function collectWithRealtime(realtime) {
+  const fixtures = {
+    '/config/auth': auth, '/config/realtime': realtime,
+    '/config/storage': {}, '/postgrest': {},
+    '/functions': [], '/secrets': [], '/api-keys': [],
+  };
+  return collectPlatformConfig({
+    accessToken: 'test-token',
+    projectRef: 'abcdefghijklmnopqrst',
+    managementApi: 'https://management.test/v1',
+    fetchImpl: async (url) => new Response(JSON.stringify(
+      fixtures[new URL(url).pathname.replace('/v1/projects/abcdefghijklmnopqrst', '')],
+    )),
+  });
+}
+
+test('accepts unset Realtime options from older project configurations', async () => {
+  const realtime = { connection_pool: null, postgres_changes_pool: null, private_only: null };
+  assert.deepEqual((await collectWithRealtime(realtime)).realtime, realtime);
+  assert.deepEqual((await collectWithRealtime({})).realtime, {});
+});
+
+test('does not leak unclassified or malformed Realtime configuration', async () => {
+  await assert.rejects(
+    () => collectWithRealtime({ new_secret: 'must-not-leak' }),
+    /Unclassified Realtime fields: new_secret/,
+  );
+  for (const realtime of [
+    { connection_pool: { password: 'must-not-leak' } },
+    { postgres_changes_pool: 'must-not-leak' },
+    { connection_pool: 1.5 },
+    { private_only: 'must-not-leak' },
+  ]) {
+    await assert.rejects(() => collectWithRealtime(realtime), (error) => {
+      assert.match(error.message, /^Invalid Realtime field:/);
+      assert.doesNotMatch(error.message, /must-not-leak/);
+      return true;
+    });
+  }
 });
 
 test('attaches the platform checksum atomically to a v2 manifest', () => {

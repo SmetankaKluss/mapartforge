@@ -51,6 +51,7 @@ const OMITTED_AUTH_PATTERNS = [
   /^smtp_/,
 ];
 const SAFE_REALTIME_KEYS = new Set([
+  'connection_pool', 'postgres_changes_pool', 'private_only',
   'max_bytes_per_second', 'max_channels_per_client', 'max_concurrent_users',
   'max_events_per_second', 'max_joins_per_second', 'max_payload_size_in_kb',
   'max_presence_events_per_second', 'presence_enabled', 'suspend',
@@ -102,7 +103,7 @@ export async function collectPlatformConfig({
       providers: providerStatus(auth),
       smtpConfigured: Boolean(auth.smtp_host && auth.smtp_user && auth.smtp_pass),
     },
-    realtime: pickStrict(realtime, SAFE_REALTIME_KEYS, 'Realtime'),
+    realtime: sanitizeRealtime(realtime),
     storage: sanitizeStorage(storage),
     postgrest: pickStrict(postgrest, SAFE_POSTGREST_KEYS, 'PostgREST'),
     functions: requireArray(functions, 'Functions').map((item) => ({
@@ -165,6 +166,19 @@ function pickStrict(value, allowed, label) {
 
 function pick(value, allowed) {
   return Object.fromEntries([...allowed].filter((key) => key in value).map((key) => [key, value[key]]));
+}
+
+function sanitizeRealtime(value) {
+  const result = pickStrict(value, SAFE_REALTIME_KEYS, 'Realtime');
+  for (const key of ['connection_pool', 'postgres_changes_pool']) {
+    if (key in result && result[key] !== null && !Number.isSafeInteger(result[key])) {
+      throw new Error(`Invalid Realtime field: ${key}`);
+    }
+  }
+  if ('private_only' in result && result.private_only !== null && typeof result.private_only !== 'boolean') {
+    throw new Error('Invalid Realtime field: private_only');
+  }
+  return result;
 }
 
 function sanitizeStorage(value) {
