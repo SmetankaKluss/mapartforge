@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
 
 const project = process.env.SUPABASE_PROJECT_REF;
 const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -40,6 +41,8 @@ if (process.argv.includes('--cleanup')) {
     let source = await readFile('deploy/migration/cloud-integrity-probe.ts', 'utf8');
     source = source.replaceAll('../../supabase/functions/_shared/', '../_shared/');
     source = source.replace('/* DEPLOY_EXPIRY */0', String(Date.now() + 15 * 60 * 1000));
+    const proofToken = randomBytes(32).toString('hex');
+    source = source.replace('DEPLOY_TOKEN_HASH', createHash('sha256').update(proofToken).digest('hex'));
     await writeFile(join(target, 'index.ts'), source);
     for (const name of ['companionArtifactYandexStorage.ts', 'companionSaveVerification.ts']) {
       await writeFile(join(shared, name), await readFile(`supabase/functions/_shared/${name}`));
@@ -60,12 +63,12 @@ if (process.argv.includes('--cleanup')) {
     const key = keys.find(value => value.name === 'service_role')?.api_key;
     if (!key) throw new Error('Proof credential unavailable');
     const response = await fetch(endpoint, { method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, apikey: key }, signal: AbortSignal.timeout(180000) });
+      headers: { Authorization: `Bearer ${key}`, apikey: key, 'x-proof-token': proofToken }, signal: AbortSignal.timeout(180000) });
     console.log(JSON.stringify({ proofHttpStatus: response.status }));
     const result = await response.json().catch(() => ({ ok: false }));
     const safe = { ok: result.ok === true, checks: {}, timings: {} };
     for (const name of ['changed_payload_rejected', 'changed_payload', 'marked_put', 'marked_verify', 'kms',
-      'marked_immutable', 'browser_cors', 'legacy_put', 'legacy_verify', 'legacy_immutable', 'cleanup']) {
+      'marked_immutable', 'browser_cors', 'marked_response_cors', 'legacy_response_cors', 'legacy_put', 'legacy_verify', 'legacy_immutable', 'cleanup']) {
       if (typeof result.checks?.[name] === 'boolean') safe.checks[name] = result.checks[name];
       if (Number.isFinite(result.timings?.[name])) safe.timings[name] = result.timings[name];
     }

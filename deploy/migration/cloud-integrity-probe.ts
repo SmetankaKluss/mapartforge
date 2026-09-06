@@ -14,15 +14,15 @@ import {
 } from '../../supabase/functions/_shared/companionSaveVerification.ts';
 
 const proofExpiresAt = /* DEPLOY_EXPIRY */0;
+const proofTokenHash = 'DEPLOY_TOKEN_HASH';
 
 // Temporary service-only proof. No client input, database rows or user files.
 Deno.serve(async request => {
   if (Date.now() > proofExpiresAt) return new Response(null, { status: 410 });
-  const expected = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const provided = request.headers.get('authorization')?.replace(/^Bearer /, '');
-  if (!expected || !provided || !timingSafeEqual(
-    createHash('sha256').update(expected).digest(),
-    createHash('sha256').update(provided).digest(),
+  const provided = request.headers.get('x-proof-token');
+  if (!provided || !timingSafeEqual(
+    new TextEncoder().encode(proofTokenHash),
+    new TextEncoder().encode(createHash('sha256').update(provided).digest('hex')),
   )) return new Response(null, { status: 401 });
   if (request.method !== 'POST') return new Response(null, { status: 405 });
   const config = readCompanionArtifactYandexConfig();
