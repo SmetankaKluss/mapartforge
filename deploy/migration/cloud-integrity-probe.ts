@@ -85,7 +85,12 @@ Deno.serve(async request => {
       const upload = await send(target.url, { method: 'PUT', headers: { ...target.headers, Origin: 'https://mapkluss.art' }, body: bytes });
       checks[stage] = upload.ok;
       checks[`${name}_response_cors`] = ['*', 'https://mapkluss.art'].includes(upload.headers.get('access-control-allow-origin') ?? '');
-      await upload.body?.cancel();
+      if (!upload.ok) {
+        const error = await upload.text();
+        for (const code of ['SignatureDoesNotMatch', 'AccessDenied', 'BadDigest', 'InvalidDigest', 'InvalidRequest', 'XAmzContentSHA256Mismatch', 'NotImplemented']) {
+          checks[`provider_${code}`] = error.includes(`<Code>${code}</Code>`);
+        }
+      } else await upload.body?.cancel();
       if (!checks[stage]) throw new Error(stage);
       timings[stage] = Math.round(performance.now() - started);
       stage = `${name}_verify`;

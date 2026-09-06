@@ -68,6 +68,7 @@ if (process.argv.includes('--cleanup')) {
     const result = await response.json().catch(() => ({ ok: false }));
     const safe = { ok: result.ok === true, checks: {}, timings: {} };
     for (const name of ['changed_payload_rejected', 'changed_payload', 'marked_put', 'marked_verify', 'kms',
+      'provider_SignatureDoesNotMatch', 'provider_AccessDenied', 'provider_BadDigest', 'provider_InvalidDigest', 'provider_InvalidRequest', 'provider_XAmzContentSHA256Mismatch', 'provider_NotImplemented',
       'marked_immutable', 'browser_cors', 'cors_http', 'cors_origin', 'cors_method', 'cors_headers', 'marked_response_cors', 'legacy_response_cors', 'legacy_put', 'legacy_verify', 'legacy_immutable', 'cleanup']) {
       if (typeof result.checks?.[name] === 'boolean') safe.checks[name] = result.checks[name];
       if (Number.isFinite(result.timings?.[name])) safe.timings[name] = result.timings[name];
