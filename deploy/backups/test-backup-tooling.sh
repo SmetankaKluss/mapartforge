@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-for command_name in createdb initdb node pg_ctl psql tar; do
+for command_name in createdb initdb node pg_ctl pg_dump psql tar; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "$command_name is required" >&2
     exit 1
@@ -66,7 +66,7 @@ CREATE TABLE public.companion_lens_sessions (id uuid PRIMARY KEY, owner_id uuid 
 CREATE TABLE public.companion_lens_placements (id uuid PRIMARY KEY, session_id uuid NOT NULL, owner_id uuid NOT NULL);
 CREATE TABLE public.companion_lens_subscribers (id uuid PRIMARY KEY);
 CREATE TABLE public.companion_lens_reports (id uuid PRIMARY KEY);
-CREATE TABLE storage.buckets (id text PRIMARY KEY);
+CREATE TABLE storage.buckets (id text PRIMARY KEY, type text NOT NULL DEFAULT 'STANDARD');
 CREATE TABLE storage.objects (id uuid PRIMARY KEY, bucket_id text NOT NULL, name text NOT NULL, metadata jsonb);
 CREATE TABLE supabase_migrations.schema_migrations (version text PRIMARY KEY);
 SQL
@@ -86,7 +86,7 @@ INSERT INTO public.companion_lens_sessions VALUES ('00000000-0000-0000-0000-0000
 INSERT INTO public.companion_lens_placements VALUES ('00000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001');
 INSERT INTO public.companion_lens_subscribers VALUES ('00000000-0000-0000-0000-000000000012');
 INSERT INTO public.companion_lens_reports VALUES ('00000000-0000-0000-0000-000000000013');
-INSERT INTO storage.buckets VALUES ('mapartforge');
+INSERT INTO storage.buckets (id) VALUES ('mapartforge');
 INSERT INTO storage.objects VALUES ('00000000-0000-0000-0000-000000000014', 'mapartforge', 'fixture.png', '{"size": "123"}');
 INSERT INTO supabase_migrations.schema_migrations VALUES ('fixture');
 SQL
@@ -153,4 +153,57 @@ if MAPKLUSS_RESTORE_DB_URL="$target_url" \
   exit 1
 fi
 
-echo "Backup tooling fixture and disposable restore drill passed"
+# Model a managed Storage schema newer than the clean Supabase base.
+psql "$source_url" -X -v ON_ERROR_STOP=1 \
+  -f "$script_dir/storage-schema-compat.sql" \
+  -c "update storage.objects set archived_at = '2026-09-01T12:00:00Z', is_delete_marker = true, is_versioned = true" >/dev/null
+pg_dump "$source_url" --schema-only --no-owner --schema=public --schema=supabase_migrations >"$fixture_dir/schema.sql"
+pg_dump "$source_url" --data-only --no-owner >"$fixture_dir/data.sql"
+
+createdb -h 127.0.0.1 -p "$port" -U postgres mapkluss_base_restore_drill
+base_url="postgresql://postgres@127.0.0.1:${port}/mapkluss_base_restore_drill"
+psql "$base_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+COMMENT ON DATABASE mapkluss_base_restore_drill IS 'mapkluss-disposable-restore-target';
+CREATE SCHEMA auth;
+CREATE SCHEMA storage;
+CREATE TABLE auth.users (id uuid PRIMARY KEY);
+CREATE TABLE storage.buckets (id text PRIMARY KEY, type text NOT NULL DEFAULT 'STANDARD');
+CREATE TABLE storage.objects (id uuid PRIMARY KEY, bucket_id text NOT NULL, name text NOT NULL, metadata jsonb);
+SQL
+
+PATH="$bin_dir:$PATH" \
+  MAPKLUSS_SUPABASE_CLI_BIN="$bin_dir/supabase" \
+  MAPKLUSS_TEST_FIXTURE_DIR="$fixture_dir" \
+  MAPKLUSS_BACKUP_DIR="$backup_dir" \
+  MAPKLUSS_BACKUP_TIMESTAMP="test-base-fixture" \
+  SUPABASE_DB_URL="$source_url" \
+  "$script_dir/backup-postgres.sh" >/dev/null
+
+MAPKLUSS_RESTORE_DB_URL="$base_url" \
+  MAPKLUSS_RESTORE_MODE=supabase-base \
+  MAPKLUSS_ALLOW_DESTRUCTIVE_RESTORE=disposable-only \
+  "$script_dir/restore-drill.sh" "$backup_dir/mapkluss-postgres-test-base-fixture.tar.gz" >/dev/null
+
+psql "$base_url" -X -v ON_ERROR_STOP=1 -f "$script_dir/storage-schema-compat.sql" >/dev/null
+round_trip=$(psql "$base_url" -X -v ON_ERROR_STOP=1 -Atc "
+  select b.versioning_status = 'DISABLED'
+    and o.archived_at = '2026-09-01T12:00:00Z'::timestamptz
+    and o.is_delete_marker and o.is_versioned
+  from storage.buckets b join storage.objects o on o.bucket_id = b.id;
+")
+if [[ "$round_trip" != "t" ]]; then
+  echo "Managed Storage compatibility lost restored values" >&2
+  exit 1
+fi
+if psql "$base_url" -X -v ON_ERROR_STOP=1 --single-transaction \
+  -c 'update storage.objects set is_versioned = false' \
+  -c "update storage.buckets set versioning_status = 'INVALID'" >/dev/null 2>&1; then
+  echo "Managed Storage compatibility accepted an invalid versioning status" >&2
+  exit 1
+fi
+if [[ $(psql "$base_url" -X -v ON_ERROR_STOP=1 -Atc 'select is_versioned from storage.objects') != "t" ]]; then
+  echo "Failed Storage transaction was not rolled back" >&2
+  exit 1
+fi
+
+echo "Backup tooling fixtures, managed Storage compatibility and disposable restore drills passed"

@@ -128,12 +128,18 @@ else
   fi
 fi
 
+compatibility_files=()
+if [[ "$restore_mode" == "supabase-base" ]]; then
+  compatibility_files=(--file "$script_dir/storage-schema-compat.sql")
+fi
+
 psql "$target_url" \
   -X \
   --single-transaction \
   --variable ON_ERROR_STOP=1 \
   --file "$extract_dir/roles.sql" \
   --file "$extract_dir/schema.sql" \
+  "${compatibility_files[@]}" \
   --command 'SET session_replication_role = replica' \
   --file "$extract_dir/data.sql"
 
