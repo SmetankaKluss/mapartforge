@@ -51,6 +51,18 @@ test('rejects public access, a wrong key and incomplete browser CORS', () => {
   assert.equal(errors.length, 3);
 });
 
+test('requires the native v2 signature headers', () => {
+  const input = fixture();
+  input.cors.CORSRules[0].AllowedHeaders = [
+    'content-type', 'content-md5', 'if-none-match', 'x-amz-content-sha256',
+    'x-amz-meta-integrity', 'x-amz-meta-sha256', 'x-amz-meta-source-bucket',
+    'x-amz-server-side-encryption', 'x-amz-server-side-encryption-aws-kms-key-id',
+  ];
+  assert.equal(validateArtifactStoragePolicy(input).length, 1);
+  input.cors.CORSRules[0].AllowedHeaders.push('authorization', 'x-amz-date');
+  assert.deepEqual(validateArtifactStoragePolicy(input), []);
+});
+
 test('rejects any bucket policy or an unverifiable policy state', () => {
   const present = fixture();
   present.bucketPolicyAbsent = false;

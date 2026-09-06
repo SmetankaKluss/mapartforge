@@ -39,10 +39,12 @@ export function validateArtifactStoragePolicy({
     return includesCaseInsensitive(rule?.AllowedOrigins, requiredOrigin)
       && ['GET', 'HEAD', 'PUT'].every(method => includesCaseInsensitive(methods, method))
       && [
+        'authorization',
         'content-type',
         'content-md5',
         'if-none-match',
         'x-amz-content-sha256',
+        'x-amz-date',
         'x-amz-meta-integrity',
         'x-amz-meta-sha256',
         'x-amz-meta-source-bucket',
