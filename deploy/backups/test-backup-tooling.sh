@@ -122,7 +122,7 @@ cp "$MAPKLUSS_TEST_FIXTURE_DIR/${kind}.sql" "$output_file"
 SH
 chmod 700 "$bin_dir/supabase"
 
-psql "$source_url" -X -v ON_ERROR_STOP=1 \
+psql "$source_url" -X -v ON_ERROR_STOP=1 --single-transaction \
   -f "$fixture_dir/schema.sql" \
   -f "$fixture_dir/data.sql" >/dev/null
 
@@ -154,18 +154,20 @@ if MAPKLUSS_RESTORE_DB_URL="$target_url" \
 fi
 
 # Model a managed Storage schema newer than the clean Supabase base.
-psql "$source_url" -X -v ON_ERROR_STOP=1 \
+psql "$source_url" -X -v ON_ERROR_STOP=1 --single-transaction \
   -f "$script_dir/storage-schema-compat.sql" \
   -c "update storage.objects set archived_at = '2026-09-01T12:00:00Z', is_delete_marker = true, is_versioned = true" >/dev/null
-pg_dump "$source_url" --schema-only --no-owner --schema=public --schema=supabase_migrations >"$fixture_dir/schema.sql"
+pg_dump "$source_url" --schema-only --no-owner --table='public.*' --table='supabase_migrations.*' >"$fixture_dir/schema.sql"
 pg_dump "$source_url" --data-only --no-owner >"$fixture_dir/data.sql"
 
 createdb -h 127.0.0.1 -p "$port" -U postgres mapkluss_base_restore_drill
 base_url="postgresql://postgres@127.0.0.1:${port}/mapkluss_base_restore_drill"
 psql "$base_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 COMMENT ON DATABASE mapkluss_base_restore_drill IS 'mapkluss-disposable-restore-target';
+CREATE EXTENSION pgcrypto;
 CREATE SCHEMA auth;
 CREATE SCHEMA storage;
+CREATE SCHEMA supabase_migrations;
 CREATE TABLE auth.users (id uuid PRIMARY KEY);
 CREATE TABLE storage.buckets (id text PRIMARY KEY, type text NOT NULL DEFAULT 'STANDARD');
 CREATE TABLE storage.objects (id uuid PRIMARY KEY, bucket_id text NOT NULL, name text NOT NULL, metadata jsonb);
@@ -191,7 +193,7 @@ MAPKLUSS_RESTORE_DB_URL="$base_url" \
   MAPKLUSS_ALLOW_DESTRUCTIVE_RESTORE=disposable-only \
   "$script_dir/restore-drill.sh" "$backup_dir/mapkluss-postgres-test-base-fixture.tar.gz" >/dev/null
 
-psql "$base_url" -X -v ON_ERROR_STOP=1 -f "$script_dir/storage-schema-compat.sql" >/dev/null
+psql "$base_url" -X -v ON_ERROR_STOP=1 --single-transaction -f "$script_dir/storage-schema-compat.sql" >/dev/null
 round_trip=$(psql "$base_url" -X -v ON_ERROR_STOP=1 -Atc "
   select b.versioning_status = 'DISABLED'
     and o.archived_at = '2026-09-01T12:00:00Z'::timestamptz

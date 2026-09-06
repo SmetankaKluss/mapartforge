@@ -321,6 +321,9 @@ jobs:
           db_url=$(node -e '
             const target = new URL(process.argv[1]);
             target.username = "supabase_admin";
+            if (!["127.0.0.1", "localhost"].includes(target.hostname) || target.pathname !== "/postgres") {
+              throw new Error("Refusing a non-local administrative restore target");
+            }
             process.stdout.write(target.toString());
           ' "$db_url")
           echo "::add-mask::$db_url"
