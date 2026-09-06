@@ -43,12 +43,22 @@ Deno.serve(async request => {
   const send: typeof fetch = (input, init = {}) => fetch(input, {
     ...init, signal: AbortSignal.timeout(15000),
   });
+  // Isolated protocol experiment, not a browser upload contract.
+  const nativeTarget = async (target: { url: string; headers: Record<string, string> }) => {
+    const url = new URL(target.url);
+    url.search = '';
+    const aws = new AwsClient({ ...config, service: 's3', retries: 0 });
+    const signed = await aws.sign(url.toString(), {
+      method: 'PUT', headers: target.headers, aws: { allHeaders: true },
+    });
+    return { ...target, url: signed.url, headers: Object.fromEntries(signed.headers) };
+  };
   let ok = false;
   try {
     for (const row of rows) {
       const marked = !!row.integrity;
       const name = marked ? 'marked' : 'legacy';
-      const target = await createCompanionArtifactUploadTarget(config, {
+      let target = await createCompanionArtifactUploadTarget(config, {
         ...row, integrity: marked ? { contentMd5 } : undefined,
       });
       if (marked) {
@@ -68,13 +78,14 @@ Deno.serve(async request => {
           && methods.includes('PUT') && Object.keys(target.headers).every(header => headers.includes('*') || headers.includes(header.toLowerCase()));
         await cors.body?.cancel();
         if (!checks.browser_cors) throw new Error(stage);
+        target = await nativeTarget(target);
         stage = 'changed_payload';
         const changed = bytes.slice();
         changed[0] ^= 1;
         // A matching MD5 cannot excuse a mismatched signed SHA-256 payload.
-        const wrongTarget = await createCompanionArtifactUploadTarget(config, {
+        const wrongTarget = await nativeTarget(await createCompanionArtifactUploadTarget(config, {
           ...row, integrity: { contentMd5: createHash('md5').update(changed).digest('base64') },
-        });
+        }));
         const rejected = await send(wrongTarget.url, { method: 'PUT', headers: wrongTarget.headers, body: changed });
         checks.changed_payload_rejected = [400, 403].includes(rejected.status);
         checks.changed_payload_accepted = rejected.ok;
