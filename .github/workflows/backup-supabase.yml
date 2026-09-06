@@ -316,6 +316,15 @@ jobs:
             }
           ' "$db_url"
 
+          # Managed Storage belongs to a reserved role unavailable to postgres.
+          # This URL was obtained from, and verified against, the disposable stack.
+          db_url=$(node -e '
+            const target = new URL(process.argv[1]);
+            target.username = "supabase_admin";
+            process.stdout.write(target.toString());
+          ' "$db_url")
+          echo "::add-mask::$db_url"
+
           pg_bin="${RUNNER_TEMP}/mapkluss-pg17-bin"
           install -d -m 700 "$pg_bin"
           cat >"$pg_bin/psql" <<'PSQL_WRAPPER'
