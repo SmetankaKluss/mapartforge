@@ -171,6 +171,13 @@ CREATE TABLE storage.buckets (id text PRIMARY KEY, type text NOT NULL DEFAULT 'S
 CREATE TABLE storage.objects (id uuid PRIMARY KEY, bucket_id text NOT NULL, name text NOT NULL, metadata jsonb);
 SQL
 
+psql "$base_url" -X -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+CREATE ROLE mapkluss_test_storage_owner NOLOGIN;
+GRANT USAGE, CREATE ON SCHEMA storage TO mapkluss_test_storage_owner;
+ALTER TABLE storage.buckets OWNER TO mapkluss_test_storage_owner;
+ALTER TABLE storage.objects OWNER TO mapkluss_test_storage_owner;
+SQL
+
 PATH="$bin_dir:$PATH" \
   MAPKLUSS_SUPABASE_CLI_BIN="$bin_dir/supabase" \
   MAPKLUSS_TEST_FIXTURE_DIR="$fixture_dir" \
