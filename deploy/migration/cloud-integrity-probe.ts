@@ -77,6 +77,7 @@ Deno.serve(async request => {
         });
         const rejected = await send(wrongTarget.url, { method: 'PUT', headers: wrongTarget.headers, body: changed });
         checks.changed_payload_rejected = [400, 403].includes(rejected.status);
+        checks.changed_payload_accepted = rejected.ok;
         await rejected.body?.cancel();
         if (!checks.changed_payload_rejected) throw new Error('changed_payload');
       }
