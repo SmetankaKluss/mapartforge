@@ -200,6 +200,9 @@ export function verifyCompanionArtifactYandexHeadResponse(
   if (artifact.storageProvider !== 'yandex' || artifact.integrity !== 'yandex-payload-v1' || !artifact.contentMd5) {
     throw new CompanionArtifactVerificationError('invalid_reserved_manifest', false, 422);
   }
+  if (response.headers.get('content-length') === null) {
+    throw new CompanionArtifactVerificationError('artifact_size_mismatch', false, 422);
+  }
   assertVerifiedArtifactHeaders(artifact, response);
   if ((response.headers.get('x-amz-meta-integrity') ?? '').trim() !== 'yandex-payload-v1'
     || (response.headers.get('x-amz-meta-sha256') ?? '').trim().toLowerCase() !== artifact.sha256

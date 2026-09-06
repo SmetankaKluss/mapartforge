@@ -171,6 +171,21 @@ Deno.test("accepts Yandex metadata only when the signed payload integrity proof 
       new Response(null, {
         headers: {
           "content-type": "application/json",
+          "etag": '"202cb962ac59075b964b07152d234b70"',
+          "x-amz-meta-integrity": "yandex-payload-v1",
+          "x-amz-meta-sha256": artifact.sha256,
+        },
+      }),
+    )),
+    "artifact_size_mismatch",
+  );
+
+  await expectCode(
+    Promise.resolve().then(() => verifyCompanionArtifactYandexHeadResponse(
+      artifact,
+      new Response(null, {
+        headers: {
+          "content-type": "application/json",
           "content-length": "3",
           "etag": '"00000000000000000000000000000000"',
           "x-amz-meta-integrity": "yandex-payload-v1",

@@ -526,6 +526,9 @@ async function handleCompanionSavePrepare(
           storagePath: String(row.storagePath ?? ''),
           contentType: String(row.contentType ?? ''),
           sha256: String(row.sha256 ?? ''),
+          integrity: row.integrity === 'yandex-payload-v1'
+            ? { contentMd5: String(row.contentMd5 ?? '') }
+            : undefined,
         }),
       };
     }))
