@@ -61,7 +61,8 @@ if (process.argv.includes('--cleanup')) {
     if (!key) throw new Error('Proof credential unavailable');
     const response = await fetch(endpoint, { method: 'POST',
       headers: { Authorization: `Bearer ${key}`, apikey: key }, signal: AbortSignal.timeout(180000) });
-    const result = await response.json();
+    console.log(JSON.stringify({ proofHttpStatus: response.status }));
+    const result = await response.json().catch(() => ({ ok: false }));
     const safe = { ok: result.ok === true, checks: {}, timings: {} };
     for (const name of ['changed_payload_rejected', 'changed_payload', 'marked_put', 'marked_verify', 'kms',
       'marked_immutable', 'browser_cors', 'legacy_put', 'legacy_verify', 'legacy_immutable', 'cleanup']) {
