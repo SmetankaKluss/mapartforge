@@ -11,6 +11,7 @@ on:
         options:
           - inventory
           - copy
+          - integrity-proof
 
 permissions:
   contents: read
@@ -20,6 +21,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  integrity-proof:
+    if: inputs.mode == 'integrity-proof'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: storage-migration
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Deploy, verify and remove isolated integrity proof
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node deploy/migration/run-cloud-integrity-proof.mjs
+      - name: Remove only this run's temporary proof
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: node deploy/migration/run-cloud-integrity-proof.mjs --cleanup
+
   inventory:
     if: inputs.mode == 'inventory'
     runs-on: ubuntu-latest
