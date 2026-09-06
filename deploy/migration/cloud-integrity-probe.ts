@@ -60,6 +60,10 @@ Deno.serve(async request => {
         const allowed = cors.headers.get('access-control-allow-origin');
         const methods = (cors.headers.get('access-control-allow-methods') ?? '').toUpperCase().split(/\s*,\s*/);
         const headers = (cors.headers.get('access-control-allow-headers') ?? '').toLowerCase().split(/\s*,\s*/);
+        checks.cors_http = cors.ok;
+        checks.cors_origin = allowed === '*' || allowed === 'https://mapkluss.art';
+        checks.cors_method = methods.includes('PUT');
+        checks.cors_headers = Object.keys(target.headers).every(header => headers.includes('*') || headers.includes(header.toLowerCase()));
         checks.browser_cors = cors.ok && (allowed === '*' || allowed === 'https://mapkluss.art')
           && methods.includes('PUT') && Object.keys(target.headers).every(header => headers.includes('*') || headers.includes(header.toLowerCase()));
         await cors.body?.cancel();
