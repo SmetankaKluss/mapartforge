@@ -242,12 +242,14 @@ export async function presignCompanionArtifactYandexRequest(
       return [name, value] as const;
     },
   ).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
-  const signedHeaders = ["host", ...signedHeaderEntries.map(([name]) => name)]
-    .join(";");
-  const canonicalHeaders = [
-    `host:${endpoint.host}`,
-    ...signedHeaderEntries.map(([name, value]) => `${name}:${value}`),
-  ].join("\n") + "\n";
+  const allSignedHeaders = [["host", endpoint.host], ...signedHeaderEntries]
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  if (new Set(allSignedHeaders.map(([name]) => name)).size !== allSignedHeaders.length) {
+    throw new Error("Companion artifact Yandex signed header is duplicated");
+  }
+  const signedHeaders = allSignedHeaders.map(([name]) => name).join(";");
+  const canonicalHeaders = allSignedHeaders
+    .map(([name, value]) => `${name}:${value}`).join("\n") + "\n";
   const entries: [string, string][] = [
     ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
     ["X-Amz-Credential", `${config.accessKeyId}/${credentialScope}`],

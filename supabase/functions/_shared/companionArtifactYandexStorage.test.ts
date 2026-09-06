@@ -86,12 +86,7 @@ Deno.test("artifact upload target is immutable, encrypted and checksum-bound", a
   const signedHeaders = decodeURIComponent(
     url.searchParams.get("X-Amz-SignedHeaders") ?? "",
   );
-  assert(signedHeaders.includes("content-type"));
-  assert(signedHeaders.includes("content-md5"));
-  assert(signedHeaders.includes("if-none-match"));
-  assert(signedHeaders.includes("x-amz-meta-sha256"));
-  assert(signedHeaders.includes("x-amz-content-sha256"));
-  assert(signedHeaders.includes("x-amz-server-side-encryption"));
+  assertEquals(signedHeaders, "content-md5;content-type;host;if-none-match;x-amz-content-sha256;x-amz-meta-integrity;x-amz-meta-sha256;x-amz-meta-source-bucket;x-amz-server-side-encryption;x-amz-server-side-encryption-aws-kms-key-id");
   assert(!target.url.includes(config.secretAccessKey));
 });
 
@@ -124,6 +119,12 @@ Deno.test("artifact HEAD signature stays private and uses the metadata-only meth
 });
 
 Deno.test("artifact request rejects unsafe signed headers", async () => {
+  await assertRejects(
+    () => presignCompanionArtifactYandexRequest(config, "PUT", "bucket", "file", 60,
+      { "X-Test": "one", "x-test": "two" }),
+    Error,
+    "signed header is duplicated",
+  );
   await assertRejects(
     () =>
       presignCompanionArtifactYandexRequest(
