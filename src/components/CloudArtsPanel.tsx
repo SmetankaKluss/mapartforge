@@ -112,7 +112,7 @@ export function CloudArtsPanel({ onClose, onOpenArt, defaultEmail }: CloudArtsPa
   const [authBusy, setAuthBusy] = useState(false);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [emailCooldownUntil, setEmailCooldownUntil] = useState(0);
-  const [emailCooldownNow, setEmailCooldownNow] = useState(Date.now());
+  const [emailCooldownNow, setEmailCooldownNow] = useState(() => Date.now());
   const [favoriteBusyArtId, setFavoriteBusyArtId] = useState<string | null>(null);
   const [trackerBusyArtId, setTrackerBusyArtId] = useState<string | null>(null);
   const useMockCloud = import.meta.env.DEV && new URLSearchParams(window.location.search).get('cloudFolderMock') === '1';

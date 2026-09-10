@@ -17,7 +17,7 @@ type AttributionSnapshot = {
   kind?: 'direct' | 'referral' | 'campaign';
 };
 
-const ATTRIBUTION_STORAGE_KEY = 'mapkluss_attribution_v1';
+const ATTRIBUTION_STORAGE_KEY = 'mapkluss_attribution_v1'; // gitleaks:allow -- browser-only attribution key, not a credential.
 const ATTRIBUTION_QUERY_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'] as const;
 const BLOCKED_ANALYTICS_PARAM_KEYS = new Set([
   'access_token', 'art_id', 'device_code', 'email', 'filename', 'message', 'password',

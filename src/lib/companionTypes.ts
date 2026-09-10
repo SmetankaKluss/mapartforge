@@ -95,6 +95,7 @@ export interface CompanionLibraryItem {
   privacy: ArtPrivacy;
   grid: MapGrid;
   mode: '2d' | '3d';
+  buildTechnique?: BuildTechnique;
   previewUrl: string | null;
   updatedAt: string;
   isFavorite: boolean;

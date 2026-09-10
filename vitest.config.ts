@@ -6,6 +6,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       'deploy/**/*.test.js',
       'supabase/functions/**/*.test.ts',
+      'supabase/tests/**/*.test.mjs', // Disposable PostgreSQL harnesses, not Vitest suites.
     ],
   },
 })

@@ -1,527 +1,247 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  getSession, updateGathered, updatePlaced,
-  switchToBuilding, subscribeSession,
-} from '../lib/buildSession';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { getSession, updateGathered, updatePlaced, switchToBuilding, subscribeSession } from '../lib/buildSession';
 import type { BuildSession, SessionMaterial } from '../lib/buildSession';
 import { applyPageMeta } from '../lib/meta';
-import '../buildTracker.css';
 import { base64ToBytes } from '../lib/base64';
+import { materialColour } from '../lib/trackerPreview';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
+import { BlockIcon } from './BlockIcon';
 import { PublicSiteHeader } from './PublicSiteHeader';
+import { TrackerPreview } from './TrackerPreview';
+import { useTrackerLive } from './useTrackerLive';
+import { trackerMaterialCounts } from '../lib/trackerMaterialCounts';
+import '../trackerWorkspace.css';
 
-// ─── i18n ────────────────────────────────────────────────────────────────────
 type Lang = 'ru' | 'en';
-const T = {
-  back:         { ru: 'Назад', en: 'Back' },
-  tracker:      { ru: 'ТРЕКЕР ПОСТРОЙКИ', en: 'BUILD TRACKER' },
-  loading:      { ru: 'Загрузка…', en: 'Loading…' },
-  notFound:     { ru: 'Сессия не найдена.', en: 'Session not found.' },
-  gathering:    { ru: 'Сбор ресурсов', en: 'Gathering' },
-  building:     { ru: 'Строительство', en: 'Building' },
-  statsTitle:   { ru: 'Статистика', en: 'Progress' },
-  blockTypes:   { ru: 'видов блоков', en: 'block types' },
-  blocksTotal:  { ru: 'блоков всего', en: 'blocks total' },
-  progress:     { ru: 'Прогресс', en: 'Progress' },
-  switchBtn:    { ru: 'Начать строительство', en: 'Start building' },
-  modeBadge:    { ru: 'Режим строительства', en: 'Building mode' },
-  colBlock:     { ru: 'Материал', en: 'Material' },
-  colNeed:      { ru: 'Нужно', en: 'Needed' },
-  colProgress:  { ru: 'Прогресс', en: 'Progress' },
-  colAction:    { ru: 'Собрано', en: 'Gathered' },
-  colActionB:   { ru: 'Поставлено', en: 'Placed' },
-  tableTitle:   { ru: 'Список материалов', en: 'Materials list' },
-  perMap:       { ru: 'На карту', en: 'Per map' },
-  server:       { ru: 'Сервер', en: 'Server' },
-  coords:       { ru: 'Координаты', en: 'Coords' },
-  notes:        { ru: 'Заметки', en: 'Notes' },
-  maps:         { ru: 'Карты', en: 'Maps' },
-  confirmTitle: { ru: 'Начать строительство?', en: 'Start building?' },
-  confirmDesc:  { ru: 'Режим переключится на отслеживание поставленных блоков. Данные сбора сохранятся.', en: 'Switch to tracking placed blocks. Gathering data is preserved.' },
-  cancel:       { ru: 'Отмена', en: 'Cancel' },
-  confirmYes:   { ru: 'Да, начать', en: 'Yes, start' },
-  switching:    { ru: 'Переключение…', en: 'Switching…' },
-  switchError:  { ru: 'Не удалось переключить режим. Попробуйте ещё раз.', en: 'Could not switch mode. Try again.' },
-  saveError:    { ru: 'Не удалось сохранить изменение. Проверь соединение и повтори.', en: 'Could not save the change. Check your connection and try again.' },
-  retry:        { ru: 'Обновить страницу', en: 'Reload page' },
-  downloadLite: { ru: 'Схематика (.litematic)', en: 'Schematic (.litematic)' },
-} as const;
+type Mode = 'gathering' | 'building';
+const TrackerDevLogin = import.meta.env.DEV ? lazy(() => import('./dev/TrackerDevLogin')) : null;
+const emptyPatch = () => ({ gathering: {} as Record<string, number>, building: {} as Record<string, number> });
+const safeCount = (value: number, max: number) => Number.isFinite(value) ? Math.max(0, Math.min(max, Math.floor(value))) : 0;
 
-function t(key: keyof typeof T, lang: Lang): string {
-  return T[key][lang];
-}
-
-function fmtStacks(n: number, lang: Lang) {
-  const stacks = Math.floor(n / 64);
-  const rem    = n % 64;
-  const st     = lang === 'ru' ? 'ст' : 'st';
-  if (stacks === 0) return `${rem}`;
-  if (rem === 0)    return `${stacks}${st}`;
-  return `${stacks}${st} + ${rem}`;
-}
-
-function totalBlocks(materials: SessionMaterial[]) {
-  return materials.reduce((s, m) => s + m.count, 0);
-}
-function totalDone(record: Record<string, number>, materials: SessionMaterial[]) {
-  return materials.reduce((s, m) => s + Math.min(record[m.nbtName] ?? 0, m.count), 0);
-}
-
-/** Wiki texture URL for a block nbtName (strips minecraft: prefix) */
-function blockIconUrl(nbtName: string): string {
-  const simple = nbtName.replace(/^minecraft:/, '');
-  const title = simple.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('_');
-  return `https://minecraft.wiki/w/Special:FilePath/${title}.png`;
-}
-
-// Snake-reveal canvas
-function drawSnakeReveal(canvas: HTMLCanvasElement, colorData: ImageData, pct: number) {
-  const ctx = canvas.getContext('2d')!;
-  const { width, height } = canvas;
-  const total    = width * height;
-  const revealed = Math.floor(total * Math.min(pct, 100) / 100);
-  const src = colorData.data;
-  const out = ctx.createImageData(width, height);
-  const dst = out.data;
-
-  for (let i = 0; i < total; i++) {
-    const row = Math.floor(i / width);
-    const col = row % 2 === 0 ? i % width : width - 1 - (i % width);
-    const si  = (row * width + col) * 4;
-    if (i < revealed) {
-      dst[si] = src[si]; dst[si+1] = src[si+1]; dst[si+2] = src[si+2]; dst[si+3] = src[si+3];
-    } else {
-      const g = Math.round(0.299*src[si] + 0.587*src[si+1] + 0.114*src[si+2]);
-      dst[si] = g; dst[si+1] = g; dst[si+2] = g; dst[si+3] = src[si+3];
-    }
-  }
-  ctx.putImageData(out, 0, 0);
-}
-
-// ─── Material row ─────────────────────────────────────────────────────────────
-interface RowProps {
-  mat: SessionMaterial;
-  value: number;
-  onChange: (nbtName: string, val: number) => void;
-  accentColor: string;
-  lang: Lang;
-  perMapTarget: number; // effective target (total or per-map)
-}
-
-function MaterialRow({ mat, value, onChange, accentColor, lang, perMapTarget }: RowProps) {
-  const [addVal, setAddVal] = useState('');
-  const pct  = Math.min(100, (value / perMapTarget) * 100);
-  const done = value >= perMapTarget;
-
-  function handleAdd() {
-    const delta = parseInt(addVal) || 0;
-    if (delta === 0) return;
-    onChange(mat.nbtName, Math.min(mat.count, Math.max(0, value + delta)));
-    setAddVal('');
-  }
-  function handleSub() {
-    const delta = parseInt(addVal) || 0;
-    if (delta === 0) return;
-    onChange(mat.nbtName, Math.max(0, value - delta));
-    setAddVal('');
-  }
-
-  return (
-    <div className={`bt-row${done ? ' bt-row--done' : ''}`} role="row">
-      {/* Name + icon */}
-      <div className="bt-cell" role="cell">
-        <img
-          className="bt-block-icon"
-          src={blockIconUrl(mat.nbtName)}
-          alt=""
-          loading="lazy"
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-        />
-        <span className="bt-row-name">{mat.displayName}</span>
-        {done && <span className="bt-row-check"><IconGlyph icon={mkIcons.check} /></span>}
-      </div>
-
-      {/* Need */}
-      <div className="bt-cell" role="cell" data-label={t('colNeed', lang)}>
-        <span className="bt-row-need">{fmtStacks(perMapTarget, lang)}</span>
-      </div>
-
-      {/* Progress bar */}
-      <div className="bt-cell bt-bar-cell" role="cell" data-label={t('colProgress', lang)}>
-        <div className="bt-bar-top">
-          <span className="bt-bar-gathered">{value.toLocaleString()}</span>
-          <span className="bt-bar-pct">{Math.round(pct)}%</span>
-        </div>
-        <div className="bt-bar" role="progressbar" aria-label={`${mat.displayName}: ${t('progress', lang)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
-          <div className="bt-bar-fill" style={{ width: `${pct}%`, background: accentColor }} />
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="bt-cell bt-controls-cell" role="cell" data-label={t('colAction', lang)}>
-        <span className="bt-row-total">{value}</span>
-        <input
-          className="bt-row-add-input"
-          type="number"
-          placeholder="N"
-          value={addVal}
-          aria-label={lang === 'ru' ? `Изменение количества: ${mat.displayName}` : `Amount change: ${mat.displayName}`}
-          onChange={e => setAddVal(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-        />
-        <button className="bt-row-sub-btn" onClick={handleSub} title="Убрать / Remove" aria-label="Убрать / Remove"><IconGlyph icon={mkIcons.minus} /></button>
-        <button className="bt-row-add-btn" onClick={handleAdd} title="Добавить / Add" aria-label="Добавить / Add"><IconGlyph icon={mkIcons.plus} /></button>
-      </div>
+function MaterialRow({ mat, value, lang, onChange, readOnly }: { mat: SessionMaterial; value: number; lang: Lang; onChange: (value: number) => void; readOnly?: boolean }) {
+  const [amount, setAmount] = useState('64');
+  const colour = materialColour(mat.nbtName);
+  const done = safeCount(value, mat.count);
+  const percent = mat.count > 0 ? Math.round(done / mat.count * 100) : 0;
+  return <li className={`bt-material${done >= mat.count ? ' is-complete' : ''}`}>
+    <div className="bt-material-name">
+      {colour ? <BlockIcon className="bt-material-icon" nbtName={colour.block.nbtName} blockId={colour.block.blockId} csId={colour.row.csId} r={colour.row.r} g={colour.row.g} b={colour.row.b} /> : <IconGlyph icon={mkIcons.package} />}
+      <span title={mat.displayName}>{mat.displayName}</span><span className="bt-material-percent">{percent}%</span>
     </div>
-  );
+    <progress value={done} max={Math.max(1, mat.count)} aria-label={mat.displayName} />
+    <fieldset className="bt-material-controls" disabled={readOnly} style={{ border: 0, margin: 0, minWidth: 0 }}>
+      <span>{done.toLocaleString()} <span className="bt-muted">/ {mat.count.toLocaleString()}</span></span>
+      <input type="number" min="1" max={mat.count} step="1" value={amount} aria-label={`${lang === 'ru' ? 'Количество' : 'Amount'}: ${mat.displayName}`} onChange={event => setAmount(event.target.value)} />
+      <button type="button" title={lang === 'ru' ? 'Убрать' : 'Subtract'} aria-label={`${lang === 'ru' ? 'Убрать' : 'Subtract'}: ${mat.displayName}`} disabled={done === 0} onClick={() => onChange(Math.max(0, done - safeCount(Number(amount), mat.count)))}><IconGlyph icon={mkIcons.minus} /></button>
+      <button type="button" title={lang === 'ru' ? 'Добавить' : 'Add'} aria-label={`${lang === 'ru' ? 'Добавить' : 'Add'}: ${mat.displayName}`} disabled={done >= mat.count} onClick={() => onChange(Math.min(mat.count, done + safeCount(Number(amount), mat.count)))}><IconGlyph icon={mkIcons.plus} /></button>
+      <button type="button" title={lang === 'ru' ? 'Собрано полностью' : 'Complete material'} aria-label={`${lang === 'ru' ? 'Готово' : 'Complete'}: ${mat.displayName}`} disabled={done >= mat.count} onClick={() => onChange(mat.count)}><IconGlyph icon={mkIcons.check} /></button>
+    </fieldset>
+  </li>;
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
 export function BuildTracker({ sessionId }: { sessionId: string }) {
+  const [lang, setLang] = useState<Lang>(() => { try { return localStorage.getItem('bt_lang') === 'en' ? 'en' : 'ru'; } catch { return 'ru'; } });
+  const text = (ru: string, en: string) => lang === 'ru' ? ru : en;
+  const [loadedSession, setSession] = useState<BuildSession | null>(null);
+  const [error, setError] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(0);
+  const [view, setView] = useState<Mode>('gathering');
+  const [selected, setSelected] = useState(-1);
+  const [original, setOriginal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [remainingOnly, setRemainingOnly] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const pending = useRef(emptyPatch());
+  const editRevision = useRef(0);
+  const fixtureMode = useRef<Mode>('gathering');
+  const save = useRef<(() => void) | null>(null);
+  const refresh = useRef<(() => void) | null>(null);
+  const mock = import.meta.env.DEV && new URLSearchParams(location.search).get('trackerMock') === '1';
+  const live = useTrackerLive(sessionId, mock);
+  const session = loadedSession ?? live?.value.session ?? null;
+  const scanned = view === 'building' && !!live?.value.snapshot;
+
+  useEffect(() => { applyPageMeta({ title: 'MapKluss Build Tracker', description: 'Minecraft map art build tracker.', url: `${location.origin}${location.pathname}`, robots: 'noindex,nofollow' }); }, []);
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   useEffect(() => {
-    applyPageMeta({
-      title: 'MapKluss Build Tracker',
-      description: 'Shared build tracker session for Minecraft map art.',
-      url: window.location.href,
-      robots: 'noindex,nofollow',
-    });
-  }, []);
-
-  const [session,     setSession]     = useState<BuildSession | null>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState('');
-  const [actionError, setActionError] = useState('');
-  const [switching,   setSwitching]   = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [gathered,    setGathered]    = useState<Record<string, number>>({});
-  const [placed,      setPlaced]      = useState<Record<string, number>>({});
-  const [lang, setLang] = useState<Lang>(() =>
-    (() => {
-      try { return (localStorage.getItem('bt_lang') as Lang) ?? 'ru'; }
-      catch { return 'ru'; }
-    })()
-  );
-
-  const [perMapMode, setPerMapMode] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
-
-  useEffect(() => {
-    if (!showConfirm) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !switching) setShowConfirm(false);
+    let stopped = false;
+    let fetching = false;
+    let dirtyRead = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let writing = false;
+    let initialized = false;
+    let fixture: BuildSession | null = null;
+    pending.current = emptyPatch();
+    fixtureMode.current = 'gathering';
+    const merge = (next: BuildSession) => {
+      if (stopped) return;
+      setSession({ ...next, gathered: { ...next.gathered, ...pending.current.gathering }, placed: { ...next.placed, ...pending.current.building } });
+      if (!initialized) { initialized = true; setView(next.mode); }
+      setLastUpdated(Date.now()); setError(false);
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [showConfirm, switching]);
-
-  const saveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const colorRef   = useRef<ImageData | null>(null);
-  const pctRef     = useRef(0);
-  const modeRef    = useRef<'gathering' | 'building'>('gathering');
-
-  function toggleLang() {
-    const next: Lang = lang === 'ru' ? 'en' : 'ru';
-    setLang(next);
-    try { localStorage.setItem('bt_lang', next); } catch { /* Language still changes without storage. */ }
-  }
-
-  function initCanvas(src: string) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const img = new Image();
-    img.onload = () => {
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-      colorRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      drawSnakeReveal(canvas, colorRef.current, modeRef.current === 'building' ? pctRef.current : 100);
+    const load = async () => {
+      if (stopped || document.hidden) return;
+      if (fetching) { dirtyRead = true; return; }
+      fetching = true;
+      const revision = editRevision.current;
+      try {
+        if (mock) { fixture ??= (await import('./dev/trackerFixture')).trackerFixture(sessionId); merge({ ...fixture, mode: fixtureMode.current }); }
+        else {
+          const next = await getSession(sessionId);
+          if (revision === editRevision.current) merge(next); else dirtyRead = true;
+        }
+      } catch (failure) {
+        if (!stopped) {
+          setError(true);
+          const status = (failure as { context?: { status?: number } })?.context?.status;
+          if (status === 401 || status === 403) { setSession(null); pending.current = emptyPatch(); }
+        }
+      }
+      finally { fetching = false; if (dirtyRead && !stopped) { dirtyRead = false; void load(); } }
     };
-    img.src = src;
+    const flush = async () => {
+      if (stopped || writing) return;
+      writing = true; setSaving(true);
+      let succeeded = false;
+      try {
+        for (const mode of ['gathering', 'building'] as const) {
+          const patch = { ...pending.current[mode] };
+          if (!Object.keys(patch).length) continue;
+          if (mock && fixture) {
+            const key = mode === 'gathering' ? 'gathered' : 'placed';
+            fixture = { ...fixture, [key]: { ...fixture[key], ...patch } };
+          } else {
+            // The legacy endpoint replaces this field; retain untouched materials.
+            const remote = await getSession(sessionId);
+            if (stopped) return;
+            if (mode === 'gathering') await updateGathered(sessionId, { ...remote.gathered, ...patch });
+            else await updatePlaced(sessionId, { ...remote.placed, ...patch });
+          }
+          if (stopped) return;
+          for (const [key, value] of Object.entries(patch)) if (pending.current[mode][key] === value) delete pending.current[mode][key];
+        }
+        editRevision.current++;
+        succeeded = true; setSaveError(false); void load();
+      } catch { if (!stopped) setSaveError(true); }
+      finally {
+        writing = false;
+        if (!stopped) {
+          setSaving(false);
+          if (succeeded && (Object.keys(pending.current.gathering).length || Object.keys(pending.current.building).length)) timer = setTimeout(() => { void flush(); }, 400);
+        }
+      }
+    };
+    save.current = () => { clearTimeout(timer); timer = setTimeout(() => { void flush(); }, 400); };
+    refresh.current = () => { void load(); };
+    void load();
+    let unsubscribe = () => {};
+    try { if (!mock) unsubscribe = subscribeSession(sessionId, () => { void load(); }); } catch { /* The bounded refresh remains available. */ }
+    const interval = setInterval(() => { void load(); }, 15000);
+    const visible = () => { if (!document.hidden) void load(); };
+    document.addEventListener('visibilitychange', visible);
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (Object.keys(pending.current.gathering).length || Object.keys(pending.current.building).length) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => { stopped = true; clearTimeout(timer); clearInterval(interval); unsubscribe(); document.removeEventListener('visibilitychange', visible); window.removeEventListener('beforeunload', beforeUnload); };
+  }, [sessionId, mock]);
+
+  const record = view === 'gathering' ? session?.gathered ?? {} : live?.value.snapshot
+    ? trackerMaterialCounts(session?.materials ?? [], live.value.snapshot.materials) : session?.placed ?? {};
+  const materials = session?.materials ?? [];
+  const total = materials.reduce((sum, material) => sum + material.count, 0);
+  const done = materials.reduce((sum, material) => sum + safeCount(record[material.nbtName], material.count), 0);
+  const summary = scanned ? (selected >= 0 ? live?.value.snapshot?.parts[selected] : live?.value.snapshot?.summary) : null;
+  const progressTotal = scanned ? summary?.[0] ?? 0 : total;
+  const progressDone = scanned ? summary?.[1] ?? 0 : done;
+  const pct = progressTotal ? Math.round(progressDone / progressTotal * 100) : 0;
+  const filtered = materials.filter(material => (!remainingOnly || safeCount(record[material.nbtName], material.count) < material.count)
+    && `${material.displayName} ${material.nbtName}`.toLowerCase().includes(search.toLowerCase()));
+  function change(nbtName: string, count: number) {
+    if (scanned || !loadedSession) return;
+    editRevision.current++;
+    pending.current[view][nbtName] = count;
+    setSession(current => current ? { ...current, [view === 'gathering' ? 'gathered' : 'placed']: { ...(view === 'gathering' ? current.gathered : current.placed), [nbtName]: count } } : current);
+    save.current?.();
   }
-
-  useEffect(() => {
-    getSession(sessionId)
-      .then(s => {
-        setSession(s);
-        setGathered(s.gathered);
-        setPlaced(s.placed);
-        modeRef.current = s.mode;
-        setLoading(false);
-        setTimeout(() => initCanvas(s.image_preview), 50);
-      })
-      .catch(() => { setError('not_found'); setLoading(false); });
-
-    let unsub = () => {};
-    try {
-      unsub = subscribeSession(sessionId, s => {
-        setSession(s);
-        setGathered(s.gathered);
-        setPlaced(s.placed);
-        modeRef.current = s.mode;
-      });
-    } catch {
-      setError('not_found');
-      setLoading(false);
-    }
-    return () => unsub();
-  }, [sessionId]);
-
-  const debounceSave = useCallback((g: Record<string, number>, p: Record<string, number>, mode: string) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const request = mode === 'gathering' ? updateGathered(sessionId, g) : updatePlaced(sessionId, p);
-      request.then(() => setActionError(''), () => setActionError(t('saveError', lang)));
-    }, 500);
-  }, [lang, sessionId]);
-
-  function handleGatheredChange(nbtName: string, val: number) {
-    const next = { ...gathered, [nbtName]: val };
-    setGathered(next);
-    debounceSave(next, placed, 'gathering');
+  function toggleLanguage() {
+    const next = lang === 'ru' ? 'en' : 'ru'; setLang(next);
+    try { localStorage.setItem('bt_lang', next); } catch { /* In-memory preference remains usable. */ }
   }
-  function handlePlacedChange(nbtName: string, val: number) {
-    const next = { ...placed, [nbtName]: val };
-    setPlaced(next);
-    debounceSave(gathered, next, 'building');
+  async function startBuilding() {
+    setBusy(true);
+    try { if (!mock) await switchToBuilding(sessionId); else fixtureMode.current = 'building'; editRevision.current++; setSession(current => current ? { ...current, mode: 'building' } : current); setView('building'); setSaveError(false); }
+    catch { setSaveError(true); }
+    finally { setBusy(false); }
   }
-
-  async function handleSwitch() {
-    setSwitching(true);
-    setActionError('');
-    try {
-      await switchToBuilding(sessionId);
-      setSession(s => s ? { ...s, mode: 'building' } : s);
-      modeRef.current = 'building';
-    } catch (err) {
-      console.error(err);
-      setActionError(t('switchError', lang));
-    }
-    finally { setSwitching(false); setShowConfirm(false); }
+  function download() {
+    if (!session?.litematic_b64) return;
+    const bytes = base64ToBytes(session.litematic_b64);
+    const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: 'application/octet-stream' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${session.info.title || 'MapKluss'}.litematic`; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-
-  function handleDownloadLitematic() {
-    const s = session;
-    if (!s?.litematic_b64) return;
-    const bytes = base64ToBytes(s.litematic_b64);
-    const buffer = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(buffer).set(bytes);
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `${s.info?.title || 'MapArt'}_2d.litematic`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function copyLink() {
+    try { await navigator.clipboard.writeText(`${location.origin}${location.pathname}`); setCopied(true); }
+    catch { setCopied(false); }
   }
-
-  if (loading) return (
-    <div className="public-shell">
-      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
-      <main className="bt-page bt-page--loading" aria-busy="true">
-        <div className="bt-loading-mark" aria-hidden="true" />
-        <p role="status">{t('loading', lang)}</p>
-      </main>
-    </div>
-  );
-  if (error) return (
-    <div className="public-shell">
-      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
-      <main className="bt-page bt-page--error">
-        <p role="alert"><IconGlyph icon={mkIcons.alert} /> {t('notFound', lang)}</p>
-        <div className="bt-error-actions">
-          <button type="button" onClick={() => window.location.reload()}>{t('retry', lang)}</button>
-          <a href="/" className="bt-back-link"><IconGlyph icon={mkIcons.arrowLeft} /> {t('back', lang)}</a>
-        </div>
-      </main>
-    </div>
-  );
-
-  const s       = session!;
-  const mode    = s.mode;
-  const record  = mode === 'gathering' ? gathered : placed;
-  const total   = totalBlocks(s.materials);
-  const done    = totalDone(record, s.materials);
-  const pctDone = total > 0 ? Math.min(100, (done / total) * 100) : 0;
-  pctRef.current = pctDone;
-
-  // Update canvas: gathering = full color, building = snake reveal by progress
-  if (canvasRef.current && colorRef.current) {
-    drawSnakeReveal(canvasRef.current, colorRef.current, mode === 'building' ? pctDone : 100);
-  }
-
-  const accent = mode === 'gathering' ? 'var(--color-accent)' : 'var(--color-warning)';
-  const info   = s.info ?? {};
-
-  return (
-    <div className="public-shell">
-      <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLang} />
-      <main className="bt-page">
-      {/* Top bar */}
-      <header className="bt-topbar">
-        <a href="/" className="bt-back-link"><IconGlyph icon={mkIcons.arrowLeft} /> {t('back', lang)}</a>
-        <div className="bt-topbar-title">{t('tracker', lang)}</div>
-        <div className="bt-topbar-spacer" />
-        <span className={`bt-tag bt-tag--mode-${mode}`}><IconGlyph icon={mode === 'gathering' ? mkIcons.pickaxe : mkIcons.hammer} /> {t(mode, lang)}</span>
+  return <div className="public-shell bt-shell">
+    <PublicSiteHeader active="cloud" lang={lang} onToggleLanguage={toggleLanguage} />
+    {!mock && TrackerDevLogin && <Suspense fallback={null}><TrackerDevLogin lang={lang} /></Suspense>}
+    {!session ? <main className="bt-empty" aria-busy={!error}>
+      <IconGlyph icon={error ? mkIcons.alert : mkIcons.hammer} />
+      <h1>{error ? text('Трекер недоступен', 'Tracker unavailable') : text('Открываю трекер…', 'Opening tracker…')}</h1>
+      {error && <><a href="/cloud">{text('Аккаунт', 'Account')}</a><button onClick={() => refresh.current?.()}>{text('Повторить', 'Retry')}</button></>}
+    </main> : <main className="bt-workspace">
+      <header className="bt-heading">
+        <a href="/cloud" className="bt-icon-button" title={text('Облако', 'Cloud')} aria-label={text('Облако', 'Cloud')}><IconGlyph icon={mkIcons.arrowLeft} /></a>
+        <div className="bt-heading-title"><h1>{session.info?.title || text('Трекер постройки', 'Build tracker')}</h1><span className="bt-muted">{session.map_grid.wide} × {session.map_grid.tall} · {text('Трекер', 'Tracker')}{mock ? ' · Demo' : ''}</span></div>
+        <span className={`bt-sync${error || saveError ? ' is-error' : ''}`} role="status">{saveError ? text('Не сохранено', 'Not saved') : error ? text('Нет связи', 'Disconnected') : saving ? text('Сохраняю…', 'Saving…') : lastUpdated ? `${text('Обновлено', 'Updated')} ${new Date(lastUpdated).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+        <button className="bt-icon-button" onClick={() => { if (saveError) save.current?.(); refresh.current?.(); }} title={text('Обновить', 'Refresh')} aria-label={text('Обновить', 'Refresh')}><IconGlyph icon={mkIcons.reset} /></button>
+        <button className="bt-icon-button" onClick={copyLink} title={text('Скопировать ссылку', 'Copy link')} aria-label={text('Скопировать ссылку', 'Copy link')}><IconGlyph icon={copied ? mkIcons.check : mkIcons.link} /></button>
       </header>
-
-      {/* Project card */}
-      <div className="bt-project-card">
-        {/* Preview */}
-        <div className="bt-project-preview">
-          <canvas ref={canvasRef} />
-        </div>
-
-        {/* Main info */}
-        <div className="bt-project-main">
-          <div className="bt-project-title">
-            {info.title || t('tracker', lang)}
-          </div>
-          <div className="bt-project-tags">
-            <span className={`bt-tag bt-tag--mode-${mode}`}>
-              <IconGlyph icon={mode === 'gathering' ? mkIcons.pickaxe : mkIcons.hammer} /> {t(mode, lang)}
-            </span>
-          </div>
-          <div className="bt-project-meta-grid">
-            {info.server && (
-              <div className="bt-meta-item">
-                <span className="bt-meta-label">{t('server', lang)}</span>
-                <span className="bt-meta-value">{info.server}</span>
-              </div>
-            )}
-            {info.coords && (
-              <div className="bt-meta-item">
-                <span className="bt-meta-label">{t('coords', lang)}</span>
-                <span className="bt-meta-value">{info.coords}</span>
-              </div>
-            )}
-            <div className="bt-meta-item">
-              <span className="bt-meta-label">{t('maps', lang)}</span>
-              <span className="bt-meta-value">{s.map_grid.wide}×{s.map_grid.tall}</span>
+      <div className="bt-workbench">
+        <section className="bt-artwork" aria-label={text('Арт', 'Artwork')}>
+          <div className="bt-view-toolbar">
+            <div className="bt-segments" role="group" aria-label={text('Режим просмотра', 'View mode')}>
+              <button aria-pressed={view === 'gathering'} onClick={() => setView('gathering')}><IconGlyph icon={mkIcons.pickaxe} />{text('Сбор', 'Gather')}</button>
+              <button aria-pressed={view === 'building'} onClick={() => setView('building')}><IconGlyph icon={mkIcons.hammer} />{text('Стройка', 'Build')}</button>
             </div>
-            {info.description && (
-              <div className="bt-meta-item bt-meta-item--wide">
-                <span className="bt-meta-label">{t('notes', lang)}</span>
-                <span className="bt-meta-value">{info.description}</span>
-              </div>
-            )}
+            <button className="bt-icon-button" aria-pressed={original} onClick={() => setOriginal(value => !value)} title={text('Оригинал', 'Original')} aria-label={text('Оригинал', 'Original')}><IconGlyph icon={mkIcons.eye} /></button>
+            <select aria-label={text('Карта', 'Map')} value={selected} onChange={event => setSelected(Number(event.target.value))}>
+              <option value={-1}>{text('Весь арт', 'Whole art')}</option>
+              {Array.from({ length: Math.min(100, session.map_grid.wide * session.map_grid.tall) }, (_, index) => <option key={index} value={index}>{text('Карта', 'Map')} {index + 1} · {index % session.map_grid.wide + 1}:{Math.floor(index / session.map_grid.wide) + 1}</option>)}
+            </select>
           </div>
-
-          {s.litematic_b64 && (
-            <button className="bt-download-lite" onClick={handleDownloadLitematic}>
-              <IconGlyph icon={mkIcons.package} /> {t('downloadLite', lang)}
-            </button>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="bt-project-stats">
-          <div className="bt-stats-title">{t('statsTitle', lang)}</div>
-          <div className="bt-stat-block">
-            <div className="bt-stats-big">{s.materials.length}</div>
-            <div className="bt-stats-sub">{t('blockTypes', lang)}</div>
+          <TrackerPreview src={session.image_preview} materials={materials} gathered={session.gathered} original={original} building={view === 'building'} wide={session.map_grid.wide} tall={session.map_grid.tall} selected={selected} lang={lang} liveImage={live?.image} />
+          <footer className="bt-art-footer">
+            <span>{original ? text('Оригинал', 'Original') : view === 'gathering' ? text('По собранным материалам', 'Gathered materials') : live?.access === 'login' ? text('Войди в аккаунт для синхронизации', 'Sign in to sync progress') : live?.access === 'denied' ? text('У этого аккаунта нет доступа к стройке', 'This account cannot access the build') : scanned ? live?.fresh ? text('Minecraft · обновляется', 'Minecraft · updating') : text('Minecraft · последнее состояние', 'Minecraft · last snapshot') : text('Ожидаю сканирование в Minecraft', 'Waiting for Minecraft scan')}{scanned && (live?.value.participants ?? 1) > 1 ? ` · ${live?.value.participants} ${text('участников', 'participants')}` : ''}</span>
+            {session.litematic_b64 && <button onClick={download}><IconGlyph icon={mkIcons.download} />{text('Схема', 'Schematic')}</button>}
+          </footer>
+        </section>
+        <aside className="bt-inspector">
+          <div className="bt-summary">
+            <div><h2>{view === 'gathering' ? text('Собрано', 'Gathered') : scanned ? text('Построено', 'Built') : text('Поставлено вручную', 'Manually recorded')}</h2><strong>{pct}%</strong></div>
+            <progress value={progressDone} max={Math.max(1, progressTotal)} aria-label={text('Общий прогресс', 'Total progress')} />
+            <div className="bt-muted"><span>{progressDone.toLocaleString()} / {progressTotal.toLocaleString()}</span><span>{materials.length} {text('материалов', 'materials')}</span></div>
+            {summary && <div className="bt-muted">{text('Ошибки', 'Wrong')}: {summary[3]} · {text('Не проверено', 'Unchecked')}: {summary[4] + summary[5]}</div>}
           </div>
-          <div className="bt-stat-block">
-            <div className="bt-stats-big" style={{ fontSize: 18 }}>{total.toLocaleString()}</div>
-            <div className="bt-stats-sub">{t('blocksTotal', lang)}</div>
+          <div className="bt-material-toolbar">
+            <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={text('Найти материал', 'Find material')} aria-label={text('Найти материал', 'Find material')} />
+            <button className="bt-icon-button" aria-pressed={remainingOnly} onClick={() => setRemainingOnly(value => !value)} title={text('Только недостающие', 'Remaining only')} aria-label={text('Только недостающие', 'Remaining only')}><IconGlyph icon={mkIcons.tracker} /></button>
           </div>
-          <div className="bt-stat-block">
-            <div className="bt-stats-progress-label">
-              <span>{t('progress', lang)}</span>
-              <span className="bt-stats-pct" style={{ color: accent }}>{Math.round(pctDone)}%</span>
-            </div>
-            <div className="bt-stats-bar" role="progressbar" aria-label={t('progress', lang)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pctDone)}>
-              <div
-                className={`bt-stats-bar-fill bt-stats-bar-fill--${mode}`}
-                style={{ width: `${pctDone}%` }}
-              />
-            </div>
-            <div className="bt-stats-done-count" style={{ color: accent }}>
-              {done.toLocaleString()} / {total.toLocaleString()}
-            </div>
+          <ul className="bt-materials" aria-label={text('Материалы', 'Materials')}>
+            {filtered.map(material => <MaterialRow key={material.nbtName} mat={material} value={record[material.nbtName] ?? 0} lang={lang} readOnly={scanned || !loadedSession} onChange={value => change(material.nbtName, value)} />)}
+            {!filtered.length && <li className="bt-no-results">{text('Нет материалов', 'No materials')}</li>}
+          </ul>
+          <div className="bt-session-actions">
+            {session.mode === 'gathering' && <button onClick={startBuilding} disabled={busy || saving || !loadedSession}><IconGlyph icon={mkIcons.hammer} />{text('Начать стройку', 'Start building')}</button>}
+            {(session.info?.server || session.info?.coords || session.info?.description) && <details><summary>{text('Детали', 'Details')}</summary><p>{session.info.server}</p><p>{session.info.coords}</p><p>{session.info.description}</p></details>}
           </div>
-        </div>
+        </aside>
       </div>
-
-      {/* Mode switch */}
-      <div className="bt-switch-wrap">
-        {mode === 'gathering' ? (
-          <button className="bt-switch-btn" onClick={() => setShowConfirm(true)} disabled={switching}>
-            <IconGlyph icon={mkIcons.hammer} /> {t('switchBtn', lang)}
-          </button>
-        ) : (
-          <div className="bt-mode-badge"><IconGlyph icon={mkIcons.hammer} /> {t('modeBadge', lang)}</div>
-        )}
-        {actionError && <p className="bt-error bt-action-error">{actionError}</p>}
-      </div>
-
-      {/* Table */}
-      <div className="bt-table-section">
-        <div className="bt-table-toolbar">
-          <span className="bt-table-toolbar-title">{t('tableTitle', lang)}</span>
-          <span className="bt-table-count">{s.materials.length} {t('blockTypes', lang)}</span>
-          <div className="bt-toolbar-spacer" />
-          <button
-            className={`bt-per-map-btn${perMapMode ? ' bt-per-map-btn--active' : ''}`}
-            aria-pressed={perMapMode}
-            title={lang === 'ru'
-              ? `Показать нужное количество на 1 карту из ${s.map_grid.wide * s.map_grid.tall}`
-              : `Show needed amount for 1 map out of ${s.map_grid.wide * s.map_grid.tall}`}
-            onClick={() => setPerMapMode(v => !v)}
-          >
-            {perMapMode ? (lang === 'ru' ? 'Все карты' : 'All maps') : `${t('perMap', lang)} (1/${s.map_grid.wide * s.map_grid.tall})`}
-          </button>
-        </div>
-        <div className="bt-table" role="table" aria-label={t('tableTitle', lang)}>
-        <div className="bt-table-head" role="row">
-          <div className="bt-th" role="columnheader">{t('colBlock', lang)}</div>
-          <div className="bt-th" role="columnheader">{t('colNeed', lang)}</div>
-          <div className="bt-th" role="columnheader">{t('colProgress', lang)}</div>
-          <div className="bt-th" role="columnheader">{mode === 'gathering' ? t('colAction', lang) : t('colActionB', lang)}</div>
-        </div>
-        <div className="bt-table-body" role="rowgroup">
-          {s.materials.map(mat => {
-            const totalMaps = s.map_grid.wide * s.map_grid.tall;
-            const perMapTarget = perMapMode ? Math.ceil(mat.count / totalMaps) : mat.count;
-            return (
-            <MaterialRow
-              key={mat.nbtName}
-              mat={mat}
-              value={record[mat.nbtName] ?? 0}
-              onChange={mode === 'gathering' ? handleGatheredChange : handlePlacedChange}
-              accentColor={accent}
-              lang={lang}
-              perMapTarget={perMapTarget}
-            />
-            );
-          })}
-        </div>
-        </div>
-      </div>
-
-      {/* Confirm */}
-      {showConfirm && (
-        <div className="bt-confirm-overlay" onClick={() => setShowConfirm(false)}>
-          <div className="bt-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="bt-confirm-title" onClick={e => e.stopPropagation()}>
-            <p className="bt-confirm-title" id="bt-confirm-title">{t('confirmTitle', lang)}</p>
-            <p className="bt-confirm-desc">{t('confirmDesc', lang)}</p>
-            <div className="bt-confirm-btns">
-              <button className="bt-btn bt-btn--cancel" onClick={() => setShowConfirm(false)} autoFocus>
-                {t('cancel', lang)}
-              </button>
-              <button className="bt-btn bt-btn--confirm" onClick={handleSwitch} disabled={switching}>
-                {switching ? t('switching', lang) : t('confirmYes', lang)}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      </main>
-    </div>
-  );
+    </main>}
+  </div>;
 }

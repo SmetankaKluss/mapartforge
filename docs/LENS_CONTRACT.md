@@ -99,10 +99,17 @@ personal placements only.
   the current session instead of leaving a phantom preview.
 - Publish, status refresh, code rotation, and close all re-check the publisher lease in their
   database update. Reacquiring a session therefore invalidates every older in-flight mutation.
-- Website status/heartbeat: 30 seconds only for an active visible-tab session. Offline after
-  90 seconds, expired after 120 seconds without it.
+- Website status/heartbeat: 30 seconds only for an active visible-tab session. Editor is offline
+  after 90 seconds, but the preview remains usable while authorized mod heartbeats renew expiry.
+  A session expires after 120 seconds without a website or authorized viewer renewal.
+  Closing/unmounting the editor does not send `session_close`; explicit Stop still does.
+  Website retains its in-memory invitation code across same-session responses that omit it;
+  a new session, terminal state or changed realtime capability does not inherit that code.
 - Mod presence heartbeat: 30 seconds, aggregated across at most 20 sessions and eight owned
-  placements. A group placement is hidden after 90 seconds without
+  placements. Owner and current-generation subscriber heartbeats renew nonterminal,
+  not-yet-expired sessions only; they never revive closed sessions or a revoked group generation.
+  World exit clears local rendering and stops world tick heartbeats. A group placement is hidden
+  after 90 seconds without
   its owner's heartbeat.
 - Preview source is final `previewImageData`, never compare mode.
 - Pick the largest tile resolution in `128, 64, 32, 16` whose atlas is at most 4096 px per

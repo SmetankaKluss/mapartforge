@@ -9,6 +9,9 @@ describe('MapKluss Wiki navigation', () => {
   });
 
   it('recognises wiki routes and resolves article paths', () => {
+    expect(getWikiArticleFromPath('/wiki/companion-guide').id).toBe('companion-guide');
+    expect(searchWiki('привязка', 'ru').map(item => item.id)).toContain('companion-guide');
+    expect(searchWiki('AutoFrame', 'en').map(item => item.id)).toContain('companion-guide');
     expect(isWikiPath('/wiki')).toBe(true);
     expect(isWikiPath('/wiki/editing-tools/')).toBe(true);
     expect(isWikiPath('/examples')).toBe(false);

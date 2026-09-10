@@ -60,7 +60,7 @@ function normalizeDeviceApprovalMessage(raw: string, t: Translator): string {
     return t('Сначала введи код из Minecraft.', 'Enter the code shown in Minecraft first.');
   }
   if (normalized.includes('code_not_found_or_already_used')) {
-    return t('Код не найден, уже использован или истёк. Запусти вход в моде заново.', 'The code was not found, was already used, or expired. Start mod login again.');
+    return t('Код уже использован, истёк или не найден. Проверь Minecraft: если аккаунт подключён, повторять вход не нужно. Если нет — получи новый код в моде.', 'The code was already used, expired, or was not found. Check Minecraft: if your account is connected, you do not need to sign in again. Otherwise, get a new code in the mod.');
   }
   if (normalized.includes('dev_approve_localhost_only')) {
     return t('Dev-подтверждение работает только с localhost или 127.0.0.1.', 'Dev approval only works on localhost or 127.0.0.1.');
@@ -93,10 +93,14 @@ export function DeviceApprovalPage() {
   const [signedIn, setSignedIn] = useState(false);
   const telegramDomainAllowed = isTelegramLoginHostAllowed();
   const [emailCooldownUntil, setEmailCooldownUntil] = useState(0);
-  const [emailCooldownNow, setEmailCooldownNow] = useState(Date.now());
+  const [emailCooldownNow, setEmailCooldownNow] = useState(() => Date.now());
   const emailCooldownRemaining = Math.max(0, Math.ceil((emailCooldownUntil - emailCooldownNow) / 1000));
   const emailCooldownActive = emailCooldownRemaining > 0;
   const autoApproveAttemptedRef = useRef(false);
+  const approvalInFlightRef = useRef(false);
+  const approvedCodeRef = useRef('');
+  const [approvedCode, setApprovedCode] = useState('');
+  const codeApproved = approvedCode !== '' && approvedCode === code.trim().toUpperCase();
   const localDevPage = useMemo(() => isLocalDevPage(), []);
   const devApprovalEnabled = localDevPage && import.meta.env.DEV && import.meta.env.VITE_ALLOW_DEV_DEVICE_APPROVE === 'true';
 
@@ -159,6 +163,9 @@ export function DeviceApprovalPage() {
   }
 
   const approve = useCallback(async () => {
+    const submittedCode = code.trim().toUpperCase();
+    if (approvalInFlightRef.current || approvedCodeRef.current === submittedCode || submittedCode.length < 4) return;
+    approvalInFlightRef.current = true;
     setStatus('busy');
     setMessage('');
     try {
@@ -170,21 +177,26 @@ export function DeviceApprovalPage() {
         return;
       }
       const { error } = await supabase.functions.invoke('companion-device', {
-        body: { action: 'device_approve', user_code: code.trim().toUpperCase() },
+        body: { action: 'device_approve', user_code: submittedCode },
         headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
       });
       if (error) throw error;
+      approvedCodeRef.current = submittedCode;
+      setApprovedCode(submittedCode);
       setStatus('done');
       trackEvent('companion_device_login_approved', { approval_mode: 'authenticated' });
       setMessage(t('Вход мода подтверждён. Можно вернуться в Minecraft.', 'Mod login approved. You can return to Minecraft.'));
     } catch (err) {
       setStatus('error');
       setMessage(await describeSupabaseError(err, t));
+    } finally {
+      approvalInFlightRef.current = false;
     }
   }, [code, t]);
 
   async function approveDev() {
-    if (!devApprovalEnabled) return;
+    if (!devApprovalEnabled || approvalInFlightRef.current || codeApproved) return;
+    approvalInFlightRef.current = true;
     setStatus('busy');
     setMessage('');
     try {
@@ -197,12 +209,16 @@ export function DeviceApprovalPage() {
         },
       });
       if (error) throw error;
+      approvedCodeRef.current = code.trim().toUpperCase();
+      setApprovedCode(approvedCodeRef.current);
       setStatus('done');
       setMessage(t('Вход мода подтверждён в local dev режиме. Можно вернуться в Minecraft.', 'Mod login approved in local dev mode. You can return to Minecraft.'));
       await refreshSessionLabel();
     } catch (err) {
       setStatus('error');
       setMessage(await describeSupabaseError(err, t));
+    } finally {
+      approvalInFlightRef.current = false;
     }
   }
 
@@ -342,7 +358,12 @@ export function DeviceApprovalPage() {
                 <input
                   className="companion-code"
                   value={code}
-                  onChange={event => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                  onChange={event => {
+                    setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''));
+                    setStatus('idle');
+                    setMessage('');
+                  }}
+                  disabled={status === 'busy'}
                   placeholder="ABCD-EFGH"
                   maxLength={12}
                   autoComplete="one-time-code"
@@ -351,11 +372,11 @@ export function DeviceApprovalPage() {
                 />
               </label>
               <div className="companion-actions">
-                <button onClick={approve} disabled={!signedIn || status === 'busy' || code.trim().length < 4}>
-                  {status === 'busy' ? t('Подтверждаю…', 'Approving…') : t('Подключить мод', 'Connect mod')}
+                <button onClick={approve} disabled={!signedIn || status === 'busy' || codeApproved || code.trim().length < 4}>
+                  {codeApproved ? t('Мод подключён', 'Mod connected') : status === 'busy' ? t('Подтверждаю…', 'Approving…') : t('Подключить мод', 'Connect mod')}
                 </button>
                 {devApprovalEnabled && (
-                  <button onClick={() => void approveDev()} disabled={status === 'busy' || code.trim().length < 4}>{t('Локальный тест', 'Local test')}</button>
+                  <button onClick={() => void approveDev()} disabled={status === 'busy' || codeApproved || code.trim().length < 4}>{t('Локальный тест', 'Local test')}</button>
                 )}
               </div>
               {!signedIn && <p className="companion-muted">{t('Кнопка станет доступна после входа на первом шаге.', 'The button becomes available after sign-in in step one.')}</p>}

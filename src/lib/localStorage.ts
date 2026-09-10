@@ -25,7 +25,7 @@ export interface SavedSettings {
   supportMode?: 1 | 2 | 3;
 }
 
-const STORAGE_KEY = 'mapartforge-v4';
+const STORAGE_KEY = 'mapartforge-v4'; // gitleaks:allow -- browser-only settings key, not a credential.
 
 // Version tag stored alongside blockSelection to detect corrupt data from earlier bugs.
 // Increment this if the blockSelection schema changes in a breaking way.

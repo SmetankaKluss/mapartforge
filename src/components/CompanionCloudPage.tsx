@@ -400,7 +400,7 @@ export function CompanionCloudPage() {
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [emailCooldownUntil, setEmailCooldownUntil] = useState(0);
-  const [emailCooldownNow, setEmailCooldownNow] = useState(Date.now());
+  const [emailCooldownNow, setEmailCooldownNow] = useState(() => Date.now());
   const [selectedModVersion, setSelectedModVersion] = useState<CompanionModVersion>('26.2');
   const [libraryQuery, setLibraryQuery] = useState('');
   const [libraryTab, setLibraryTab] = useState<LibraryTab>('arts');

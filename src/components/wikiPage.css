@@ -324,6 +324,32 @@
   border-top: 1px solid var(--border-soft);
 }
 
+.companion-guide-figure {
+  margin: 20px 0 28px;
+}
+
+.companion-guide-figure a {
+  display: block;
+}
+
+.companion-guide-figure a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.companion-guide-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.companion-guide-figure figcaption {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .wiki-article-body h2 {
   margin: 0 0 12px;
   color: var(--text);

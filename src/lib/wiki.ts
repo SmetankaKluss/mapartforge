@@ -1,5 +1,6 @@
 export type WikiArticleId =
   | 'welcome'
+  | 'companion-guide'
   | 'first-art'
   | 'image-processing'
   | 'build-modes'
@@ -13,7 +14,7 @@ export type WikiArticleId =
   | 'shortcuts'
   | 'troubleshooting';
 
-export type WikiGroupId = 'start' | 'editor' | 'build' | 'reference';
+export type WikiGroupId = 'start' | 'editor' | 'build' | 'companion' | 'reference';
 
 export interface WikiArticleMeta {
   id: WikiArticleId;
@@ -36,6 +37,7 @@ export const WIKI_GROUPS: WikiGroupMeta[] = [
   { id: 'editor', titleRu: 'Редактор', titleEn: 'Editor' },
   { id: 'build', titleRu: 'Постройка и Companion', titleEn: 'Building & Companion' },
   { id: 'reference', titleRu: 'Справка', titleEn: 'Reference' },
+  { id: 'companion', titleRu: 'Мод Companion', titleEn: 'Companion mod' },
 ];
 
 export const WIKI_ARTICLES: WikiArticleMeta[] = [
@@ -119,6 +121,13 @@ export const WIKI_ARTICLES: WikiArticleMeta[] = [
     summaryRu: 'Как сохранить арт в аккаунт и открыть его прямо в моде.',
     summaryEn: 'Save an art to your account and open it directly in the mod.',
     keywords: ['cloud', 'облако', 'companion', 'мод', 'account', 'аккаунт', 'login'],
+  },
+  {
+    id: 'companion-guide', group: 'companion',
+    titleRu: 'Руководство по моду', titleEn: 'Companion guide',
+    summaryRu: 'Установка, схемы, сбор ресурсов, стройка, Lens и Two-layer.',
+    summaryEn: 'Installation, schematics, gathering, building, Lens and Two-layer.',
+    keywords: ['companion', 'мод', 'установка', 'сбор', 'привязка', 'autoframe', 'tracker', 'friends', 'друзья'],
   },
   {
     id: 'lens',

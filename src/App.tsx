@@ -114,7 +114,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-dense-workbench-1-31-0-2026-08-24',
+  id: 'mapkluss-companion-0-14-0-site-1-32-0',
   url: 'https://t.me/mapkluss',
 };
 
@@ -530,7 +530,7 @@ export default function App() {
       next[targetIndex].t = currentT;
       return next;
     });
-  }, []);
+  }, [setGradientStops]);
   const bgModeRef  = useRef<'color' | 'transparent'>('color');
   const bgColorRef = useRef('#ffffff');
   bgModeRef.current  = bgMode;
@@ -553,6 +553,7 @@ export default function App() {
   const cloudMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [cloudMenuStyle, setCloudMenuStyle] = useState<React.CSSProperties>({});
   const [currentCloudArtId, setCurrentCloudArtId] = useState<string | null>(null);
+  const [loadedCloudVersionId, setLoadedCloudVersionId] = useState<string | null>(null);
   const [currentCloudImportId, setCurrentCloudImportId] = useState<string | null>(null);
   const [currentCloudTitle, setCurrentCloudTitle] = useState<string>('');
   const [currentCloudPrivacy, setCurrentCloudPrivacy] = useState<ArtPrivacy>('unlisted');
@@ -564,7 +565,7 @@ export default function App() {
 
   const showAppNotice = useCallback((message: string, tone: AppNotice['tone'] = 'info') => {
     setAppNotice({ message, tone });
-  }, []);
+  }, [setAppNotice]);
 
   useEffect(() => {
     if (!appNotice) return;
@@ -583,7 +584,7 @@ export default function App() {
   const refreshCloudUser = useCallback(async () => {
     const user = await getCurrentCompanionAuthUser();
     setCloudUserEmail(user?.email ?? null);
-  }, []);
+  }, [setCloudUserEmail]);
 
   useEffect(() => {
     void refreshCloudUser();
@@ -1207,7 +1208,7 @@ export default function App() {
     setUndoStack([]);
     setRedoStack([]);
     runProcess(img, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess, setSourceHasAlpha, setBgMode]);
 
   // ── GIF Project handlers ─────────────────────────────────────────────────────
 
@@ -1292,7 +1293,10 @@ export default function App() {
       const pal = buildComputedPalette(buildPaletteFromSelection(cfg.blockSelection, cfgShades, minecraftVersion, platformMode), colorMatch);
       const w = gridPixelWidth(mapGrid);
       const h = gridPixelHeight(mapGrid);
-      const bitmap = await createImageBitmap(frame, { resizeWidth: w, resizeHeight: h, resizeQuality: 'pixelated', colorSpaceConversion: 'none' });
+      // Let `processImage` perform the final map-grid reduction. Pre-scaling
+      // here would bypass the exact linear-light resampler used everywhere
+      // else, making GIF Litematic frames less faithful than still images.
+      const bitmap = await createImageBitmap(frame, { colorSpaceConversion: 'none' });
       const { processImage } = await import('./lib/processor');
       const result = await processImage(bitmap, { dithering: coerceDitheringMode(cfg.dithering), width: w, height: h, intensity: cfg.intensity / 100, bnScale: cfg.bnScale, palette: pal, adjustments: cfg.adjustments, klussParams: cfg.klussParams ?? DEFAULT_KLUSS_PARAMS });
       bitmap.close();
@@ -1320,7 +1324,7 @@ export default function App() {
     setUndoStack([]);
     setRedoStack([]);
     runProcess(croppedImg, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams);
-  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess]);
+  }, [dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, activePalette, effectiveAdjustments, bnScale, klussParams, runProcess, setShowCropModal]);
 
   const handleCreateBlankCanvas = useCallback((
     bg: { r: number; g: number; b: number; a: number } | null,
@@ -1351,7 +1355,7 @@ export default function App() {
     const newLayer = createLayer('Слой 1');
     newLayer.imageData = data;
     setLayerState({ layers: [newLayer], activeLayerId: newLayer.id, groups: [] });
-  }, []);
+  }, [setShowNewCanvasModal]);
 
   const handleDitheringChange = useCallback((mode: DitheringMode) => {
     setDithering(mode);
@@ -1526,7 +1530,7 @@ export default function App() {
       processTargetLayerIdRef.current = latestRef.current.activeLayerId;
       runProcess(sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, newPalette, effectiveAdjustments, bnScale, klussParams);
     }
-  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, buildTechnique, supportBlock, runProcess]);
+  }, [sourceImage, dithering, mapGrid, intensity, compareMode, compareLeft, compareRight, blockSelection, effectiveAdjustments, bnScale, klussParams, minecraftVersion, platformMode, colorMatch, buildTechnique, supportBlock, runProcess, setSupportBlock]);
 
   const handlePlatformModeChange = useCallback((next: PlatformMode) => {
     if (isPlatformLockedForBuildTechnique(buildTechnique)) return;
@@ -2552,7 +2556,7 @@ export default function App() {
     } finally {
       setCloudSaving(false);
     }
-  }, [cloudSaving, compositeImageData, handleCloudSignInFromEditor, previewImageData, showAppNotice, t]);
+  }, [cloudSaving, compositeImageData, handleCloudSignInFromEditor, previewImageData, showAppNotice, t, setCloudSaving, setCloudUserEmail]);
 
   const handleConfirmCloudSave = useCallback(async ({ title, privacy }: { title: string; privacy: ArtPrivacy }) => {
     if (cloudSaving) return;
@@ -2643,7 +2647,7 @@ export default function App() {
     } finally {
       setCloudSaving(false);
     }
-  }, [activePalette, blockSelection, bnScale, buildCurrentCloudProjectJson, buildTechnique, cloudSaving, compositeImageData, currentCloudArtId, currentCloudImportId, dithering, intensity, klussParams, mapGrid, mapMode, minecraftVersion, platformMode, previewImageData, showAppNotice, staircaseMode, supportBlock, supportMode, t]);
+  }, [activePalette, blockSelection, bnScale, buildCurrentCloudProjectJson, buildTechnique, cloudSaving, compositeImageData, currentCloudArtId, currentCloudImportId, dithering, intensity, klussParams, mapGrid, mapMode, minecraftVersion, platformMode, previewImageData, showAppNotice, staircaseMode, supportBlock, supportMode, t, setCloudSaving, setCurrentCloudArtId, setCurrentCloudTitle, setCurrentCloudPrivacy, setMinecraftContinuation]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -2794,7 +2798,7 @@ export default function App() {
       console.error('Failed to load project from history', err);
       showAppNotice(t('Не удалось открыть проект из истории.', 'Could not open project from history.'), 'error');
     }
-  }, [showAppNotice, t]);
+  }, [showAppNotice, t, setSupportBlock, setSupportMode]);
 
   const applyProjectJsonToEditor = useCallback(async (json: string, successMessage?: string) => {
     const full = deserializeFullProject(json);
@@ -2870,7 +2874,7 @@ export default function App() {
     setRedoStack([]);
     if (successMessage) showAppNotice(successMessage);
     return true;
-  }, [showAppNotice]);
+  }, [showAppNotice, setSupportBlock, setSupportMode]);
   applyProjectJsonRef.current = applyProjectJsonToEditor;
 
   const estimateCurrentAutosaveBytes = useCallback(
@@ -2929,6 +2933,7 @@ export default function App() {
     if (successMessage) showAppNotice(successMessage);
   }, [showAppNotice]);
 
+  const cloudImportLoadedRef = useRef(false);
   const handleCloudImport = useCallback(async () => {
     const params = new URLSearchParams(window.location.search);
     const importId = params.get('companionImport');
@@ -2936,6 +2941,8 @@ export default function App() {
     const artId = params.get('art');
 
     if (!importId && !versionId && !artId) return;
+
+    setLoadedCloudVersionId(null);
 
     try {
       if (importId) {
@@ -2957,6 +2964,7 @@ export default function App() {
 
       if (versionId) {
         const downloaded = await downloadCompanionArtVersionProjectJson(versionId);
+        if (artId && downloaded.version.artId !== artId) throw new Error('Cloud art version mismatch.');
         const ok = await applyProjectJsonToEditor(
           downloaded.projectJson,
           t('Облачный арт открыт в редакторе.', 'Cloud art opened in the editor.'),
@@ -2964,6 +2972,7 @@ export default function App() {
         if (!ok) throw new Error('Project file is incompatible.');
         setCurrentCloudImportId(null);
         setCurrentCloudArtId(downloaded.version.artId);
+        setLoadedCloudVersionId(versionId);
         setCurrentCloudTitle(downloaded.version.title);
         setCurrentCloudPrivacy('unlisted');
         trackEvent('cloud_reopen_completed', { source_kind: 'version', content_kind: 'project' });
@@ -3005,22 +3014,22 @@ export default function App() {
       throw new Error('Project file is incompatible.');
     } catch (err) {
       console.error('Failed to load cloud import into editor', err);
+      cloudImportLoadedRef.current = false;
       if (importId) {
         window.location.assign(`/cloud?import=${encodeURIComponent(importId)}`);
         return;
       }
       showAppNotice(t('Не удалось открыть данные из облака в редакторе.', 'Could not open cloud data in the editor.'), 'error');
     }
-  }, [applyImportedImageToEditor, applyProjectJsonToEditor, showAppNotice, t]);
+  }, [applyImportedImageToEditor, applyProjectJsonToEditor, showAppNotice, t, setLoadedCloudVersionId, setCurrentCloudImportId, setCurrentCloudArtId, setCurrentCloudTitle, setCurrentCloudPrivacy]);
 
-  const cloudImportLoadedRef = useRef(false);
   useEffect(() => {
     if (cloudImportLoadedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     if (!params.get('companionImport') && !params.get('artVersion') && !params.get('art')) return;
     cloudImportLoadedRef.current = true;
     void handleCloudImport();
-  }, [handleCloudImport]);
+  }, [handleCloudImport, cloudUserEmail]);
 
   useEffect(() => {
     const target = document.querySelector<HTMLElement>('.support-btn');
@@ -3136,6 +3145,8 @@ export default function App() {
                   <span>{t('Исходный код сайта', 'Website source code')}</span>
                 </a>
                 <LensController
+                  cloudArtId={currentCloudArtId}
+                  cloudVersionId={loadedCloudVersionId}
                   imageData={previewImageData}
                   grid={mapGrid}
                   mapMode={mapMode}
@@ -3171,20 +3182,20 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Новое обновление редактора MapKluss', 'New MapKluss editor update')}
+          aria-label={t('Обновление MapKluss Companion 0.14.0', 'MapKluss Companion 0.14.0 update')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
-            <span>EDITOR</span>
+            <span>COMPANION</span>
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline={t('ПЛОТНЫЙ РАБОЧИЙ РЕЖИМ', 'DENSE WORKBENCH MODE')}
-            detail={t('МАТЕРИАЛЫ РЯДОМ С ПАЛИТРОЙ · БЫСТРАЯ ПИПЕТКА', 'MATERIALS NEXT TO PALETTE · FAST EYEDROPPER')}
+            headline={t('COMPANION 0.14.0', 'COMPANION 0.14.0')}
+            detail={t('НОВОЕ МЕНЮ · ТРЕКЕР СТРОЙКИ · LENS ИЗ МОДА · ГАЙД', 'NEW MENU · BUILD TRACKER · LENS FROM THE MOD · GUIDE')}
           />
           <span className="update-banner-sr">
-            {t('В редакторе появился добровольный плотный рабочий режим: быстрые материалы рядом с палитрой и серия выборок пипеткой.',
-              'The editor now has an optional dense workbench mode: quick materials beside the palette and repeat eyedropper sampling.')}
+            {t('Новое меню мода, живой прогресс стройки, Lens из Minecraft и руководство в Wiki.',
+              'A new mod menu, live build progress, Lens from Minecraft and a Wiki guide.')}
           </span>
           <a
             className="update-banner-link"

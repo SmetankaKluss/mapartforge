@@ -17,8 +17,11 @@ import {
 } from '../lib/companionLens';
 import { chooseLensTileResolution, LensPublishQueue } from '../lib/lensPreview';
 import { getSupabaseClient } from '../lib/supabase';
+import { canResumeCloudLens, retainLensInviteCode } from '../lib/lensSessionState';
 
 interface LensControllerProps {
+  cloudArtId?: string | null;
+  cloudVersionId?: string | null;
   imageData: ImageData | null;
   grid: LensGrid;
   mapMode: LensMapMode;
@@ -64,7 +67,14 @@ function lensErrorMessage(error: unknown, t: LensControllerProps['t']): string {
   return error instanceof Error ? error.message : t('Не удалось подключить Lens.', 'Could not connect Lens.');
 }
 
-export function LensController({ imageData, grid, mapMode, title, processing, compareMode, t }: LensControllerProps) {
+export function LensController({ imageData, grid, mapMode, title, processing, compareMode, t, cloudArtId, cloudVersionId }: LensControllerProps) {
+  const resumeParams = new URLSearchParams(window.location.search);
+  const requestedSession = resumeParams.get('lensSession');
+  const requestedArt = resumeParams.get('art');
+  const requestedVersion = resumeParams.get('artVersion');
+  const resumeReady = canResumeCloudLens(requestedArt, requestedVersion, cloudArtId, cloudVersionId);
+  const resumeSession = requestedSession && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedSession) ? requestedSession : null;
+  const resumeAttempted = useRef(false);
   const useMockLens = import.meta.env.DEV && new URLSearchParams(window.location.search).get('lensMock') === '1';
   const [expanded, setExpanded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -88,8 +98,9 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
   translateRef.current = t;
 
   const adoptSession = useCallback((nextSession: LensSession | null) => {
-    sessionRef.current = nextSession;
-    setSession(nextSession);
+    const next = retainLensInviteCode(sessionRef.current, nextSession);
+    sessionRef.current = next;
+    setSession(next);
   }, []);
 
   useEffect(() => {
@@ -229,11 +240,7 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
   useEffect(() => {
     const workerJobs = workerJobsRef.current;
     return () => {
-      const activeSession = sessionRef.current;
-      const publisherLease = publisherLeaseRef.current;
-      if (enabledRef.current && activeSession && publisherLease) {
-        void closeLensSession(activeSession.sessionId, publisherLease).catch(() => undefined);
-      }
+      // Leaving the editor must not stop viewers still connected in Minecraft.
       lifecycleEpochRef.current += 1;
       queueRef.current?.clear();
       enabledRef.current = false;
@@ -389,7 +396,8 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
     setPhase('connecting');
     setErrorMessage('');
     try {
-      const response = await startLensSession({ title, grid, mapMode });
+      if (resumeSession && !resumeReady) throw new Error(t('Сначала загрузите Cloud-арт.', 'Load the Cloud art first.'));
+      const response = resumeSession ? await reacquireLensSession(resumeSession) : await startLensSession({ title, grid, mapMode });
       if (epoch !== lifecycleEpochRef.current) {
         if (response.publisherLease) {
           void closeLensSession(response.session.sessionId, response.publisherLease).catch(() => undefined);
@@ -403,12 +411,24 @@ export function LensController({ imageData, grid, mapMode, title, processing, co
       adoptSession(response.session);
       setPhase('live');
       queueRef.current?.enqueue({ imageData, grid, mapMode, title });
+      if (resumeSession) {
+        const url = new URL(window.location.href); url.searchParams.delete('lensSession');
+        window.history.replaceState(window.history.state, '', url);
+      }
     } catch (error) {
       if (epoch !== lifecycleEpochRef.current) return;
       setPhase('error');
       setErrorMessage(lensErrorMessage(error, t));
     }
-  }, [adoptSession, compareMode, grid, imageData, mapMode, processing, t, title, user]);
+  }, [adoptSession, compareMode, grid, imageData, mapMode, processing, t, title, user, resumeSession, resumeReady]);
+
+  useEffect(() => {
+    if (!resumeSession || resumeAttempted.current || !user || !imageData || processing || compareMode || !resumeReady) return;
+    const timer = window.setTimeout(() => {
+      resumeAttempted.current = true; setExpanded(true); void start();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [resumeSession, user, imageData, processing, compareMode, resumeReady, start]);
 
   const stop = useCallback(async () => {
     const activeSession = sessionRef.current;

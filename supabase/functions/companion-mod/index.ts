@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.99.3';
+import { libraryBuildTechniques } from '../_shared/libraryBuildTechnique.ts';
 import {
   drainCompanionStorageDeleteOutbox,
 } from '../_shared/companionStorageCleanup.ts';
@@ -210,6 +211,11 @@ async function mapLibraryRows(
   admin: AdminClient,
   entries: Array<{ row: LibraryRow; isFavorite?: boolean }>,
 ) {
+  const buildTechniques = await libraryBuildTechniques(entries, async ids => {
+    const { data, error } = await admin.from('art_versions').select('id,art_id,settings').in('id', ids);
+    if (error) throw error;
+    return data ?? [];
+  });
   const eligible = entries.filter(({ row }) => (
     Boolean(row.preview_path)
     && Boolean(row.current_version_id)
@@ -277,6 +283,7 @@ async function mapLibraryRows(
     privacy: row.privacy,
     grid: row.map_grid,
     mode: row.map_mode,
+    buildTechnique: buildTechniques.get(row.id) ?? 'standard',
     previewUrl: row.current_version_id && row.preview_path
       ? signedUrls.get(libraryPreviewKey(row.id, row.current_version_id, row.preview_path)) ?? null
       : null,

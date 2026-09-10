@@ -14,6 +14,7 @@ import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
 import { PublicSiteHeader } from './PublicSiteHeader';
 import './wikiPage.css';
+import { CompanionGuide, companionGuideSections } from './CompanionGuide';
 
 type Translate = (ru: string, en: string) => string;
 
@@ -27,6 +28,7 @@ interface TocItem {
 }
 
 const ARTICLE_TOC: Record<WikiArticleId, TocItem[]> = {
+  'companion-guide': companionGuideSections.map(([id, labelRu, labelEn]) => ({ id, labelRu, labelEn })),
   welcome: [
     { id: 'what-it-does', labelRu: 'Что умеет MapKluss', labelEn: 'What MapKluss does' },
     { id: 'choose-a-path', labelRu: 'Выбери свой путь', labelEn: 'Choose a path' },
@@ -117,6 +119,8 @@ function Key({ children }: { children: ReactNode }) {
 
 function ArticleBody({ articleId, t, onArticle }: { articleId: WikiArticleId; t: Translate; onArticle: (id: WikiArticleId) => void }) {
   switch (articleId) {
+    case 'companion-guide':
+      return <CompanionGuide t={t} />;
     case 'welcome':
       return (
         <>
@@ -253,7 +257,7 @@ function ArticleBody({ articleId, t, onArticle }: { articleId: WikiArticleId; t:
       return (
         <>
           <p className="wiki-lead">{t('Lens показывает непрерывный полноцветный preview редактора поверх настоящих рамок в Minecraft. Это client-only фантом: он ничего не ставит, не ломает и не изменяет на сервере.', 'Lens displays a continuous full-colour editor preview over real item frames in Minecraft. It is a client-only phantom: it never places, breaks, or changes anything on the server.')}</p>
-          <section id="lens-purpose"><h2>{t('Для чего нужен Lens', 'What Lens is for')}</h2><p>{t('Можно заранее оценить размер и положение арта на стене, полу или потолке и видеть изменения палитры, дизеринга и ручной правки примерно через секунду без нового экспорта схемы.', 'Preview an art’s size and placement on a wall, floor, or ceiling and see palette, dithering, and manual edits update in about a second without exporting another schematic.')}</p></section>
+          <section id="lens-purpose"><h2>{t('Для чего нужен Lens', 'What Lens is for')}</h2><p>{t('Можно заранее оценить размер и положение арта на стене, полу или потолке и видеть изменения палитры, дизеринга и ручной правки без нового экспорта схемы.', 'Preview an art’s size and placement on a wall, floor, or ceiling and see palette, dithering, and manual edits without exporting another schematic.')}</p></section>
           <section id="lens-flow"><h2>{t('Как запустить', 'How to start')}</h2><ol><li>{t('Войди в один аккаунт MapKluss на сайте и в Companion.', 'Sign in to the same MapKluss account on the website and in Companion.')}</li><li>{t('Открой готовый арт в редакторе и запусти Lens из меню аккаунта.', 'Open a ready art in the editor and start Lens from the account menu.')}</li><li>{t('В разделе Lens мода обнови список и выбери активную сессию.', 'Refresh the mod’s Lens section and select the active session.')}</li><li>{t('Посмотри на левую нижнюю рамку будущего арта и установи личное размещение. Пока сессия активна, редактор обновляет фантом автоматически.', 'Look at the bottom-left frame of the future art and create a personal placement. While the session is active, editor changes update the phantom automatically.')}</li></ol></section>
           <section id="lens-safety"><h2>{t('Кто видит Lens', 'Who can see Lens')}</h2><p>{t('По умолчанию фантом видит только владелец. Доступ другим пользователям Companion выдаётся только через код группы и может быть отозван. Публичного режима и автоматического показа всем игрокам на сервере нет. Preview хранится временно и удаляется после закрытия сессии.', 'Only the owner sees the phantom by default. Other Companion users gain access only through an explicit group code, and that access can be revoked. There is no public mode or automatic display to everyone on a server. Preview files are temporary and are removed after the session closes.')}</p></section>
         </>

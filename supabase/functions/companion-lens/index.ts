@@ -25,6 +25,8 @@ import {
   uploadImmutableLensPreview,
 } from "../_shared/lensYandexStorage.ts";
 
+import { lensSessionStatus } from "../_shared/lensSessionLifetime.ts";
+
 const API_VERSION = 1;
 const BUCKET = "mapkluss-lens";
 const MAX_PREVIEW_BYTES = 8 * 1024 * 1024;
@@ -679,14 +681,8 @@ async function refreshSessionState(
   row: LensSessionRow,
 ): Promise<LensSessionRow> {
   if (row.status === "closed" || row.status === "expired") return row;
-  const editorAge = Date.now() - new Date(row.last_editor_seen_at).getTime();
-  const expired = new Date(row.expires_at).getTime() <= Date.now() ||
-    editorAge >= SESSION_EXPIRES_MS;
-  const nextStatus = expired
-    ? "expired"
-    : editorAge >= SESSION_OFFLINE_MS
-    ? "offline"
-    : "active";
+  // Device heartbeats can keep a session alive while the editor is asleep.
+  const nextStatus = lensSessionStatus(row, Date.now(), SESSION_OFFLINE_MS);
   if (nextStatus === row.status) return row;
   const { data, error } = await admin
     .from("companion_lens_sessions")
@@ -1122,7 +1118,7 @@ async function handleSessionStart(
   principal: Principal,
   payload: JsonRecord,
 ) {
-  requireKind(principal, "website", "publisher_required");
+  if (principal.kind !== "website" && principal.kind !== "device") fail("publisher_required", 403);
   await consumeRateLimit(admin, principal, "session_start", 20, 60);
   const ownerId = principal.userId!;
   const title = requiredString(payload, "title", 120);
@@ -1213,7 +1209,7 @@ async function handleSessionPublish(
   payload: JsonRecord,
   preview?: File,
 ) {
-  requireKind(principal, "website", "publisher_required");
+  if (principal.kind !== "website" && principal.kind !== "device") fail("publisher_required", 403);
   await consumeRateLimit(admin, principal, "session_publish", 1, 1);
   if (!preview) fail("invalid_preview", 400);
   if (preview.type && preview.type !== "image/png") {
@@ -2026,6 +2022,21 @@ async function handlePresenceHeartbeat(
         .eq("device_token_hash", principal.tokenHash)
         .in("session_id", currentSubscriberIds);
       if (error) throw error;
+      for (const sessionId of currentSubscriberIds) {
+        const generation = subscriberGenerations.get(sessionId);
+        if (generation === undefined) continue;
+        const { error: renewalError } = await admin
+          .from("companion_lens_sessions")
+          .update({
+            last_mod_seen_at: timestamp,
+            expires_at: futureIso(SESSION_EXPIRES_MS),
+          })
+          .eq("id", sessionId)
+          .eq("group_generation", generation)
+          .in("status", ["active", "offline"])
+          .gt("expires_at", timestamp);
+        if (renewalError) throw renewalError;
+      }
     }
     if (ownerSessionIds.length) {
       const { error: ownerHeartbeatError } = await admin
@@ -2033,8 +2044,12 @@ async function handlePresenceHeartbeat(
         .update({
           last_mod_seen_at: timestamp,
           owner_device_token_hash: principal.tokenHash,
+          expires_at: futureIso(SESSION_EXPIRES_MS),
         })
-        .in("id", ownerSessionIds);
+        .in("id", ownerSessionIds)
+        .eq("owner_id", principal.userId)
+        .in("status", ["active", "offline"])
+        .gt("expires_at", timestamp);
       if (ownerHeartbeatError) throw ownerHeartbeatError;
     }
   }
@@ -2632,6 +2647,15 @@ Deno.serve(async (req) => {
         payload,
         preview,
       );
+    }
+    if (action === "session_seed") {
+      requireKind(principal, "device", "device_required");
+      const encoded = requiredString(payload, "previewBase64", 3 * 1024 * 1024);
+      let bytes: Uint8Array;
+      try { bytes = Uint8Array.from(atob(encoded), ch => ch.charCodeAt(0)); }
+      catch { fail("invalid_preview", 400); }
+      return await handleSessionPublish(admin, serviceKey, principal, payload,
+        new File([new Uint8Array(bytes!).buffer], "preview.png", { type: "image/png" }));
     }
     if (action === "session_reacquire") {
       return await handleSessionReacquire(admin, principal, payload);

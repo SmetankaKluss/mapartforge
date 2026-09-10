@@ -3,7 +3,7 @@ import { selectSupabaseRoute, type SupabaseRoute } from './supabaseRouting';
 
 const PUBLIC_SUPABASE_DIRECT_URL = 'https://opxgnyadxybceldaokdi.supabase.co';
 const PUBLIC_SUPABASE_GATEWAY_URL = 'https://api.mapkluss.art';
-const PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weGdueWFkeHliY2VsZGFva2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDU5MjEsImV4cCI6MjA4OTYyMTkyMX0.80IIx_1WGuUtxJlfu7qhOAQKdEb0FwEV8gD5ybe8DcQ';
+const PUBLIC_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weGdueWFkeHliY2VsZGFva2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNDU5MjEsImV4cCI6MjA4OTYyMTkyMX0.80IIx_1WGuUtxJlfu7qhOAQKdEb0FwEV8gD5ybe8DcQ'; // gitleaks:allow -- Supabase browser anon key; access is constrained by RLS.
 export const SUPABASE_AUTH_STORAGE_KEY = 'sb-opxgnyadxybceldaokdi-auth-token';
 
 const explicitSupabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
