@@ -150,7 +150,7 @@ export async function handleBuildSource(
     return reply(
       code === "42501"
         ? 403
-        : code === "40001"
+        : code === "PT409" || code === "40001"
         ? 409
         : code?.startsWith("22")
         ? 400

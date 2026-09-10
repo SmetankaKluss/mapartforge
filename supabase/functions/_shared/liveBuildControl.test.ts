@@ -192,7 +192,7 @@ Deno.test("build control sanitizes database errors and never retries mutations",
   const f = fixture();
   let calls = 0;
   for (
-    const [code, status] of [["42501", 403], ["40001", 409], ["54000", 429], [
+    const [code, status] of [["42501", 403], ["PT409", 409], ["40001", 409], ["54000", 429], [
       "23514",
       400,
     ], ["XX000", 503]] as const
@@ -206,5 +206,5 @@ Deno.test("build control sanitizes database errors and never retries mutations",
       status,
     );
   }
-  assertEquals(calls, 5);
+  assertEquals(calls, 6);
 });

@@ -5,6 +5,18 @@ import {
   sourceDigest,
 } from "./liveBuildSource.ts";
 const id = "11111111-1111-4111-8111-111111111111";
+Deno.test("source conflicts return 409 without retrying control", async () => {
+  for (const code of ["PT409", "40001"]) {
+    const f = fixture();
+    let calls = 0;
+    f.deps.control = () => {
+      calls++;
+      return Promise.resolve({ data: null, error: { code } });
+    };
+    assertEquals((await handleBuildSource(f.request("get"), f.deps)).status, 409);
+    assertEquals(calls, 1);
+  }
+});
 function fixture() {
   const bytes = new Uint8Array([1, 2, 3]);
   const hash = sourceDigest(bytes);

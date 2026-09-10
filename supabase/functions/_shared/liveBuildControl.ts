@@ -151,7 +151,7 @@ export async function handleBuildControl(
     if (result.error) {
       const code = result.error.code;
       if (code === "42501") return reply(403, { error: "build_access_denied" });
-      if (code === "40001") return reply(409, { error: "revision_conflict" });
+      if (code === "PT409" || code === "40001") return reply(409, { error: "revision_conflict" });
       if (code === "54000") return reply(429, { error: "build_limit" });
       if (code?.startsWith("22") || code?.startsWith("23")) {
         return reply(400, { error: "invalid_request" });
