@@ -3,6 +3,7 @@ import {
   MAX_CANVAS_ZOOM,
   MIN_CANVAS_ZOOM,
   canStartCanvasPan,
+  canvasPixelAtPoint,
   canvasZoomFromWheel,
   canvasZoomToSlider,
   hasCanvasPanStarted,
@@ -10,6 +11,23 @@ import {
 } from '../canvasViewport';
 
 describe('canvas viewport zoom', () => {
+  it('maps pointer positions through the rendered bounds at fractional zoom and CSS scaling', () => {
+    for (const scale of [0.5, 1, 1.37, 2.5, 7.99]) {
+      const rect = { left: 10.5, top: -3.25, width: 128 * scale, height: 256 * scale };
+      expect(canvasPixelAtPoint(rect.left + 42.5 * scale, rect.top + 160.5 * scale, rect, 128, 256))
+        .toEqual({ px: 42, py: 160 });
+      expect(canvasPixelAtPoint(rect.left + rect.width, rect.top, rect, 128, 256)).toBeNull();
+    }
+  });
+
+  it('does not select a pixel outside or in an empty canvas', () => {
+    const rect = { left: 10, top: 20, width: 256, height: 128 };
+    expect(canvasPixelAtPoint(9, 21, rect, 128, 128)).toBeNull();
+    expect(canvasPixelAtPoint(11, 19, rect, 128, 128)).toBeNull();
+    expect(canvasPixelAtPoint(11, 21, { ...rect, width: 0 }, 128, 128)).toBeNull();
+    expect(canvasPixelAtPoint(NaN, 21, rect, 128, 128)).toBeNull();
+  });
+
   it('maps the exponential slider endpoints and midpoint', () => {
     expect(sliderToCanvasZoom(0)).toBe(MIN_CANVAS_ZOOM);
     expect(sliderToCanvasZoom(50)).toBe(200);

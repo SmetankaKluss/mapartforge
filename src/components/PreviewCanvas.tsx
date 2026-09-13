@@ -13,7 +13,8 @@ import { type PaintTool, type PaintBlock, type TextLayerMeta } from './previewCa
 import { createTextMeta, getTextLayout, renderTextLayer, textLocalVector } from '../lib/textRender';
 import { TextToolOverlay } from './TextToolOverlay';
 import type { TextPaletteBlock } from './TextToolOverlay';
-import { CANVAS_PAN_THRESHOLD } from '../lib/canvasViewport';
+import { CANVAS_PAN_THRESHOLD, canvasPixelAtPoint } from '../lib/canvasViewport';
+import { buildMaterialLookup, sampleMaterialPixel, type MaterialLookupEntry } from '../lib/materialLookup';
 
 import type { BlockSelection } from '../lib/paletteBlocks';
 import type { ComputedPalette } from '../lib/dithering';
@@ -65,6 +66,7 @@ type CanvasDownEvent = CanvasPointEvent & {
 interface Props {
   mode: 'pixel' | 'block';
   imageData: ImageData | null;     // composite of all visible layers — for display & tooltips
+  materialData?: ImageData | null; // encoded blocks before preview-only shading
   paintData: ImageData | null;     // active layer only — for painting operations
   originalData: ImageData | null;
   showOriginal: boolean;
@@ -113,29 +115,7 @@ interface Props {
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
-type LookupEntry = {
-  baseId: number; shade: number; csId: number;
-  blockId: number; displayName: string; colourName: string;
-};
-
-function buildColorLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, LookupEntry> {
-  const map = new Map<number, LookupEntry>();
-  for (let i = 0; i < cp.colors.length; i++) {
-    const c = cp.colors[i];
-    const key = (c.r << 16) | (c.g << 8) | c.b;
-    if (map.has(key)) continue;
-    const row = COLOUR_ROWS.find(r => r.baseId === c.baseId);
-    if (!row) continue;
-    const activeIds = sel[row.csId] ?? [];
-    const block = row.blocks.find(b => activeIds.includes(b.blockId)) ?? row.blocks[0];
-    if (!block) continue;
-    map.set(key, {
-      baseId: c.baseId, shade: c.shade, csId: row.csId,
-      blockId: block.blockId, displayName: block.displayName, colourName: row.colourName,
-    });
-  }
-  return map;
-}
+type LookupEntry = MaterialLookupEntry;
 
 function findTextPaletteBlock(hex: string, cp: ComputedPalette, sel: BlockSelection): TextPaletteBlock | null {
   const parsed = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -469,7 +449,7 @@ function drawBrushLine(
 }
 
 export function PreviewCanvas({
-  mode, imageData, paintData, originalData, showOriginal, showGrid,
+  mode, imageData, materialData, paintData, originalData, showOriginal, showGrid,
   width, height, scale, viewScale, cp, blockSelection,
   activeTool, paintBlock, patternBlocks, brushSize, activeTextMeta = null, activeTextLocked = false, textLayers = [],
   otherLayersData,
@@ -671,7 +651,7 @@ export function PreviewCanvas({
     viewportPanning: false,
   });
 
-  const colorLookup = useMemo(() => buildColorLookup(cp, blockSelection), [cp, blockSelection]);
+  const colorLookup = useMemo(() => buildMaterialLookup(cp, blockSelection), [cp, blockSelection]);
   propsRef.current = {
     activeTool,
     paintBlock,
@@ -705,6 +685,22 @@ export function PreviewCanvas({
     if (buf && otherLayersData) return compositeTwo(otherLayersData, buf, width, height);
     return buf ?? imageData;
   })();
+  const materialImageData = paintBufferRef.current ? displayImageData : (materialData ?? imageData);
+
+  useEffect(() => {
+    // A pinned/queued tooltip must not survive a new image or palette.
+    if (hoverRafRef.current != null) cancelAnimationFrame(hoverRafRef.current);
+    hoverRafRef.current = null;
+    isPinnedRef.current = false;
+    prevHoverKeyRef.current = '';
+    const frame = requestAnimationFrame(() => {
+      setHoverInfo(null);
+      setIsPinned(false);
+      setShowRepaint(false);
+      setRepaintTarget(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [imageData, materialData, colorLookup]);
 
   // ── Cleanup timers ──────────────────────────────────────────────────────────
 
@@ -1386,8 +1382,8 @@ export function PreviewCanvas({
     hoverRafRef.current = null;
     const m = lastMoveRef.current;
     if (!m || isPinnedRef.current || isViewportPanActive()) return;
-    const info = lookupAtClient(m.x, m.y);
-    if (!info) { scheduleHide(); return; }
+    const info = lookupAtEventRef.current({ clientX: m.x, clientY: m.y });
+    if (!info) { closeTooltip(); return; }
     cancelHide();
     lastClientRef.current = { x: m.x, y: m.y };
     const pos = computeTtPos(m.x, m.y);
@@ -1409,11 +1405,7 @@ export function PreviewCanvas({
     const canvas = canvasZoneRef.current?.querySelector('canvas');
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const mx = cx - rect.left, my = cy - rect.top;
-    if (mx < 0 || my < 0 || mx >= rect.width || my >= rect.height) return null;
-    const px = Math.floor(mx / viewScale), py = Math.floor(my / viewScale);
-    if (px < 0 || px >= width || py < 0 || py >= height) return null;
-    return { px, py };
+    return canvasPixelAtPoint(cx, cy, rect, width, height);
   }
 
   function getPixelCoords(e: CanvasPointEvent): { px: number; py: number } | null {
@@ -1426,27 +1418,10 @@ export function PreviewCanvas({
   lookupAtEventRef.current = lookupAtEvent;
 
   function lookupAtClient(cx: number, cy: number): HoverInfo | null {
-    if (showOriginal || !displayImageData) return null;
+    if (showOriginal || !materialImageData) return null;
     const pos = getPixelCoordsAt(cx, cy);
     if (!pos) return null;
-    const { px, py } = pos;
-    const idx = (py * width + px) * 4;
-    const r = displayImageData.data[idx], g = displayImageData.data[idx + 1], b = displayImageData.data[idx + 2];
-    const a = displayImageData.data[idx + 3];
-    if (a === 0) return null; // fully transparent — nothing to pick
-    const exact = colorLookup.get((r << 16) | (g << 8) | b);
-    if (exact) return { pixelX: px, pixelY: py, r, g, b, ...exact };
-    // Fallback: nearest palette color via OKLab distance
-    if (cp.colors.length === 0) return null;
-    const lab = rgbToOklab(r, g, b);
-    let bestIdx = 0, bestDist = Infinity;
-    for (let i = 0; i < cp.labs.length; i++) {
-      const d = oklabDistance(lab, cp.labs[i]);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
-    }
-    const nearest = colorLookup.get((cp.colors[bestIdx].r << 16) | (cp.colors[bestIdx].g << 8) | cp.colors[bestIdx].b);
-    if (!nearest) return null;
-    return { pixelX: px, pixelY: py, r, g, b, ...nearest };
+    return sampleMaterialPixel(materialImageData, pos.px, pos.py, colorLookup);
   }
 
   // ── Split slider helpers ─────────────────────────────────────────────────────
@@ -1964,6 +1939,7 @@ export function PreviewCanvas({
   const processedLayer = mode === 'block' ? (
     <BlockCanvas
       imageData={displayImageData} cp={cp} blockSelection={blockSelection}
+      materialData={materialImageData}
       width={width} height={height} showGrid={showGrid} scale={scale} viewScale={viewScale}
       overlayRef={overlayCanvasRef}
     />

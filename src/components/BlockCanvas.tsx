@@ -3,6 +3,7 @@ import { useLocale } from '../lib/useLocale';
 import type { ComputedPalette } from '../lib/dithering';
 import type { BlockSelection } from '../lib/paletteBlocks';
 import { COLOUR_ROWS } from '../lib/paletteBlocks';
+import { buildMaterialLookup } from '../lib/materialLookup';
 import { isInSpritesheet, localBlockTextureUrl } from '../lib/blockTexture';
 import { IconGlyph } from './IconGlyph';
 import { mkIcons } from './mkIcons';
@@ -12,6 +13,7 @@ export const SPRITE_URL =
 
 interface Props {
   imageData: ImageData | null;
+  materialData?: ImageData | null;
   cp: ComputedPalette;
   blockSelection: BlockSelection;
   width: number;
@@ -70,23 +72,7 @@ function analyzeSpriteCells(sprite: HTMLImageElement): Map<string, CellBounds> {
 
 // ── Colour → palette entry lookup ─────────────────────────────────────────
 
-function buildLookup(cp: ComputedPalette, sel: BlockSelection): Map<number, { csId: number; blockId: number; nbtName: string }> {
-  const map = new Map<number, { csId: number; blockId: number; nbtName: string }>();
-  for (const c of cp.colors) {
-    const key = (c.r << 16) | (c.g << 8) | c.b;
-    if (map.has(key)) continue;
-    const row = COLOUR_ROWS.find(r => r.baseId === c.baseId);
-    if (!row) continue;
-    const activeIds = sel[row.csId] ?? [];
-    const blockId = activeIds[0] ?? (row.blocks[0]?.blockId ?? 0);
-    const block = row.blocks.find(candidate => candidate.blockId === blockId) ?? row.blocks[0];
-    if (!block) continue;
-    map.set(key, { csId: row.csId, blockId, nbtName: block.nbtName });
-  }
-  return map;
-}
-
-export function BlockCanvas({ imageData, cp, blockSelection, width, height, showGrid, scale, viewScale = scale, overlayRef }: Props) {
+export function BlockCanvas({ imageData, materialData, cp, blockSelection, width, height, showGrid, scale, viewScale = scale, overlayRef }: Props) {
   const { t } = useLocale();
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const [spriteBounds, setSpriteBounds] = useState<Map<string, CellBounds> | null>(null);
@@ -164,7 +150,8 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
 
       renderRafId = requestAnimationFrame(() => {
         if (cancelled) return;
-        const lookup = buildLookup(cp, blockSelection);
+        const lookup = buildMaterialLookup(cp, blockSelection);
+        const materials = materialData ?? imageData;
         const ctx = canvas.getContext('2d')!;
         const rasterScale = scale;
         const cw = width  * rasterScale;
@@ -182,9 +169,12 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
 
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
-            const pi  = (y * width + x) * 4;
+            const pi  = (y * imageData.width + x) * 4;
             const r   = imageData.data[pi], g = imageData.data[pi + 1], b = imageData.data[pi + 2];
-            const entry = lookup.get((r << 16) | (g << 8) | b);
+            const mi = (y * materials.width + x) * 4;
+            const entry = x < materials.width && y < materials.height && materials.data[mi + 3] >= 128
+              ? lookup.get((materials.data[mi] << 16) | (materials.data[mi + 1] << 8) | materials.data[mi + 2])
+              : undefined;
 
             for (let sy = 0; sy < rasterScale; sy++) {
               for (let sx = 0; sx < rasterScale; sx++) {
@@ -243,7 +233,7 @@ export function BlockCanvas({ imageData, cp, blockSelection, width, height, show
       cancelAnimationFrame(overlayRafId);
       cancelAnimationFrame(renderRafId);
     };
-  }, [imageData, spritePixels, spriteBounds, spriteReady, localTexturePixels, localTexturesReady, cp, blockSelection, width, height, showGrid, scale]);
+  }, [imageData, materialData, spritePixels, spriteBounds, spriteReady, localTexturePixels, localTexturesReady, cp, blockSelection, width, height, showGrid, scale]);
 
   if (!imageData) {
     return (

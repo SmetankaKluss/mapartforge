@@ -4,6 +4,18 @@ export const CANVAS_PAN_THRESHOLD = 3;
 
 const ZOOM_RANGE = MAX_CANVAS_ZOOM / MIN_CANVAS_ZOOM;
 
+export function canvasPixelAtPoint(
+  clientX: number, clientY: number,
+  rect: { left: number; top: number; width: number; height: number },
+  width: number, height: number,
+): { px: number; py: number } | null {
+  const x = clientX - rect.left, y = clientY - rect.top;
+  if (!Number.isFinite(x) || !Number.isFinite(y)
+      || rect.width <= 0 || rect.height <= 0 || width <= 0 || height <= 0
+      || x < 0 || y < 0 || x >= rect.width || y >= rect.height) return null;
+  return { px: Math.floor(x * width / rect.width), py: Math.floor(y * height / rect.height) };
+}
+
 export function clampCanvasZoom(value: number): number {
   return Math.min(MAX_CANVAS_ZOOM, Math.max(MIN_CANVAS_ZOOM, value));
 }

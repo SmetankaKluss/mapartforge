@@ -1,6 +1,6 @@
 import type { ComputedPalette } from './dithering';
 import type { BlockSelection } from './paletteBlocks';
-import { COLOUR_ROWS } from './paletteBlocks';
+import { buildMaterialLookup } from './materialLookup';
 import type { MapGrid } from './types';
 import { MAP_BLOCK_SIZE } from './types';
 import type { SessionMaterial } from './buildSession';
@@ -20,25 +20,7 @@ export function computeRawMaterials(
   sel: BlockSelection,
   mapGrid: MapGrid,
 ): RawMaterialEntry[] {
-  const colorToBase = new Map<number, number>();
-  for (const c of cp.colors) {
-    const key = (c.r << 16) | (c.g << 8) | c.b;
-    if (!colorToBase.has(key)) colorToBase.set(key, c.baseId);
-  }
-
-  const baseToBlock = new Map<number, { csId: number; blockId: number; nbtName: string; displayName: string }>();
-  for (const row of COLOUR_ROWS) {
-    const activeIds = sel[row.csId] ?? [];
-    const block = row.blocks.find(b => activeIds.includes(b.blockId)) ?? row.blocks[0];
-    if (block) {
-      baseToBlock.set(row.baseId, {
-        csId: row.csId,
-        blockId: block.blockId,
-        nbtName: block.nbtName,
-        displayName: block.displayName,
-      });
-    }
-  }
+  const lookup = buildMaterialLookup(cp, sel);
 
   const numSections = mapGrid.wide * mapGrid.tall;
   const counts = new Map<string, number[]>();
@@ -49,16 +31,18 @@ export function computeRawMaterials(
     const secY = Math.min(Math.floor(y / MAP_BLOCK_SIZE), mapGrid.tall - 1);
     for (let x = 0; x < width; x++) {
       const base = (y * width + x) * 4;
+      if (data[base + 3] < 128) continue;
       const rgbKey = (data[base] << 16) | (data[base + 1] << 8) | data[base + 2];
-      const baseId = colorToBase.get(rgbKey);
-      if (baseId === undefined) continue;
-      const info = baseToBlock.get(baseId);
+      const info = lookup.get(rgbKey);
       if (!info) continue;
 
       const key = `${info.csId}_${info.blockId}`;
       if (!counts.has(key)) {
         counts.set(key, new Array(1 + numSections).fill(0));
-        infos.set(key, info);
+        infos.set(key, {
+          csId: info.csId, blockId: info.blockId,
+          nbtName: info.nbtName, displayName: info.displayName,
+        });
       }
       const arr = counts.get(key)!;
       arr[0]++;

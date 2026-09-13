@@ -114,7 +114,7 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-companion-0-14-0-site-1-32-0',
+  id: 'mapkluss-editor-1-32-1-companion-0-14-1',
   url: 'https://t.me/mapkluss',
 };
 
@@ -3182,20 +3182,20 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Обновление MapKluss Companion 0.14.0', 'MapKluss Companion 0.14.0 update')}
+          aria-label={t('Обновление MapKluss 1.32.1', 'MapKluss 1.32.1 update')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
-            <span>COMPANION</span>
+            <span>MAPKLUSS</span>
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline={t('COMPANION 0.14.0', 'COMPANION 0.14.0')}
-            detail={t('НОВОЕ МЕНЮ · ТРЕКЕР СТРОЙКИ · LENS ИЗ МОДА · ГАЙД', 'NEW MENU · BUILD TRACKER · LENS FROM THE MOD · GUIDE')}
+            headline="MAPKLUSS 1.32.1 · COMPANION 0.14.1"
+            detail={t('ПИПЕТКА · СОВМЕСТНАЯ СТРОЙКА · РАСПОЗНАВАНИЕ КАРТ', 'EYEDROPPER · SHARED BUILDS · MAP RECOGNITION')}
           />
           <span className="update-banner-sr">
-            {t('Новое меню мода, живой прогресс стройки, Lens из Minecraft и руководство в Wiki.',
-              'A new mod menu, live build progress, Lens from Minecraft and a Wiki guide.')}
+            {t('Исправлены пипетка и материалы редактора. Companion 0.14.1 улучшает распознавание карт и размещение общей схемы по принятому закрепу.',
+              'Fixed editor eyedropper and materials. Companion 0.14.1 improves map recognition and places shared schematics at accepted anchors.')}
           </span>
           <a
             className="update-banner-link"
@@ -3973,6 +3973,7 @@ export default function App() {
                 <PreviewCanvas
                   mode={textureMode}
                   imageData={previewImageData ?? imageData} paintData={imageData} originalData={originalData}
+                  materialData={compositeImageData}
                   showOriginal={false} showGrid={showGrid}
                   width={pw} height={ph} scale={rasterScale} viewScale={displayScale}
                   cp={activePalette} blockSelection={blockSelection}
