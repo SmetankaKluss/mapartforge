@@ -1,0 +1,4 @@
+433340c4fd3ad225ae8d4f4b544b841e1941569ddfc49fdd8f34c7ad3f4e9b28  mapkluss-companion-1.21.11-0.14.3.jar
+869ca9df7a800230ce3c0d5618e028d477eafb292b16554ee3c6a6ceb64eb532  mapkluss-companion-1.21.4-0.14.3.jar
+7e452524be708c187acc5c7f9a11680f93315f8ebcdc62fcc005fff907e0741b  mapkluss-companion-1.21.8-0.14.3.jar
+e2461b1eb9757b892e80bf21aaaac6a7b8d0f7d3f0508708cebc9c99d7d5e4cf  mapkluss-companion-26.2-0.14.3.jar
