@@ -138,5 +138,5 @@
  *   1.29.3 — трансформации текста также обновляются покадрово
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
-// 1.32.1: consistent editor material sampling, textures and counts.
-export const VERSION = 'v1.32.1';
+// 1.32.2: Companion 0.14.3 recognition, AutoFrame and inventory button fixes.
+export const VERSION = 'v1.32.2';

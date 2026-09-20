@@ -3190,12 +3190,12 @@ export default function App() {
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline="MAPKLUSS 1.32.1 · COMPANION 0.14.1"
-            detail={t('ПИПЕТКА · СОВМЕСТНАЯ СТРОЙКА · РАСПОЗНАВАНИЕ КАРТ', 'EYEDROPPER · SHARED BUILDS · MAP RECOGNITION')}
+            headline="MAPKLUSS 1.32.2 · COMPANION 0.14.3"
+            detail={t('РАСПОЗНАВАНИЕ КАРТ · РАМКИ · КНОПКА ИНВЕНТАРЯ', 'MAP RECOGNITION · FRAMES · INVENTORY BUTTON')}
           />
           <span className="update-banner-sr">
-            {t('Исправлены пипетка и материалы редактора. Companion 0.14.1 улучшает распознавание карт и размещение общей схемы по принятому закрепу.',
-              'Fixed editor eyedropper and materials. Companion 0.14.1 improves map recognition and places shared schematics at accepted anchors.')}
+            {t('Companion 0.14.3 исправляет распознавание разных артов, вставку карт в рамки и положение кнопки при открытой книге рецептов.',
+              'Companion 0.14.3 fixes mixed-art recognition, frame insertion, and the inventory button position with the recipe book open.')}
           </span>
           <a
             className="update-banner-link"
