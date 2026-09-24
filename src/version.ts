@@ -139,4 +139,5 @@
  *   1.29.4 — текст во время transform рисуется напрямую на canvas; слой сохраняется после отпускания
  */
 // 1.32.2: Companion 0.14.3 recognition, AutoFrame and inventory button fixes.
-export const VERSION = 'v1.32.2';
+// 1.35.0: Classic account and private Cloud save through the existing MapKluss contract.
+export const VERSION = 'v1.35.0';

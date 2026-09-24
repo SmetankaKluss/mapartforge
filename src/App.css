@@ -915,6 +915,24 @@ input, select, textarea { outline: none; }
 }
 .lang-toggle-btn { font-family: var(--font-ui); font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); background: none; border: var(--header-button-border, 1px) solid var(--border); padding: 4px 10px; cursor: pointer; letter-spacing: 0.02em; margin-right: 8px; white-space: nowrap; transition: color 0.12s, border-color 0.12s; }
 .lang-toggle-btn:hover { color: var(--cyan); border-color: rgb(var(--cyan-rgb) / 0.45); }
+
+.classic-editor-link {
+  flex: 0 0 auto;
+  margin-right: 8px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.classic-editor-link:hover { border-color: var(--cyan); color: var(--cyan); }
+.classic-editor-link:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+@media (max-width: 1099px) {
+  .classic-editor-link { display: none; }
+}
 .header-ver { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); padding: 2px 6px; border: var(--header-button-border, 1px) solid var(--border); text-decoration: none; display: inline-block; }
 .header-ver:hover { color: var(--cyan); border-color: rgb(var(--cyan-rgb) / 0.45); }
 

@@ -563,7 +563,7 @@ export function Controls({
           </select>
         </div>
         <div className="dither-options" data-tour="dithering">
-          {DITHERING_OPTIONS.map(({ value, label, desc }) => (
+          {DITHERING_OPTIONS.filter(option => option.value !== 'kluss').map(({ value, label, desc }) => (
             <label
               key={value}
               className={`dither-option ${dithering === value ? 'active' : ''}`}

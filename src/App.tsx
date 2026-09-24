@@ -114,8 +114,8 @@ import {
 import { detachEditorUrlFromCloudSource } from './lib/editorCloudSession';
 
 const ANNOUNCEMENT = {
-  id: 'mapkluss-editor-1-32-1-companion-0-14-1',
-  url: 'https://t.me/mapkluss',
+  id: 'mapkluss-editor-1-35-0-classic-cloud',
+  url: '/classic/',
 };
 
 const SHOW_PATTERN_BLOCKS = false;
@@ -213,7 +213,7 @@ const DITHERING_LABELS: Record<DitheringMode, string> = {
 const ALL_MODES: DitheringMode[] = ['none', 'floyd-steinberg', 'stucki', 'jjn', 'atkinson', 'blue-noise', 'yliluoma2', 'kluss'];
 
 function coerceDitheringMode(mode: unknown): DitheringMode {
-  return ALL_MODES.includes(mode as DitheringMode) ? mode as DitheringMode : 'floyd-steinberg';
+  return ALL_MODES.includes(mode as DitheringMode) ? mode as DitheringMode : 'blue-noise';
 }
 
 /** Returns true if the layer ref's imageData has at least one non-transparent pixel. */
@@ -420,7 +420,7 @@ export default function App() {
   const [textureMode, setTextureMode]   = useState<'pixel' | 'block'>('pixel');
   const [dithering, setDithering]       = useState<DitheringMode>(coerceDitheringMode(saved.dithering));
   const [intensity, setIntensity]       = useState(saved.intensity ?? 100);
-  const [bnScale, setBnScale]           = useState(saved.bnScale ?? 2);
+  const [bnScale, setBnScale]           = useState(saved.bnScale ?? (saved.dithering ? 2 : 1));
   const [klussParams, setKlussParams]   = useState<KlussParams>(saved.klussParams ?? DEFAULT_KLUSS_PARAMS);
   const [mapGrid, setMapGrid]           = useState<MapGrid>(saved.mapGrid ?? { wide: 1, tall: 1 });
   const [processing, setProcessing]     = useState(false);
@@ -3144,6 +3144,17 @@ export default function App() {
                   <IconGlyph icon={mkIcons.github} />
                   <span>{t('Исходный код сайта', 'Website source code')}</span>
                 </a>
+                <a
+                  className="cloud-action-menu-item"
+                  href={lang === 'ru' ? '/classic/ru/' : '/classic/'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setCloudMenuOpen(false)}
+                  role="menuitem"
+                >
+                  <IconGlyph icon={mkIcons.palette} />
+                  <span>{t('Классический редактор', 'Classic editor')}</span>
+                </a>
                 <LensController
                   cloudArtId={currentCloudArtId}
                   cloudVersionId={loadedCloudVersionId}
@@ -3169,6 +3180,7 @@ export default function App() {
             <IconGlyph icon={mkIcons.support} />
             <span>{t('Поддержать', 'Support')}</span>
           </a>
+          <a className="classic-editor-link" href={lang === 'ru' ? '/classic/ru/' : '/classic/'} target="_blank" rel="noopener noreferrer" title={t('Классический редактор на основе MapartCraft', 'Classic editor based on MapartCraft')}>{t('Классика', 'Classic')}</a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
           <a className="header-icon-btn" href="/wiki/" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <a className="header-icon-btn" href="https://github.com/SmetankaKluss/mapartforge" target="_blank" rel="noopener noreferrer" title={t('Исходный код сайта на GitHub', 'Website source code on GitHub')} aria-label={t('Открыть исходный код сайта на GitHub', 'Open website source code on GitHub')}><IconGlyph icon={mkIcons.github} /></a>
@@ -3182,7 +3194,7 @@ export default function App() {
         <div
           className="update-banner update-banner--companion"
           role="region"
-          aria-label={t('Обновление MapKluss 1.32.1', 'MapKluss 1.32.1 update')}
+          aria-label={t('Обновление MapKluss 1.35.0', 'MapKluss 1.35.0 update')}
         >
           <div className="update-banner-badge" aria-hidden="true">
             <IconGlyph icon={mkIcons.hammer} size={15} />
@@ -3190,16 +3202,16 @@ export default function App() {
             <b>{t('НОВОЕ', 'NEW')}</b>
           </div>
           <UpdateBannerTicker
-            headline="MAPKLUSS 1.32.2 · COMPANION 0.14.3"
-            detail={t('РАСПОЗНАВАНИЕ КАРТ · РАМКИ · КНОПКА ИНВЕНТАРЯ', 'MAP RECOGNITION · FRAMES · INVENTORY BUTTON')}
+            headline="MAPKLUSS 1.35.0 · CLASSIC"
+            detail={t('АККАУНТ И ОБЛАКО · 2D, 3D И TWO-LAYER', 'ACCOUNT AND CLOUD · 2D, 3D AND TWO-LAYER')}
           />
           <span className="update-banner-sr">
-            {t('Companion 0.14.3 исправляет распознавание разных артов, вставку карт в рамки и положение кнопки при открытой книге рецептов.',
-              'Companion 0.14.3 fixes mixed-art recognition, frame insertion, and the inventory button position with the recipe book open.')}
+            {t('MapKluss Classic: привычный интерфейс с методами стройки MapKluss и сохранением в облако для вошедших пользователей.',
+              'MapKluss Classic: a familiar workspace with MapKluss build methods and Cloud save for signed-in users.')}
           </span>
           <a
             className="update-banner-link"
-            href={ANNOUNCEMENT.url}
+            href={lang === 'ru' ? `${ANNOUNCEMENT.url}ru/` : ANNOUNCEMENT.url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => {
@@ -3207,7 +3219,7 @@ export default function App() {
               setShowAnnouncement(false);
             }}
           >
-            <span>{t('В TELEGRAM', 'TELEGRAM')}</span>
+            <span>{t('ОТКРЫТЬ CLASSIC', 'OPEN CLASSIC')}</span>
             <IconGlyph icon={mkIcons.arrowLeft} size={13} />
           </a>
           <button
@@ -3912,7 +3924,8 @@ export default function App() {
                   onChange={e => handleCompareSideChange('left', e.target.value as DitheringMode)}
                   disabled={processing}
                 >
-                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                  {compareLeft === 'kluss' && <option value="kluss" disabled>KlussDither (legacy)</option>}
+                  {ALL_MODES.filter(m => m !== 'kluss').map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
                 </select>
               </div>
               <span className="compare-vs">VS</span>
@@ -3924,7 +3937,8 @@ export default function App() {
                   onChange={e => handleCompareSideChange('right', e.target.value as DitheringMode)}
                   disabled={processing}
                 >
-                  {ALL_MODES.map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
+                  {compareRight === 'kluss' && <option value="kluss" disabled>KlussDither (legacy)</option>}
+                  {ALL_MODES.filter(m => m !== 'kluss').map(m => <option key={m} value={m}>{DITHERING_LABELS[m]}</option>)}
                 </select>
               </div>
             </div>

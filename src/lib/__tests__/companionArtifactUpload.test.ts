@@ -12,6 +12,15 @@ const target = {
 };
 
 describe('uploadCompanionArtifactBlob', () => {
+  it('reports the storage host without leaking signed URLs on network failure', async () => {
+    await expect(uploadCompanionArtifactBlob(
+      'artifact-1',
+      new Blob(['png']),
+      target,
+      vi.fn(async () => { throw new TypeError(`Failed to fetch ${target.url}`); }),
+    )).rejects.toThrow(/^artifact_upload_network_failed \(storage\.example\)$/);
+  });
+
   it.each([200, 409, 412])('accepts immutable upload status %s', async status => {
     const fetcher = vi.fn(async () => new Response(null, { status }));
     await expect(uploadCompanionArtifactBlob(

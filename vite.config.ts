@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { staticPublicRoutes } from './scripts/staticRoutes'
+import { classicPublicRoutes } from './scripts/classicRoutes'
+import { fileURLToPath } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), staticPublicRoutes()],
+  plugins: [react(), staticPublicRoutes(), classicPublicRoutes()],
   server: {
     host: true,
     port: parseInt(process.env.PORT || '5173'),
@@ -14,8 +16,12 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        classicCloud: fileURLToPath(new URL('./src/classicCloudBridge.ts', import.meta.url)),
+      },
       output: {
-        entryFileNames: `assets/[name]-[hash]-v2.js`,
+        entryFileNames: (chunk) => chunk.name === 'classicCloud' ? 'classic-cloud-api.js' : 'assets/[name]-[hash]-v2.js',
         chunkFileNames: `assets/[name]-[hash]-v2.js`,
         manualChunks(id) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react';

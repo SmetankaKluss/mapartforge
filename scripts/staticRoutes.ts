@@ -218,6 +218,8 @@ export function staticPublicRoutes(): Plugin {
       const outDir = path.resolve(config.root, config.build.outDir);
       const indexPath = path.join(outDir, 'index.html');
       const template = await readFile(indexPath, 'utf8');
+      // Keep slashless Classic navigation out of the Studio SPA fallback.
+      await writeFile(path.join(outDir, 'classic.html'), await readFile(path.join(outDir, 'classic', 'index.html'), 'utf8'), 'utf8');
       const routes = buildRoutes();
       for (const route of routes) {
         const directory = path.join(outDir, ...route.routePath.split('/').filter(Boolean));
