@@ -7,3 +7,6 @@
 *.gif binary
 *.dat binary
 *.litematic binary
+
+# Preserve the exact staged distribution bytes and its checksums.
+public/classic/** -text
