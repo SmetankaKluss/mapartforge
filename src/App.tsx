@@ -3070,7 +3070,9 @@ export default function App() {
           </a>
           <div className="header-titles">
             <h1 className="app-title">MAPKLUSS</h1>
-            <span className="app-tagline">MINECRAFT MAP ART GENERATOR</span>
+            <a className="classic-editor-link" href={lang === 'ru' ? '/classic/ru/' : '/classic/'} target="_blank" rel="noopener noreferrer" title={t('Открыть классический редактор MapKluss в новой вкладке', 'Open MapKluss Classic in a new tab')}>
+              <span>{t('Классика', 'Classic')}</span><IconGlyph icon={mkIcons.arrowRight} />
+            </a>
           </div>
           <div className="header-spacer" />
           <div className={`header-cloud-actions${cloudMenuOpen ? ' is-open' : ''}`} aria-label="Облако и мод MapKluss" data-tour="cloud">
@@ -3180,7 +3182,6 @@ export default function App() {
             <IconGlyph icon={mkIcons.support} />
             <span>{t('Поддержать', 'Support')}</span>
           </a>
-          <a className="classic-editor-link" href={lang === 'ru' ? '/classic/ru/' : '/classic/'} target="_blank" rel="noopener noreferrer" title={t('Классический редактор на основе MapartCraft', 'Classic editor based on MapartCraft')}>{t('Классика', 'Classic')}</a>
           <button className="header-icon-btn" onClick={() => { trackEvent('tutorial_opened', { tutorial_type: 'tour_selector', lang }); setTourSelectorIsWelcome(false); setShowTourSelector(true); }} title={t('Запустить интерактивный тур', 'Start guided tour')} aria-label={t('Гид', 'Guide')}><IconGlyph icon={mkIcons.guide} /></button>
           <a className="header-icon-btn" href="/wiki/" onClick={() => trackEvent('tutorial_opened', { tutorial_type: 'wiki', lang })} title={t('Открыть Wiki', 'Open Wiki')} aria-label="Wiki"><IconGlyph icon={mkIcons.wiki} /></a>
           <a className="header-icon-btn" href="https://github.com/SmetankaKluss/mapartforge" target="_blank" rel="noopener noreferrer" title={t('Исходный код сайта на GitHub', 'Website source code on GitHub')} aria-label={t('Открыть исходный код сайта на GitHub', 'Open website source code on GitHub')}><IconGlyph icon={mkIcons.github} /></a>
