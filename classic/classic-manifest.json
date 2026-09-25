@@ -1,0 +1,7 @@
+{
+  "name": "MapKluss Classic",
+  "version": "1.2.0",
+  "upstream": "0f24df5d7a913f978bdd4738de95bc11461d497e",
+  "license": "GPL-3.0-only",
+  "source": "mapkluss-classic-source.zip"
+}

@@ -1,0 +1,49 @@
+MapKluss Classic (version in classic-manifest.json)
+
+MapartCraft by rebane2001 and contributors
+https://github.com/rebane2001/mapartcraft
+Based on revision 0f24df5d7a913f978bdd4738de95bc11461d497e.
+GNU General Public License version 3. See LICENSE.txt and the downloadable
+mapkluss-classic-source.zip for the modified application and build instructions.
+MapKluss modifications dated 2026-09-23 through 2026-09-25, copyright 2026 SmetankaKluss.
+Changes: MapKluss branding and layout, Vite build and source packaging, input
+validation, color processing, exports, Cloud integration and browser tests.
+The modified application is distributed under GPL-3.0-only. MIT notices for
+compatible MapKluss modules remain intact. When hosted on MapKluss, the source
+archive also contains mapkluss-cloud-bridge/ with its source and build recipe.
+The MapKluss support button funds MapKluss via Boosty, not rebane2001.
+The original author's support page remains separately linked in the footer.
+MapKluss color processing, dithering and schematic/Two-layer export modules
+were ported from the MapKluss MIT-licensed source by SmetankaKluss.
+The original MIT copyright and permission notice is preserved in
+public/licenses/MapKluss-MIT.txt in the source archive.
+NO WARRANTY. This is an independent fork, not the upstream author's service.
+Original credits and translations are retained in UPSTREAM-README.md and src/locale.
+
+Minecraft block textures: Mojang / Microsoft, retained from upstream MapartCraft.
+Minecraft assets are not relicensed by MapKluss under GPL. This project is not
+an official Minecraft product and is not approved by or associated with Mojang
+or Microsoft. https://www.minecraft.net/en-us/usage-guidelines
+
+OpenMoji flags: OpenMoji contributors, CC BY-SA 4.0.
+https://openmoji.org/ / https://creativecommons.org/licenses/by-sa/4.0/
+Original flag files, including upstream variations, retained without further edits.
+License text: licenses/OpenMoji-LICENSE.txt.
+
+KenPixel Mini Square: Kenney, CC0 (upstream bundled font).
+https://opengameart.org/content/kenney-fonts
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Play: Copyright (c) 2011 Jonas Hecksher, Playtypes, e-types AS.
+Tektur: Copyright 2023 The Tektur Project Authors.
+Unmodified fonts under SIL Open Font License 1.1.
+See fonts/Play-OFL.txt and fonts/Tektur-OFL.txt.
+
+Runtime libraries and their license texts are included under licenses/npm/.
+React, React DOM, React Router, Three.js, fflate and supporting packages retain their
+respective MIT notices. JSZip: MIT OR GPL-3.0-or-later. Pako: MIT AND Zlib.
+Exact dependency versions, sources and integrity hashes: package-lock.json
+inside the source archive. Build tooling is not included in the browser bundle.
+
+Test image: Vincent van Gogh, The Starry Night (1889), public-domain artwork;
+fixture copied from the MapKluss public example collection. Not used as UI chrome.
